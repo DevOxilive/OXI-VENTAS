@@ -3,10 +3,14 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
+
+
 
 Route::get('/', function () {
     return redirect('/login');
 });
+
 
 Route::middleware([
     'auth:sanctum',
@@ -17,7 +21,16 @@ Route::middleware([
 
         return Inertia::render('Dashboard');
     })->name('dashboard');
+    Route::get('/register', function () {
+        return Inertia::render('Auth/Register', [
+            'roles' => DB::table('roles')
+                ->where('name', '!=', 'Administrador') // opcional (seguridad)
+                ->orderBy('name')
+                ->get()
+        ]);
+    })->name('register');
 });
+
 
 // Rutas de acceso directo al dashboard de Recursos Humanos
 Route::prefix('Recursos-humanos')->group(function () {
