@@ -9,6 +9,7 @@ Route::get('/', function () {
     return redirect('/login');
 });
 
+
 Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
@@ -18,7 +19,30 @@ Route::middleware([
 
         return Inertia::render('Dashboard');
     })->name('dashboard');
+    Route::get('/register', function () {
+        return Inertia::render('Auth/Register', [
+            'roles' => DB::table('roles')
+                ->where('name', '!=', 'Administrador') // opcional (seguridad)
+                ->orderBy('name')
+                ->get()
+        ]);
+    })->name('register');
 });
+Route::get('/register', [RegisterController::class, 'create']);
+
+Route::prefix('Sistemas')->group(function () {
+
+    Route::get('/empleados', [UserController::class, 'index'])
+        ->name('sistemas.empleados');
+ 
+
+// Mostrar formulario
+Route::get('/register', [RegisterController::class, 'create'])->name('register');
+
+
+
+});
+
 
 // Rutas de acceso directo al dashboard de Recursos Humanos
 Route::prefix('Recursos-humanos')->group(function () {
