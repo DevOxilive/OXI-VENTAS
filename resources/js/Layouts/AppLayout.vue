@@ -7,6 +7,17 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
+import { usePage } from '@inertiajs/vue3';
+
+const page = usePage();
+const role = page.props.auth.user?.role?.name;
+
+// helpers
+const isAdmin = role === 'Administrador';
+const isSistemas = role === 'Sistemas';
+const isRH = role === 'Recursos Humanos';
+const isVentas = role === 'Ventas';
+const isInventario = role === 'Inventario';
 
 defineProps({
     title: String,
@@ -43,16 +54,45 @@ const logout = () => {
                             <!-- Logo -->
                             <div class="shrink-0 flex items-center">
                                 <Link :href="route('dashboard')">
-                                <img src="@/img/oxilive.ico" alt="Oxilive Logo" class="block h-10 w-auto" />
+                                    <img src="@/img/oxilive.ico" alt="Oxilive Logo" class="block h-10 w-auto" />
                                 </Link>
                             </div>
 
                             <!-- Navigation Links -->
                             <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+
+                                <!-- DASHBOARD -->
                                 <NavLink :href="route('dashboard')" :active="route().current('dashboard')">
                                     Dashboard
                                 </NavLink>
+
+                                <!-- ROLES -->
+                                <NavLink v-if="isAdmin || isSistemas" href="/recursos-humanos/roles">
+                                    Roles
+                                </NavLink>
+
+                                <!-- USUARIOS -->
+                                <NavLink v-if="isAdmin || isSistemas" href="/recursos-humanos/usuarios">
+                                    Usuarios
+                                </NavLink>
+
+                                <!-- CAPITAL HUMANO -->
+                                <NavLink v-if="isAdmin || isRH" href="/recursos-humanos/empleados">
+                                    Capital Humano
+                                </NavLink>
+
+                                <!-- VENTAS -->
+                                <NavLink v-if="isAdmin || isVentas" href="/ventas">
+                                    Ventas
+                                </NavLink>
+
+                                <!-- INVENTARIO -->
+                                <NavLink v-if="isAdmin || isInventario" href="/inventario">
+                                    Inventario
+                                </NavLink>
+
                             </div>
+
                         </div>
 
                         <div class="hidden sm:flex sm:items-center sm:ms-6">
@@ -204,10 +244,33 @@ const logout = () => {
                 <div :class="{ 'block': showingNavigationDropdown, 'hidden': !showingNavigationDropdown }"
                     class="sm:hidden">
                     <div class="pt-2 pb-3 space-y-1">
+
                         <ResponsiveNavLink :href="route('dashboard')" :active="route().current('dashboard')">
                             Dashboard
                         </ResponsiveNavLink>
+
+                        <ResponsiveNavLink v-if="isAdmin || isSistemas" href="/recursos-humanos/roles">
+                            Roles
+                        </ResponsiveNavLink>
+
+                        <ResponsiveNavLink v-if="isAdmin || isSistemas" href="/recursos-humanos/usuarios">
+                            Usuarios
+                        </ResponsiveNavLink>
+
+                        <ResponsiveNavLink v-if="isAdmin || isRH" href="/recursos-humanos/empleados">
+                            Capital Humano
+                        </ResponsiveNavLink>
+
+                        <ResponsiveNavLink v-if="isAdmin || isVentas" href="/ventas">
+                            Ventas
+                        </ResponsiveNavLink>
+
+                        <ResponsiveNavLink v-if="isAdmin || isInventario" href="/inventario">
+                            Inventario
+                        </ResponsiveNavLink>
+
                     </div>
+
 
                     <!-- Responsive Settings Options -->
                     <div class="pt-4 pb-1 border-t border-gray-200">

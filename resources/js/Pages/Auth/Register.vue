@@ -1,13 +1,18 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { watch } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+
+const page = usePage();
+const roles = page.props.roles;
+
 
 const form = useForm({
     name: '',
     email: '',
     password: '',
     password_confirmation: '',
-    role: '',
+    role_id: '',
     terms: false,
 });
 
@@ -71,8 +76,7 @@ const limpiar = () => {
                     <!-- NOMBRE -->
                     <div>
                         <input type="text" placeholder="Nombre completo" v-model="form.name"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-                            required />
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required />
                         <p v-if="form.errors.name" class="text-red-500 text-sm">
                             {{ form.errors.name }}
                         </p>
@@ -80,35 +84,37 @@ const limpiar = () => {
 
                     <!-- ROL -->
                     <div>
-                        <select v-model="form.role"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-                            required>
+                        <select v-model="form.role_id"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required>
+
                             <option value="">Seleccionar rol</option>
-                            <option value="admin">Administrador</option>
-                            <option value="ventas">Ventas</option>
-                            <option value="user">Usuario</option>
+
+                            <option v-for="role in roles" :key="role.id" :value="role.id">
+                                {{ role.name }}
+                            </option>
+
                         </select>
-                        <p v-if="form.errors.role" class="text-red-500 text-sm">
-                            {{ form.errors.role }}
+
+                        <p v-if="form.errors.role_id" class="text-red-500 text-sm">
+                            {{ form.errors.role_id }}
                         </p>
                     </div>
 
-                    <!-- EMAIL -->
-                 <div>
-    <input type="email" v-model="form.email"
-        placeholder="correo"
-        class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" />
 
-    <p v-if="form.errors.email" class="text-red-500 text-sm">
-        {{ form.errors.email }}
-    </p>
-</div>
+                    <!-- EMAIL -->
+                    <div>
+                        <input type="email" v-model="form.email" placeholder="correo"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" />
+
+                        <p v-if="form.errors.email" class="text-red-500 text-sm">
+                            {{ form.errors.email }}
+                        </p>
+                    </div>
 
                     <!-- PASSWORD -->
                     <div>
                         <input type="password" placeholder="Contraseña" v-model="form.password"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-                            required />
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required />
                         <p v-if="form.errors.password" class="text-red-500 text-sm">
                             {{ form.errors.password }}
                         </p>
@@ -116,10 +122,8 @@ const limpiar = () => {
 
                     <!-- CONFIRMAR -->
                     <div>
-                        <input type="password" placeholder="Confirmar contraseña"
-                            v-model="form.password_confirmation"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-                            required />
+                        <input type="password" placeholder="Confirmar contraseña" v-model="form.password_confirmation"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required />
                     </div>
 
                     <!-- BOTONES -->
@@ -130,8 +134,7 @@ const limpiar = () => {
                             Registrarme
                         </button>
 
-                        <button type="button"
-                            @click="limpiar"
+                        <button type="button" @click="limpiar"
                             class="w-1/2 bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition">
                             Limpiar
                         </button>
