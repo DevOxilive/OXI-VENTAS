@@ -3,21 +3,19 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use GuzzleHttp\Promise\Create;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class UsersSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        User::create([
-            'name' => 'admin',
-            'email' => 'admin@oxilive.com.mx',
-            'password' => '1234567890',
-        ]);
+        User::updateOrCreate(
+            ['email' => 'admin@oxilive.com.mx'],
+            [
+                'name' => 'admin',
+                'password' => Hash::make('1234567890'),
+            ]
+        );
     }
 }
