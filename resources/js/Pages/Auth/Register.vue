@@ -8,7 +8,7 @@ const form = useForm({
     email: '',
     password: '',
     password_confirmation: '',
-    role: '',
+    role_id: '',
     terms: false,
 });
 
@@ -77,8 +77,7 @@ const roles = usePage().props.roles;
                     <!-- NOMBRE -->
                     <div>
                         <input type="text" placeholder="Nombre completo" v-model="form.name"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-                            required />
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required />
                         <p v-if="form.errors.name" class="text-red-500 text-sm">
                             {{ form.errors.name }}
                         </p>
@@ -97,22 +96,21 @@ const roles = usePage().props.roles;
 
 </select>
 
-                    <!-- EMAIL -->
-                 <div>
-    <input type="email" v-model="form.email"
-        placeholder="correo"
-        class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" />
 
-    <p v-if="form.errors.email" class="text-red-500 text-sm">
-        {{ form.errors.email }}
-    </p>
-</div>
+                    <!-- EMAIL -->
+                    <div>
+                        <input type="email" v-model="form.email" placeholder="correo"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" />
+
+                        <p v-if="form.errors.email" class="text-red-500 text-sm">
+                            {{ form.errors.email }}
+                        </p>
+                    </div>
 
                     <!-- PASSWORD -->
                     <div>
                         <input type="password" placeholder="Contraseña" v-model="form.password"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-                            required />
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required />
                         <p v-if="form.errors.password" class="text-red-500 text-sm">
                             {{ form.errors.password }}
                         </p>
@@ -120,10 +118,8 @@ const roles = usePage().props.roles;
 
                     <!-- CONFIRMAR -->
                     <div>
-                        <input type="password" placeholder="Confirmar contraseña"
-                            v-model="form.password_confirmation"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-                            required />
+                        <input type="password" placeholder="Confirmar contraseña" v-model="form.password_confirmation"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required />
                     </div>
 
                     <!-- BOTONES -->
@@ -134,8 +130,7 @@ const roles = usePage().props.roles;
                             Registrarme
                         </button>
 
-                        <button type="button"
-                            @click="limpiar"
+                        <button type="button" @click="limpiar"
                             class="w-1/2 bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition">
                             Limpiar
                         </button>
