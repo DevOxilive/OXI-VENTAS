@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\EmpleadoController;
 
 Route::get('/', function () {
@@ -28,20 +29,17 @@ Route::middleware([
         ]);
     })->name('register');
 });
-Route::get('/register', [RegisterController::class, 'create']);
+// Route::get('/register', [RegisterController::class, 'create']);
 
-Route::prefix('Sistemas')->group(function () {
+// Route::prefix('Sistemas')->group(function () {
 
-    Route::get('/empleados', [UserController::class, 'index'])
-        ->name('sistemas.empleados');
- 
+//     Route::get('/empleados', [UserController::class, 'index'])
+//         ->name('sistemas.empleados');
 
 // Mostrar formulario
-Route::get('/register', [RegisterController::class, 'create'])->name('register');
+// Route::get('/register', [RegisterController::class, 'create'])->name('register');
 
-
-
-});
+// });
 
 
 // Rutas de acceso directo al dashboard de Recursos Humanos
