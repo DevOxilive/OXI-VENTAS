@@ -1,6 +1,7 @@
 <script setup>
-import RecursosHumanosLayout from '@/Lsayouts/RecursosHumanosLayout.vue'
-defineOptions({ layout: RecursosHumanoLayout })
+import { ref } from 'vue'
+import RecursosHumanosLayout from '@/Layouts/RecursosHumanosLayout.vue'
+defineOptions({ layout: RecursosHumanosLayout })
 </script>
 
 <template>
