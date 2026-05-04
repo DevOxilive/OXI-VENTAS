@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\EmpleadoController;
 
 Route::get('/', function () {
     return redirect('/login');
@@ -27,6 +28,6 @@ Route::prefix('Recursos-humanos')->group(function () {
     Route::get('/roles', fn() => Inertia::render('Recursos-humanos/Roles'))->name('rh.roles');
 
     Route::get('/usuarios', fn() => Inertia::render('Recursos-humanos/Usuarios'))->name('rh.usuarios');
-
-    Route::get('/empleados', fn() => Inertia::render('Recursos-humanos/Empleados'))->name('rh.empleados');
+    Route::get('/empleados', [EmpleadoController::class, 'index'])->name('rh.empleados');
+    Route::post('/empleados', [EmpleadoController::class, 'store'])->name('rh.empleados.store');
 });
