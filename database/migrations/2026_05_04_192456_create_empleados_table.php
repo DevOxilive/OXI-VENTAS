@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('empleados', function (Blueprint $table) {
@@ -36,15 +33,12 @@ return new class extends Migration
             $table->string('nss')->nullable();
             $table->string('rfc')->nullable();
 
-            // CONTROL
             $table->timestamps();
         });
     }
-    /**
-     * Reverse the migrations.
-     */
+
     public function down(): void
     {
-        Schema::dropIfExists('employee');
+        Schema::dropIfExists('empleados');
     }
 };
