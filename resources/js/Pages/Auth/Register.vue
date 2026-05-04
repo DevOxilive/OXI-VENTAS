@@ -3,10 +3,6 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 
-const page = usePage();
-const roles = page.props.roles;
-
-
 const form = useForm({
     name: '',
     email: '',
@@ -15,6 +11,7 @@ const form = useForm({
     role_id: '',
     terms: false,
 });
+
 
 // Generar correo automático
 watch(() => form.name, (newName) => {
@@ -30,9 +27,12 @@ watch(() => form.name, (newName) => {
 
 // Enviar formulario
 const submit = () => {
-    form.post(route('register'), {
+    form.post('/register', {
         onSuccess: () => {
             form.reset();
+        },
+        onError: (errors) => {
+            console.log(errors);
         }
     });
 };
@@ -41,6 +41,7 @@ const submit = () => {
 const limpiar = () => {
     form.reset();
 };
+const roles = usePage().props.roles;
 </script>
 
 <template>
@@ -83,22 +84,17 @@ const limpiar = () => {
                     </div>
 
                     <!-- ROL -->
-                    <div>
-                        <select v-model="form.role_id"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required>
+             <select v-model="form.role"
+    class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+    required>
 
-                            <option value="">Seleccionar rol</option>
+    <option value="">Seleccionar rol</option>
 
-                            <option v-for="role in roles" :key="role.id" :value="role.id">
-                                {{ role.name }}
-                            </option>
+    <option v-for="rol in roles" :key="rol.id" :value="rol.name">
+        {{ rol.name }}
+    </option>
 
-                        </select>
-
-                        <p v-if="form.errors.role_id" class="text-red-500 text-sm">
-                            {{ form.errors.role_id }}
-                        </p>
-                    </div>
+</select>
 
 
                     <!-- EMAIL -->
