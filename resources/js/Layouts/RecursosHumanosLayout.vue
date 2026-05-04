@@ -10,6 +10,11 @@
 
     Esto permite reutilizar una misma plantilla visual en todas las páginas
     del sistema administrativo, manteniendo consistencia y mejor organización.
+
+    SI NECESITAS REUTILIZAR ESTE RECURSO, GENERA UN ARCHIVO NUEVO SOBRE ESTA CARPETA
+    Nombralo con el nombre de la interfaz que generaras basada en este layout 
+    y Invocalo en el script setup de tu nueva vista, definiendo el layout a utilizar.
+    Ejemplo: import RecursosHumanosLayout from '@/Layouts/RecursosHumanosLayout.vue'
 -->
 
 <script setup>
