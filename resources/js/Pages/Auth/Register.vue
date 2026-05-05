@@ -84,18 +84,16 @@ const roles = usePage().props.roles;
                     </div>
 
                     <!-- ROL -->
-             <select v-model="form.role"
-    class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-    required>
+                    <select v-model="form.role_id"
+                        class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required>
 
-    <option value="">Seleccionar rol</option>
+                        <option value="">Seleccionar rol</option>
 
-    <option v-for="rol in roles" :key="rol.id" :value="rol.name">
-        {{ rol.name }}
-    </option>
+                        <option v-for="rol in roles" :key="rol.id" :value="rol.id">
+                            {{ rol.name }}
+                        </option>
 
-</select>
-
+                    </select>
 
                     <!-- EMAIL -->
                     <div>
