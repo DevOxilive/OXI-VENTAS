@@ -1,75 +1,73 @@
 <script setup>
-import AppLayout from '@/Layouts/AppLayout.vue';
-import { Link, usePage } from '@inertiajs/vue3';
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { usePage } from '@inertiajs/vue3'
 
-const page = usePage();
-
-const role = page.props.auth.user?.role?.name;
-
-// helpers
-const isAdmin = role === 'Administrador';
-const isSistemas = role === 'Sistemas';
-const isRH = role === 'Recursos Humanos';
-const isVentas = role === 'Ventas';
-const isInventario = role === 'Inventario';
+const page = usePage()
 </script>
 
 <template>
-    <AppLayout title="Dashboard">
+    <AdminLayout>
 
-        <div class="min-h-screen bg-gradient-to-br from-green-400 to-green-600 p-6 md:p-10">
+        <div class="space-y-6">
 
-            <!-- Título -->
-            <div class="text-center mb-8">
-                <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800 drop-shadow-lg">
-                    Elige una categoría
+            <!-- HERO / HEADER -->
+            <div class="bg-white p-5 md:p-8 rounded-2xl shadow-sm border">
+
+                <h1 class="text-xl md:text-3xl font-bold text-slate-700 leading-tight">
+                    Bienvenido, {{ page.props.auth.user.name }}
                 </h1>
+
+                <p class="text-sm md:text-base text-slate-500 mt-2">
+                    Acceso confirmado al panel administrativo del sistema.
+                </p>
+
             </div>
-            <!-- <pre class="text-white">
-{{ $page.props.auth.user }}
-</pre> -->
 
-            <!-- GRID -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <!-- KPI GRID -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
 
-                <!-- ROLES (solo admin o sistemas) -->
-                <Link v-if="isAdmin || isSistemas" href="/roles"
-                    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
-                    <div class="text-5xl mb-3">🛡️</div>
-                    <h2 class="text-lg font-bold">Roles</h2>
-                </Link>
+                <!-- ROLE -->
+                <div class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border">
 
-                <!-- USUARIOS -->
-                <Link v-if="isAdmin || isSistemas" href="/usuarios"
-                    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
-                    <div class="text-5xl mb-3">👤</div>
-                    <h2 class="text-lg font-bold">Usuarios</h2>
-                </Link>
+                    <h2 class="text-xs md:text-sm text-slate-500">
+                        Rol Actual
+                    </h2>
 
-                <!-- CAPITAL HUMANO -->
-                <Link v-if="isAdmin || isRH" href="/empleados"
-                    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
-                    <div class="text-5xl mb-3">🧑‍💼</div>
-                    <h2 class="text-lg font-bold">Capital Humano</h2>
-                </Link>
+                    <p class="text-lg md:text-xl font-bold text-slate-700 mt-2">
+                        {{ page.props.auth.user.role.name }}
+                    </p>
 
-                <!-- VENTAS -->
-                <Link v-if="isAdmin || isVentas" href="/ventas"
-                    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
-                    <div class="text-5xl mb-3">💰</div>
-                    <h2 class="text-lg font-bold">Ventas</h2>
-                </Link>
+                </div>
 
-                <!-- INVENTARIO -->
-                <Link v-if="isAdmin || isInventario" href="/inventario"
-                    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
-                    <div class="text-5xl mb-3">📦</div>
-                    <h2 class="text-lg font-bold">Inventario</h2>
-                </Link>
+                <!-- STATUS -->
+                <div class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border">
+
+                    <h2 class="text-xs md:text-sm text-slate-500">
+                        Estado del Sistema
+                    </h2>
+
+                    <p class="text-lg md:text-xl font-bold text-green-600 mt-2">
+                        Operativo
+                    </p>
+
+                </div>
+
+                <!-- ACCESS -->
+                <div class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border">
+
+                    <h2 class="text-xs md:text-sm text-slate-500">
+                        Acceso
+                    </h2>
+
+                    <p class="text-lg md:text-xl font-bold text-slate-700 mt-2">
+                        Autorizado
+                    </p>
+
+                </div>
 
             </div>
 
         </div>
 
-    </AppLayout>
+    </AdminLayout>
 </template>

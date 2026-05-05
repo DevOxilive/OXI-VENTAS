@@ -1,9 +1,9 @@
 <script setup>
 import { ref } from 'vue'
-import RecursosHumanosLayout from '@/Layouts/RecursosHumanosLayout.vue'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
 import EmpleadoRegisterModal from '@/Components/Forms/EmpleadoRegisterModal.vue'
 
-defineOptions({ layout: RecursosHumanosLayout })
+defineOptions({ layout: AdminLayout })
 
 const showModal = ref(false)
 
@@ -21,31 +21,50 @@ function cerrarModal() {
 </script>
 
 <template>
-    <div class="bg-[#f6f3f7] min-h-screen rounded-3xl p-6">
-        <h1 class="text-xl font-semibold text-slate-700 mb-6">Dashboard Empleados</h1>
+    <div class="bg-[#f6f3f7] min-h-screen rounded-2xl md:rounded-3xl p-4 md:p-6">
 
-        <div class="flex items-center justify-between mb-5 gap-4 flex-wrap">
-            <div class="flex gap-3">
-                <button class="px-5 py-2 rounded-xl bg-white border shadow-sm">Empleados</button>
-                <button class="px-5 py-2 rounded-xl bg-white border shadow-sm">Candidatos</button>
+        <!-- HEADER -->
+        <h1 class="text-lg md:text-xl font-semibold text-slate-700 mb-5 md:mb-6">
+            Empleados
+        </h1>
+
+        <!-- TOOLBAR -->
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-5">
+
+            <!-- TABS -->
+            <div class="flex gap-2 overflow-x-auto">
+                <button class="px-4 py-2 rounded-xl bg-white border shadow-sm text-sm whitespace-nowrap">
+                    Empleados
+                </button>
+                <button class="px-4 py-2 rounded-xl bg-white border shadow-sm text-sm whitespace-nowrap">
+                    Candidatos
+                </button>
             </div>
 
-            <div class="flex items-center gap-3">
-                <div class="bg-white rounded-full px-5 py-2 border flex items-center gap-2">
+            <!-- ACTIONS -->
+            <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+
+                <!-- SEARCH -->
+                <div class="bg-white rounded-full px-4 py-2 border flex items-center gap-2 w-full sm:w-auto">
                     <span class="material-symbols-outlined text-[20px]">search</span>
-                    <input type="text" placeholder="Buscar empleado" class="outline-none bg-transparent text-sm" />
+                    <input type="text" placeholder="Buscar empleado"
+                        class="outline-none bg-transparent text-sm w-full" />
                 </div>
 
+                <!-- ADD -->
                 <button @click="abrirModalGeneral"
-                    class="bg-[#1f1d2b] text-white px-5 py-2 rounded-full text-sm flex items-center gap-2">
+                    class="bg-[#1f1d2b] text-white px-4 py-2 rounded-full text-sm flex items-center justify-center gap-2">
                     <span class="material-symbols-outlined text-[18px]">add_circle</span>
-                    Nuevo empleado
+                    Nuevo
                 </button>
+
             </div>
         </div>
 
-        <div class="bg-white border rounded-xl overflow-hidden">
-            <table class="w-full text-sm">
+        <!-- DESKTOP / TABLET TABLE -->
+        <div class="hidden md:block bg-white border rounded-xl overflow-x-auto">
+
+            <table class="w-full text-sm min-w-[800px]">
                 <thead class="bg-gray-50 text-slate-600">
                     <tr>
                         <th class="text-left px-4 py-3">Empleado</th>
@@ -56,6 +75,7 @@ function cerrarModal() {
                         <th class="text-left px-4 py-3">Acciones</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     <tr v-for="(empleado, index) in empleadosDB" :key="index" class="border-t hover:bg-gray-50">
                         <td class="px-4 py-3">{{ empleado.nombre }}</td>
@@ -67,14 +87,53 @@ function cerrarModal() {
                     </tr>
                 </tbody>
             </table>
+
         </div>
 
+        <!-- MOBILE CARDS -->
+        <div class="md:hidden space-y-3">
+
+            <div v-for="(empleado, index) in empleadosDB" :key="index" class="bg-white border rounded-xl p-4 shadow-sm">
+
+                <div class="flex justify-between items-start">
+
+                    <div>
+                        <p class="font-semibold text-slate-700">
+                            {{ empleado.nombre }}
+                        </p>
+
+                        <p class="text-sm text-slate-500">
+                            {{ empleado.puesto }}
+                        </p>
+                    </div>
+
+                    <div class="text-sm text-slate-400">
+                        {{ empleado.estado }}
+                    </div>
+
+                </div>
+
+                <div class="mt-3 text-xs text-slate-500 space-y-1">
+                    <p>Departamento: {{ empleado.departamento }}</p>
+                    <p>Inicio: {{ empleado.fecha }}</p>
+                </div>
+
+                <div class="mt-3 flex justify-end gap-3 text-lg">
+                    ✏️ 🗑️
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- EXPORT -->
         <div class="mt-5">
-            <button class="bg-[#1f1d2b] text-white px-5 py-2 rounded-full text-sm flex items-center gap-2">
+            <button class="bg-[#1f1d2b] text-white px-4 py-2 rounded-full text-sm">
                 Exportar Excel
             </button>
         </div>
 
         <EmpleadoRegisterModal v-if="showModal" @close="cerrarModal" />
+
     </div>
 </template>

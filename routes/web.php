@@ -70,19 +70,15 @@ Route::middleware([
     | 👨‍💼 CAPITAL HUMANO (RH)
     |--------------------------------------------------------------------------
     */
-    Route::prefix('capital-humano')->group(function () {
+    Route::prefix('Recursos-humanos')->group(function () {
 
-        Route::get(
-            '/home',
-            fn() =>
-            Inertia::render('CapitalHumano/Home')
-        )->name('rh.home');
+        Route::get('/home', fn() => Inertia::render('Recursos-humanos/Home'))->name('rh.home');
 
-        Route::get('/empleados', [EmpleadoController::class, 'index'])
-            ->name('rh.empleados');
+        Route::get('/roles', fn() => Inertia::render('Recursos-humanos/Roles'))->name('rh.roles');
 
-        Route::post('/empleados', [EmpleadoController::class, 'store'])
-            ->name('rh.empleados.store');
+        Route::get('/usuarios', fn() => Inertia::render('Recursos-humanos/Usuarios'))->name('rh.usuarios');
+        Route::get('/empleados', [EmpleadoController::class, 'index'])->name('rh.empleados');
+        Route::post('/empleados', [EmpleadoController::class, 'store'])->name('rh.empleados.store');
     });
 
 
