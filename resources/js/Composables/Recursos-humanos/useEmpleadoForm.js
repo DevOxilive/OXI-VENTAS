@@ -75,6 +75,24 @@ export function useEmpleadoForm(props, emit) {
         }
     }
 
+    function detectSpamText(value) {
+        if (!value) return false
+
+        const texto = value.toLowerCase().trim()
+
+        if (/^(.)\1{4,}$/.test(texto)) return true
+        if (/^[0-9]{5,}$/.test(texto)) return true
+        if (/^[^a-záéíóúñ0-9]+$/i.test(texto)) return true
+        if (/(\w{2,4})\1{2,}/.test(texto)) return true
+        if (/[bcdfghjklmnñpqrstvwxyz]{6,}/i.test(texto)) return true
+        if (/asd|qwe|zxc|wer|sdf|xcv/i.test(texto)) return true
+
+        const vocales = (texto.match(/[aeiouáéíóú]/gi) || []).length
+        if (texto.length >= 8 && vocales <= 1) return true
+
+        return false
+    }
+
     function validarCampo(campo) {
         frontendErrors[campo] = ''
         const valor = empleado[campo]
@@ -84,26 +102,52 @@ export function useEmpleadoForm(props, emit) {
             return
         }
 
-        if (['nombre', 'apellido', 'puesto', 'banco', 'grado', 'especialidad'].includes(campo) && !validators.onlyLetters(valor))
-            frontendErrors[campo] = 'Solo se permiten letras.'
+        if (['nombre', 'apellido', 'puesto', 'banco', 'grado', 'especialidad'].includes(campo)) {
+            if (!validators.onlyLetters(valor)) {
+                frontendErrors[campo] = 'Solo se permiten letras.'
+                return
+            }
 
-        if (campo === 'correo' && !validators.validEmail(valor))
+            if (detectSpamText(valor)) {
+                frontendErrors[campo] = 'Texto no válido.'
+                return
+            }
+        }
+
+        if (campo === 'domicilio' && detectSpamText(valor)) {
+            frontendErrors[campo] = 'Domicilio no válido.'
+            return
+        }
+
+        if (campo === 'correo' && !validators.validEmail(valor)) {
             frontendErrors[campo] = 'Correo inválido.'
+            return
+        }
 
-        if (campo === 'telefono' && !validators.validPhone(valor))
+        if (campo === 'telefono' && !validators.validPhone(valor)) {
             frontendErrors[campo] = 'Debe contener 10 dígitos.'
+            return
+        }
 
-        if (campo === 'fechaInicio' && !validators.validDate(valor))
+        if (campo === 'fechaInicio' && !validators.validDate(valor)) {
             frontendErrors[campo] = 'Fecha no válida.'
+            return
+        }
 
-        if (campo === 'cuenta' && !validators.validCuenta(valor))
+        if (campo === 'cuenta' && !validators.validCuenta(valor)) {
             frontendErrors[campo] = 'Cuenta inválida.'
+            return
+        }
 
-        if (campo === 'nss' && !validators.validNSS(valor))
+        if (campo === 'nss' && !validators.validNSS(valor)) {
             frontendErrors[campo] = 'NSS inválido.'
+            return
+        }
 
-        if (campo === 'rfc' && !validators.validRFC(valor))
+        if (campo === 'rfc' && !validators.validRFC(valor)) {
             frontendErrors[campo] = 'RFC inválido.'
+            return
+        }
     }
 
     function validarFormularioCompleto() {

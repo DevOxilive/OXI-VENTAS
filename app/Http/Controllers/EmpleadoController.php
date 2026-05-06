@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Empleado;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Exports\EmpleadosExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class EmpleadoController extends Controller
 {
@@ -114,5 +116,19 @@ class EmpleadoController extends Controller
         $empleado->delete();
 
         return redirect()->back();
+    }
+
+    public function exportarExcel(Request $request)
+    {
+        $estado = $request->estado;
+        $departamento = $request->departamento;
+        $busqueda = $request->busqueda;
+
+        $nombreArchivo = 'empleados_' . now()->format('d_m_Y_H_i_s') . '.xlsx';
+
+        return Excel::download(
+            new EmpleadosExport($estado, $departamento, $busqueda),
+            $nombreArchivo
+        );
     }
 }

@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmpleadoController;
 
+
 /*
 |--------------------------------------------------------------------------
 | PUBLIC (sin login)
@@ -85,11 +86,12 @@ Route::middleware([
         Route::get('/usuarios', fn() => Inertia::render('Recursos-humanos/Usuarios'))->name('rh.usuarios');
         Route::get('/empleados', [EmpleadoController::class, 'index'])->name('rh.empleados');
         Route::post('/empleados', [EmpleadoController::class, 'store'])->name('rh.empleados.store');
+        Route::post('/empleados/store', [EmpleadoController::class, 'store'])->name('rh.empleados.store');
+        Route::put('/empleados/{id}', [EmpleadoController::class, 'update'])->name('rh.empleados.update');
+        Route::delete('/empleados/{id}', [EmpleadoController::class, 'destroy'])->name('rh.empleados.destroy');
 
-        Route::get('/rh/empleados', [EmpleadoController::class, 'index'])->name('rh.empleados');
-        Route::post('/rh/empleados/store', [EmpleadoController::class, 'store'])->name('rh.empleados.store');
-        Route::put('/rh/empleados/{id}', [EmpleadoController::class, 'update'])->name('rh.empleados.update');
-        Route::delete('/rh/empleados/{id}', [EmpleadoController::class, 'destroy'])->name('rh.empleados.destroy');
+        Route::get('/empleados/exportar-excel', [EmpleadoController::class, 'exportarExcel'])
+            ->name('rh.empleados.exportarExcel');
     });
 
 
@@ -100,7 +102,7 @@ Route::middleware([
     */
 
     // Solo Ventas, Sistemas y Administradores pueden acceder a estas rutas
-    Route::middleware(['auth', 'role:Ventas, Sistemas,Administrador'])->group(function () {
+    Route::middleware(['auth', 'role:Ventas, Administrador'])->group(function () {
 
         Route::prefix('ventas')->group(function () {
 
