@@ -1,8 +1,8 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmpleadoController;
 
 /*
@@ -49,28 +49,34 @@ Route::middleware([
     | 🔐 SISTEMAS
     |--------------------------------------------------------------------------
     */
-    Route::prefix('sistemas')->group(function () {
+    // Solo Sistemas y Administradores pueden acceder a estas rutas
+    Route::middleware(['auth', 'role:Sistemas,Administrador'])->group(function () {
 
-        Route::get(
-            '/roles',
-            fn() =>
-            Inertia::render('Sistemas/Roles')
-        )->name('sistemas.roles');
+        Route::prefix('sistemas')->group(function () {
 
-        Route::get(
-            '/usuarios',
-            fn() =>
-            Inertia::render('Sistemas/Usuarios')
-        )->name('sistemas.usuarios');
+            Route::get(
+                '/roles',
+                fn() =>
+                Inertia::render('Sistemas/Roles')
+            )->name('sistemas.roles');
+
+            Route::get(
+                '/usuarios',
+                fn() =>
+                Inertia::render('Sistemas/Usuarios')
+            )->name('sistemas.usuarios');
+        });
     });
-
 
     /*
     |--------------------------------------------------------------------------
     | 👨‍💼 CAPITAL HUMANO (RH)
     |--------------------------------------------------------------------------
     */
-    Route::prefix('Recursos-humanos')->group(function () {
+
+
+    // Solo Recursos Humanos y Administradores pueden acceder a estas rutas
+    Route::middleware(['auth', 'role:Recursos Humanos,Administrador'])->group(function () {
 
         Route::get('/home', fn() => Inertia::render('Recursos-humanos/Home'))->name('rh.home');
 
@@ -92,27 +98,35 @@ Route::middleware([
     | 💰 VENTAS
     |--------------------------------------------------------------------------
     */
-    Route::prefix('ventas')->group(function () {
 
-        Route::get(
-            '/',
-            fn() =>
-            Inertia::render('Ventas/Home')
-        )->name('ventas.home');
+    // Solo Ventas, Sistemas y Administradores pueden acceder a estas rutas
+    Route::middleware(['auth', 'role:Ventas, Sistemas,Administrador'])->group(function () {
+
+        Route::prefix('ventas')->group(function () {
+
+            Route::get(
+                '/',
+                fn() =>
+                Inertia::render('Ventas/Home')
+            )->name('ventas.home');
+        });
     });
-
 
     /*
     |--------------------------------------------------------------------------
     | 📦 INVENTARIO
     |--------------------------------------------------------------------------
     */
-    Route::prefix('inventario')->group(function () {
+    // Solo Inventario y Administradores pueden acceder a estas rutas
+    Route::middleware(['auth', 'role:Inventario, Administrador'])->group(function () {
 
-        Route::get(
-            '/',
-            fn() =>
-            Inertia::render('Inventario/Home')
-        )->name('inventario.home');
+        Route::prefix('inventario')->group(function () {
+
+            Route::get(
+                '/',
+                fn() =>
+                Inertia::render('Inventario/Home')
+            )->name('inventario.home');
+        });
     });
 });
