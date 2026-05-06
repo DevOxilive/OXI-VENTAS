@@ -79,6 +79,11 @@ Route::middleware([
         Route::get('/usuarios', fn() => Inertia::render('Recursos-humanos/Usuarios'))->name('rh.usuarios');
         Route::get('/empleados', [EmpleadoController::class, 'index'])->name('rh.empleados');
         Route::post('/empleados', [EmpleadoController::class, 'store'])->name('rh.empleados.store');
+
+        Route::get('/rh/empleados', [EmpleadoController::class, 'index'])->name('rh.empleados');
+        Route::post('/rh/empleados/store', [EmpleadoController::class, 'store'])->name('rh.empleados.store');
+        Route::put('/rh/empleados/{id}', [EmpleadoController::class, 'update'])->name('rh.empleados.update');
+        Route::delete('/rh/empleados/{id}', [EmpleadoController::class, 'destroy'])->name('rh.empleados.destroy');
     });
 
 

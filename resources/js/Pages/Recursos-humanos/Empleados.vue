@@ -1,22 +1,64 @@
 <script setup>
 import { ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import EmpleadoRegisterModal from '@/Components/Forms/EmpleadoRegisterModal.vue'
+import { router } from '@inertiajs/vue3'
+import {
+    UniversalActionModal,
+    ToastAlert,
+    ErrorAlert
+} from '@/Components/Modales/UniversalActionModal'
+import EmpleadoRegisterModal from '@/Components/Formularios/EmpleadoRegisterModal.vue'
 
 defineOptions({ layout: AdminLayout })
 
 const showModal = ref(false)
+const modoModal = ref('create')
+const empleadoSeleccionado = ref(null)
 
 const { empleadosDB } = defineProps({
     empleadosDB: Array
 })
 
 function abrirModalGeneral() {
+    modoModal.value = 'create'
+    empleadoSeleccionado.value = null
+    showModal.value = true
+}
+
+function abrirModalEditar(empleado) {
+    modoModal.value = 'edit'
+    empleadoSeleccionado.value = empleado
     showModal.value = true
 }
 
 function cerrarModal() {
     showModal.value = false
+}
+
+function eliminarEmpleado(empleado) {
+    UniversalActionModal({
+        title: 'Confirmar eliminación',
+        message: '¿Deseas eliminar permanentemente a',
+        itemName: `${empleado.nombre} ${empleado.apellido}`,
+        confirmText: 'Sí, eliminar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            router.delete(route('rh.empleados.destroy', empleado.id), {
+                onSuccess: () => {
+                    ToastAlert({
+                        icon: 'success',
+                        title: 'Empleado eliminado correctamente'
+                    })
+                },
+                onError: () => {
+                    ErrorAlert({
+                        title: 'Error al eliminar',
+                        message: 'No fue posible eliminar el empleado'
+                    })
+                }
+            })
+        }
+    })
 }
 </script>
 
@@ -82,8 +124,20 @@ function cerrarModal() {
                         <td class="px-4 py-3">{{ empleado.puesto }}</td>
                         <td class="px-4 py-3">{{ empleado.departamento }}</td>
                         <td class="px-4 py-3">{{ empleado.estado }}</td>
-                        <td class="px-4 py-3">{{ empleado.fecha }}</td>
-                        <td class="px-4 py-3">✏️ 🗑️</td>
+                        <td class="px-4 py-3">{{ empleado.fechaInicio }}</td>
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-3 text-slate-600">
+
+                                <button @click="abrirModalEditar(empleado)" class="hover:text-blue-600 transition">
+                                    <span class="material-symbols-outlined text-[20px]">edit</span>
+                                </button>
+
+                                <button @click="eliminarEmpleado(empleado)" class="hover:text-red-600 transition">
+                                    <span class="material-symbols-outlined text-[20px]">delete</span>
+                                </button>
+
+                            </div>
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -115,11 +169,19 @@ function cerrarModal() {
 
                 <div class="mt-3 text-xs text-slate-500 space-y-1">
                     <p>Departamento: {{ empleado.departamento }}</p>
-                    <p>Inicio: {{ empleado.fecha }}</p>
+                    <p>Inicio: {{ empleado.fechaInicio }}</p>
                 </div>
 
-                <div class="mt-3 flex justify-end gap-3 text-lg">
-                    ✏️ 🗑️
+                <div class="mt-3 flex justify-end gap-3 text-slate-600">
+
+                    <button @click="abrirModalEditar(empleado)" class="hover:text-blue-600 transition">
+                        <span class="material-symbols-outlined text-[20px]">edit</span>
+                    </button>
+
+                    <button @click="eliminarEmpleado(empleado)" class="hover:text-red-600 transition">
+                        <span class="material-symbols-outlined text-[20px]">delete</span>
+                    </button>
+
                 </div>
 
             </div>
@@ -133,7 +195,8 @@ function cerrarModal() {
             </button>
         </div>
 
-        <EmpleadoRegisterModal v-if="showModal" @close="cerrarModal" />
+        <EmpleadoRegisterModal v-if="showModal" :modo="modoModal" :empleadoEditar="empleadoSeleccionado"
+            @close="cerrarModal" />
 
     </div>
 </template>
