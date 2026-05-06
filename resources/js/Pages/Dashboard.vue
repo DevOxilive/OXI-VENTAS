@@ -1,67 +1,59 @@
 <script setup>
-import AppLayout from '@/Layouts/AppLayout.vue';
-import { Link, usePage } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue'
+import { Link, usePage } from '@inertiajs/vue3'
+import { computed } from 'vue'
 
-const page = usePage();
+const page = usePage()
 
-const role = page.props.auth.user?.role?.name;
+// 🔥 REACTIVO
+const permissions = computed(() => page.props.auth.permissions || [])
 
-// helpers
-const isAdmin = role === 'Administrador';
-const isSistemas = role === 'Sistemas';
-const isRH = role === 'Recursos Humanos';
-const isVentas = role === 'Ventas';
-const isInventario = role === 'Inventario';
+// 🔥 VALIDAR PERMISOS
+const can = (modulo) => {
+    return permissions.value.some(p => p.startsWith(modulo + '.'))
+}
 </script>
-
 <template>
     <AppLayout title="Dashboard">
 
         <div class="min-h-screen bg-gradient-to-br from-green-400 to-green-600 p-6 md:p-10">
 
-            <!-- Título -->
             <div class="text-center mb-8">
-                <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800 drop-shadow-lg">
+                <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800">
                     Elige una categoría
                 </h1>
             </div>
-            <!-- <pre class="text-white">
-{{ $page.props.auth.user }}
-</pre> -->
 
-            <!-- GRID -->
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
 
-                <!-- ROLES (solo admin o sistemas) -->
-                <Link v-if="isAdmin || isSistemas" href="/roles"
+                <Link v-if="can('roles')" href="/roles"
                     class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
                     <div class="text-5xl mb-3">🛡️</div>
                     <h2 class="text-lg font-bold">Roles</h2>
                 </Link>
 
-                <!-- USUARIOS -->
-                <Link v-if="isAdmin || isSistemas" href="/usuarios"
-                    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
+       <Link    
+    v-if="can('usuarios')" 
+    :href="route('sistemas.empleados', { vista: 'usuarios' })"
+    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition"
+>
                     <div class="text-5xl mb-3">👤</div>
                     <h2 class="text-lg font-bold">Usuarios</h2>
                 </Link>
 
-                <!-- CAPITAL HUMANO -->
-                <Link v-if="isAdmin || isRH" href="/empleados"
+                <Link v-if="can('empleados')" href="/empleados"
                     class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
                     <div class="text-5xl mb-3">🧑‍💼</div>
                     <h2 class="text-lg font-bold">Capital Humano</h2>
                 </Link>
 
-                <!-- VENTAS -->
-                <Link v-if="isAdmin || isVentas" href="/ventas"
+                <Link v-if="can('ventas')" href="/ventas"
                     class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
                     <div class="text-5xl mb-3">💰</div>
                     <h2 class="text-lg font-bold">Ventas</h2>
                 </Link>
 
-                <!-- INVENTARIO -->
-                <Link v-if="isAdmin || isInventario" href="/inventario"
+                <Link v-if="can('inventario')" href="/inventario"
                     class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
                     <div class="text-5xl mb-3">📦</div>
                     <h2 class="text-lg font-bold">Inventario</h2>

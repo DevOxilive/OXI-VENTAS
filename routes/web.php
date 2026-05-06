@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\EmpleadoController;
+use App\Http\Controllers\UserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,11 +16,11 @@ Route::get('/', function () {
     return redirect('/login');
 });
 
-// Registro personalizado con roles
+// Registro con roles
 Route::get('/register', function () {
     return Inertia::render('Auth/Register', [
         'roles' => DB::table('roles')
-            ->where('name', '!=', 'Administrador') // seguridad básica
+            ->where('name', '!=', 'Administrador')
             ->orderBy('name')
             ->get()
     ]);
@@ -28,7 +29,7 @@ Route::get('/register', function () {
 
 /*
 |--------------------------------------------------------------------------
-| AUTH (requiere login)
+| 🔐 TODO PROTEGIDO (LOGIN)
 |--------------------------------------------------------------------------
 */
 
@@ -38,7 +39,7 @@ Route::middleware([
     'verified',
 ])->group(function () {
 
-    // Dashboard
+    // 📊 Dashboard
     Route::get('/dashboard', function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
@@ -46,35 +47,41 @@ Route::middleware([
 
     /*
     |--------------------------------------------------------------------------
-    | 🔐 SISTEMAS
+    | 🧠 SISTEMAS (Usuarios / Permisos)
     |--------------------------------------------------------------------------
     */
     Route::prefix('sistemas')->group(function () {
 
-        Route::get(
-            '/roles',
-            fn() =>
-            Inertia::render('Sistemas/Roles')
-        )->name('sistemas.roles');
+        // LISTAR
+        Route::get('/empleados', [UserController::class, 'index'])
+            ->name('sistemas.empleados');
 
-        Route::get(
-            '/usuarios',
-            fn() =>
-            Inertia::render('Sistemas/Usuarios')
-        )->name('sistemas.usuarios');
+        // CREAR
+        Route::post('/empleados', [UserController::class, 'store'])
+            ->name('sistemas.empleados.store');
+
+        // ACTUALIZAR
+        Route::put('/empleados/{id}', [UserController::class, 'update'])
+            ->name('sistemas.empleados.update');
+
+        // ELIMINAR (soft delete si ya lo implementaste)
+        Route::delete('/empleados/{id}', [UserController::class, 'destroy'])
+            ->name('sistemas.empleados.destroy');
+
+        // ACTUALIZAR PERMISOS
+        Route::post('/usuarios/{user}/permisos', [UserController::class, 'updatePermissions'])
+            ->name('usuarios.permisos');
     });
 
 
     /*
     |--------------------------------------------------------------------------
-    | 👨‍💼 CAPITAL HUMANO (RH)
+    | 👨‍💼 CAPITAL HUMANO
     |--------------------------------------------------------------------------
     */
     Route::prefix('capital-humano')->group(function () {
 
-        Route::get(
-            '/home',
-            fn() =>
+        Route::get('/home', fn() =>
             Inertia::render('CapitalHumano/Home')
         )->name('rh.home');
 
@@ -93,9 +100,7 @@ Route::middleware([
     */
     Route::prefix('ventas')->group(function () {
 
-        Route::get(
-            '/',
-            fn() =>
+        Route::get('/', fn() =>
             Inertia::render('Ventas/Home')
         )->name('ventas.home');
     });
@@ -108,10 +113,9 @@ Route::middleware([
     */
     Route::prefix('inventario')->group(function () {
 
-        Route::get(
-            '/',
-            fn() =>
+        Route::get('/', fn() =>
             Inertia::render('Inventario/Home')
         )->name('inventario.home');
     });
+
 });
