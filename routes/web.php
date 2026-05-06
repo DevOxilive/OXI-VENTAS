@@ -4,6 +4,7 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmpleadoController;
+use App\Http\Controllers\UserController;
 
 
 /*
@@ -16,11 +17,11 @@ Route::get('/', function () {
     return redirect('/login');
 });
 
-// Registro personalizado con roles
+// Registro con roles
 Route::get('/register', function () {
     return Inertia::render('Auth/Register', [
         'roles' => DB::table('roles')
-            ->where('name', '!=', 'Administrador') // seguridad básica
+            ->where('name', '!=', 'Administrador')
             ->orderBy('name')
             ->get()
     ]);
@@ -29,7 +30,7 @@ Route::get('/register', function () {
 
 /*
 |--------------------------------------------------------------------------
-| AUTH (requiere login)
+| 🔐 TODO PROTEGIDO (LOGIN)
 |--------------------------------------------------------------------------
 */
 
@@ -39,7 +40,7 @@ Route::middleware([
     'verified',
 ])->group(function () {
 
-    // Dashboard
+    // 📊 Dashboard
     Route::get('/dashboard', function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
@@ -47,7 +48,7 @@ Route::middleware([
 
     /*
     |--------------------------------------------------------------------------
-    | 🔐 SISTEMAS
+    | 🧠 SISTEMAS (Usuarios / Permisos)
     |--------------------------------------------------------------------------
     */
     // Solo Sistemas y Administradores pueden acceder a estas rutas
@@ -71,7 +72,7 @@ Route::middleware([
 
     /*
     |--------------------------------------------------------------------------
-    | 👨‍💼 CAPITAL HUMANO (RH)
+    | 👨‍💼 CAPITAL HUMANO
     |--------------------------------------------------------------------------
     */
 
@@ -131,4 +132,5 @@ Route::middleware([
             )->name('inventario.home');
         });
     });
+
 });
