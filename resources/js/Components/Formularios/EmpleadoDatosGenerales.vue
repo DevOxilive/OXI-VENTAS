@@ -16,36 +16,36 @@ defineEmits(['validate'])
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-            <InputField label="Nombre" v-model="empleado.nombre"
+            <InputField label="Nombre" field="nombre" v-model="empleado.nombre"
                 :error="frontendErrors.nombre || empleado.errors.nombre" @validate="$emit('validate', 'nombre')" />
 
-            <InputField label="Apellido" v-model="empleado.apellido"
+            <InputField label="Apellido" field="apellido" v-model="empleado.apellido"
                 :error="frontendErrors.apellido || empleado.errors.apellido"
                 @validate="$emit('validate', 'apellido')" />
 
             <div class="sm:col-span-2">
-                <InputField label="Correo electrónico" v-model="empleado.correo"
+                <InputField label="Correo electrónico" field="correo" v-model="empleado.correo"
                     :error="frontendErrors.correo || empleado.errors.correo" @validate="$emit('validate', 'correo')" />
             </div>
 
             <div class="sm:col-span-2">
-                <InputField label="Teléfono" v-model="empleado.telefono"
+                <InputField label="Teléfono" field="telefono" v-model="empleado.telefono"
                     :error="frontendErrors.telefono || empleado.errors.telefono"
                     @validate="$emit('validate', 'telefono')" />
             </div>
 
             <div class="sm:col-span-2">
-                <InputField label="Domicilio" v-model="empleado.domicilio"
+                <InputField label="Domicilio" field="domicilio" v-model="empleado.domicilio"
                     :error="frontendErrors.domicilio || empleado.errors.domicilio"
                     @validate="$emit('validate', 'domicilio')" />
             </div>
 
-            <InputField type="date" label="Fecha de ingreso" v-model="empleado.fechaInicio"
+            <InputField type="date" label="Fecha de ingreso" field="fechaInicio" v-model="empleado.fechaInicio"
                 :error="frontendErrors.fechaInicio || empleado.errors.fechaInicio"
                 @validate="$emit('validate', 'fechaInicio')" />
 
-            <SelectField label="Estatus" v-model="empleado.estado" :options="['Activo', 'Inactivo']" />
-
+            <SelectField label="Estatus" field="estado" v-model="empleado.estado" :options="['Activo', 'Inactivo']"
+                :error="frontendErrors.estado || empleado.errors.estado" @validate="$emit('validate', 'estado')" />
         </div>
     </div>
 </template>

@@ -17,37 +17,40 @@ defineEmits(['validate'])
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-            <InputField label="Puesto" v-model="empleado.puesto"
+            <InputField label="Puesto" field="puesto" v-model="empleado.puesto"
                 :error="frontendErrors.puesto || empleado.errors.puesto" @validate="$emit('validate', 'puesto')" />
 
-            <SelectField label="Departamento" v-model="empleado.departamento" :options="departamentos"
-                :error="frontendErrors.departamento || empleado.errors.departamento"
+            <SelectField label="Departamento" field="departamento" v-model="empleado.departamento"
+                :options="departamentos" :error="frontendErrors.departamento || empleado.errors.departamento"
                 @validate="$emit('validate', 'departamento')" />
 
-            <InputField label="Banco" v-model="empleado.banco" :error="frontendErrors.banco || empleado.errors.banco"
-                @validate="$emit('validate', 'banco')" />
+            <InputField label="Banco" field="banco" v-model="empleado.banco"
+                :error="frontendErrors.banco || empleado.errors.banco" @validate="$emit('validate', 'banco')" />
 
-            <InputField label="Cuenta bancaria" v-model="empleado.cuenta"
+            <InputField label="Cuenta bancaria" field="cuenta" v-model="empleado.cuenta"
                 :error="frontendErrors.cuenta || empleado.errors.cuenta" @validate="$emit('validate', 'cuenta')" />
 
-            <InputField label="Grado de estudios" v-model="empleado.grado"
+            <InputField label="Grado de estudios" field="grado" v-model="empleado.grado"
                 :error="frontendErrors.grado || empleado.errors.grado" @validate="$emit('validate', 'grado')" />
 
-            <InputField label="Especialidad" v-model="empleado.especialidad"
+            <InputField label="Especialidad" field="especialidad" v-model="empleado.especialidad"
                 :error="frontendErrors.especialidad || empleado.errors.especialidad"
                 @validate="$emit('validate', 'especialidad')" />
 
-            <InputField label="Tipo de contrato" v-model="empleado.tipoContrato"
-                :error="frontendErrors.tipoContrato || empleado.errors.tipoContrato"
+            <SelectField label="Tipo de contrato" field="tipoContrato" v-model="empleado.tipoContrato" :options="[
+                { value: 'Planta/Indefinido', label: 'Planta/Indefinido' },
+                { value: 'Temporal', label: 'Temporal' },
+                { value: 'Por honorarios', label: 'Por honorarios' }
+            ]" :error="frontendErrors.tipoContrato || empleado.errors.tipoContrato"
                 @validate="$emit('validate', 'tipoContrato')" />
 
-            <InputField label="Antigüedad" v-model="empleado.antiguedad" readonly />
+            <InputField label="Antigüedad" field="antiguedad" v-model="empleado.antiguedad" readonly />
 
-            <InputField label="NSS" v-model="empleado.nss" :error="frontendErrors.nss || empleado.errors.nss"
-                @validate="$emit('validate', 'nss')" />
+            <InputField label="NSS" field="nss" v-model="empleado.nss"
+                :error="frontendErrors.nss || empleado.errors.nss" @validate="$emit('validate', 'nss')" />
 
-            <InputField label="RFC" v-model="empleado.rfc" :error="frontendErrors.rfc || empleado.errors.rfc"
-                @validate="$emit('validate', 'rfc')" />
+            <InputField label="RFC" field="rfc" v-model="empleado.rfc"
+                :error="frontendErrors.rfc || empleado.errors.rfc" @validate="$emit('validate', 'rfc')" />
 
         </div>
     </div>
