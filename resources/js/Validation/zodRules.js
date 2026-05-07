@@ -123,12 +123,6 @@ function detectSpamEmail(value) {
 export function buildZodField(config) {
     let rule = z.string();
 
-    if (config.required) {
-        rule = rule.min(1, "Este campo es obligatorio.");
-    } else {
-        rule = rule.optional().or(z.literal(""));
-    }
-
     if (config.min) {
         rule = rule.min(config.min, config.message);
     }
@@ -167,6 +161,12 @@ export function buildZodField(config) {
         rule = rule.refine((value) => !detectSpamText(value), {
             message: config.spamMessage || "Texto no válido.",
         });
+    }
+
+    if (config.required) {
+        rule = rule.min(1, "Este campo es obligatorio.");
+    } else {
+        rule = rule.optional().or(z.literal(""));
     }
 
     return rule;

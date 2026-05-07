@@ -28,8 +28,8 @@ const textoBotonGuardar = computed(() => {
     if (empleado.processing) return 'Procesando...'
 
     return props.modo === 'crear'
-        ? 'Guardar empleado'
-        : 'Actualizar empleado'
+        ? 'Actualizar Empleado'
+        : 'Guardar empleado'
 })
 
 const totalErrores = computed(() => resumenErrores.value.length)

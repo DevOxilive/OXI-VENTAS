@@ -50,18 +50,79 @@ export const fieldRegistry = {
         max: 10,
         message: "Debe contener 10 dígitos.",
     },
-
-    domicilio: {
-        type: "address",
+    calle: {
+        type: "text",
         required: true,
-        min: 8,
-        max: 120,
-        titleCase: true,
+        min: 2,
+        max: 80,
         preventSpam: true,
-        message: "Domicilio inválido.",
-        spamMessage: "Domicilio no válido.",
+        titleCase: true,
+        message: "Calle inválida.",
     },
 
+    numeroExterior: {
+        type: "alphanumeric",
+        required: true,
+        min: 1,
+        max: 20,
+        preventSpam: true,
+        uppercase: true,
+        message: "Número exterior inválido.",
+    },
+
+    numeroInterior: {
+        type: "alphanumeric",
+        required: false,
+        max: 20,
+        preventSpam: true,
+        uppercase: false,
+        message: "Número interior inválido.",
+    },
+
+    codigoPostal: {
+        type: "numeric",
+        required: true,
+        min: 5,
+        max: 5,
+        message: "El código postal debe tener exactamente 5 números.",
+    },
+
+    colonia: {
+        type: "text",
+        required: true,
+        min: 2,
+        max: 80,
+        preventSpam: true,
+        titleCase: true,
+        message: "Colonia inválida.",
+    },
+
+    municipio: {
+        type: "letters",
+        required: true,
+        min: 2,
+        max: 80,
+        titleCase: true,
+        preventSpam: true,
+        message: "Municipio inválido.",
+    },
+
+    estadoDomicilio: {
+        type: "letters",
+        required: true,
+        min: 2,
+        max: 80,
+        titleCase: true,
+        preventSpam: true,
+        message: "Estado inválido.",
+    },
+
+    urlMaps: {
+        type: "text",
+        required: false,
+        max: 255,
+        message: "URL inválida.",
+    },
     fechaInicio: {
         type: "date",
         required: true,

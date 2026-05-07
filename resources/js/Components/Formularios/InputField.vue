@@ -15,15 +15,26 @@ const props = defineProps({
     readonly: Boolean
 })
 
+const emit = defineEmits(['update:modelValue', 'validate'])
+
 const inputId = computed(() =>
     props.field || props.label?.toLowerCase().replace(/\s+/g, '-')
 )
-const emit = defineEmits(['update:modelValue', 'validate'])
 
 const fieldConfig = computed(() => fieldRegistry[props.field])
 
+const isDateField = computed(() =>
+    props.type === 'date' || fieldConfig.value?.type === 'date'
+)
+
 function handleInput(e) {
     const config = fieldConfig.value
+
+    if (isDateField.value) {
+        emit('update:modelValue', e.target.value)
+        emit('validate', props.field)
+        return
+    }
 
     const value = config
         ? sanitizeField(e.target.value, config)
@@ -36,6 +47,11 @@ function handleInput(e) {
 }
 
 function blockExtraInput(e) {
+    if (isDateField.value) {
+        e.preventDefault()
+        return
+    }
+
     const config = fieldConfig.value
     if (!config) return
 
@@ -62,7 +78,8 @@ function blockExtraInput(e) {
         </label>
 
         <input :id="inputId" :name="field" :type="type" :value="modelValue" :readonly="readonly"
-            @keydown="blockExtraInput" @input="handleInput" @blur="emit('validate', field)" :class="[
+            :inputmode="isDateField ? 'none' : undefined" @keydown="blockExtraInput" @input="handleInput"
+            @blur="emit('validate', field)" :class="[
                 'w-full px-4 py-3 rounded-xl border outline-none transition text-sm',
                 readonly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white',
                 error ? 'border-red-500 bg-red-50' : 'border-slate-300 focus:border-[#1f1d2b]'

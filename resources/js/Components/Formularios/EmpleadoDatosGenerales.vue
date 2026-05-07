@@ -34,10 +34,40 @@ defineEmits(['validate'])
                     @validate="$emit('validate', 'telefono')" />
             </div>
 
+            <div class="sm:col-span-2 border-t pt-5 mt-2">
+                <h4 class="font-semibold text-slate-700 mb-3">Domicilio</h4>
+            </div>
+
+            <InputField label="Calle" field="calle" v-model="empleado.calle"
+                :error="frontendErrors.calle || empleado.errors.calle" @validate="$emit('validate', 'calle')" />
+
+            <InputField label="Número exterior" field="numeroExterior" v-model="empleado.numeroExterior"
+                :error="frontendErrors.numeroExterior || empleado.errors.numeroExterior"
+                @validate="$emit('validate', 'numeroExterior')" />
+
+            <InputField label="Número interior" field="numeroInterior" v-model="empleado.numeroInterior"
+                :error="frontendErrors.numeroInterior || empleado.errors.numeroInterior"
+                @validate="$emit('validate', 'numeroInterior')" />
+
+            <InputField label="Código postal" field="codigoPostal" v-model="empleado.codigoPostal"
+                :error="frontendErrors.codigoPostal || empleado.errors.codigoPostal"
+                @validate="$emit('validate', 'codigoPostal')" />
+
+            <InputField label="Colonia" field="colonia" v-model="empleado.colonia"
+                :error="frontendErrors.colonia || empleado.errors.colonia" @validate="$emit('validate', 'colonia')" />
+
+            <InputField label="Municipio" field="municipio" v-model="empleado.municipio"
+                :error="frontendErrors.municipio || empleado.errors.municipio"
+                @validate="$emit('validate', 'municipio')" />
+
+            <InputField label="Estado" field="estadoDomicilio" v-model="empleado.estadoDomicilio"
+                :error="frontendErrors.estadoDomicilio || empleado.errors.estadoDomicilio"
+                @validate="$emit('validate', 'estadoDomicilio')" />
+
             <div class="sm:col-span-2">
-                <InputField label="Domicilio" field="domicilio" v-model="empleado.domicilio"
-                    :error="frontendErrors.domicilio || empleado.errors.domicilio"
-                    @validate="$emit('validate', 'domicilio')" />
+                <InputField label="URL Google Maps" field="urlMaps" v-model="empleado.urlMaps"
+                    :error="frontendErrors.urlMaps || empleado.errors.urlMaps"
+                    @validate="$emit('validate', 'urlMaps')" />
             </div>
 
             <InputField type="date" label="Fecha de ingreso" field="fechaInicio" v-model="empleado.fechaInicio"
