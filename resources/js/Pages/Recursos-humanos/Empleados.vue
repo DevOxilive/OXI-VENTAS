@@ -1,80 +1,69 @@
 <script setup>
-import { ref } from 'vue'
-import RecursosHumanosLayout from '@/Layouts/RecursosHumanosLayout.vue'
-import EmpleadoRegisterModal from '@/Components/Forms/EmpleadoRegisterModal.vue'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
 
-defineOptions({ layout: RecursosHumanosLayout })
+import { useEmpleadoActions } from '@/Composables/Recursos-humanos/useEmpleadoActions'
+import { useEmpleadoFilters } from '@/Composables/Recursos-humanos/useEmpleadoFilters'
+import { useEmpleadoExport } from '@/Composables/Recursos-humanos/useEmpleadoExport'
 
-const showModal = ref(false)
+import EmpleadoRegisterModal from '@/Components/Formularios/EmpleadoRegisterModal.vue'
+import EmpleadosToolbar from '@/Components/Recursos-humanos/EmpleadosToolbar.vue'
+import EmpleadosTable from '@/Components/Recursos-humanos/EmpleadosTable.vue'
+import EmpleadosMobileCards from '@/Components/Recursos-humanos/EmpleadosMobileCards.vue'
+
+defineOptions({ layout: AdminLayout })
 
 const { empleadosDB } = defineProps({
     empleadosDB: Array
 })
 
-function abrirModalGeneral() {
-    showModal.value = true
-}
+const {
+    filtroEstado,
+    filtroDepartamento,
+    filtroPuesto,
+    registrosAMostrar,
+    busqueda,
+    empleadosFiltrados
+} = useEmpleadoFilters(empleadosDB)
 
-function cerrarModal() {
-    showModal.value = false
-}
+const { exportarExcel } = useEmpleadoExport(
+    filtroEstado,
+    filtroDepartamento,
+    filtroPuesto,
+    busqueda
+)
+
+const {
+    showModal,
+    modoModal,
+    empleadoSeleccionado,
+    abrirModalGeneral,
+    abrirModalEditar,
+    cerrarModal,
+    eliminarEmpleado
+} = useEmpleadoActions()
 </script>
 
 <template>
-    <div class="bg-[#f6f3f7] min-h-screen rounded-3xl p-6">
-        <h1 class="text-xl font-semibold text-slate-700 mb-6">Dashboard Empleados</h1>
+    <div class="bg-[#f6f3f7] min-h-screen rounded-2xl md:rounded-3xl p-4 md:p-6">
 
-        <div class="flex items-center justify-between mb-5 gap-4 flex-wrap">
-            <div class="flex gap-3">
-                <button class="px-5 py-2 rounded-xl bg-white border shadow-sm">Empleados</button>
-                <button class="px-5 py-2 rounded-xl bg-white border shadow-sm">Candidatos</button>
-            </div>
+        <h1 class="text-lg md:text-xl font-semibold text-slate-700 mb-5">
+            Empleados
+        </h1>
 
-            <div class="flex items-center gap-3">
-                <div class="bg-white rounded-full px-5 py-2 border flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[20px]">search</span>
-                    <input type="text" placeholder="Buscar empleado" class="outline-none bg-transparent text-sm" />
-                </div>
+        <EmpleadosToolbar :empleadosFiltrados="empleadosFiltrados" :empleadosDB="empleadosDB"
+            :registrosAMostrar="registrosAMostrar" @nuevo="abrirModalGeneral" @excel="exportarExcel"
+            @update:registrosAMostrar="registrosAMostrar = $event" />
 
-                <button @click="abrirModalGeneral"
-                    class="bg-[#1f1d2b] text-white px-5 py-2 rounded-full text-sm flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[18px]">add_circle</span>
-                    Nuevo empleado
-                </button>
-            </div>
-        </div>
+        <EmpleadosTable :empleadosFiltrados="empleadosFiltrados" :busqueda="busqueda" :filtroPuesto="filtroPuesto"
+            :filtroDepartamento="filtroDepartamento" :filtroEstado="filtroEstado" @update:busqueda="busqueda = $event"
+            @update:filtroPuesto="filtroPuesto = $event" @update:filtroDepartamento="filtroDepartamento = $event"
+            @update:filtroEstado="filtroEstado = $event" @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
 
-        <div class="bg-white border rounded-xl overflow-hidden">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-slate-600">
-                    <tr>
-                        <th class="text-left px-4 py-3">Empleado</th>
-                        <th class="text-left px-4 py-3">Puesto</th>
-                        <th class="text-left px-4 py-3">Departamento</th>
-                        <th class="text-left px-4 py-3">Estado</th>
-                        <th class="text-left px-4 py-3">Fecha de inicio</th>
-                        <th class="text-left px-4 py-3">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(empleado, index) in empleadosDB" :key="index" class="border-t hover:bg-gray-50">
-                        <td class="px-4 py-3">{{ empleado.nombre }}</td>
-                        <td class="px-4 py-3">{{ empleado.puesto }}</td>
-                        <td class="px-4 py-3">{{ empleado.departamento }}</td>
-                        <td class="px-4 py-3">{{ empleado.estado }}</td>
-                        <td class="px-4 py-3">{{ empleado.fecha }}</td>
-                        <td class="px-4 py-3">✏️ 🗑️</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <EmpleadosMobileCards :empleadosFiltrados="empleadosFiltrados" @editar="abrirModalEditar"
+            @eliminar="eliminarEmpleado" />
 
-        <div class="mt-5">
-            <button class="bg-[#1f1d2b] text-white px-5 py-2 rounded-full text-sm flex items-center gap-2">
-                Exportar Excel
-            </button>
-        </div>
+        <EmpleadoRegisterModal v-if="showModal" :modo="modoModal" :empleadoEditar="empleadoSeleccionado"
+            @close="cerrarModal" />
 
-        <EmpleadoRegisterModal v-if="showModal" @close="cerrarModal" />
     </div>
 </template>

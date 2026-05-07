@@ -1,10 +1,11 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmpleadoController;
 use App\Http\Controllers\UserController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -50,46 +51,48 @@ Route::middleware([
     | 🧠 SISTEMAS (Usuarios / Permisos)
     |--------------------------------------------------------------------------
     */
-    Route::prefix('sistemas')->group(function () {
+    // Solo Sistemas y Administradores pueden acceder a estas rutas
+    Route::middleware(['auth', 'role:Sistemas,Administrador'])->group(function () {
 
-        // LISTAR
-        Route::get('/empleados', [UserController::class, 'index'])
-            ->name('sistemas.empleados');
+        Route::prefix('sistemas')->group(function () {
 
-        // CREAR
-        Route::post('/empleados', [UserController::class, 'store'])
-            ->name('sistemas.empleados.store');
+            Route::get(
+                '/roles',
+                fn() =>
+                Inertia::render('Sistemas/Roles')
+            )->name('sistemas.roles');
 
-        // ACTUALIZAR
-        Route::put('/empleados/{id}', [UserController::class, 'update'])
-            ->name('sistemas.empleados.update');
-
-        // ELIMINAR (soft delete si ya lo implementaste)
-        Route::delete('/empleados/{id}', [UserController::class, 'destroy'])
-            ->name('sistemas.empleados.destroy');
-
-        // ACTUALIZAR PERMISOS
-        Route::post('/usuarios/{user}/permisos', [UserController::class, 'updatePermissions'])
-            ->name('usuarios.permisos');
+            Route::get(
+                '/usuarios',
+                fn() =>
+                Inertia::render('Sistemas/Usuarios')
+            )->name('sistemas.usuarios');
+        });
     });
-
 
     /*
     |--------------------------------------------------------------------------
     | 👨‍💼 CAPITAL HUMANO
     |--------------------------------------------------------------------------
     */
-    Route::prefix('capital-humano')->group(function () {
 
-        Route::get('/home', fn() =>
-            Inertia::render('CapitalHumano/Home')
-        )->name('rh.home');
 
-        Route::get('/empleados', [EmpleadoController::class, 'index'])
-            ->name('rh.empleados');
+    // Solo Recursos Humanos y Administradores pueden acceder a estas rutas
+    Route::middleware(['auth', 'role:Recursos Humanos,Administrador'])->group(function () {
 
-        Route::post('/empleados', [EmpleadoController::class, 'store'])
-            ->name('rh.empleados.store');
+        Route::get('/home', fn() => Inertia::render('Recursos-humanos/Home'))->name('rh.home');
+
+        Route::get('/roles', fn() => Inertia::render('Recursos-humanos/Roles'))->name('rh.roles');
+
+        Route::get('/usuarios', fn() => Inertia::render('Recursos-humanos/Usuarios'))->name('rh.usuarios');
+        Route::get('/empleados', [EmpleadoController::class, 'index'])->name('rh.empleados');
+        Route::post('/empleados', [EmpleadoController::class, 'store'])->name('rh.empleados.store');
+        Route::post('/empleados/store', [EmpleadoController::class, 'store'])->name('rh.empleados.store');
+        Route::put('/empleados/{id}', [EmpleadoController::class, 'update'])->name('rh.empleados.update');
+        Route::delete('/empleados/{id}', [EmpleadoController::class, 'destroy'])->name('rh.empleados.destroy');
+
+        Route::get('/empleados/exportar-excel', [EmpleadoController::class, 'exportarExcel'])
+            ->name('rh.empleados.exportarExcel');
     });
 
 
@@ -98,24 +101,36 @@ Route::middleware([
     | 💰 VENTAS
     |--------------------------------------------------------------------------
     */
-    Route::prefix('ventas')->group(function () {
 
-        Route::get('/', fn() =>
-            Inertia::render('Ventas/Home')
-        )->name('ventas.home');
+    // Solo Ventas, Sistemas y Administradores pueden acceder a estas rutas
+    Route::middleware(['auth', 'role:Ventas, Administrador'])->group(function () {
+
+        Route::prefix('ventas')->group(function () {
+
+            Route::get(
+                '/',
+                fn() =>
+                Inertia::render('Ventas/Home')
+            )->name('ventas.home');
+        });
     });
-
 
     /*
     |--------------------------------------------------------------------------
     | 📦 INVENTARIO
     |--------------------------------------------------------------------------
     */
-    Route::prefix('inventario')->group(function () {
+    // Solo Inventario y Administradores pueden acceder a estas rutas
+    Route::middleware(['auth', 'role:Inventario, Administrador'])->group(function () {
 
-        Route::get('/', fn() =>
-            Inertia::render('Inventario/Home')
-        )->name('inventario.home');
+        Route::prefix('inventario')->group(function () {
+
+            Route::get(
+                '/',
+                fn() =>
+                Inertia::render('Inventario/Home')
+            )->name('inventario.home');
+        });
     });
 
 });

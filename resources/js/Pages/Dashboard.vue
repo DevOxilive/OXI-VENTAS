@@ -1,67 +1,72 @@
 <script setup>
-import AppLayout from '@/Layouts/AppLayout.vue'
-import { Link, usePage } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { usePage } from '@inertiajs/vue3'
 
 const page = usePage()
-
-// 🔥 REACTIVO
-const permissions = computed(() => page.props.auth.permissions || [])
-
-// 🔥 VALIDAR PERMISOS
-const can = (modulo) => {
-    return permissions.value.some(p => p.startsWith(modulo + '.'))
-}
 </script>
 <template>
-    <AppLayout title="Dashboard">
+    <AdminLayout>
 
-        <div class="min-h-screen bg-gradient-to-br from-green-400 to-green-600 p-6 md:p-10">
+        <div class="space-y-6">
 
-            <div class="text-center mb-8">
-                <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800">
-                    Elige una categoría
+            <!-- HERO / HEADER -->
+            <div class="bg-white p-5 md:p-8 rounded-2xl shadow-sm border">
+
+                <h1 class="text-xl md:text-3xl font-bold text-slate-700 leading-tight">
+                    Bienvenido, {{ page.props.auth.user.name }}
                 </h1>
+
+                <p class="text-sm md:text-base text-slate-500 mt-2">
+                    Acceso confirmado al panel administrativo del sistema.
+                </p>
+
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <!-- KPI GRID -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
 
-                <Link v-if="can('roles')" href="/roles"
-                    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
-                    <div class="text-5xl mb-3">🛡️</div>
-                    <h2 class="text-lg font-bold">Roles</h2>
-                </Link>
+                <!-- ROLE -->
+                <div class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border">
 
-       <Link    
-    v-if="can('usuarios')" 
-    :href="route('sistemas.empleados', { vista: 'usuarios' })"
-    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition"
->
-                    <div class="text-5xl mb-3">👤</div>
-                    <h2 class="text-lg font-bold">Usuarios</h2>
-                </Link>
+                    <h2 class="text-xs md:text-sm text-slate-500">
+                        Rol Actual
+                    </h2>
 
-                <Link v-if="can('empleados')" href="/empleados"
-                    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
-                    <div class="text-5xl mb-3">🧑‍💼</div>
-                    <h2 class="text-lg font-bold">Capital Humano</h2>
-                </Link>
+                    <p class="text-lg md:text-xl font-bold text-slate-700 mt-2">
+                        {{ page.props.auth.user.role.name }}
+                    </p>
 
-                <Link v-if="can('ventas')" href="/ventas"
-                    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
-                    <div class="text-5xl mb-3">💰</div>
-                    <h2 class="text-lg font-bold">Ventas</h2>
-                </Link>
+                </div>
 
-                <Link v-if="can('inventario')" href="/inventario"
-                    class="bg-white rounded-xl shadow-md p-6 text-center hover:scale-105 transition">
-                    <div class="text-5xl mb-3">📦</div>
-                    <h2 class="text-lg font-bold">Inventario</h2>
-                </Link>
+                <!-- STATUS -->
+                <div class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border">
+
+                    <h2 class="text-xs md:text-sm text-slate-500">
+                        Estado del Sistema
+                    </h2>
+
+                    <p class="text-lg md:text-xl font-bold text-green-600 mt-2">
+                        Operativo
+                    </p>
+
+                </div>
+
+                <!-- ACCESS -->
+                <div class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border">
+
+                    <h2 class="text-xs md:text-sm text-slate-500">
+                        Acceso
+                    </h2>
+
+                    <p class="text-lg md:text-xl font-bold text-slate-700 mt-2">
+                        Autorizado
+                    </p>
+
+                </div>
 
             </div>
 
         </div>
 
-    </AppLayout>
+    </AdminLayout>
 </template>
