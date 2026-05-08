@@ -12,7 +12,7 @@ defineEmits(['close'])
 
         <div>
             <h2 class="text-lg md:text-2xl font-bold text-slate-800">
-                {{ modo === 'create' ? 'Registro corporativo de empleado' : 'Actualizar empleado' }}
+                {{ modo === 'crear' ? 'Registro corporativo de empleado' : 'Actualizar empleado' }}
             </h2>
 
             <p v-if="totalErrores > 0" class="text-xs md:text-sm text-red-500 mt-1 font-medium">
