@@ -102,6 +102,32 @@ function detectSpamText(value) {
     return false;
 }
 
+function detectSoftSpamText(value) {
+    if (!value) return false;
+
+    const original = value.toString().trim();
+    const texto = normalizeText(original).replace(/\s+/g, "");
+
+    if (texto.length < 4) return false;
+
+    // Repetición absurda: aaaaa, 11111, kkkkk
+    if (/^(.)\1{4,}$/.test(texto)) return true;
+
+    // Letras repetidas exageradas dentro del texto
+    if (/(.)\1{5,}/i.test(texto)) return true;
+
+    // Bloques repetidos muy evidentes: asdasdasd, qweqweqwe
+    if (/([a-z0-9]{2,5})\1{2,}/i.test(texto)) return true;
+
+    // Palabras claramente de prueba
+    if (/(asd|qwe|zxc|test|prueba|fake|dummy)/i.test(texto)) return true;
+
+    // Demasiadas consonantes seguidas, más tolerante que el detector fuerte
+    if (/[bcdfghjklmnpqrstvwxyz]{9,}/i.test(texto)) return true;
+
+    return false;
+}
+
 function detectSpamEmail(value) {
     if (!value || !value.includes("@")) return false;
 
@@ -158,9 +184,18 @@ export function buildZodField(config) {
     }
 
     if (config.preventSpam) {
-        rule = rule.refine((value) => !detectSpamText(value), {
-            message: config.spamMessage || "Texto no válido.",
-        });
+        rule = rule.refine(
+            (value) => {
+                if (config.spamLevel === "soft") {
+                    return !detectSoftSpamText(value);
+                }
+
+                return !detectSpamText(value);
+            },
+            {
+                message: config.spamMessage || "Texto no válido.",
+            },
+        );
     }
 
     if (config.required) {
