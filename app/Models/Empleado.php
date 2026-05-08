@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
 
 class Empleado extends Model
 {
@@ -35,4 +36,9 @@ class Empleado extends Model
         'nss',
         'rfc'
     ];
+
+    public function user()
+    {
+        return $this->hasOne(User::class);
+    }
 }

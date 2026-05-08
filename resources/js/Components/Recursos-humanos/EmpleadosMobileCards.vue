@@ -1,4 +1,10 @@
 <script setup>
+import { computed } from 'vue'
+import { usePage } from '@inertiajs/vue3'
+
+const page = usePage()
+const authPermissions = computed(() => page.props.auth.permissions || [])
+const can = (permiso) => authPermissions.value.includes(permiso)
 defineProps({
     empleadosFiltrados: Array
 })
@@ -32,18 +38,19 @@ defineEmits(['visualizar', 'editar', 'eliminar'])
             </div>
 
             <div class="mt-3 flex justify-end gap-3 text-slate-600">
-                <button @click="$emit('visualizar', empleado)" class="hover:text-emerald-600 transition"
-                    title="Visualizar">
-                    <span class="material-symbols-outlined text-[20px]">visibility</span>
-                </button>
+              <button
+    v-if="can('empleados.editar')"
+    @click="$emit('editar', empleado)"
+>
+    Editar
+</button>
 
-                <button @click="$emit('editar', empleado)" class="hover:text-blue-600 transition">
-                    <span class="material-symbols-outlined text-[20px]">edit</span>
-                </button>
-
-                <button @click="$emit('eliminar', empleado)" class="hover:text-red-600 transition">
-                    <span class="material-symbols-outlined text-[20px]">delete</span>
-                </button>
+                <button
+    v-if="can('empleados.eliminar')"
+    @click="$emit('eliminar', empleado.id)"
+>
+    Eliminar
+</button>
             </div>
         </div>
     </div>

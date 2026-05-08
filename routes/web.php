@@ -5,7 +5,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EmpleadoController;
 use App\Http\Controllers\UserController;
-
+use Illuminate\Support\Facades\Auth;
+use App\Models\User;
 
 /*
 |--------------------------------------------------------------------------
@@ -47,29 +48,47 @@ Route::middleware([
 
 
     /*
-    |--------------------------------------------------------------------------
-    | 🧠 SISTEMAS (Usuarios / Permisos)
-    |--------------------------------------------------------------------------
-    */
-    // Solo Sistemas y Administradores pueden acceder a estas rutas
-    Route::middleware(['auth', 'role:Sistemas,Administrador'])->group(function () {
+|--------------------------------------------------------------------------
+| 🧠 SISTEMAS (Usuarios / Permisos)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('sistemas')->group(function () {
 
-        Route::prefix('sistemas')->group(function () {
+    Route::get('/Empleados', function () {
 
-            Route::get(
-                '/roles',
-                fn() =>
-                Inertia::render('Sistemas/Roles')
-            )->name('sistemas.roles');
+        $user = \App\Models\User::find(Auth::id());
 
-            Route::get(
-                '/usuarios',
-                fn() =>
-                Inertia::render('Sistemas/Usuarios')
-            )->name('sistemas.usuarios');
-        });
-    });
+        abort_unless(
+            Auth::check() && $user && $user->hasPermission('usuarios.ver'),
+            403
+        );
 
+        return Inertia::render('Sistemas/Empleados', [
+            'empleados' => \App\Models\Empleado::doesntHave('user')->get(),
+
+            'usuarios' => \App\Models\User::with(['role', 'permissions'])
+                ->select('id', 'empleado_id', 'name', 'email', 'role_id')
+                ->get(),
+
+            'roles' => \App\Models\Role::all(),
+            'permissions' => \App\Models\Permission::all(),
+        ]);
+
+    })->name('sistemas.empleados');
+
+    Route::post('/Empleados', [UserController::class, 'store'])
+        ->name('sistemas.empleados.store');
+
+    Route::put('/Empleados/{id}', [UserController::class, 'update'])
+        ->name('sistemas.empleados.update');
+
+    Route::delete('/Empleados/{id}', [UserController::class, 'destroy'])
+        ->name('sistemas.empleados.destroy');
+
+    Route::get('/usuarios', fn() => Inertia::render('Sistemas/Usuarios'))
+        ->name('sistemas.usuarios');
+
+});
     /*
     |--------------------------------------------------------------------------
     | 👨‍💼 CAPITAL HUMANO

@@ -4,13 +4,16 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useEmpleadoActions } from '@/Composables/Recursos-humanos/useEmpleadoActions'
 import { useEmpleadoFilters } from '@/Composables/Recursos-humanos/useEmpleadoFilters'
 import { useEmpleadoExport } from '@/Composables/Recursos-humanos/useEmpleadoExport'
+import { usePermissions } from '@/Composables/usePermissions'
 
 import EmpleadoRegisterModal from '@/Components/Formularios/EmpleadoRegisterModal.vue'
 import EmpleadosToolbar from '@/Components/Recursos-humanos/EmpleadosToolbar.vue'
 import EmpleadosTable from '@/Components/Recursos-humanos/EmpleadosTable.vue'
 import EmpleadosMobileCards from '@/Components/Recursos-humanos/EmpleadosMobileCards.vue'
 
+
 defineOptions({ layout: AdminLayout })
+const { can } = usePermissions()
 
 const { empleadosDB } = defineProps({
     empleadosDB: Array
@@ -52,21 +55,50 @@ const {
             Empleados
         </h1>
 
-        <EmpleadosToolbar :empleadosFiltrados="empleadosFiltrados" :empleadosDB="empleadosDB"
-            :registrosAMostrar="registrosAMostrar" @nuevo="abrirModalGeneral" @excel="exportarExcel"
-            @update:registrosAMostrar="registrosAMostrar = $event" />
+        <EmpleadosToolbar
+            v-if="can('empleados.crear') || can('empleados.exportar')"
+            :empleadosFiltrados="empleadosFiltrados"
+            :empleadosDB="empleadosDB"
+            :registrosAMostrar="registrosAMostrar"
+            @nuevo="abrirModalGeneral"
+            @excel="exportarExcel"
+            @update:registrosAMostrar="registrosAMostrar = $event"
+        />
 
-        <EmpleadosTable :empleadosFiltrados="empleadosFiltrados" :busqueda="busqueda" :filtroPuesto="filtroPuesto"
-            :filtroDepartamento="filtroDepartamento" :filtroEstado="filtroEstado" @update:busqueda="busqueda = $event"
-            @update:filtroPuesto="filtroPuesto = $event" @update:filtroDepartamento="filtroDepartamento = $event"
-            @update:filtroEstado="filtroEstado = $event" @visualizar="abrirModalVisualizar" @editar="abrirModalEditar"
-            @eliminar="eliminarEmpleado" />
+        <EmpleadosTable
+            v-if="can('empleados.ver')"
+            :empleadosFiltrados="empleadosFiltrados"
+            :busqueda="busqueda"
+            :filtroPuesto="filtroPuesto"
+            :filtroDepartamento="filtroDepartamento"
+            :filtroEstado="filtroEstado"
+            @update:busqueda="busqueda = $event"
+            @update:filtroPuesto="filtroPuesto = $event"
+            @update:filtroDepartamento="filtroDepartamento = $event"
+            @update:filtroEstado="filtroEstado = $event"
+            @editar="abrirModalEditar"
+            @eliminar="eliminarEmpleado"
+        />
 
-        <EmpleadosMobileCards :empleadosFiltrados="empleadosFiltrados" @visualizar="abrirModalVisualizar"
-            @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
+        <EmpleadosMobileCards
+            v-if="can('empleados.ver')"
+            :empleadosFiltrados="empleadosFiltrados"
+            @editar="abrirModalEditar"
+            @eliminar="eliminarEmpleado"
+        />
 
-        <EmpleadoRegisterModal v-if="showModal" :modo="modoModal" :empleadoEditar="empleadoSeleccionado"
-            @close="cerrarModal" />
+        <EmpleadoRegisterModal
+            v-if="
+                showModal &&
+                (
+                    can('empleados.crear') ||
+                    can('empleados.editar')
+                )
+            "
+            :modo="modoModal"
+            :empleadoEditar="empleadoSeleccionado"
+            @close="cerrarModal"
+        />
 
     </div>
 </template>

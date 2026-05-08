@@ -1,4 +1,11 @@
 <script setup>
+import { computed } from 'vue'
+import { usePage } from '@inertiajs/vue3'
+
+const page = usePage()
+const authPermissions = computed(() => page.props.auth.permissions || [])
+const can = (permiso) => authPermissions.value.includes(permiso)
+
 defineProps({
     empleadosFiltrados: Array,
     busqueda: String,
@@ -25,16 +32,21 @@ defineEmits([
                 <tr>
 
                     <th class="text-left px-4 py-3">
-                        <input id="busquedaEmpleado" name="busquedaEmpleado" :value="busqueda"
-                            @input="$emit('update:busqueda', $event.target.value)" type="text"
+                        <input
+                            :value="busqueda"
+                            @input="$emit('update:busqueda', $event.target.value)"
+                            type="text"
                             placeholder="Buscar empleado"
-                            class="w-full border rounded-md px-3 py-1.5 text-sm outline-none" />
+                            class="w-full border rounded-md px-3 py-1.5 text-sm outline-none"
+                        />
                     </th>
 
                     <th class="text-left px-4 py-3">
-                        <select id="filtroPuesto" name="filtroPuesto" :value="filtroPuesto"
+                        <select
+                            :value="filtroPuesto"
                             @change="$emit('update:filtroPuesto', $event.target.value)"
-                            class="w-full border rounded-md px-3 py-1.5 text-sm outline-none bg-white">
+                            class="w-full border rounded-md px-3 py-1.5 text-sm outline-none bg-white"
+                        >
                             <option value="">Puesto...</option>
                             <option value="Gerente">Gerente</option>
                             <option value="Auxiliar">Auxiliar</option>
@@ -49,9 +61,11 @@ defineEmits([
                     </th>
 
                     <th class="text-left px-4 py-3">
-                        <select id="filtroDepartamento" name="filtroDepartamento" :value="filtroDepartamento"
+                        <select
+                            :value="filtroDepartamento"
                             @change="$emit('update:filtroDepartamento', $event.target.value)"
-                            class="w-full border rounded-md px-3 py-1.5 text-sm outline-none bg-white">
+                            class="w-full border rounded-md px-3 py-1.5 text-sm outline-none bg-white"
+                        >
                             <option value="">Departamento...</option>
                             <option value="Inventario">Inventario</option>
                             <option value="Sistemas">Sistemas</option>
@@ -61,9 +75,11 @@ defineEmits([
                     </th>
 
                     <th class="text-left px-4 py-3">
-                        <select id="filtroEstado" name="filtroEstado" :value="filtroEstado"
+                        <select
+                            :value="filtroEstado"
                             @change="$emit('update:filtroEstado', $event.target.value)"
-                            class="w-full border rounded-md px-3 py-1.5 text-sm outline-none bg-white">
+                            class="w-full border rounded-md px-3 py-1.5 text-sm outline-none bg-white"
+                        >
                             <option value="">Estado...</option>
                             <option value="Activo">Activo</option>
                             <option value="Inactivo">Inactivo</option>
@@ -71,19 +87,28 @@ defineEmits([
                     </th>
 
                     <th class="text-left px-4 py-3">
-                        <input id="periodoInicio" name="periodoInicio" disabled placeholder="Periodo de inicio"
-                            class="w-full border rounded-md px-3 py-1.5 text-sm bg-gray-100 text-center" />
+                        <input
+                            disabled
+                            placeholder="Periodo de inicio"
+                            class="w-full border rounded-md px-3 py-1.5 text-sm bg-gray-100 text-center"
+                        />
                     </th>
 
-                    <th class="text-left px-4 py-3">
+                    <th
+                        v-if="can('empleados.editar') || can('empleados.eliminar')"
+                        class="text-left px-4 py-3"
+                    >
                         Acciones
                     </th>
-
                 </tr>
             </thead>
 
             <tbody>
-                <tr v-for="(empleado, index) in empleadosFiltrados" :key="index" class="border-t hover:bg-gray-50">
+                <tr
+                    v-for="(empleado, index) in empleadosFiltrados"
+                    :key="index"
+                    class="border-t hover:bg-gray-50"
+                >
                     <td class="px-4 py-3">
                         {{ empleado.nombre }} {{ empleado.apellido }}
                     </td>
@@ -104,25 +129,23 @@ defineEmits([
                         {{ empleado.fechaInicio }}
                     </td>
 
-                    <td class="px-4 py-3">
+                    <td
+                        v-if="can('empleados.editar') || can('empleados.eliminar')"
+                        class="px-4 py-3"
+                    >
                         <div class="flex items-center gap-3 text-slate-600">
-                            <button @click="$emit('visualizar', empleado)" class="hover:text-emerald-600 transition"
-                                title="Visualizar">
-                                <span class="material-symbols-outlined text-[20px]">
-                                    visibility
-                                </span>
+                            <button
+                                v-if="can('empleados.editar')"
+                                @click="$emit('editar', empleado)"
+                            >
+                                ✏️
                             </button>
 
-                            <button @click="$emit('editar', empleado)" class="hover:text-blue-600 transition">
-                                <span class="material-symbols-outlined text-[20px]">
-                                    edit
-                                </span>
-                            </button>
-
-                            <button @click="$emit('eliminar', empleado)" class="hover:text-red-600 transition">
-                                <span class="material-symbols-outlined text-[20px]">
-                                    delete
-                                </span>
+                            <button
+                                v-if="can('empleados.eliminar')"
+                                @click="$emit('eliminar', empleado.id)"
+                            >
+                                🗑️
                             </button>
 
                         </div>
