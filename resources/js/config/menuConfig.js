@@ -1,4 +1,7 @@
-export function generateMenu(role) {
+export function generateMenu(role, permissions = []) {
+
+    const can = (permiso) => permissions.includes(permiso)
+
     const isAdmin = role === 'Administrador'
     const isSistemas = role === 'Sistemas'
     const isRH = role === 'Recursos Humanos'
@@ -23,21 +26,32 @@ export function generateMenu(role) {
     | SISTEMAS
     |--------------------------------------------------------------------------
     */
-    if (isAdmin || isSistemas) {
+    if (
+        isAdmin ||
+        isSistemas ||
+        can('usuarios.ver') ||
+        can('roles.ver')
+    ) {
+
         menu.push({
             text: 'Sistemas',
             icon: 'settings',
+isOpen: true,
+
+
             children: [
-                {
-                    text: 'Roles del Sistema',
-                    icon: 'security',
-                    url: route('sistemas.roles')
-                },
-                {
-                    text: 'Usuarios del Sistema',
-                    icon: 'group',
-                    url: route('sistemas.usuarios')
-                }
+
+                ...(isAdmin || isSistemas || can('usuarios.ver')    
+                    ? [{
+                        text: 'Registro de Usuarios',
+                        icon: 'security',
+                        url: route('sistemas.empleados')
+                    }]
+                    : []
+                ),
+
+               
+
             ]
         })
     }
@@ -47,7 +61,12 @@ export function generateMenu(role) {
     | RECURSOS HUMANOS
     |--------------------------------------------------------------------------
     */
-    if (isAdmin || isRH) {
+    if (
+        isAdmin ||
+        isRH ||
+        can('empleados.ver')
+    ) {
+
         menu.push({
             text: 'Capital Humano',
             icon: 'badge',
@@ -60,7 +79,12 @@ export function generateMenu(role) {
     | VENTAS
     |--------------------------------------------------------------------------
     */
-    if (isAdmin || isVentas) {
+    if (
+        isAdmin ||
+        isVentas ||
+        can('ventas.ver')
+    ) {
+
         menu.push({
             text: 'Ventas',
             icon: 'paid',
@@ -73,7 +97,12 @@ export function generateMenu(role) {
     | INVENTARIO
     |--------------------------------------------------------------------------
     */
-    if (isAdmin || isInventario) {
+    if (
+        isAdmin ||
+        isInventario ||
+        can('inventario.ver')
+    ) {
+
         menu.push({
             text: 'Inventario',
             icon: 'inventory_2',

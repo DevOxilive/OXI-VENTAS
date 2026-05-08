@@ -1,4 +1,12 @@
+
 <script setup>
+import ExportButton from '@/Components/ExportButton.vue'
+import { computed } from 'vue'
+import { usePage } from '@inertiajs/vue3'
+
+const page = usePage()
+const authPermissions = computed(() => page.props.auth.permissions || [])
+const can = (permiso) => authPermissions.value.includes(permiso)
 defineProps({
     empleadosFiltrados: Array,
     empleadosDB: Array,
@@ -16,17 +24,16 @@ defineEmits([
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
 
         <div class="flex items-center gap-3">
-            <button @click="$emit('nuevo')"
-                class="bg-[#1f1d2b] text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>
-                Nuevo empleado
-            </button>
+         <button
+    v-if="can('empleados.crear')"
+    @click="$emit('nuevo')"
+    class="bg-[#1f1d2b] text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+>
+    <span class="material-symbols-outlined text-[18px]">add_circle</span>
+    Nuevo empleado
+</button>
 
-            <button @click="$emit('excel')"
-                class="bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">download</span>
-                Excel
-            </button>
+         <ExportButton label="Exportar Excel" @click="$emit('excel')" />
         </div>
 
         <div class="flex items-center gap-2 text-sm text-slate-600">

@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Permission;
 use App\Models\Empleado;
+use Inertia\Inertia;
 
 class UserController extends Controller
 {
@@ -30,34 +31,21 @@ class UserController extends Controller
     }
 
     // 📋 LISTAR
- public function index()
+    public function index()
 {
-    return inertia('Sistemas/Empleados', [
+    dd(Role::with('permissions')->get()->toArray());
 
-        // 👇 EMPLEADOS (tabla empleados REAL)
-        'empleados' => Empleado::select(
-            'id',
-            'nombre',
-            'apellido',
-            'correo'
-        )->get(),
-
-        // 👇 USUARIOS (tabla users)
-        'usuarios' => User::with(['role', 'permissions'])
-            ->select('id','name','email','role_id')
-            ->get(),
-
-        'roles' => Role::all(),
-        'permissions' => Permission::all(),
+    return Inertia::render('Sistemas/Empleados', [
+        // ...
     ]);
 }
-
     // ➕ CREAR
     public function store(Request $request)
     {
         $this->checkPermission('usuarios.crear');
 
         $request->validate([
+            'empleado_id' => 'nullable|exists:empleados,id',
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|confirmed|min:6',
@@ -67,13 +55,18 @@ class UserController extends Controller
         ]);
 
         $user = User::create([
+            'empleado_id' => $request->empleado_id,
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role_id' => $request->role_id
         ]);
-
-        $user->permissions()->sync($request->input('permissions', []));
+$user->load('role.permissions');
+      $user->permissions()->sync(
+    $request->has('permissions')
+        ? $request->permissions
+        : optional($user->role)->permissions->pluck('id')->toArray()
+);
 
    return redirect()->route('sistemas.empleados')
     ->with('success', 'Usuario creado correctamente');
@@ -108,8 +101,12 @@ class UserController extends Controller
                 ? Hash::make($request->password)
                 : $user->password
         ]);
-
-        $user->permissions()->sync($request->input('permissions', []));
+$user->load('role.permissions');
+     $user->permissions()->sync(
+   $request->has('permissions')
+        ? $request->permissions
+        : optional($user->role)->permissions->pluck('id')->toArray()
+);
 
      return redirect()->route('sistemas.empleados')
     ->with('success', 'Usuario actualizado');

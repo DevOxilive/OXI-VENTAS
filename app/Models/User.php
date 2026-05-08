@@ -5,14 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Fortify\TwoFactorAuthenticatable;
-use Laravel\Jetstream\HasProfilePhoto;
-use Laravel\Sanctum\HasApiTokens;
+use App\Models\Empleado;
+
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, HasProfilePhoto, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable;
 
     protected $fillable = [
+        'empleado_id',
         'name',
         'email',
         'password',
@@ -20,15 +20,13 @@ class User extends Authenticatable
     ];
 
     protected $hidden = [
-        'password',
+        'password', 
         'remember_token',
         'two_factor_recovery_codes',
         'two_factor_secret',
     ];
 
-    protected $appends = [
-        'profile_photo_url',
-    ];
+   
 
     protected function casts(): array
     {
@@ -36,9 +34,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
-    } // 🔥 ESTA LLAVE FALTABA
+    }
 
-    // 🔥 RELACIONES
     public function permissions()
     {
         return $this->belongsToMany(\App\Models\Permission::class);
@@ -49,23 +46,35 @@ class User extends Authenticatable
         return $this->belongsTo(\App\Models\Role::class);
     }
 
-    // 🔥 TODOS LOS PERMISOS (ROL + DIRECTOS)
+    public function empleado()
+    {
+        return $this->belongsTo(Empleado::class);
+    }
+
     public function getAllPermissionsAttribute()
-{
-    return $this->permissions;
-}
+    {
+        $directos = $this->permissions ?? collect();
 
-    // 🔥 VERIFICAR PERMISO
-public function hasPermission($permiso)
-{
-    $permisosDirectos = $this->permissions->pluck('name');
+        $delRol = $this->role
+            ? $this->role->permissions
+            : collect();
 
-    $permisosRol = $this->role
-        ? $this->role->permissions->pluck('name')
-        : collect();
+        return $directos
+            ->merge($delRol)
+            ->unique('id')
+            ->values();
+    }
 
-    return $permisosDirectos
-        ->merge($permisosRol)
-        ->contains($permiso);
-}
+    public function hasPermission($permission)
+    {
+        if ($this->permissions()->where('name', $permission)->exists()) {
+            return true;
+        }
+
+        if ($this->role && $this->role->permissions()->where('name', $permission)->exists()) {
+            return true;
+        }
+
+        return false;
+    }
 }

@@ -6,7 +6,8 @@ import { ref } from 'vue'
 
 const page = usePage()
 const role = page.props.auth.user?.role?.name
-const menuItems = generateMenu(role)
+const permissions = page.props.auth.permissions || []
+const menuItems = generateMenu(role, permissions)
 
 const sidebarOpen = ref(false)
 
