@@ -16,23 +16,33 @@ defineEmits([
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
 
         <div class="flex items-center gap-3">
+
             <button @click="$emit('nuevo')"
                 class="bg-[#1f1d2b] text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">add_circle</span>
+                <span class="material-symbols-outlined text-[18px]">
+                    add_circle
+                </span>
+
                 Nuevo empleado
             </button>
 
             <button @click="$emit('excel')"
                 class="bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">download</span>
+                <span class="material-symbols-outlined text-[18px]">
+                    download
+                </span>
+
                 Excel
             </button>
+
         </div>
 
         <div class="flex items-center gap-2 text-sm text-slate-600">
+
             <span>Mostrar</span>
 
-            <select :value="registrosAMostrar" @change="$emit('update:registrosAMostrar', Number($event.target.value))"
+            <select id="registrosAMostrar" name="registrosAMostrar" :value="registrosAMostrar"
+                @change="$emit('update:registrosAMostrar', Number($event.target.value))"
                 class="border rounded-md px-3 py-1.5 outline-none bg-white">
                 <option :value="5">5</option>
                 <option :value="10">10</option>
@@ -42,6 +52,7 @@ defineEmits([
             </select>
 
             <span>registros</span>
+
         </div>
     </div>
 

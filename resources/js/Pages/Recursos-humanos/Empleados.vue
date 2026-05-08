@@ -38,9 +38,11 @@ const {
     empleadoSeleccionado,
     abrirModalGeneral,
     abrirModalEditar,
+    abrirModalVisualizar,
     cerrarModal,
     eliminarEmpleado
 } = useEmpleadoActions()
+
 </script>
 
 <template>
@@ -57,10 +59,11 @@ const {
         <EmpleadosTable :empleadosFiltrados="empleadosFiltrados" :busqueda="busqueda" :filtroPuesto="filtroPuesto"
             :filtroDepartamento="filtroDepartamento" :filtroEstado="filtroEstado" @update:busqueda="busqueda = $event"
             @update:filtroPuesto="filtroPuesto = $event" @update:filtroDepartamento="filtroDepartamento = $event"
-            @update:filtroEstado="filtroEstado = $event" @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
-
-        <EmpleadosMobileCards :empleadosFiltrados="empleadosFiltrados" @editar="abrirModalEditar"
+            @update:filtroEstado="filtroEstado = $event" @visualizar="abrirModalVisualizar" @editar="abrirModalEditar"
             @eliminar="eliminarEmpleado" />
+
+        <EmpleadosMobileCards :empleadosFiltrados="empleadosFiltrados" @visualizar="abrirModalVisualizar"
+            @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
 
         <EmpleadoRegisterModal v-if="showModal" :modo="modoModal" :empleadoEditar="empleadoSeleccionado"
             @close="cerrarModal" />
