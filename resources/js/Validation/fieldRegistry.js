@@ -184,13 +184,14 @@ export const fieldRegistry = {
     },
 
     especialidad: {
-        type: "letters",
+        type: "text",
         required: true,
         min: 2,
         max: 50,
         titleCase: true,
         preventSpam: true,
-        message: "Solo se permiten letras.",
+        spamLevel: "soft",
+        message: "Especialidad inválida.",
         spamMessage: "Especialidad no válida.",
     },
 
