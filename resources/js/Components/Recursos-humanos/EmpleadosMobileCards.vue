@@ -9,7 +9,7 @@ defineProps({
     empleadosFiltrados: Array
 })
 
-defineEmits(['editar', 'eliminar'])
+defineEmits(['visualizar', 'editar', 'eliminar'])
 </script>
 
 <template>

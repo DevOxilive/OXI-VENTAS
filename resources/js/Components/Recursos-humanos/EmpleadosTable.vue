@@ -19,6 +19,7 @@ defineEmits([
     'update:filtroPuesto',
     'update:filtroDepartamento',
     'update:filtroEstado',
+    'visualizar',
     'editar',
     'eliminar'
 ])
@@ -29,6 +30,7 @@ defineEmits([
         <table class="w-full text-sm min-w-[800px]">
             <thead class="bg-gray-50 text-slate-600">
                 <tr>
+
                     <th class="text-left px-4 py-3">
                         <input
                             :value="busqueda"
@@ -145,8 +147,10 @@ defineEmits([
                             >
                                 🗑️
                             </button>
+
                         </div>
                     </td>
+
                 </tr>
             </tbody>
         </table>

@@ -1,29 +1,71 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { fieldRegistry } from '@/Validation/fieldRegistry'
+
+const selectId = computed(() =>
+    props.field || props.label?.toLowerCase().replace(/\s+/g, '-')
+)
+
+const props = defineProps({
     label: String,
+    field: String,
     modelValue: [String, Number],
     error: String,
-    options: Array
+    options: {
+        type: Array,
+        default: () => []
+    },
+    placeholder: {
+        type: String,
+        default: 'Seleccione una opción'
+    },
+    disabled: Boolean
 })
 
 const emit = defineEmits(['update:modelValue', 'validate'])
+
+const fieldConfig = computed(() => fieldRegistry[props.field])
+
+function handleChange(e) {
+    emit('update:modelValue', e.target.value)
+    emit('validate', props.field)
+}
+
+function handleBlur() {
+    emit('validate', props.field)
+}
 </script>
 
 <template>
     <div>
-        <label class="block text-sm font-semibold mb-1 text-slate-700">{{ label }}</label>
+        <label :for="selectId" class="block text-sm font-semibold mb-1 text-slate-700">
+            {{ label }}
+        </label>
 
-        <select :value="modelValue" @change="emit('update:modelValue', $event.target.value)" @blur="emit('validate')"
-            :class="[
-                'w-full px-4 py-3 rounded-xl border outline-none text-sm',
+        <select :id="selectId" :name="field" :value="modelValue" :disabled="disabled" @change="handleChange"
+            @blur="handleBlur" :class="[
+                'w-full px-4 py-3 rounded-xl border outline-none text-sm transition',
+                disabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-white',
                 error ? 'border-red-500 bg-red-50' : 'border-slate-300 focus:border-[#1f1d2b]'
             ]">
-            <option disabled value="">Seleccione una opción</option>
-            <option v-for="item in options" :key="item" :value="item">
-                {{ item }}
+            <option disabled value="">
+                {{ placeholder }}
+            </option>
+
+            <option v-for="item in options" :key="typeof item === 'object' ? item.value : item"
+                :value="typeof item === 'object' ? item.value : item">
+                {{ typeof item === 'object' ? item.label : item }}
             </option>
         </select>
 
-        <p v-if="error" class="text-red-500 text-xs mt-1">{{ error }}</p>
+        <div class="flex justify-between items-center mt-1">
+            <p v-if="error" class="text-red-500 text-xs">
+                {{ error }}
+            </p>
+
+            <p v-if="fieldConfig?.required" class="text-[11px] text-slate-400 ml-auto">
+                Obligatorio
+            </p>
+        </div>
     </div>
 </template>

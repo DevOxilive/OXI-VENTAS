@@ -41,9 +41,11 @@ const {
     empleadoSeleccionado,
     abrirModalGeneral,
     abrirModalEditar,
+    abrirModalVisualizar,
     cerrarModal,
     eliminarEmpleado
 } = useEmpleadoActions()
+
 </script>
 
 <template>

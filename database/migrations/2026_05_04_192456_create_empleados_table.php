@@ -16,7 +16,14 @@ return new class extends Migration
             $table->string('apellido');
             $table->string('correo')->unique();
             $table->string('telefono', 20)->nullable();
-            $table->text('domicilio')->nullable();
+            $table->string('calle')->nullable();
+            $table->string('numero_exterior')->nullable();
+            $table->string('numero_interior')->nullable();
+            $table->string('codigo_postal', 5)->nullable();
+            $table->string('colonia')->nullable();
+            $table->string('municipio')->nullable();
+            $table->string('estado_domicilio')->nullable();
+            $table->text('url_maps')->nullable();
             $table->date('fecha_inicio')->nullable();
             $table->string('estado')->default('Activo');
             $table->string('foto')->nullable();

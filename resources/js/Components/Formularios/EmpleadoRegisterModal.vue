@@ -3,9 +3,9 @@ import { onMounted, onBeforeUnmount, computed } from 'vue'
 import { useEmpleadoForm } from '@/Composables/Recursos-humanos/useEmpleadoForm'
 
 import EmpleadoModalHeader from '@/Components/Formularios/EmpleadoModalHeader.vue'
-import EmpleadoDatosGenerales from '@/Components/Formularios/EmpleadoDatosGenerales.vue'
-import EmpleadoDatosLaborales from '@/Components/Formularios/EmpleadoDatosLaborales.vue'
 import EmpleadoModalFooter from '@/Components/Formularios/EmpleadoModalFooter.vue'
+import ModalContent from '@/Components/Formularios/ModalContent.vue'
+import EmpleadoDatos from '@/Components/Formularios/EmpleadoDatos.vue'
 
 const emit = defineEmits(['close'])
 
@@ -27,9 +27,9 @@ const {
 const textoBotonGuardar = computed(() => {
     if (empleado.processing) return 'Procesando...'
 
-    return props.modo === 'crear'
-        ? 'Guardar empleado'
-        : 'Actualizar empleado'
+    return props.modo === 'edit'
+        ? 'Actualizar empleado'
+        : 'Guardar empleado'
 })
 
 const totalErrores = computed(() => resumenErrores.value.length)
@@ -50,6 +50,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
     window.removeEventListener('keydown', handleEsc)
 })
+
+const esVisualizacion = computed(() => props.modo === 'view')
 </script>
 
 <template>
@@ -58,24 +60,15 @@ onBeforeUnmount(() => {
 
         <div
             class="relative bg-white w-full h-[100dvh] sm:h-[100dvh] md:h-[94vh] md:w-[96%] md:max-w-6xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-
             <EmpleadoModalHeader :modo="modo" :totalErrores="totalErrores" @close="cerrar" />
 
-            <div class="flex-1 overflow-y-auto p-4 sm:p-5 md:p-8 bg-slate-50">
-                <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <ModalContent :columns="1">
+                <EmpleadoDatos :empleado="empleado" :frontendErrors="frontendErrors" :departamentos="departamentos"
+                    :readonly="esVisualizacion" @validate="validarCampo" />
+            </ModalContent>
 
-                    <EmpleadoDatosGenerales :empleado="empleado" :frontendErrors="frontendErrors"
-                        @validate="validarCampo" />
-
-                    <EmpleadoDatosLaborales :empleado="empleado" :frontendErrors="frontendErrors"
-                        :departamentos="departamentos" @validate="validarCampo" />
-
-                </div>
-            </div>
-
-            <EmpleadoModalFooter :empleado="empleado" :textoBotonGuardar="textoBotonGuardar" @guardar="guardar"
-                @close="cerrar" />
-
+            <EmpleadoModalFooter :empleado="empleado" :modo="modo" :textoBotonGuardar="textoBotonGuardar"
+                @guardar="guardar" @close="cerrar" />
         </div>
     </div>
 </template>

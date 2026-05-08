@@ -12,12 +12,20 @@ defineEmits(['close'])
 
         <div>
             <h2 class="text-lg md:text-2xl font-bold text-slate-800">
-                {{ modo === 'create' ? 'Registro corporativo de empleado' : 'Actualizar empleado' }}
+                {{
+                    modo === 'crear'
+                        ? 'Registro corporativo de empleado'
+                        : modo === 'edit'
+                            ? 'Actualizar empleado'
+                            : 'Visualizar empleado'
+                }}
             </h2>
 
-            <p v-if="totalErrores > 0" class="text-xs md:text-sm text-red-500 mt-1 font-medium">
-                {{ totalErrores }} campo{{ totalErrores > 1 ? 's' : '' }} pendiente{{ totalErrores > 1 ? 's' : '' }} por
-                validar
+            <p v-if="modo !== 'view' && totalErrores > 0" class="text-xs md:text-sm text-red-500 mt-1 font-medium">
+                {{ totalErrores }}
+                campo{{ totalErrores > 1 ? 's' : '' }}
+                pendiente{{ totalErrores > 1 ? 's' : '' }}
+                por validar
             </p>
         </div>
 

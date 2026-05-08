@@ -37,9 +37,11 @@ defineEmits([
         </div>
 
         <div class="flex items-center gap-2 text-sm text-slate-600">
+
             <span>Mostrar</span>
 
-            <select :value="registrosAMostrar" @change="$emit('update:registrosAMostrar', Number($event.target.value))"
+            <select id="registrosAMostrar" name="registrosAMostrar" :value="registrosAMostrar"
+                @change="$emit('update:registrosAMostrar', Number($event.target.value))"
                 class="border rounded-md px-3 py-1.5 outline-none bg-white">
                 <option :value="5">5</option>
                 <option :value="10">10</option>
@@ -49,6 +51,7 @@ defineEmits([
             </select>
 
             <span>registros</span>
+
         </div>
     </div>
 
