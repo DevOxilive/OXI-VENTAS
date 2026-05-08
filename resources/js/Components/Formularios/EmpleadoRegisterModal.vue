@@ -27,9 +27,9 @@ const {
 const textoBotonGuardar = computed(() => {
     if (empleado.processing) return 'Procesando...'
 
-    return props.modo === 'crear'
-        ? 'Guardar empleado'
-        : 'Actualizar empleado'
+    return props.modo === 'edit'
+        ? 'Actualizar empleado'
+        : 'Guardar empleado'
 })
 
 const totalErrores = computed(() => resumenErrores.value.length)
@@ -50,6 +50,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
     window.removeEventListener('keydown', handleEsc)
 })
+
+const esVisualizacion = computed(() => props.modo === 'view')
 </script>
 
 <template>
@@ -62,11 +64,11 @@ onBeforeUnmount(() => {
 
             <ModalContent :columns="1">
                 <EmpleadoDatos :empleado="empleado" :frontendErrors="frontendErrors" :departamentos="departamentos"
-                    @validate="validarCampo" />
+                    :readonly="esVisualizacion" @validate="validarCampo" />
             </ModalContent>
 
-            <EmpleadoModalFooter :empleado="empleado" :textoBotonGuardar="textoBotonGuardar" @guardar="guardar"
-                @close="cerrar" />
+            <EmpleadoModalFooter :empleado="empleado" :modo="modo" :textoBotonGuardar="textoBotonGuardar"
+                @guardar="guardar" @close="cerrar" />
         </div>
     </div>
 </template>

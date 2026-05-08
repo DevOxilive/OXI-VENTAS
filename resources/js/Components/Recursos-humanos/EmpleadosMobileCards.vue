@@ -3,7 +3,7 @@ defineProps({
     empleadosFiltrados: Array
 })
 
-defineEmits(['editar', 'eliminar'])
+defineEmits(['visualizar', 'editar', 'eliminar'])
 </script>
 
 <template>
@@ -32,6 +32,11 @@ defineEmits(['editar', 'eliminar'])
             </div>
 
             <div class="mt-3 flex justify-end gap-3 text-slate-600">
+                <button @click="$emit('visualizar', empleado)" class="hover:text-emerald-600 transition"
+                    title="Visualizar">
+                    <span class="material-symbols-outlined text-[20px]">visibility</span>
+                </button>
+
                 <button @click="$emit('editar', empleado)" class="hover:text-blue-600 transition">
                     <span class="material-symbols-outlined text-[20px]">edit</span>
                 </button>

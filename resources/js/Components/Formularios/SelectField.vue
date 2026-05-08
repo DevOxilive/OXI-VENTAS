@@ -42,11 +42,12 @@ function handleBlur() {
             {{ label }}
         </label>
 
-        <select :id="selectId" :name="field" :value="modelValue" :disabled="disabled" @change="handleChange" @blur="handleBlur" :class="[
-            'w-full px-4 py-3 rounded-xl border outline-none text-sm transition',
-            disabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-white',
-            error ? 'border-red-500 bg-red-50' : 'border-slate-300 focus:border-[#1f1d2b]'
-        ]">
+        <select :id="selectId" :name="field" :value="modelValue" :disabled="disabled" @change="handleChange"
+            @blur="handleBlur" :class="[
+                'w-full px-4 py-3 rounded-xl border outline-none text-sm transition',
+                disabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-white',
+                error ? 'border-red-500 bg-red-50' : 'border-slate-300 focus:border-[#1f1d2b]'
+            ]">
             <option disabled value="">
                 {{ placeholder }}
             </option>

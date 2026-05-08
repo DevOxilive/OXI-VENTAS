@@ -76,7 +76,9 @@ export function useEmpleadoForm(props, emit) {
     const frontendErrors = reactive({});
 
     function cargarDatosEdicion() {
-        const esEdicion = ["edit", "editar"].includes(props.modo);
+        const esEdicion = ["edit", "editar", "view", "visualizar"].includes(
+            props.modo,
+        );
 
         if (!esEdicion || !props.empleadoEditar) return;
 
