@@ -51,13 +51,15 @@ export const fieldRegistry = {
         message: "Debe contener 10 dígitos.",
     },
     calle: {
-        type: "text",
+        type: "address",
         required: true,
         min: 2,
         max: 80,
         preventSpam: true,
+        spamLevel: "soft",
         titleCase: true,
         message: "Calle inválida.",
+        spamMessage: "Calle no válida.",
     },
 
     numeroExterior: {
@@ -88,13 +90,15 @@ export const fieldRegistry = {
     },
 
     colonia: {
-        type: "text",
+        type: "address",
         required: true,
         min: 2,
         max: 80,
         preventSpam: true,
+        spamLevel: "soft",
         titleCase: true,
         message: "Colonia inválida.",
+        spamMessage: "Colonia no válida.",
     },
 
     municipio: {

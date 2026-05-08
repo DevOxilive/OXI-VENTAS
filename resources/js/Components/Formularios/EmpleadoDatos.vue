@@ -1,8 +1,9 @@
 <script setup>
+import { computed } from 'vue'
 import InputField from '@/Components/Formularios/InputField.vue'
 import SelectField from '@/Components/Formularios/SelectField.vue'
 
-defineProps({
+const props = defineProps({
     empleado: Object,
     frontendErrors: Object,
     departamentos: Array,
@@ -13,6 +14,39 @@ defineProps({
 })
 
 defineEmits(['validate'])
+
+const domicilioCompleto = computed(() => {
+    const empleado = props.empleado || {}
+
+    return [
+        empleado.calle,
+        empleado.numeroExterior,
+        empleado.numeroInterior,
+        empleado.colonia,
+        empleado.municipio,
+        empleado.estadoDomicilio,
+        empleado.codigoPostal
+    ]
+        .filter(Boolean)
+        .join(', ')
+})
+
+const mapsUrl = computed(() => {
+    const urlRegistrada = props.empleado?.urlMaps?.trim()
+
+    if (urlRegistrada) return urlRegistrada
+    if (!domicilioCompleto.value) return ''
+
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(domicilioCompleto.value)}`
+})
+
+const puedeAbrirMaps = computed(() => Boolean(mapsUrl.value))
+
+function abrirGoogleMaps() {
+    if (!mapsUrl.value) return
+
+    window.open(mapsUrl.value, '_blank', 'noopener,noreferrer')
+}
 </script>
 
 <template>
@@ -81,9 +115,17 @@ defineEmits(['validate'])
                         :readonly="readonly" :error="frontendErrors.estadoDomicilio || empleado.errors.estadoDomicilio"
                         @validate="$emit('validate', 'estadoDomicilio')" />
 
-                    <InputField label="URL Google Maps" field="urlMaps" v-model="empleado.urlMaps" :readonly="readonly"
-                        :error="frontendErrors.urlMaps || empleado.errors.urlMaps"
-                        @validate="$emit('validate', 'urlMaps')" />
+                    <div class="space-y-2">
+                        <InputField label="URL Google Maps" field="urlMaps" v-model="empleado.urlMaps"
+                            :readonly="readonly" :error="frontendErrors.urlMaps || empleado.errors.urlMaps"
+                            @validate="$emit('validate', 'urlMaps')" />
+
+                        <button type="button"
+                            class="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            :disabled="!puedeAbrirMaps" @click="abrirGoogleMaps">
+                            Ver ubicación en Google Maps
+                        </button>
+                    </div>
                 </div>
             </section>
 
