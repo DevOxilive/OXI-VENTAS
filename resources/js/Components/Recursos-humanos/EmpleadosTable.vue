@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { usePermissions } from '@/Composables/usePermissions'
+import ActionIconButton from '@/Components/Formularios/ActionIconButton.vue'
 
 const { can } = usePermissions()
 
@@ -118,32 +119,14 @@ defineEmits([
 
                         <td v-if="puedeVerAcciones" class="px-4 py-4">
                             <div class="flex items-center justify-center gap-2">
-                                <button v-if="can('empleados.ver')" type="button" title="Visualizar empleado"
-                                    @click="$emit('visualizar', empleado)"
-                                    class="group w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-200 transition-all duration-200">
-                                    <span
-                                        class="material-symbols-outlined text-[20px] text-slate-500 group-hover:text-blue-600 transition">
-                                        visibility
-                                    </span>
-                                </button>
+                                <ActionIconButton v-if="can('empleados.ver')" icon="visibility"
+                                    title="Visualizar empleado" variant="blue" @click="$emit('visualizar', empleado)" />
 
-                                <button v-if="can('empleados.editar')" type="button" title="Editar empleado"
-                                    @click="$emit('editar', empleado)"
-                                    class="group w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-amber-50 hover:border-amber-200 transition-all duration-200">
-                                    <span
-                                        class="material-symbols-outlined text-[20px] text-slate-500 group-hover:text-amber-600 transition">
-                                        edit
-                                    </span>
-                                </button>
+                                <ActionIconButton v-if="can('empleados.editar')" icon="edit" title="Editar empleado"
+                                    variant="amber" @click="$emit('editar', empleado)" />
 
-                                <button v-if="can('empleados.eliminar')" type="button" title="Eliminar empleado"
-                                    @click="$emit('eliminar', empleado)"
-                                    class="group w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 transition-all duration-200">
-                                    <span
-                                        class="material-symbols-outlined text-[20px] text-slate-500 group-hover:text-red-600 transition">
-                                        delete
-                                    </span>
-                                </button>
+                                <ActionIconButton v-if="can('empleados.eliminar')" icon="delete"
+                                    title="Eliminar empleado" variant="red" @click="$emit('eliminar', empleado)" />
                             </div>
                         </td>
                     </tr>
