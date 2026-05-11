@@ -55,50 +55,27 @@ const {
             Empleados
         </h1>
 
-        <EmpleadosToolbar
-            v-if="can('empleados.crear') || can('empleados.exportar')"
-            :empleadosFiltrados="empleadosFiltrados"
-            :empleadosDB="empleadosDB"
-            :registrosAMostrar="registrosAMostrar"
-            @nuevo="abrirModalGeneral"
-            @excel="exportarExcel"
-            @update:registrosAMostrar="registrosAMostrar = $event"
-        />
+        <EmpleadosToolbar v-if="can('empleados.crear') || can('empleados.exportar')"
+            :empleadosFiltrados="empleadosFiltrados" :empleadosDB="empleadosDB" :registrosAMostrar="registrosAMostrar"
+            @nuevo="abrirModalGeneral" @excel="exportarExcel" @update:registrosAMostrar="registrosAMostrar = $event" />
 
-        <EmpleadosTable
-            v-if="can('empleados.ver')"
-            :empleadosFiltrados="empleadosFiltrados"
-            :busqueda="busqueda"
-            :filtroPuesto="filtroPuesto"
-            :filtroDepartamento="filtroDepartamento"
-            :filtroEstado="filtroEstado"
-            @update:busqueda="busqueda = $event"
-            @update:filtroPuesto="filtroPuesto = $event"
-            @update:filtroDepartamento="filtroDepartamento = $event"
-            @update:filtroEstado="filtroEstado = $event"
-            @editar="abrirModalEditar"
-            @eliminar="eliminarEmpleado"
-        />
+        <EmpleadosTable v-if="can('empleados.ver')" :empleadosFiltrados="empleadosFiltrados" :busqueda="busqueda"
+            :filtroPuesto="filtroPuesto" :filtroDepartamento="filtroDepartamento" :filtroEstado="filtroEstado"
+            @update:busqueda="busqueda = $event" @update:filtroPuesto="filtroPuesto = $event"
+            @update:filtroDepartamento="filtroDepartamento = $event" @update:filtroEstado="filtroEstado = $event"
+            @visualizar="abrirModalVisualizar" @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
 
-        <EmpleadosMobileCards
-            v-if="can('empleados.ver')"
-            :empleadosFiltrados="empleadosFiltrados"
-            @editar="abrirModalEditar"
-            @eliminar="eliminarEmpleado"
-        />
+        <EmpleadosMobileCards :empleadosFiltrados="empleadosFiltrados" @visualizar="abrirModalVisualizar"
+            @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
 
-        <EmpleadoRegisterModal
-            v-if="
-                showModal &&
-                (
-                    can('empleados.crear') ||
-                    can('empleados.editar')
-                )
-            "
-            :modo="modoModal"
-            :empleadoEditar="empleadoSeleccionado"
-            @close="cerrarModal"
-        />
+        <EmpleadoRegisterModal v-if="
+            showModal &&
+            (
+                can('empleados.crear') ||
+                can('empleados.editar') ||
+                can('empleados.ver')
+            )
+        " :modo="modoModal" :empleadoEditar="empleadoSeleccionado" @close="cerrarModal" />
 
     </div>
 </template>
