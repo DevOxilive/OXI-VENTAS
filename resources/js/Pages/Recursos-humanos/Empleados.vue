@@ -12,7 +12,7 @@ import EmpleadosMobileCards from '@/Components/Recursos-humanos/EmpleadosMobileC
 
 defineOptions({ layout: AdminLayout })
 
-const { can } = usePermissions()
+const { can, canAny } = usePermissions()
 
 const { empleadosDB } = defineProps({
     empleadosDB: Array
@@ -57,14 +57,14 @@ const {
             :empleadosFiltrados="empleadosFiltrados" :empleadosDB="empleadosDB" :registrosAMostrar="registrosAMostrar"
             @nuevo="abrirModalGeneral" @excel="exportarExcel" @update:registrosAMostrar="registrosAMostrar = $event" />
 
-        <EmpleadosTable v-if="can('empleados.ver')" :empleadosFiltrados="empleadosFiltrados" :busqueda="busqueda"
-            :filtroPuesto="filtroPuesto" :filtroDepartamento="filtroDepartamento" :filtroEstado="filtroEstado"
-            @update:busqueda="busqueda = $event" @update:filtroPuesto="filtroPuesto = $event"
-            @update:filtroDepartamento="filtroDepartamento = $event" @update:filtroEstado="filtroEstado = $event"
-            @visualizar="abrirModalVisualizar" @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
+        <EmpleadosTable :empleadosFiltrados="empleadosFiltrados" :busqueda="busqueda" :filtroPuesto="filtroPuesto"
+            :filtroDepartamento="filtroDepartamento" :filtroEstado="filtroEstado" @update:busqueda="busqueda = $event"
+            @update:filtroPuesto="filtroPuesto = $event" @update:filtroDepartamento="filtroDepartamento = $event"
+            @update:filtroEstado="filtroEstado = $event" @visualizar="abrirModalVisualizar" @editar="abrirModalEditar"
+            @eliminar="eliminarEmpleado" />
 
-        <EmpleadosMobileCards v-if="can('empleados.ver')" :empleadosFiltrados="empleadosFiltrados"
-            @visualizar="abrirModalVisualizar" @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
+        <EmpleadosMobileCards :empleadosFiltrados="empleadosFiltrados" @visualizar="abrirModalVisualizar"
+            @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
 
         <EmpleadoRegisterModal v-if="
             showModal &&
