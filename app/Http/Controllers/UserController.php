@@ -32,13 +32,25 @@ class UserController extends Controller
 
     // 📋 LISTAR
     public function index()
-{
-    dd(Role::with('permissions')->get()->toArray());
+    {
+        return Inertia::render('Sistemas/Empleados', [
+            'empleados' => Empleado::with('user.role')
+                ->orderBy('id', 'desc')
+                ->get(),
 
-    return Inertia::render('Sistemas/Empleados', [
-        // ...
-    ]);
-}
+            'usuarios' => User::with([
+                'role.permissions',
+                'permissions'
+            ])
+                ->orderBy('id', 'desc')
+                ->get(),
+
+            'roles' => Role::with('permissions')->get(),
+
+            'permissions' => Permission::all(),
+        ]);
+    }
+
     // ➕ CREAR
     public function store(Request $request)
     {
@@ -59,17 +71,16 @@ class UserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role_id' => $request->role_id
+            'role_id' => $request->role_id,
         ]);
-$user->load('role.permissions');
-      $user->permissions()->sync(
-    $request->has('permissions')
-        ? $request->permissions
-        : optional($user->role)->permissions->pluck('id')->toArray()
-);
 
-   return redirect()->route('sistemas.empleados')
-    ->with('success', 'Usuario creado correctamente');
+        // Permisos directos del usuario.
+        // Si el frontend precargó permisos por rol, llegarán aquí en request.
+        // Si no manda permisos, se guarda sin permisos directos.
+        $user->permissions()->sync($request->permissions ?? []);
+
+        return redirect()->route('sistemas.empleados')
+            ->with('success', 'Usuario creado correctamente');
     }
 
     // ✏️ ACTUALIZAR
@@ -99,17 +110,15 @@ $user->load('role.permissions');
             'role_id' => $request->role_id,
             'password' => $request->password
                 ? Hash::make($request->password)
-                : $user->password
+                : $user->password,
         ]);
-$user->load('role.permissions');
-     $user->permissions()->sync(
-   $request->has('permissions')
-        ? $request->permissions
-        : optional($user->role)->permissions->pluck('id')->toArray()
-);
 
-     return redirect()->route('sistemas.empleados')
-    ->with('success', 'Usuario actualizado');
+        // Actualiza SOLO permisos directos de este usuario.
+        // No toca permissions del rol.
+        $user->permissions()->sync($request->permissions ?? []);
+
+        return redirect()->route('sistemas.empleados')
+            ->with('success', 'Usuario actualizado');
     }
 
     // 🗑️ ELIMINAR
@@ -119,8 +128,7 @@ $user->load('role.permissions');
 
         User::findOrFail($id)->delete();
 
-       return redirect()->route('sistemas.empleados')
-    ->with('success', 'Usuario eliminado');
+        return redirect()->route('sistemas.empleados')
+            ->with('success', 'Usuario eliminado');
     }
-    
 }
