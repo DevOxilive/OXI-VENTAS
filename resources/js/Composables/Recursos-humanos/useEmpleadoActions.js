@@ -1,5 +1,7 @@
 import { ref } from "vue";
 import { router } from "@inertiajs/vue3";
+import { usePermissions } from "@/Composables/usePermissions";
+
 import {
     UniversalActionModal,
     ToastAlert,
@@ -7,23 +9,31 @@ import {
 } from "@/Components/Modales/UniversalActionModal";
 
 export function useEmpleadoActions() {
+    const { can } = usePermissions();
+
     const showModal = ref(false);
     const modoModal = ref("create");
     const empleadoSeleccionado = ref(null);
 
     function abrirModalGeneral() {
+        if (!can("empleados.crear")) return;
+
         modoModal.value = "create";
         empleadoSeleccionado.value = null;
         showModal.value = true;
     }
 
     function abrirModalEditar(empleado) {
+        if (!can("empleados.editar")) return;
+
         modoModal.value = "edit";
         empleadoSeleccionado.value = empleado;
         showModal.value = true;
     }
 
     function abrirModalVisualizar(empleado) {
+        if (!can("empleados.ver")) return;
+
         modoModal.value = "view";
         empleadoSeleccionado.value = empleado;
         showModal.value = true;
@@ -34,6 +44,8 @@ export function useEmpleadoActions() {
     }
 
     function eliminarEmpleado(empleado) {
+        if (!can("empleados.eliminar")) return;
+
         UniversalActionModal({
             title: "Confirmar eliminación",
             message: "¿Deseas eliminar permanentemente a",
@@ -48,6 +60,7 @@ export function useEmpleadoActions() {
                             title: "Empleado eliminado correctamente",
                         });
                     },
+
                     onError: () => {
                         ErrorAlert({
                             title: "Error al eliminar",

@@ -5,14 +5,13 @@ import { useEmpleadoActions } from '@/Composables/Recursos-humanos/useEmpleadoAc
 import { useEmpleadoFilters } from '@/Composables/Recursos-humanos/useEmpleadoFilters'
 import { useEmpleadoExport } from '@/Composables/Recursos-humanos/useEmpleadoExport'
 import { usePermissions } from '@/Composables/usePermissions'
-
 import EmpleadoRegisterModal from '@/Components/Formularios/EmpleadoRegisterModal.vue'
 import EmpleadosToolbar from '@/Components/Recursos-humanos/EmpleadosToolbar.vue'
 import EmpleadosTable from '@/Components/Recursos-humanos/EmpleadosTable.vue'
 import EmpleadosMobileCards from '@/Components/Recursos-humanos/EmpleadosMobileCards.vue'
 
-
 defineOptions({ layout: AdminLayout })
+
 const { can } = usePermissions()
 
 const { empleadosDB } = defineProps({
@@ -45,11 +44,11 @@ const {
     cerrarModal,
     eliminarEmpleado
 } = useEmpleadoActions()
-
 </script>
 
 <template>
     <div class="bg-[#f6f3f7] min-h-screen rounded-2xl md:rounded-3xl p-4 md:p-6">
+        <pre>{{ $page.props.auth }}</pre>
 
         <h1 class="text-lg md:text-xl font-semibold text-slate-700 mb-5">
             Empleados
@@ -65,15 +64,15 @@ const {
             @update:filtroDepartamento="filtroDepartamento = $event" @update:filtroEstado="filtroEstado = $event"
             @visualizar="abrirModalVisualizar" @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
 
-        <EmpleadosMobileCards :empleadosFiltrados="empleadosFiltrados" @visualizar="abrirModalVisualizar"
-            @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
+        <EmpleadosMobileCards v-if="can('empleados.ver')" :empleadosFiltrados="empleadosFiltrados"
+            @visualizar="abrirModalVisualizar" @editar="abrirModalEditar" @eliminar="eliminarEmpleado" />
 
         <EmpleadoRegisterModal v-if="
             showModal &&
             (
-                can('empleados.crear') ||
-                can('empleados.editar') ||
-                can('empleados.ver')
+                (modoModal === 'create' && can('empleados.crear')) ||
+                (modoModal === 'edit' && can('empleados.editar')) ||
+                (modoModal === 'view' && can('empleados.ver'))
             )
         " :modo="modoModal" :empleadoEditar="empleadoSeleccionado" @close="cerrarModal" />
 

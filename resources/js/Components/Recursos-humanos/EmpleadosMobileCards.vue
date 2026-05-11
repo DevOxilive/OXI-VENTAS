@@ -1,12 +1,8 @@
 <script setup>
 import { computed } from 'vue'
-import { usePage } from '@inertiajs/vue3'
+import { usePermissions } from '@/Composables/usePermissions'
 
-const page = usePage()
-
-const authPermissions = computed(() => page.props.auth?.permissions || [])
-
-const can = (permiso) => authPermissions.value.includes(permiso)
+const { can } = usePermissions()
 
 const puedeVerAcciones = computed(() =>
     can('empleados.ver') ||
@@ -19,6 +15,8 @@ defineProps({
 })
 
 defineEmits(['visualizar', 'editar', 'eliminar'])
+
+
 </script>
 
 <template>
