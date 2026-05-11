@@ -9,11 +9,11 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Permission;
 use App\Models\Empleado;
+use App\Models\Sucursal;
 use Inertia\Inertia;
 
 class UserController extends Controller
 {
-    // 🔐 VALIDAR PERMISO
     private function checkPermission($permiso)
     {
         /** @var \App\Models\User $user */
@@ -30,7 +30,6 @@ class UserController extends Controller
         }
     }
 
-    // 📋 LISTAR
     public function index()
     {
         return Inertia::render('Sistemas/Empleados', [
@@ -40,7 +39,8 @@ class UserController extends Controller
 
             'usuarios' => User::with([
                 'role.permissions',
-                'permissions'
+                'permissions',
+                'sucursales',
             ])
                 ->orderBy('id', 'desc')
                 ->get(),
@@ -48,10 +48,13 @@ class UserController extends Controller
             'roles' => Role::with('permissions')->get(),
 
             'permissions' => Permission::all(),
+
+            'sucursales' => Sucursal::where('activa', true)
+                ->orderBy('nombre')
+                ->get(),
         ]);
     }
 
-    // ➕ CREAR
     public function store(Request $request)
     {
         $this->checkPermission('usuarios.crear');
@@ -61,10 +64,23 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|confirmed|min:6',
-            'role_id' => 'nullable|exists:roles,id',
+            'role_id' => 'required|exists:roles,id',
+
+            // Varias sucursales para rol Ventas
+            'sucursal_ids' => 'nullable|array',
+            'sucursal_ids.*' => 'exists:sucursales,id',
+
             'permissions' => 'nullable|array',
             'permissions.*' => 'exists:permissions,id',
         ]);
+
+        $role = Role::findOrFail($request->role_id);
+
+        if ($role->name === 'Ventas' && empty($request->sucursal_ids)) {
+            return back()->withErrors([
+                'sucursal_ids' => 'Debes seleccionar al menos una sucursal para el vendedor.',
+            ])->withInput();
+        }
 
         $user = User::create([
             'empleado_id' => $request->empleado_id,
@@ -72,19 +88,22 @@ class UserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role_id' => $request->role_id,
-            'sucursal_id' => $request->sucursal_id,
         ]);
 
-        // Permisos directos del usuario.
-        // Si el frontend precargó permisos por rol, llegarán aquí en request.
-        // Si no manda permisos, se guarda sin permisos directos.
+        // Permisos directos
         $user->permissions()->sync($request->permissions ?? []);
+
+        // Sucursales permitidas solo para Ventas
+        if ($role->name === 'Ventas') {
+            $user->sucursales()->sync($request->sucursal_ids ?? []);
+        } else {
+            $user->sucursales()->sync([]);
+        }
 
         return redirect()->route('sistemas.empleados')
             ->with('success', 'Usuario creado correctamente');
     }
 
-    // ✏️ ACTUALIZAR
     public function update(Request $request, $id)
     {
         $this->checkPermission('usuarios.editar');
@@ -94,41 +113,64 @@ class UserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $id,
-            'role_id' => 'nullable|exists:roles,id',
-             'sucursal_id' => 'required|exists:sucursales,id',
+            'role_id' => 'required|exists:roles,id',
+
+            // Varias sucursales para rol Ventas
+            'sucursal_ids' => 'nullable|array',
+            'sucursal_ids.*' => 'exists:sucursales,id',
+
             'permissions' => 'nullable|array',
             'permissions.*' => 'exists:permissions,id',
         ]);
 
         if ($request->password) {
             $request->validate([
-                'password' => 'confirmed|min:6'
+                'password' => 'confirmed|min:6',
             ]);
+        }
+
+        $role = Role::findOrFail($request->role_id);
+
+        if ($role->name === 'Ventas' && empty($request->sucursal_ids)) {
+            return back()->withErrors([
+                'sucursal_ids' => 'Debes seleccionar al menos una sucursal para el vendedor.',
+            ])->withInput();
         }
 
         $user->update([
             'name' => $request->name,
             'email' => $request->email,
             'role_id' => $request->role_id,
+
             'password' => $request->password
                 ? Hash::make($request->password)
                 : $user->password,
         ]);
 
-        // Actualiza SOLO permisos directos de este usuario.
-        // No toca permissions del rol.
+        // Permisos directos
         $user->permissions()->sync($request->permissions ?? []);
+
+        // Sucursales permitidas solo para Ventas
+        if ($role->name === 'Ventas') {
+            $user->sucursales()->sync($request->sucursal_ids ?? []);
+        } else {
+            $user->sucursales()->sync([]);
+        }
 
         return redirect()->route('sistemas.empleados')
             ->with('success', 'Usuario actualizado');
     }
 
-    // 🗑️ ELIMINAR
     public function destroy($id)
     {
         $this->checkPermission('usuarios.eliminar');
 
-        User::findOrFail($id)->delete();
+        $user = User::findOrFail($id);
+
+        $user->permissions()->detach();
+        $user->sucursales()->detach();
+
+        $user->delete();
 
         return redirect()->route('sistemas.empleados')
             ->with('success', 'Usuario eliminado');

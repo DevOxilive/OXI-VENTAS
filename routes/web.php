@@ -69,18 +69,18 @@ return Inertia::render('Sistemas/Empleados', [
 
     'empleados' => \App\Models\Empleado::doesntHave('user')->get(),
 
-    'usuarios' => \App\Models\User::with([
-        'role',
-        'permissions',
-        'sucursal'
-    ])
+   'usuarios' => \App\Models\User::with([
+    'role',
+    'permissions',
+    'sucursales'
+])
         ->select(
             'id',
             'empleado_id',
             'name',
             'email',
             'role_id',
-            'sucursal_id'
+           
         )
         ->get(),
 

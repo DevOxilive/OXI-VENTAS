@@ -65,11 +65,11 @@ class User extends Authenticatable
             ->unique('id')
             ->values();
     }
-    public function sucursal()
-{
-    return $this->belongsTo(\App\Models\Sucursal::class);
-}
 
+public function sucursales()
+{
+    return $this->belongsToMany(\App\Models\Sucursal::class, 'sucursal_user');
+}
     public function hasPermission($permission)
     {
         if ($this->permissions()->where('name', $permission)->exists()) {

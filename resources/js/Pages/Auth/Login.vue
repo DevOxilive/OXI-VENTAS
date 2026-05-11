@@ -94,16 +94,14 @@ const submit = () => {
                         </p>
                     </div>
 
-                    <!-- SUCURSAL -->
-                   <!-- SUCURSAL -->
+                    <!-- SUCURSAL --><!-- SUCURSAL -->
 <div>
     <select
         v-model="form.sucursal_id"
         class="w-full py-4 px-4 text-lg border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
-        required
     >
         <option disabled value="">
-            Selecciona tu sucursal
+            Selecciona tu sucursal si eres vendedor
         </option>
 
         <option
@@ -119,7 +117,6 @@ const submit = () => {
         {{ form.errors.sucursal_id }}
     </p>
 </div>
-
                     <!-- BOTÓN -->
                     <button
                         type="submit"

@@ -43,38 +43,55 @@ class FortifyServiceProvider extends ServiceProvider
                     ->get(),
             ]);
         });
+Fortify::authenticateUsing(function (Request $request) {
 
-        Fortify::authenticateUsing(function (Request $request) {
-            $request->validate([
-                'email' => ['required', 'string'],
-                'password' => ['required', 'string'],
-                'sucursal_id' => ['required', 'exists:sucursales,id'],
-            ]);
+    $request->validate([
+        'email' => ['required', 'string'],
+        'password' => ['required', 'string'],
+        'sucursal_id' => ['nullable', 'exists:sucursales,id'],
+    ]);
 
-            $user = User::with('role')
-                ->where('email', $request->email)
-                ->first();
+    $user = User::with('role')
+        ->where('email', $request->email)
+        ->first();
 
-            if (! $user || ! Hash::check($request->password, $user->password)) {
-                throw ValidationException::withMessages([
-                    'email' => __('auth.failed'),
-                ]);
-            }
+    if (! $user || ! Hash::check($request->password, $user->password)) {
+        throw ValidationException::withMessages([
+            'email' => __('auth.failed'),
+        ]);
+    }
 
-            if ($user->role?->name !== 'Administrador') {
-                if ((int) $user->sucursal_id !== (int) $request->sucursal_id) {
-                    throw ValidationException::withMessages([
-                        'sucursal_id' => 'No perteneces a la sucursal seleccionada.',
-                    ]);
-                }
-            }
+    $rol = $user->role?->name;
 
-            session([
-                'sucursal_id' => $request->sucursal_id,
-            ]);
+    if ($rol === 'Ventas') {
 
-            return $user;
-        });
+    if (! $request->sucursal_id) {
+        throw ValidationException::withMessages([
+            'sucursal_id' => 'Debes seleccionar tu sucursal.',
+        ]);
+    }
+
+    $puedeEntrar = $user->sucursales()
+        ->where('sucursales.id', $request->sucursal_id)
+        ->exists();
+
+    if (! $puedeEntrar) {
+        throw ValidationException::withMessages([
+            'sucursal_id' => 'No tienes acceso a la sucursal seleccionada.',
+        ]);
+    }
+
+    session([
+        'sucursal_id' => $request->sucursal_id,
+    ]);
+} else {
+    session([
+        'sucursal_id' => null,
+    ]);
+}
+
+    return $user;
+});
 
         $this->app->singleton(RegisterResponse::class, function () {
             return new class implements RegisterResponse {

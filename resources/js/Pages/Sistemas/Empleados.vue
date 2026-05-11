@@ -58,7 +58,7 @@ const form = useForm({
     password: '',
     password_confirmation: '',
     role_id: '',
-      sucursal_id: '',
+    sucursal_ids: [],
     permissions: []
 })
 
@@ -89,6 +89,13 @@ function validar() {
         if (form.password !== form.password_confirmation) {
             errores.value.password_confirmation = 'No coincide'
         }
+        if (!form.role_id) {
+    errores.value.role_id = 'Debes seleccionar un rol'
+}
+
+if (esRolVentas.value && form.sucursal_ids.length === 0) {
+    errores.value.sucursal_ids = 'Selecciona al menos una sucursal para el vendedor'
+}
     }
 
     return Object.keys(errores.value).length === 0
@@ -201,10 +208,12 @@ function abrirModal(emp = null) {
         form.name = emp.name || ''
         form.email = emp.email || ''
         form.role_id = emp.role_id || ''
-        form.sucursal_id = emp.sucursal_id || ''
         form.permissions = emp.permissions?.length
             ? emp.permissions.map(p => p.id)
             : permisosPorRol(emp.role_id)
+            form.sucursal_ids = emp.sucursales?.length
+    ? emp.sucursales.map(s => s.id)
+    : []
     } else {
         editando.value = false
         userId.value = null
@@ -288,7 +297,19 @@ function permisosPorRol(roleId) {
 
     return rol?.permissions?.map(p => p.id) || []
 }
+const rolSeleccionado = computed(() => {
+    return roles.value.find(r => String(r.id) === String(form.role_id))
+})
 
+const esRolVentas = computed(() => {
+    return rolSeleccionado.value?.name === 'Ventas'
+})
+
+watch(() => form.role_id, () => {
+    if (!esRolVentas.value) {
+        form.sucursal_ids = []
+    }
+})
 
 
 </script>
@@ -422,8 +443,17 @@ function permisosPorRol(roleId) {
                             <p><strong>Correo:</strong> {{ usuarioSeleccionado.email || '—' }}</p>
                             <p><strong>Empleado ID:</strong> {{ usuarioSeleccionado.empleado_id || '—' }}</p>
                             <p><strong>Rol:</strong> {{ usuarioSeleccionado.role?.name || 'Sin rol' }}</p>
-                             <p><strong>Sucursal:</strong> {{ usuarioSeleccionado.sucursal?.nombre || 'Sin sucursal' }}</p>
-                        </div>
+<div v-if="usuarioSeleccionado.role?.name === 'Ventas'">
+    <strong>Sucursales:</strong>
+
+    <span
+        v-for="sucursal in usuarioSeleccionado.sucursales"
+        :key="sucursal.id"
+        class="inline-block ml-2 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs"
+    >
+        {{ sucursal.nombre }}
+    </span>
+</div>                    </div>
 
                         <div class="bg-gray-50 border rounded-xl p-4">
                             <h3 class="font-semibold mb-3 text-slate-700">
@@ -470,34 +500,60 @@ function permisosPorRol(roleId) {
                         <p v-if="errores.name" class="text-red-500 text-xs">{{ errores.name }}</p>
                     </div>
 
-                    <select v-model="form.role_id" @change="form.permissions = permisosPorRol(form.role_id)"
-                        class="border rounded px-3 py-2">
-                        <option value="">
-                            Seleccionar rol
-                        </option>
-
-                        <option v-for="rol in roles" :key="rol.id" :value="rol.id">
-                            {{ rol.name }}
-                        </option>
-                    </select>
-                    <select
-    v-model="form.sucursal_id"
-    class="border rounded px-3 py-2"
-    required
->
-    <option value="">
-        Seleccionar sucursal
-    </option>
-
-    <option
-        v-for="sucursal in sucursales"
-        :key="sucursal.id"
-        :value="sucursal.id"
+<!-- ROL -->
+<div>
+    <select
+        v-model="form.role_id"
+        @change="form.permissions = permisosPorRol(form.role_id)"
+        class="border rounded px-3 py-2 w-full"
     >
-        {{ sucursal.nombre }}
-    </option>
-</select>
+        <option value="">
+            Seleccionar rol
+        </option>
 
+        <option
+            v-for="rol in roles"
+            :key="rol.id"
+            :value="rol.id"
+        >
+            {{ rol.name }}
+        </option>
+    </select>
+
+    <p v-if="errores.role_id" class="text-red-500 text-xs">
+        {{ errores.role_id }}
+    </p>
+</div>
+<!-- SUCURSALES SOLO VENTAS -->
+<div v-if="esRolVentas">
+    <p class="text-sm font-semibold text-slate-700 mb-2">
+        Sucursales permitidas para este vendedor
+    </p>
+
+    <div class="grid grid-cols-2 gap-2">
+        <label
+            v-for="sucursal in sucursales"
+            :key="sucursal.id"
+            class="border rounded-lg px-3 py-2 cursor-pointer flex items-center gap-2"
+        >
+            <input
+                type="checkbox"
+                :value="sucursal.id"
+                v-model="form.sucursal_ids"
+            >
+
+            <span>{{ sucursal.nombre }}</span>
+        </label>
+    </div>
+
+    <p v-if="errores.sucursal_ids" class="text-red-500 text-xs">
+        {{ errores.sucursal_ids }}
+    </p>
+
+    <p v-if="form.errors.sucursal_ids" class="text-red-500 text-xs">
+        {{ form.errors.sucursal_ids }}
+    </p>
+</div>
                     <!-- BOTON PERMISOS -->
                     <div>
                         <h3 class="font-semibold text-sm mb-2">
