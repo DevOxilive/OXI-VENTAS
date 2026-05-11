@@ -48,7 +48,6 @@ const {
 
 <template>
     <div class="bg-[#f6f3f7] min-h-screen rounded-2xl md:rounded-3xl p-4 md:p-6">
-        <pre>{{ $page.props.auth }}</pre>
 
         <h1 class="text-lg md:text-xl font-semibold text-slate-700 mb-5">
             Empleados

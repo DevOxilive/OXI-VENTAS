@@ -293,8 +293,6 @@ function permisosPorRol(roleId) {
 
 <template>
     <div class="bg-[#f6f3f7] min-h-screen rounded-3xl p-6">
-        <pre>{{ $page.props.auth }}</pre>
-
 
         <h1 class="text-xl font-semibold text-slate-700 mb-6">
             Dashboard Registro de Usuarioñ
@@ -373,7 +371,7 @@ function permisosPorRol(roleId) {
                             {{
                                 vista === 'usuarios'
                                     ? (emp.role?.name || 'Sin rol')
-                            : (emp.user?.role?.name || 'SIN ROL')
+                                    : (emp.user?.role?.name || 'SIN ROL')
                             }}
                         </td>
 
