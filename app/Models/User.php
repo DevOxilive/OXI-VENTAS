@@ -17,6 +17,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role_id',
+        'sucursal_id',
     ];
 
     protected $hidden = [
@@ -65,6 +66,10 @@ class User extends Authenticatable
             ->values();
     }
 
+public function sucursales()
+{
+    return $this->belongsToMany(\App\Models\Sucursal::class, 'sucursal_user');
+}
     public function hasPermission($permission)
     {
         if ($this->permissions()->where('name', $permission)->exists()) {

@@ -24,10 +24,13 @@ Route::get('/register', function () {
         'roles' => DB::table('roles')
             ->where('name', '!=', 'Administrador')
             ->orderBy('name')
-            ->get()
+            ->get(),
+
+        'sucursales' => \App\Models\Sucursal::where('activa', true)
+            ->orderBy('nombre')
+            ->get(),
     ]);
 })->name('register');
-
 
 /*
 |--------------------------------------------------------------------------
@@ -62,17 +65,32 @@ Route::prefix('sistemas')->group(function () {
             Auth::check() && $user && $user->hasPermission('usuarios.ver'),
             403
         );
+return Inertia::render('Sistemas/Empleados', [
 
-        return Inertia::render('Sistemas/Empleados', [
-            'empleados' => \App\Models\Empleado::doesntHave('user')->get(),
+    'empleados' => \App\Models\Empleado::doesntHave('user')->get(),
 
-            'usuarios' => \App\Models\User::with(['role', 'permissions'])
-                ->select('id', 'empleado_id', 'name', 'email', 'role_id')
-                ->get(),
+   'usuarios' => \App\Models\User::with([
+    'role',
+    'permissions',
+    'sucursales'
+])
+        ->select(
+            'id',
+            'empleado_id',
+            'name',
+            'email',
+            'role_id',
+           
+        )
+        ->get(),
 
-            'roles' => \App\Models\Role::all(),
-            'permissions' => \App\Models\Permission::all(),
-        ]);
+    'roles' => \App\Models\Role::all(),
+
+    'permissions' => \App\Models\Permission::all(),
+
+    'sucursales' => \App\Models\Sucursal::where('activa', true)->get(),
+
+]);
 
     })->name('sistemas.empleados');
 

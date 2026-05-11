@@ -4,18 +4,23 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 defineProps({
     canResetPassword: Boolean,
     status: String,
+    sucursales: Array,
+    sucursales: Array,
 });
 
 const form = useForm({
     email: '',
     password: '',
+    sucursal_id: '',
+    
     remember: false,
+    
 });
 
 const submit = () => {
     form.transform(data => ({
         ...data,
-        email: data.email + '@oxilive.com.mx', 
+        email: data.email + '@oxilive.com.mx',
         remember: form.remember ? 'on' : '',
     })).post(route('login'), {
         onFinish: () => form.reset('password'),
@@ -89,6 +94,29 @@ const submit = () => {
                         </p>
                     </div>
 
+                    <!-- SUCURSAL --><!-- SUCURSAL -->
+<div>
+    <select
+        v-model="form.sucursal_id"
+        class="w-full py-4 px-4 text-lg border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+    >
+        <option disabled value="">
+            Selecciona tu sucursal si eres vendedor
+        </option>
+
+        <option
+            v-for="sucursal in sucursales"
+            :key="sucursal.id"
+            :value="sucursal.id"
+        >
+            {{ sucursal.nombre }}
+        </option>
+    </select>
+
+    <p v-if="form.errors.sucursal_id" class="text-red-500 text-sm mt-1">
+        {{ form.errors.sucursal_id }}
+    </p>
+</div>
                     <!-- BOTÓN -->
                     <button
                         type="submit"

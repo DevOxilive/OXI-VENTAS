@@ -24,6 +24,7 @@ class CreateNewUser implements CreatesNewUsers
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => $this->passwordRules(),
             'terms' => Jetstream::hasTermsAndPrivacyPolicyFeature() ? ['accepted', 'required'] : '',
+            'sucursal_id' => ['required', 'exists:sucursales,id'],
         'role_id' => ['required', 'exists:roles,id'],
         ])->validate();
 
@@ -32,6 +33,7 @@ class CreateNewUser implements CreatesNewUsers
             'email' => $input['email'],
             'password' => Hash::make($input['password']),
             'role_id' => $input['role_id'], 
+            'sucursal_id' => $input['sucursal_id'],
         ]);
     }
 }

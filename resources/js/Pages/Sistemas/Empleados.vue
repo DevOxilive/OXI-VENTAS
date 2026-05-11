@@ -38,7 +38,7 @@ const { can } = usePermissions()
 const empleados = computed(() => page.props.empleados || [])
 const usuarios = computed(() => page.props.usuarios || [])
 const roles = computed(() => page.props.roles || [])
-
+const sucursales = computed(() => page.props.sucursales || [])
 const permissions = computed(() => page.props.permissions || [])
 
 
@@ -74,13 +74,14 @@ function cerrarDetalleUsuario() {
 
 // 🔥 FORM
 const form = useForm({
-  empleado_id: '',
-  name: '',
-  email: '',
-  password: '',
-  password_confirmation: '',
-  role_id: '',
-  permissions: []
+    empleado_id: '',
+    name: '',
+    email: '',
+    password: '',
+    password_confirmation: '',
+    role_id: '',
+    sucursal_ids: [],
+    permissions: []
 })
 
 // 🔥 ERRORES
@@ -107,8 +108,25 @@ function validar() {
       errores.value.password = 'Máximo 15 caracteres'
     }
 
-    if (form.password !== form.password_confirmation) {
-      errores.value.password_confirmation = 'No coincide'
+    if (!editando.value || form.password) {
+        if (!form.password) {
+            errores.value.password = 'Contraseña requerida'
+        } else if (form.password.length < 7) {
+            errores.value.password = 'Mínimo 7 caracteres'
+        } else if (form.password.length > 15) {
+            errores.value.password = 'Máximo 15 caracteres'
+        }
+
+        if (form.password !== form.password_confirmation) {
+            errores.value.password_confirmation = 'No coincide'
+        }
+        if (!form.role_id) {
+    errores.value.role_id = 'Debes seleccionar un rol'
+}
+
+if (esRolVentas.value && form.sucursal_ids.length === 0) {
+    errores.value.sucursal_ids = 'Selecciona al menos una sucursal para el vendedor'
+}
     }
   }
 
@@ -209,29 +227,33 @@ function desactivarModulo(modulo) {
 }
 // 🔥 ABRIR MODAL CREAR / EDITAR
 function abrirModal(emp = null) {
-  form.reset()
-  form.clearErrors()
-  errores.value = {}
-  showModal.value = true
+    form.reset()
+    form.clearErrors()
+    errores.value = {}
+    showModal.value = true
 
-  if (emp && vista.value === 'usuarios') {
-    editando.value = true
-    userId.value = emp.id
+    if (emp && vista.value === 'usuarios') {
+        editando.value = true
+        userId.value = emp.id
 
-    form.empleado_id = emp.empleado_id || ''
-    form.name = emp.name || ''
-    form.email = emp.email || ''
-    form.role_id = emp.role_id || ''
-    form.permissions = emp.permissions?.length
-      ? emp.permissions.map(p => p.id)
-      : permisosPorRol(emp.role_id)
-  } else {
-    editando.value = false
-    userId.value = null
+        form.empleado_id = emp.empleado_id || ''
+        form.name = emp.name || ''
+        form.email = emp.email || ''
+        form.role_id = emp.role_id || ''
+        form.permissions = emp.permissions?.length
+            ? emp.permissions.map(p => p.id)
+            : permisosPorRol(emp.role_id)
+            form.sucursal_ids = emp.sucursales?.length
+    ? emp.sucursales.map(s => s.id)
+    : []
+    } else {
+        editando.value = false
+        userId.value = null
 
-    if (emp) {
-      form.empleado_id = emp.id
-      form.name = `${emp.nombre || ''} ${emp.apellido || ''}`.trim()
+        if (emp) {
+            form.empleado_id = emp.id
+            form.name = `${emp.nombre || ''} ${emp.apellido || ''}`.trim()
+        }
     }
   }
 }
@@ -339,18 +361,21 @@ function eliminarUsuario(id) {
     form.delete(route('sistemas.empleados.destroy', id), {
       preserveScroll: true,
 
-      onSuccess: () => {
-        ToastAlert({
-          icon: 'success',
-          title: 'Usuario eliminado correctamente',
-        })
+    return rol?.permissions?.map(p => p.id) || []
+}
+const rolSeleccionado = computed(() => {
+    return roles.value.find(r => String(r.id) === String(form.role_id))
+})
 
-        router.visit(route('sistemas.empleados'), {
-          preserveScroll: true,
-          preserveState: false,
-          replace: true
-        })
-      },
+const esRolVentas = computed(() => {
+    return rolSeleccionado.value?.name === 'Ventas'
+})
+
+watch(() => form.role_id, () => {
+    if (!esRolVentas.value) {
+        form.sucursal_ids = []
+    }
+})
 
       onError: () => {
         ErrorAlert({
@@ -496,10 +521,23 @@ function eliminarUsuario(id) {
 
               <div v-if="usuarioSeleccionado.permissions?.length" class="flex flex-wrap gap-2">
 
-                <span v-for="permiso in usuarioSeleccionado.permissions" :key="permiso.id"
-                  class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs border border-green-300">
-                  {{ permiso.name }}
-                </span>
+                        <div class="bg-gray-50 border rounded-xl p-4 grid gap-2 text-sm">
+                            <p><strong>ID:</strong> {{ usuarioSeleccionado.id }}</p>
+                            <p><strong>Nombre:</strong> {{ usuarioSeleccionado.name || '—' }}</p>
+                            <p><strong>Correo:</strong> {{ usuarioSeleccionado.email || '—' }}</p>
+                            <p><strong>Empleado ID:</strong> {{ usuarioSeleccionado.empleado_id || '—' }}</p>
+                            <p><strong>Rol:</strong> {{ usuarioSeleccionado.role?.name || 'Sin rol' }}</p>
+<div v-if="usuarioSeleccionado.role?.name === 'Ventas'">
+    <strong>Sucursales:</strong>
+
+    <span
+        v-for="sucursal in usuarioSeleccionado.sucursales"
+        :key="sucursal.id"
+        class="inline-block ml-2 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs"
+    >
+        {{ sucursal.nombre }}
+    </span>
+</div>                    </div>
 
               </div>
 
@@ -551,11 +589,77 @@ function eliminarUsuario(id) {
               Permisos
             </h3>
 
-            <button type="button" @click="showPermisosModal = true"
-              class="w-full border rounded-xl px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between">
-              <span class="text-sm font-medium">
-                Configurar permisos
-              </span>
+<!-- ROL -->
+<div>
+    <select
+        v-model="form.role_id"
+        @change="form.permissions = permisosPorRol(form.role_id)"
+        class="border rounded px-3 py-2 w-full"
+    >
+        <option value="">
+            Seleccionar rol
+        </option>
+
+        <option
+            v-for="rol in roles"
+            :key="rol.id"
+            :value="rol.id"
+        >
+            {{ rol.name }}
+        </option>
+    </select>
+
+    <p v-if="errores.role_id" class="text-red-500 text-xs">
+        {{ errores.role_id }}
+    </p>
+</div>
+<!-- SUCURSALES SOLO VENTAS -->
+<div v-if="esRolVentas">
+    <p class="text-sm font-semibold text-slate-700 mb-2">
+        Sucursales permitidas para este vendedor
+    </p>
+
+    <div class="grid grid-cols-2 gap-2">
+        <label
+            v-for="sucursal in sucursales"
+            :key="sucursal.id"
+            class="border rounded-lg px-3 py-2 cursor-pointer flex items-center gap-2"
+        >
+            <input
+                type="checkbox"
+                :value="sucursal.id"
+                v-model="form.sucursal_ids"
+            >
+
+            <span>{{ sucursal.nombre }}</span>
+        </label>
+    </div>
+
+    <p v-if="errores.sucursal_ids" class="text-red-500 text-xs">
+        {{ errores.sucursal_ids }}
+    </p>
+
+    <p v-if="form.errors.sucursal_ids" class="text-red-500 text-xs">
+        {{ form.errors.sucursal_ids }}
+    </p>
+</div>
+                    <!-- BOTON PERMISOS -->
+                    <div>
+                        <h3 class="font-semibold text-sm mb-2">
+                            Permisos
+                        </h3>
+
+                        <button type="button" @click="showPermisosModal = true"
+                            class="w-full border rounded-xl px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between">
+                            <span class="text-sm font-medium">
+                                Configurar permisos
+                            </span>
+
+                            <span class="text-xs text-gray-500">
+                                {{ form.permissions.length }} seleccionados →
+                            </span>
+                        </button>
+                    </div>
 
               <span class="text-xs text-gray-500">
                 {{ form.permissions.length }} seleccionados →
