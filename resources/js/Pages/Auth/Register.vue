@@ -9,6 +9,7 @@ const form = useForm({
     password: '',
     password_confirmation: '',
     role_id: '',
+    sucursal_id: '',
     terms: false,
 });
 
@@ -42,6 +43,7 @@ const limpiar = () => {
     form.reset();
 };
 const roles = usePage().props.roles;
+const sucursales = usePage().props.sucursales;
 </script>
 
 <template>
@@ -94,6 +96,28 @@ const roles = usePage().props.roles;
                         </option>
 
                     </select>
+                    <!-- SUCURSAL -->
+<div>
+    <select
+        v-model="form.sucursal_id"
+        class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+        required
+    >
+        <option value="">Seleccionar sucursal del usuario</option>
+
+        <option
+            v-for="sucursal in sucursales"
+            :key="sucursal.id"
+            :value="sucursal.id"
+        >
+            {{ sucursal.nombre }}
+        </option>
+    </select>
+
+    <p v-if="form.errors.sucursal_id" class="text-red-500 text-sm">
+        {{ form.errors.sucursal_id }}
+    </p>
+</div>
 
                     <!-- EMAIL -->
                     <div>

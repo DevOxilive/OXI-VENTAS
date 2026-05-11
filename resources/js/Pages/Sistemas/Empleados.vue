@@ -16,7 +16,7 @@ const { can } = usePermissions()
 const empleados = computed(() => page.props.empleados || [])
 const usuarios = computed(() => page.props.usuarios || [])
 const roles = computed(() => page.props.roles || [])
-
+const sucursales = computed(() => page.props.sucursales || [])
 const permissions = computed(() => page.props.permissions || [])
 
 
@@ -58,6 +58,7 @@ const form = useForm({
     password: '',
     password_confirmation: '',
     role_id: '',
+      sucursal_id: '',
     permissions: []
 })
 
@@ -200,6 +201,7 @@ function abrirModal(emp = null) {
         form.name = emp.name || ''
         form.email = emp.email || ''
         form.role_id = emp.role_id || ''
+        form.sucursal_id = emp.sucursal_id || ''
         form.permissions = emp.permissions?.length
             ? emp.permissions.map(p => p.id)
             : permisosPorRol(emp.role_id)
@@ -420,6 +422,7 @@ function permisosPorRol(roleId) {
                             <p><strong>Correo:</strong> {{ usuarioSeleccionado.email || '—' }}</p>
                             <p><strong>Empleado ID:</strong> {{ usuarioSeleccionado.empleado_id || '—' }}</p>
                             <p><strong>Rol:</strong> {{ usuarioSeleccionado.role?.name || 'Sin rol' }}</p>
+                             <p><strong>Sucursal:</strong> {{ usuarioSeleccionado.sucursal?.nombre || 'Sin sucursal' }}</p>
                         </div>
 
                         <div class="bg-gray-50 border rounded-xl p-4">
@@ -477,6 +480,23 @@ function permisosPorRol(roleId) {
                             {{ rol.name }}
                         </option>
                     </select>
+                    <select
+    v-model="form.sucursal_id"
+    class="border rounded px-3 py-2"
+    required
+>
+    <option value="">
+        Seleccionar sucursal
+    </option>
+
+    <option
+        v-for="sucursal in sucursales"
+        :key="sucursal.id"
+        :value="sucursal.id"
+    >
+        {{ sucursal.nombre }}
+    </option>
+</select>
 
                     <!-- BOTON PERMISOS -->
                     <div>

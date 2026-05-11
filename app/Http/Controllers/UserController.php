@@ -72,6 +72,7 @@ class UserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role_id' => $request->role_id,
+            'sucursal_id' => $request->sucursal_id,
         ]);
 
         // Permisos directos del usuario.
@@ -94,6 +95,7 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $id,
             'role_id' => 'nullable|exists:roles,id',
+             'sucursal_id' => 'required|exists:sucursales,id',
             'permissions' => 'nullable|array',
             'permissions.*' => 'exists:permissions,id',
         ]);

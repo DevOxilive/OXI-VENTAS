@@ -17,6 +17,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role_id',
+        'sucursal_id',
     ];
 
     protected $hidden = [
@@ -64,6 +65,10 @@ class User extends Authenticatable
             ->unique('id')
             ->values();
     }
+    public function sucursal()
+{
+    return $this->belongsTo(\App\Models\Sucursal::class);
+}
 
     public function hasPermission($permission)
     {
