@@ -1,9 +1,31 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import {
+  ref,
+  watch,
+  computed
+} from 'vue'
+
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { usePage, useForm, router } from '@inertiajs/vue3'
-import { usePermissions } from '@/Composables/usePermissions'
+
+import {
+  usePage,
+  useForm,
+  router
+} from '@inertiajs/vue3'
+
+import {
+  usePermissions,
+} from '@/Composables/usePermissions'
+
 import ActionIconButton from '@/Components/Formularios/ActionIconButton.vue'
+
+import {
+  UniversalActionModal,
+  ToastAlert,
+  ErrorAlert,
+  WarningAlert,
+} from '@/Components/Modales/UniversalActionModal'
+
 defineOptions({ layout: AdminLayout })
 
 // 🔥 PAGE
@@ -239,27 +261,62 @@ function cerrarModal() {
 
 // 🔥 GUARDAR
 function guardarEmpleado() {
-  if (!validar()) return
+  if (!validar()) {
+    WarningAlert({
+      title: 'Formulario incompleto',
+      message: 'Revisa los campos marcados antes de continuar.',
+    })
+
+    return
+  }
 
   form.permissions = form.permissions.filter(p => p)
 
   if (editando.value) {
     form.put(route('sistemas.empleados.update', userId.value), {
       preserveScroll: true,
+
       onSuccess: () => {
         cerrarModal()
+
+        ToastAlert({
+          icon: 'success',
+          title: 'Usuario actualizado correctamente',
+        })
+
         router.reload({ only: ['empleados', 'usuarios'] })
+      },
+
+      onError: () => {
+        ErrorAlert({
+          title: 'Error al actualizar',
+          message: 'No fue posible actualizar la información del usuario.',
+        })
       }
     })
   } else {
     form.post(route('sistemas.empleados.store'), {
       preserveScroll: true,
+
       onSuccess: () => {
         cerrarModal()
+
+        ToastAlert({
+          icon: 'success',
+          title: 'Usuario registrado correctamente',
+        })
+
         router.visit(route('sistemas.empleados'), {
           preserveScroll: true,
           preserveState: false,
           replace: true
+        })
+      },
+
+      onError: () => {
+        ErrorAlert({
+          title: 'Error al registrar',
+          message: 'No fue posible registrar el usuario.',
         })
       }
     })
@@ -268,26 +325,42 @@ function guardarEmpleado() {
 
 // 🔥 ELIMINAR
 function eliminarUsuario(id) {
-  if (!confirm('¿Eliminar usuario?')) return
+  UniversalActionModal({
+    title: 'Confirmar eliminación',
+    message: '¿Deseas eliminar permanentemente este usuario',
+    itemName: '',
+    confirmText: 'Sí, eliminar',
+    cancelText: 'Cancelar',
+    icon: 'warning',
+    confirmButtonColor: '#ef4444',
+  }).then((result) => {
+    if (!result.isConfirmed) return
 
-  form.delete(route('sistemas.empleados.destroy', id), {
-    preserveScroll: true,
-    onSuccess: () => {
-      router.visit(route('sistemas.empleados'), {
-        preserveScroll: true,
-        preserveState: false,
-        replace: true
-      })
-    }
+    form.delete(route('sistemas.empleados.destroy', id), {
+      preserveScroll: true,
+
+      onSuccess: () => {
+        ToastAlert({
+          icon: 'success',
+          title: 'Usuario eliminado correctamente',
+        })
+
+        router.visit(route('sistemas.empleados'), {
+          preserveScroll: true,
+          preserveState: false,
+          replace: true
+        })
+      },
+
+      onError: () => {
+        ErrorAlert({
+          title: 'Error al eliminar',
+          message: 'No fue posible eliminar el usuario.',
+        })
+      }
+    })
   })
-}// 🔥 PERMISOS AUTOMÁTICOS POR ROL
-function permisosPorRol(roleId) {
-  const rol = roles.value.find(r => String(r.id) === String(roleId))
-
-  return rol?.permissions?.map(p => p.id) || []
 }
-
-
 
 </script>
 
