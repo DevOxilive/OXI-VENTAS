@@ -4,15 +4,15 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useEmpleadoActions } from '@/Composables/Recursos-humanos/useEmpleadoActions'
 import { useEmpleadoFilters } from '@/Composables/Recursos-humanos/useEmpleadoFilters'
 import { useEmpleadoExport } from '@/Composables/Recursos-humanos/useEmpleadoExport'
-import { usePermissions } from '@/Composables/usePermissions'
 import EmpleadoRegisterModal from '@/Components/Formularios/EmpleadoRegisterModal.vue'
 import EmpleadosToolbar from '@/Components/Recursos-humanos/EmpleadosToolbar.vue'
 import EmpleadosTable from '@/Components/Recursos-humanos/EmpleadosTable.vue'
 import EmpleadosMobileCards from '@/Components/Recursos-humanos/EmpleadosMobileCards.vue'
+import { usePermissions } from '@/Composables/usePermissions'
 
 defineOptions({ layout: AdminLayout })
 
-const { can, canAny } = usePermissions()
+const { can } = usePermissions()
 
 const { empleadosDB } = defineProps({
     empleadosDB: Array
@@ -53,9 +53,9 @@ const {
             Empleados
         </h1>
 
-        <EmpleadosToolbar v-if="can('empleados.crear') || can('empleados.exportar')"
-            :empleadosFiltrados="empleadosFiltrados" :empleadosDB="empleadosDB" :registrosAMostrar="registrosAMostrar"
-            @nuevo="abrirModalGeneral" @excel="exportarExcel" @update:registrosAMostrar="registrosAMostrar = $event" />
+        <EmpleadosToolbar :empleadosFiltrados="empleadosFiltrados" :empleadosDB="empleadosDB"
+            :registrosAMostrar="registrosAMostrar" @nuevo="abrirModalGeneral" @excel="exportarExcel"
+            @update:registrosAMostrar="registrosAMostrar = $event" />
 
         <EmpleadosTable :empleadosFiltrados="empleadosFiltrados" :busqueda="busqueda" :filtroPuesto="filtroPuesto"
             :filtroDepartamento="filtroDepartamento" :filtroEstado="filtroEstado" @update:busqueda="busqueda = $event"

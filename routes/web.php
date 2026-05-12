@@ -55,58 +55,56 @@ Route::middleware([
 | 🧠 SISTEMAS (Usuarios / Permisos)
 |--------------------------------------------------------------------------
 */
-Route::prefix('sistemas')->group(function () {
+    Route::prefix('sistemas')->group(function () {
 
-    Route::get('/Empleados', function () {
+        Route::get('/Empleados', function () {
 
-        $user = \App\Models\User::find(Auth::id());
+            $user = \App\Models\User::find(Auth::id());
 
-        abort_unless(
-            Auth::check() && $user && $user->hasPermission('usuarios.ver'),
-            403
-        );
-return Inertia::render('Sistemas/Empleados', [
+            abort_unless(
+                Auth::check() && $user && $user->hasPermission('usuarios.ver'),
+                403
+            );
+            return Inertia::render('Sistemas/Empleados', [
 
-    'empleados' => \App\Models\Empleado::doesntHave('user')->get(),
+                'empleados' => \App\Models\Empleado::doesntHave('user')->get(),
 
-   'usuarios' => \App\Models\User::with([
-    'role',
-    'permissions',
-    'sucursales'
-])
-        ->select(
-            'id',
-            'empleado_id',
-            'name',
-            'email',
-            'role_id',
-           
-        )
-        ->get(),
+                'usuarios' => \App\Models\User::with([
+                    'role',
+                    'permissions',
+                    'sucursales'
+                ])
+                    ->select(
+                        'id',
+                        'empleado_id',
+                        'name',
+                        'email',
+                        'role_id',
 
-    'roles' => \App\Models\Role::all(),
+                    )
+                    ->get(),
 
-    'permissions' => \App\Models\Permission::all(),
+                'roles' => \App\Models\Role::all(),
 
-    'sucursales' => \App\Models\Sucursal::where('activa', true)->get(),
+                'permissions' => \App\Models\Permission::all(),
 
-]);
+                'sucursales' => \App\Models\Sucursal::where('activa', true)->get(),
 
-    })->name('sistemas.empleados');
+            ]);
+        })->name('sistemas.empleados');
 
-    Route::post('/Empleados', [UserController::class, 'store'])
-        ->name('sistemas.empleados.store');
+        Route::post('/Empleados', [UserController::class, 'store'])
+            ->name('sistemas.empleados.store');
 
-    Route::put('/Empleados/{id}', [UserController::class, 'update'])
-        ->name('sistemas.empleados.update');
+        Route::put('/Empleados/{id}', [UserController::class, 'update'])
+            ->name('sistemas.empleados.update');
 
-    Route::delete('/Empleados/{id}', [UserController::class, 'destroy'])
-        ->name('sistemas.empleados.destroy');
+        Route::delete('/Empleados/{id}', [UserController::class, 'destroy'])
+            ->name('sistemas.empleados.destroy');
 
-    Route::get('/usuarios', fn() => Inertia::render('Sistemas/Usuarios'))
-        ->name('sistemas.usuarios');
-
-});
+        Route::get('/usuarios', fn() => Inertia::render('Sistemas/Usuarios'))
+            ->name('sistemas.usuarios');
+    });
     /*
     |--------------------------------------------------------------------------
     | 👨‍💼 CAPITAL HUMANO
@@ -169,5 +167,4 @@ return Inertia::render('Sistemas/Empleados', [
             )->name('inventario.home');
         });
     });
-
 });

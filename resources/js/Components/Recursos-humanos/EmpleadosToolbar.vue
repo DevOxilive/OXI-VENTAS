@@ -1,8 +1,5 @@
 <script setup>
 import ExportButton from '@/Components/ExportButton.vue'
-import { usePermissions } from '@/Composables/usePermissions'
-
-const { can } = usePermissions()
 
 defineProps({
     empleadosFiltrados: Array,
@@ -21,13 +18,17 @@ defineEmits([
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
 
         <div class="flex items-center gap-3">
-            <button v-if="can('empleados.crear')" @click="$emit('nuevo')"
+            <button @click="$emit('nuevo')"
                 class="bg-[#1f1d2b] text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px]">add_circle</span>
                 Nuevo empleado
             </button>
 
-            <ExportButton v-if="can('empleados.exportar')" label="Exportar Excel" @click="$emit('excel')" />
+            <button type="button" @click="$emit('excel')"
+                class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">download</span>
+                Exportar Excel
+            </button>
         </div>
 
         <div class="flex items-center gap-2 text-sm text-slate-600">
