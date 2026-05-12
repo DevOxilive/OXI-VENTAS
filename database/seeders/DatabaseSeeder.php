@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             EmpleadoSeeder::class,
             UsersSeeder::class,
+            SucursalSeeder::class,
         ]);
     }
 }
