@@ -3,7 +3,8 @@ import { ref, watch, computed } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { usePage, useForm, router } from '@inertiajs/vue3'
 import { usePermissions } from '@/Composables/usePermissions'
-
+import UsuarioRegisterModal from '@/Components/Formularios/UsuarioRegisterModal.vue'
+import UsuarioDetalleModal from '@/Components/Formularios/UsuarioDetalleModal.vue'
 import ActionIconButton from '@/Components/Formularios/ActionIconButton.vue'
 
 import {
@@ -396,6 +397,7 @@ function eliminarUsuario(id) {
       </div>
     </div>
 
+    <!-- TABLA -->
     <div class="bg-white border rounded-xl overflow-hidden">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 text-slate-600">
@@ -410,6 +412,7 @@ function eliminarUsuario(id) {
         <tbody>
           <tr v-for="emp in listaActual" :key="emp.id" @click="abrirDetalleUsuario(emp)"
             class="border-t hover:bg-gray-50" :class="vista === 'usuarios' ? 'cursor-pointer' : ''">
+            <!-- NOMBRE -->
             <td class="px-4 py-3">
               {{
                 vista === 'usuarios'
@@ -418,24 +421,28 @@ function eliminarUsuario(id) {
               }}
             </td>
 
+            <!-- CORREO -->
             <td class="px-4 py-3">
               {{
                 vista === 'usuarios'
                   ? (emp.email || '—')
-                  : (emp.correo || '—')
+                  : 'Sin usuario registrado'
               }}
             </td>
 
+            <!-- ROL -->
             <td class="px-4 py-3 capitalize">
               {{
                 vista === 'usuarios'
                   ? (emp.role?.name || 'Sin rol')
-                  : (emp.user?.role?.name || 'SIN ROL')
+                  : (emp.user?.role?.name || 'Sin usuario registrado')
               }}
             </td>
 
+            <!-- ACCIONES -->
             <td class="px-4 py-3">
               <div class="flex items-center gap-2">
+
                 <ActionIconButton v-if="vista === 'empleados' && can('usuarios.crear')" icon="person_add"
                   title="Crear usuario" variant="blue" @click.stop="abrirModal(emp)" />
 
@@ -444,244 +451,23 @@ function eliminarUsuario(id) {
 
                 <ActionIconButton v-if="vista === 'usuarios' && can('usuarios.eliminar')" icon="delete"
                   title="Eliminar usuario" variant="red" @click.stop="eliminarUsuario(emp.id)" />
+
               </div>
             </td>
           </tr>
         </tbody>
       </table>
-
-      <div v-if="showDetalle" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-        <div class="bg-white w-[650px] max-h-[85vh] overflow-y-auto rounded-3xl p-6 shadow-xl">
-
-          <div class="flex justify-between items-center mb-5">
-            <h2 class="text-2xl font-bold text-slate-700">
-              Detalle del usuario
-            </h2>
-
-            <button @click="cerrarDetalleUsuario" class="bg-gray-200 hover:bg-gray-300 rounded-full px-3 py-1">
-              ✕
-            </button>
-          </div>
-
-          <div v-if="usuarioSeleccionado" class="space-y-4">
-            <div class="bg-gray-50 border rounded-xl p-4 grid gap-2 text-sm">
-              <p><strong>ID:</strong> {{ usuarioSeleccionado.id }}</p>
-              <p><strong>Nombre:</strong> {{ usuarioSeleccionado.name || '—' }}</p>
-              <p><strong>Correo:</strong> {{ usuarioSeleccionado.email || '—' }}</p>
-              <p><strong>Empleado ID:</strong> {{ usuarioSeleccionado.empleado_id || '—' }}</p>
-              <p><strong>Rol:</strong> {{ usuarioSeleccionado.role?.name || 'Sin rol' }}</p>
-
-              <div v-if="usuarioSeleccionado.role?.name === 'Ventas'">
-                <strong>Sucursales:</strong>
-
-                <span v-for="sucursal in usuarioSeleccionado.sucursales" :key="sucursal.id"
-                  class="inline-block ml-2 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs">
-                  {{ sucursal.nombre }}
-                </span>
-              </div>
-            </div>
-
-            <div class="bg-gray-50 border rounded-xl p-4">
-              <h3 class="font-semibold mb-3 text-slate-700">
-                Permisos activados
-              </h3>
-
-              <div v-if="usuarioSeleccionado.permissions?.length" class="flex flex-wrap gap-2">
-                <span v-for="permiso in usuarioSeleccionado.permissions" :key="permiso.id"
-                  class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs border border-green-300">
-                  {{ permiso.name }}
-                </span>
-              </div>
-
-              <p v-else class="text-sm text-gray-500">
-                Este usuario no tiene permisos activados.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
-    <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div class="bg-[#e9e9e9] w-[500px] rounded-3xl p-6 shadow-xl">
+    <!-- MODAL DETALLE -->
+    <UsuarioDetalleModal v-if="showDetalle" :usuario="usuarioSeleccionado" @close="cerrarDetalleUsuario" />
 
-        <h2 class="text-3xl font-bold text-center mb-6">
-          {{ editando ? 'Editar usuario' : 'Registrar usuario' }}
-        </h2>
-
-        <div class="grid gap-4 bg-white p-4 rounded-lg">
-
-          <div>
-            <input v-model="form.name" maxlength="50" minlength="1" placeholder="Nombre completo"
-              class="border rounded px-3 py-2 w-full">
-
-            <p v-if="errores.name" class="text-red-500 text-xs">
-              {{ errores.name }}
-            </p>
-          </div>
-
-          <div>
-            <select v-model="form.role_id" class="border rounded px-3 py-2 w-full">
-              <option value="">Seleccionar rol</option>
-
-              <option v-for="rol in roles" :key="rol.id" :value="rol.id">
-                {{ rol.name }}
-              </option>
-            </select>
-
-            <p v-if="errores.role_id" class="text-red-500 text-xs">
-              {{ errores.role_id }}
-            </p>
-          </div>
-
-          <div v-if="esRolVentas">
-            <p class="text-sm font-semibold text-slate-700 mb-2">
-              Sucursales permitidas para este vendedor
-            </p>
-
-            <div class="grid grid-cols-2 gap-2">
-              <label v-for="sucursal in sucursales" :key="sucursal.id"
-                class="border rounded-lg px-3 py-2 cursor-pointer flex items-center gap-2">
-                <input type="checkbox" :value="sucursal.id" v-model="form.sucursal_ids">
-
-                <span>{{ sucursal.nombre }}</span>
-              </label>
-            </div>
-
-            <p v-if="errores.sucursal_ids" class="text-red-500 text-xs">
-              {{ errores.sucursal_ids }}
-            </p>
-
-            <p v-if="form.errors.sucursal_ids" class="text-red-500 text-xs">
-              {{ form.errors.sucursal_ids }}
-            </p>
-          </div>
-
-          <div>
-            <h3 class="font-semibold text-sm mb-2">
-              Permisos
-            </h3>
-
-            <button type="button" @click="showPermisosModal = true"
-              class="w-full border rounded-xl px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between">
-              <span class="text-sm font-medium">
-                Configurar permisos
-              </span>
-
-              <span class="text-xs text-gray-500">
-                {{ form.permissions.length }} seleccionados →
-              </span>
-            </button>
-          </div>
-
-          <div>
-            <input v-model="form.email" class="border rounded px-3 py-2 bg-gray-100 w-full">
-
-            <p v-if="errores.email" class="text-red-500 text-xs">
-              {{ errores.email }}
-            </p>
-          </div>
-
-          <div>
-            <input type="password" v-model="form.password" maxlength="15" minlength="7" placeholder="Contraseña"
-              class="border rounded px-3 py-2 w-full">
-
-            <p v-if="errores.password" class="text-red-500 text-xs">
-              {{ errores.password }}
-            </p>
-          </div>
-
-          <div>
-            <input type="password" v-model="form.password_confirmation" maxlength="15" minlength="7"
-              placeholder="Confirmar contraseña" class="border rounded px-3 py-2 w-full">
-
-            <p v-if="errores.password_confirmation" class="text-red-500 text-xs">
-              {{ errores.password_confirmation }}
-            </p>
-          </div>
-
-          <div class="flex justify-between mt-3">
-            <button v-if="editando ? can('usuarios.editar') : can('usuarios.crear')" @click="guardarEmpleado"
-              class="bg-[#1f1d2b] text-white px-6 py-2 rounded-full">
-              Guardar
-            </button>
-
-            <button @click="cerrarModal" class="bg-gray-300 px-6 py-2 rounded-full">
-              Cancelar
-            </button>
-          </div>
-
-        </div>
-      </div>
-    </div>
-
-    <div v-if="showPermisosModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-      <div class="bg-white w-[750px] max-w-[95vw] max-h-[85vh] rounded-3xl shadow-xl flex flex-col">
-
-        <div class="flex items-center justify-between px-6 py-4 border-b">
-          <div>
-            <h2 class="text-xl font-bold text-slate-700">
-              Configurar permisos
-            </h2>
-
-            <p class="text-sm text-gray-500">
-              Selecciona qué módulos y acciones podrá usar este usuario.
-            </p>
-          </div>
-
-          <button type="button" @click="showPermisosModal = false"
-            class="bg-gray-200 hover:bg-gray-300 rounded-full px-3 py-1">
-            ✕
-          </button>
-        </div>
-
-        <div class="p-6 overflow-y-auto">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div v-for="(grupo, modulo) in permisosAgrupados" :key="modulo" class="border rounded-2xl p-4 bg-gray-50">
-              <div class="flex items-center justify-between mb-3">
-                <h3 class="font-semibold capitalize text-slate-700">
-                  {{ modulo }}
-                </h3>
-
-                <span class="text-xs text-gray-500">
-                  {{grupo.filter(p => form.permissions.includes(p.id)).length}}
-                  /
-                  {{ grupo.length }}
-                </span>
-              </div>
-
-              <div class="space-y-2">
-                <div v-for="perm in grupo" :key="perm.id"
-                  class="flex items-center justify-between bg-white px-3 py-2 rounded-xl border">
-                  <span class="text-sm capitalize">
-                    {{ perm.name }}
-                  </span>
-
-                  <div @click="togglePermiso(perm.id)"
-                    class="w-10 h-5 flex items-center rounded-full p-1 cursor-pointer transition"
-                    :class="form.permissions.includes(perm.id) ? 'bg-green-500' : 'bg-gray-300'">
-                    <div class="w-4 h-4 bg-white rounded-full shadow transform transition"
-                      :class="form.permissions.includes(perm.id) ? 'translate-x-5' : 'translate-x-0'" />
-                  </div>
-                </div>
-
-                <p v-if="!grupo.length" class="text-xs text-gray-400 text-center py-2">
-                  Sin permisos registrados.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-3xl">
-          <button type="button" @click="showPermisosModal = false"
-            class="bg-[#1f1d2b] text-white px-6 py-2 rounded-full">
-            Regresar
-          </button>
-        </div>
-
-      </div>
-    </div>
+    <!-- MODAL REGISTRO -->
+    <UsuarioRegisterModal v-if="showModal" :form="form" :errores="errores" :roles="roles" :sucursales="sucursales"
+      :permisosAgrupados="permisosAgrupados" :editando="editando"
+      :canGuardar="editando ? can('usuarios.editar') : can('usuarios.crear')" :esRolVentas="esRolVentas"
+      @close="cerrarModal" @guardar="guardarEmpleado" @toggle-permiso="togglePermiso"
+      @change-role="form.permissions = permisosPorRol(form.role_id)" />
 
   </div>
 </template>
