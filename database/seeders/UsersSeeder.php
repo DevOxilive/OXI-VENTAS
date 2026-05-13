@@ -19,7 +19,7 @@ class UsersSeeder extends Seeder
         $user = User::updateOrCreate(
             ['email' => 'admin@oxilive.com.mx'],
             [
-                'empleado_id' => 1,
+                'employee_id' => 1,
                 'name' => 'admin',
                 'password' => Hash::make('1234567890'),
                 'role_id' => $adminRole?->id,
