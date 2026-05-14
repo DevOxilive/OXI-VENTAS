@@ -80,7 +80,7 @@ onBeforeUnmount(() => {
                 </section>
             </GeneralModalContent>
 
-            <GeneralModalFooter :empleado="{ processing: false }" modo="view" textoBotonGuardar="" @close="cerrar" />
+            <GeneralModalFooter :employee="{ processing: false }" modo="view" saveButtonText="" @close="cerrar" />
         </div>
     </div>
 </template>

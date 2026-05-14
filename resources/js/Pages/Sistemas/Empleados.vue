@@ -3,8 +3,8 @@ import { ref, watch, computed } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { usePage, useForm, router } from '@inertiajs/vue3'
 import { usePermissions } from '@/Composables/usePermissions'
-import UsuarioRegisterModal from '@/Components/Formularios/UsuarioRegisterModal.vue'
-import UsuarioDetalleModal from '@/Components/Formularios/UsuarioDetalleModal.vue'
+import UserRegisterModal from '@/Components/Forms/UserRegisterModal.vue'
+import UserDetailModal from '@/Components/Forms/UserDetailModal.vue'
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
 
 import {
@@ -40,7 +40,7 @@ const usuarioSeleccionado = ref(null)
 const showPermisosModal = ref(false)
 
 const form = useForm({
-  empleado_id: '',
+  employee_id: '',
   name: '',
   email: '',
   password: '',
@@ -51,6 +51,14 @@ const form = useForm({
 })
 
 const errores = ref({})
+
+function getEmployeeFullName(emp) {
+  return `${emp.first_name || emp.firstName || ''} ${emp.last_name || emp.lastName || ''}`.trim()
+}
+
+function getEmployeeEmail(emp) {
+  return emp.email || ''
+}
 
 const rolSeleccionado = computed(() => {
   return roles.value.find(r => String(r.id) === String(form.role_id))
@@ -110,11 +118,11 @@ const listaFiltrada = computed(() => {
     data = data.filter(emp => {
       const nombre = vista.value === 'usuarios'
         ? (emp.name || '')
-        : `${emp.nombre || ''} ${emp.apellido || ''}`
+        : getEmployeeFullName(emp)
 
       const correo = vista.value === 'usuarios'
         ? (emp.email || '')
-        : (emp.correo || '')
+        : getEmployeeEmail(emp)
 
       return nombre.toLowerCase().includes(b) || correo.toLowerCase().includes(b)
     })
@@ -202,7 +210,7 @@ function abrirModal(emp = null) {
     editando.value = true
     userId.value = emp.id
 
-    form.empleado_id = emp.empleado_id || ''
+    form.employee_id = emp.employee_id || ''
     form.name = emp.name || ''
     form.email = emp.email || ''
     form.role_id = emp.role_id || ''
@@ -218,8 +226,8 @@ function abrirModal(emp = null) {
     userId.value = null
 
     if (emp) {
-      form.empleado_id = emp.id
-      form.name = `${emp.nombre || ''} ${emp.apellido || ''}`.trim()
+      form.employee_id = emp.id
+      form.name = getEmployeeFullName(emp)
     }
   }
 }
@@ -397,7 +405,6 @@ function eliminarUsuario(id) {
       </div>
     </div>
 
-    <!-- TABLA -->
     <div class="bg-white border rounded-xl overflow-hidden">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 text-slate-600">
@@ -412,16 +419,15 @@ function eliminarUsuario(id) {
         <tbody>
           <tr v-for="emp in listaActual" :key="emp.id" @click="abrirDetalleUsuario(emp)"
             class="border-t hover:bg-gray-50" :class="vista === 'usuarios' ? 'cursor-pointer' : ''">
-            <!-- NOMBRE -->
+
             <td class="px-4 py-3">
               {{
                 vista === 'usuarios'
                   ? (emp.name || '—')
-                  : `${emp.nombre || ''} ${emp.apellido || ''}`.trim()
+                  : (getEmployeeFullName(emp) || 'Sin nombre registrado')
               }}
             </td>
 
-            <!-- CORREO -->
             <td class="px-4 py-3">
               {{
                 vista === 'usuarios'
@@ -430,7 +436,6 @@ function eliminarUsuario(id) {
               }}
             </td>
 
-            <!-- ROL -->
             <td class="px-4 py-3 capitalize">
               {{
                 vista === 'usuarios'
@@ -439,7 +444,6 @@ function eliminarUsuario(id) {
               }}
             </td>
 
-            <!-- ACCIONES -->
             <td class="px-4 py-3">
               <div class="flex items-center gap-2">
 
@@ -455,15 +459,19 @@ function eliminarUsuario(id) {
               </div>
             </td>
           </tr>
+
+          <tr v-if="!listaActual.length">
+            <td colspan="4" class="px-4 py-10 text-center text-slate-500">
+              No se encontraron registros.
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- MODAL DETALLE -->
-    <UsuarioDetalleModal v-if="showDetalle" :usuario="usuarioSeleccionado" @close="cerrarDetalleUsuario" />
+    <UserDetailModal v-if="showDetalle" :usuario="usuarioSeleccionado" @close="cerrarDetalleUsuario" />
 
-    <!-- MODAL REGISTRO -->
-    <UsuarioRegisterModal v-if="showModal" :form="form" :errores="errores" :roles="roles" :sucursales="sucursales"
+    <UserRegisterModal v-if="showModal" :form="form" :errores="errores" :roles="roles" :sucursales="sucursales"
       :permisosAgrupados="permisosAgrupados" :editando="editando"
       :canGuardar="editando ? can('usuarios.editar') : can('usuarios.crear')" :esRolVentas="esRolVentas"
       @close="cerrarModal" @guardar="guardarEmpleado" @toggle-permiso="togglePermiso"

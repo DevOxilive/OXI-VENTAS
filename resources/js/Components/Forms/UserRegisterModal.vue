@@ -203,8 +203,8 @@ onBeforeUnmount(() => {
                 </section>
             </GeneralModalContent>
 
-            <GeneralModalFooter :empleado="form" :modo="canGuardar ? modo : 'view'"
-                :textoBotonGuardar="textoBotonGuardar" @guardar="$emit('guardar')" @close="cerrar" />
+            <GeneralModalFooter :employee="form" :modo="canGuardar ? modo : 'view'" :saveButtonText="textoBotonGuardar"
+                @save="$emit('guardar')" @close="cerrar" />
         </div>
     </div>
 </template>

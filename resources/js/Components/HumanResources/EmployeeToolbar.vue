@@ -26,9 +26,9 @@ defineEmits([
 
                 Nuevo empleado
             </button>
-
             <ExportButton @click="$emit('excel')" />
         </div>
+
 
         <div class="flex items-center gap-3">
 

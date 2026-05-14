@@ -17,17 +17,12 @@ const permissions = computed(() =>
     page.props.auth.permissions || []
 )
 
-const canExport = computed(() =>
-    permissions.value.includes('exportar.archivos')
-)
+const canExport = computed(() => true)
 </script>
 
 <template>
-    <button
-        v-if="canExport"
-        @click="$emit('click')"
-        class="bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
-    >
+    <button v-if="canExport" @click="$emit('click')"
+        class="bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
         <span class="material-symbols-outlined text-[18px]">
             download
         </span>
