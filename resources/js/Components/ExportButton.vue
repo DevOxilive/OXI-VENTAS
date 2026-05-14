@@ -14,10 +14,18 @@ defineEmits(['click'])
 const page = usePage()
 
 const permissions = computed(() =>
-    page.props.auth.permissions || []
+    page.props.auth?.permissions || []
 )
 
-const canExport = computed(() => true)
+const canExport = computed(() =>
+    permissions.value.some(permission => {
+        const name = typeof permission === 'string'
+            ? permission
+            : permission.name
+
+        return name === 'exportar.archivos'
+    })
+)
 </script>
 
 <template>

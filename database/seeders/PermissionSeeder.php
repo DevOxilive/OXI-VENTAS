@@ -9,6 +9,7 @@ class PermissionSeeder extends Seeder
 {
     public function run(): void
     {
+
         $permissions = [
 
             // EMPLEADOS
@@ -16,6 +17,9 @@ class PermissionSeeder extends Seeder
             'empleados.crear',
             'empleados.editar',
             'empleados.eliminar',
+
+            // EXPORTAR
+            'exportar.archivos',
 
             // ROLES
             'roles.ver',
@@ -28,15 +32,13 @@ class PermissionSeeder extends Seeder
             'usuarios.crear',
             'usuarios.editar',
             'usuarios.eliminar',
-
         ];
 
-       foreach ($permissions as $permission) {
-    DB::table('permissions')->updateOrInsert(
-        ['name' => $permission],
-        ['created_at' => now(), 'updated_at' => now()]
-    );
-}
-
+        foreach ($permissions as $permission) {
+            DB::table('permissions')->updateOrInsert(
+                ['name' => $permission],
+                ['created_at' => now(), 'updated_at' => now()]
+            );
+        }
     }
 }

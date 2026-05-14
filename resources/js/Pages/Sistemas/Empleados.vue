@@ -16,6 +16,8 @@ import {
 
 defineOptions({ layout: AdminLayout })
 
+const cargandoEdicion = ref(false)
+
 const page = usePage()
 const { can } = usePermissions()
 
@@ -71,6 +73,16 @@ const esRolVentas = computed(() => {
 function permisosPorRol(roleId) {
   const rol = roles.value.find(r => String(r.id) === String(roleId))
   return rol?.permissions?.map(p => p.id) || []
+}
+
+function asignarPermisosPorRol() {
+  if (cargandoEdicion.value) return
+
+  form.permissions = permisosPorRol(form.role_id)
+
+  if (!esRolVentas.value) {
+    form.sucursal_ids = []
+  }
 }
 
 function validar() {
@@ -207,6 +219,8 @@ function abrirModal(emp = null) {
   showModal.value = true
 
   if (emp && vista.value === 'usuarios') {
+    cargandoEdicion.value = true
+
     editando.value = true
     userId.value = emp.id
 
@@ -214,13 +228,19 @@ function abrirModal(emp = null) {
     form.name = emp.name || ''
     form.email = emp.email || ''
     form.role_id = emp.role_id || ''
-    form.permissions = emp.permissions?.length
+
+    form.permissions = Array.isArray(emp.permissions)
       ? emp.permissions.map(p => p.id)
       : permisosPorRol(emp.role_id)
 
     form.sucursal_ids = emp.sucursales?.length
       ? emp.sucursales.map(s => s.id)
       : []
+
+    setTimeout(() => {
+      cargandoEdicion.value = false
+    }, 0)
+
   } else {
     editando.value = false
     userId.value = null
@@ -249,11 +269,7 @@ watch(() => form.name, (nuevoNombre) => {
 })
 
 watch(() => form.role_id, () => {
-  form.permissions = permisosPorRol(form.role_id)
-
-  if (!esRolVentas.value) {
-    form.sucursal_ids = []
-  }
+  asignarPermisosPorRol()
 })
 
 function cerrarModal() {
@@ -475,7 +491,7 @@ function eliminarUsuario(id) {
       :permisosAgrupados="permisosAgrupados" :editando="editando"
       :canGuardar="editando ? can('usuarios.editar') : can('usuarios.crear')" :esRolVentas="esRolVentas"
       @close="cerrarModal" @guardar="guardarEmpleado" @toggle-permiso="togglePermiso"
-      @change-role="form.permissions = permisosPorRol(form.role_id)" />
-
+      @change-role="asignarPermisosPorRol">
+    </UserRegisterModal>
   </div>
 </template>
