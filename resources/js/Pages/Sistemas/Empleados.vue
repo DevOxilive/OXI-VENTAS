@@ -5,7 +5,7 @@ import { usePage, useForm, router } from '@inertiajs/vue3'
 import { usePermissions } from '@/Composables/usePermissions'
 import UsuarioRegisterModal from '@/Components/Formularios/UsuarioRegisterModal.vue'
 import UsuarioDetalleModal from '@/Components/Formularios/UsuarioDetalleModal.vue'
-import ActionIconButton from '@/Components/Formularios/ActionIconButton.vue'
+import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
 
 import {
   UniversalActionModal,

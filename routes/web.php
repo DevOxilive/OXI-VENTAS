@@ -76,7 +76,7 @@ Route::middleware([
                 ])
                     ->select(
                         'id',
-                        'empleado_id',
+                        'employee_id',
                         'name',
                         'email',
                         'role_id',
