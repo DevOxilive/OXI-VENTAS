@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use Inertia\Inertia;
 use App\Models\Employee;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use App\Events\EmployeeChanged;
 use App\Exports\EmployeeExport;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -58,7 +59,7 @@ class EmployeeController extends Controller
             'department' => 'required',
         ]);
 
-        Employee::create([
+        $employee = Employee::create([
             'first_name' => $request->firstName,
             'last_name' => $request->lastName,
             'email' => $request->email,
@@ -86,6 +87,7 @@ class EmployeeController extends Controller
             'rfc' => $request->rfc,
         ]);
 
+        broadcast(new EmployeeChanged('created', $employee->id))->toOthers();
         return redirect()->back();
     }
 
@@ -128,6 +130,7 @@ class EmployeeController extends Controller
             'rfc' => $request->rfc,
         ]);
 
+        broadcast(new EmployeeChanged('updated', $employee->id))->toOthers();
         return redirect()->back();
     }
 
@@ -135,7 +138,11 @@ class EmployeeController extends Controller
     {
         $employee = Employee::findOrFail($id);
 
+        $employeeId = $employee->id;
+
         $employee->delete();
+
+        broadcast(new EmployeeChanged('deleted', $employeeId))->toOthers();
 
         return redirect()->back();
     }

@@ -35,7 +35,7 @@ function toggleSidebar() {
         >
 
             <div class="mb-10">
-                <h1 class="text-2xl font-bold text-slate-700">OXI POS</h1>
+                <h1 class="text-2xl font-bold text-slate-700">OXIVENTAS</h1>
                 <p class="text-sm text-slate-400">Sistema Administrativo</p>
             </div>
 
