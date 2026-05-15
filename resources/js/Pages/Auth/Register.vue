@@ -1,7 +1,6 @@
 <script setup>
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { watch } from 'vue';
-import { usePage } from '@inertiajs/vue3';
 
 const form = useForm({
     name: '',
@@ -9,10 +8,9 @@ const form = useForm({
     password: '',
     password_confirmation: '',
     role_id: '',
-    sucursal_id: '',
+    branch_id: '',
     terms: false,
 });
-
 
 // Generar correo automático
 watch(() => form.name, (newName) => {
@@ -42,19 +40,19 @@ const submit = () => {
 const limpiar = () => {
     form.reset();
 };
+
 const roles = usePage().props.roles;
-const sucursales = usePage().props.sucursales;
+const branches = usePage().props.branches;
 </script>
 
 <template>
-
     <Head title="Registro" />
 
     <div class="min-h-screen flex flex-col md:flex-row">
-
         <!-- IZQUIERDA -->
         <div
-            class="md:w-1/2 bg-gradient-to-br from-green-400 to-green-600 flex flex-col justify-center items-center text-white p-8">
+            class="md:w-1/2 bg-gradient-to-br from-green-400 to-green-600 flex flex-col justify-center items-center text-white p-8"
+        >
             <img src="@/img/OXILIVE.ico" alt="Logo" class="w-24 mb-4" />
             <h1 class="text-3xl md:text-4xl font-bold text-center">OXI-VENTAS</h1>
         </div>
@@ -62,67 +60,87 @@ const sucursales = usePage().props.sucursales;
         <!-- DERECHA -->
         <div class="flex-1 flex justify-center items-center p-6">
             <div class="w-full max-w-md bg-white rounded-lg shadow-md p-6">
-
                 <!-- MENSAJE -->
-                <div v-if="$page.props.flash?.success"
-                    class="mb-4 p-3 bg-green-100 text-green-700 rounded-lg text-center">
+                <div
+                    v-if="$page.props.flash?.success"
+                    class="mb-4 p-3 bg-green-100 text-green-700 rounded-lg text-center"
+                >
                     {{ $page.props.flash.success }}
                 </div>
 
                 <div class="flex flex-col items-center mb-6">
                     <img src="@/img/user.jpg" class="w-20 sm:w-40 md:w-48" />
-                    <h2 class="text-xl md:text-2xl font-bold mt-4">Crea tu cuenta</h2>
+                    <h2 class="text-xl md:text-2xl font-bold mt-4">
+                        Crea tu cuenta
+                    </h2>
                 </div>
 
                 <form @submit.prevent="submit" class="space-y-4">
-
                     <!-- NOMBRE -->
                     <div>
-                        <input type="text" placeholder="Nombre completo" v-model="form.name"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required />
+                        <input
+                            type="text"
+                            placeholder="Nombre completo"
+                            v-model="form.name"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+                            required
+                        />
+
                         <p v-if="form.errors.name" class="text-red-500 text-sm">
                             {{ form.errors.name }}
                         </p>
                     </div>
 
                     <!-- ROL -->
-                    <select v-model="form.role_id"
-                        class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required>
-
+                    <select
+                        v-model="form.role_id"
+                        class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+                        required
+                    >
                         <option value="">Seleccionar rol</option>
 
-                        <option v-for="rol in roles" :key="rol.id" :value="rol.id">
-                            {{ rol.name }}
+                        <option
+                            v-for="role in roles"
+                            :key="role.id"
+                            :value="role.id"
+                        >
+                            {{ role.name }}
                         </option>
-
                     </select>
-                    <!-- SUCURSAL -->
-<div>
-    <select
-        v-model="form.sucursal_id"
-        class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-        required
-    >
-        <option value="">Seleccionar sucursal del usuario</option>
 
-        <option
-            v-for="sucursal in sucursales"
-            :key="sucursal.id"
-            :value="sucursal.id"
-        >
-            {{ sucursal.nombre }}
-        </option>
-    </select>
+                    <!-- BRANCH -->
+                    <div>
+                        <select
+                            v-model="form.branch_id"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+                            required
+                        >
+                            <option value="">
+                                Seleccionar sucursal del usuario
+                            </option>
 
-    <p v-if="form.errors.sucursal_id" class="text-red-500 text-sm">
-        {{ form.errors.sucursal_id }}
-    </p>
-</div>
+                            <option
+                                v-for="branch in branches"
+                                :key="branch.id"
+                                :value="branch.id"
+                            >
+                                {{ branch.name }}
+                            </option>
+                        </select>
+
+                        <p v-if="form.errors.branch_id" class="text-red-500 text-sm">
+                            {{ form.errors.branch_id }}
+                        </p>
+                    </div>
 
                     <!-- EMAIL -->
                     <div>
-                        <input type="email" v-model="form.email" placeholder="correo"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" />
+                        <input
+                            type="email"
+                            v-model="form.email"
+                            placeholder="correo"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+                        />
 
                         <p v-if="form.errors.email" class="text-red-500 text-sm">
                             {{ form.errors.email }}
@@ -131,8 +149,14 @@ const sucursales = usePage().props.sucursales;
 
                     <!-- PASSWORD -->
                     <div>
-                        <input type="password" placeholder="Contraseña" v-model="form.password"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required />
+                        <input
+                            type="password"
+                            placeholder="Contraseña"
+                            v-model="form.password"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+                            required
+                        />
+
                         <p v-if="form.errors.password" class="text-red-500 text-sm">
                             {{ form.errors.password }}
                         </p>
@@ -140,34 +164,46 @@ const sucursales = usePage().props.sucursales;
 
                     <!-- CONFIRMAR -->
                     <div>
-                        <input type="password" placeholder="Confirmar contraseña" v-model="form.password_confirmation"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500" required />
+                        <input
+                            type="password"
+                            placeholder="Confirmar contraseña"
+                            v-model="form.password_confirmation"
+                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+                            required
+                        />
                     </div>
 
                     <!-- BOTONES -->
                     <div class="flex gap-2">
-                        <button type="submit"
+                        <button
+                            type="submit"
                             class="w-1/2 bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition"
-                            :disabled="form.processing">
+                            :disabled="form.processing"
+                        >
                             Registrarme
                         </button>
 
-                        <button type="button" @click="limpiar"
-                            class="w-1/2 bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition">
+                        <button
+                            type="button"
+                            @click="limpiar"
+                            class="w-1/2 bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition"
+                        >
                             Limpiar
                         </button>
                     </div>
-
                 </form>
 
                 <!-- LOGIN -->
                 <p class="mt-4 text-center text-gray-600">
                     ¿Ya tienes cuenta?
-                    <Link :href="route('login')" class="text-green-500 hover:underline">
+
+                    <Link
+                        :href="route('login')"
+                        class="text-green-500 hover:underline"
+                    >
                         Inicia sesión
                     </Link>
                 </p>
-
             </div>
         </div>
     </div>

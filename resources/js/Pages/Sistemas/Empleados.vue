@@ -24,7 +24,7 @@ const { can } = usePermissions()
 const empleados = computed(() => page.props.empleados || [])
 const usuarios = computed(() => page.props.usuarios || [])
 const roles = computed(() => page.props.roles || [])
-const sucursales = computed(() => page.props.sucursales || [])
+const branches = computed(() => page.props.branches || [])
 const permissions = computed(() => page.props.permissions || [])
 
 const vista = ref(can('usuarios.ver') ? 'usuarios' : 'empleados')
@@ -48,7 +48,7 @@ const form = useForm({
   password: '',
   password_confirmation: '',
   role_id: '',
-  sucursal_ids: [],
+  branch_ids: [],
   permissions: []
 })
 
@@ -81,7 +81,7 @@ function asignarPermisosPorRol() {
   form.permissions = permisosPorRol(form.role_id)
 
   if (!esRolVentas.value) {
-    form.sucursal_ids = []
+    form.branch_ids = []
   }
 }
 
@@ -100,8 +100,8 @@ function validar() {
     errores.value.role_id = 'Debes seleccionar un rol'
   }
 
-  if (esRolVentas.value && form.sucursal_ids.length === 0) {
-    errores.value.sucursal_ids = 'Selecciona al menos una sucursal para el vendedor'
+  if (esRolVentas.value && form.branch_ids.length === 0) {
+    errores.value.branch_ids = 'Selecciona al menos una sucursal para el vendedor'
   }
 
   if (!editando.value || form.password) {
@@ -233,8 +233,8 @@ function abrirModal(emp = null) {
       ? emp.permissions.map(p => p.id)
       : permisosPorRol(emp.role_id)
 
-    form.sucursal_ids = emp.sucursales?.length
-      ? emp.sucursales.map(s => s.id)
+    form.branch_ids = emp.branches?.length
+      ? emp.branches.map(b => b.id)
       : []
 
     setTimeout(() => {
@@ -305,7 +305,7 @@ function guardarEmpleado() {
           title: 'Usuario actualizado correctamente',
         })
 
-        router.reload({ only: ['empleados', 'usuarios', 'sucursales'] })
+        router.reload({ only: ['empleados', 'usuarios', 'branches'] })
       },
 
       onError: () => {
@@ -487,7 +487,7 @@ function eliminarUsuario(id) {
 
     <UserDetailModal v-if="showDetalle" :usuario="usuarioSeleccionado" @close="cerrarDetalleUsuario" />
 
-    <UserRegisterModal v-if="showModal" :form="form" :errores="errores" :roles="roles" :sucursales="sucursales"
+    <UserRegisterModal v-if="showModal" :form="form" :errores="errores" :roles="roles" :branches="branches"
       :permisosAgrupados="permisosAgrupados" :editando="editando"
       :canGuardar="editando ? can('usuarios.editar') : can('usuarios.crear')" :esRolVentas="esRolVentas"
       @close="cerrarModal" @guardar="guardarEmpleado" @toggle-permiso="togglePermiso"

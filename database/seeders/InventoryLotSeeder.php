@@ -9,7 +9,7 @@ class InventoryLotSeeder extends Seeder
 {
     public function run(): void
     {
-        $branchId = DB::table('sucursales')->value('id') ?? 1;
+        $branchId = DB::table('branches')->value('id');
 
         $lots = [
             ['id' => 1, 'branch_id' => $branchId, 'product_id' => 1, 'lot_code' => 'LOTCOCA001', 'entry_date' => now()->toDateString(), 'expiration_date' => now()->addMonths(8)->toDateString(), 'current_stock' => 50, 'unit_cost' => 12.00, 'active' => true],

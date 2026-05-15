@@ -13,7 +13,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             EmployeeSeeder::class,
             UsersSeeder::class,
-            SucursalSeeder::class,
+           BranchSeeder::class,
               AreaSeeder::class,
         DepartmentSeeder::class,
         PositionSeeder::class,

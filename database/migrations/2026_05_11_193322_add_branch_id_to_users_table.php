@@ -13,11 +13,10 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
 
-            $table->foreignId('sucursal_id')
-                ->nullable()
-                ->after('role_id')
-                ->constrained('sucursales')
-                ->nullOnDelete();
+          $table->foreignId('branch_id')
+    ->nullable()
+    ->constrained('branches')
+    ->nullOnDelete();
 
         });
     }
@@ -29,8 +28,8 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
 
-            $table->dropForeign(['sucursal_id']);
-            $table->dropColumn('sucursal_id');
+         $table->dropForeign(['branch_id']);
+$table->dropColumn('branch_id');
 
         });
     }

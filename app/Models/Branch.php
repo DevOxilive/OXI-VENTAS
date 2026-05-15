@@ -1,0 +1,20 @@
+<?php
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Branch extends Model
+{
+    protected $table = 'branches';
+
+    protected $fillable = [
+        'name',
+        'address',
+        'active',
+    ];
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'branch_user');
+    }
+}

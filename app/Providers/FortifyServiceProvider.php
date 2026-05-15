@@ -6,7 +6,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
-use App\Models\Sucursal;
+use App\Models\Branch;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -38,60 +38,59 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::loginView(function () {
             return Inertia::render('Auth/Login', [
-                'sucursales' => Sucursal::where('activa', true)
-                    ->orderBy('nombre')
+                'branches' => Branch::where('active', true)
+                    ->orderBy('name')
                     ->get(),
             ]);
         });
-Fortify::authenticateUsing(function (Request $request) {
 
-    $request->validate([
-        'email' => ['required', 'string'],
-        'password' => ['required', 'string'],
-        'sucursal_id' => ['nullable', 'exists:sucursales,id'],
-    ]);
+        Fortify::authenticateUsing(function (Request $request) {
+            $request->validate([
+                'email' => ['required', 'string'],
+                'password' => ['required', 'string'],
+                'branch_id' => ['nullable', 'exists:branches,id'],
+            ]);
 
-    $user = User::with('role')
-        ->where('email', $request->email)
-        ->first();
+            $user = User::with('role')
+                ->where('email', $request->email)
+                ->first();
 
-    if (! $user || ! Hash::check($request->password, $user->password)) {
-        throw ValidationException::withMessages([
-            'email' => __('auth.failed'),
-        ]);
-    }
+            if (! $user || ! Hash::check($request->password, $user->password)) {
+                throw ValidationException::withMessages([
+                    'email' => __('auth.failed'),
+                ]);
+            }
 
-    $rol = $user->role?->name;
+            $role = $user->role?->name;
 
-    if ($rol === 'Ventas') {
+            if ($role === 'Ventas') {
+                if (! $request->branch_id) {
+                    throw ValidationException::withMessages([
+                        'branch_id' => 'Debes seleccionar tu sucursal.',
+                    ]);
+                }
 
-    if (! $request->sucursal_id) {
-        throw ValidationException::withMessages([
-            'sucursal_id' => 'Debes seleccionar tu sucursal.',
-        ]);
-    }
+                $canEnter = $user->branches()
+                    ->where('branches.id', $request->branch_id)
+                    ->exists();
 
-    $puedeEntrar = $user->sucursales()
-        ->where('sucursales.id', $request->sucursal_id)
-        ->exists();
+                if (! $canEnter) {
+                    throw ValidationException::withMessages([
+                        'branch_id' => 'No tienes acceso a la sucursal seleccionada.',
+                    ]);
+                }
 
-    if (! $puedeEntrar) {
-        throw ValidationException::withMessages([
-            'sucursal_id' => 'No tienes acceso a la sucursal seleccionada.',
-        ]);
-    }
+                session([
+                    'branch_id' => $request->branch_id,
+                ]);
+            } else {
+                session([
+                    'branch_id' => null,
+                ]);
+            }
 
-    session([
-        'sucursal_id' => $request->sucursal_id,
-    ]);
-} else {
-    session([
-        'sucursal_id' => null,
-    ]);
-}
-
-    return $user;
-});
+            return $user;
+        });
 
         $this->app->singleton(RegisterResponse::class, function () {
             return new class implements RegisterResponse {

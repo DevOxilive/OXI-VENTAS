@@ -9,8 +9,8 @@ class PurchaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $branchId = DB::table('sucursales')->value('id') ?? 1;
-        $employeeId = DB::table('empleados')->value('id') ?? 1;
+        $branchId = DB::table('branches')->value('id') ?? 1;
+        $employeeId = DB::table('employees')->value('id') ?? 1;
 
         DB::table('purchases')->updateOrInsert(
             ['id' => 1],
