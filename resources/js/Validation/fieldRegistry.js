@@ -218,7 +218,7 @@ export const fieldRegistry = {
 
     nss: {
         type: "numeric",
-        required: true,
+        required: false,
         min: 11,
         max: 11,
         message: "NSS inválido.",

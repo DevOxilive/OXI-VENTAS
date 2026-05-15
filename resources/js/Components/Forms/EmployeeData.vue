@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 
@@ -14,6 +14,15 @@ const props = defineProps({
 })
 
 defineEmits(['validate'])
+
+watch(
+    () => props.employee?.hasImss,
+    (hasImss) => {
+        if (!hasImss && props.employee) {
+            props.employee.nss = ''
+        }
+    }
+)
 
 const fullAddress = computed(() => {
     const employee = props.employee || {}
@@ -165,8 +174,27 @@ function openGoogleMaps() {
 
                     <InputField label="Antigüedad" field="seniority" v-model="employee.seniority" readonly />
 
-                    <InputField label="NSS" field="nss" v-model="employee.nss" :readonly="readonly"
-                        :error="frontendErrors.nss || employee.errors.nss" @validate="$emit('validate', 'nss')" />
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3">
+                            <div>
+                                <p class="text-sm font-semibold text-slate-700">¿Está dado de alta en IMSS?</p>
+                                <p class="text-xs text-slate-500">Activa el NSS solo cuando aplique</p>
+                            </div>
+
+                            <button type="button"
+                                class="relative inline-flex h-7 w-14 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-50"
+                                :class="employee.hasImss ? 'bg-[#1f1d2b]' : 'bg-slate-300'" :disabled="readonly"
+                                @click="employee.hasImss = !employee.hasImss">
+                                <span class="inline-block h-6 w-6 transform rounded-full bg-white shadow transition"
+                                    :class="employee.hasImss ? 'translate-x-7' : 'translate-x-1'" />
+                            </button>
+                        </div>
+
+                        <InputField label="NSS" field="nss" v-model="employee.nss"
+                            :readonly="readonly || !employee.hasImss"
+                            :error="employee.hasImss ? (frontendErrors.nss || employee.errors.nss) : ''"
+                            @validate="$emit('validate', 'nss')" />
+                    </div>
 
                     <InputField label="RFC" field="rfc" v-model="employee.rfc" :readonly="readonly"
                         :error="frontendErrors.rfc || employee.errors.rfc" @validate="$emit('validate', 'rfc')" />

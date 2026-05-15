@@ -64,6 +64,9 @@ export function useEmployeeForm(props, emit) {
         specialty: "",
         contractType: "",
         seniority: "",
+
+        hasImss: false, // 👈 AGREGA ESTE
+
         nss: "",
         rfc: "",
     });
@@ -98,6 +101,7 @@ export function useEmployeeForm(props, emit) {
             specialty: props.employeeToEdit.specialty || "",
             contractType: props.employeeToEdit.contractType || "",
             seniority: props.employeeToEdit.seniority || "",
+            hasImss: Boolean(props.employeeToEdit.nss),
             nss: props.employeeToEdit.nss || "",
             rfc: props.employeeToEdit.rfc || "",
         });
@@ -168,6 +172,24 @@ export function useEmployeeForm(props, emit) {
 
     function saveEmployee() {
         const isCreating = props.modo === "create";
+
+        if (!employee.hasImss) {
+            employee.nss = "";
+            frontendErrors.nss = "";
+        }
+
+        if (employee.hasImss && !employee.nss) {
+            frontendErrors.nss =
+                "El NSS es obligatorio si el empleado está dado de alta en IMSS.";
+
+            WarningAlert({
+                title: "Formulario incompleto",
+                message:
+                    "Debes capturar el NSS o marcar que no está dado de alta en IMSS",
+            });
+
+            return;
+        }
 
         if (!validateCompleteForm()) {
             WarningAlert({
