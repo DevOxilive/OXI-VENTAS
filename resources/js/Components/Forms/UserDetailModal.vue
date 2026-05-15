@@ -1,9 +1,9 @@
 <script setup>
 import { onMounted, onBeforeUnmount } from 'vue'
 
-import EmpleadoModalHeader from '@/Components/Formularios/EmpleadoModalHeader.vue'
-import EmpleadoModalFooter from '@/Components/Formularios/EmpleadoModalFooter.vue'
-import ModalContent from '@/Components/Formularios/ModalContent.vue'
+import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
+import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
+import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
 
 defineProps({
     usuario: Object,
@@ -34,9 +34,9 @@ onBeforeUnmount(() => {
 
         <div
             class="relative bg-white w-full h-[100dvh] md:h-[90vh] md:w-[92%] md:max-w-4xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-            <EmpleadoModalHeader modo="view" :totalErrores="0" @close="cerrar" />
+            <GeneralModalHeader modo="view" :totalErrores="0" @close="cerrar" />
 
-            <ModalContent :columns="1">
+            <GeneralModalContent :columns="1">
                 <section class="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 md:p-6 shadow-sm">
                     <h3 class="font-bold text-base border-b pb-3 mb-4">
                         Datos del usuario
@@ -78,9 +78,9 @@ onBeforeUnmount(() => {
                         Este usuario no tiene permisos activados.
                     </p>
                 </section>
-            </ModalContent>
+            </GeneralModalContent>
 
-            <EmpleadoModalFooter :empleado="{ processing: false }" modo="view" textoBotonGuardar="" @close="cerrar" />
+            <GeneralModalFooter :employee="{ processing: false }" modo="view" saveButtonText="" @close="cerrar" />
         </div>
     </div>
 </template>

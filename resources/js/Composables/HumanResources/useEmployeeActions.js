@@ -8,52 +8,52 @@ import {
     ErrorAlert,
 } from "@/Components/Modales/UniversalActionModal";
 
-export function useEmpleadoActions() {
+export function useEmployeeActions() {
     const { can } = usePermissions();
 
     const showModal = ref(false);
-    const modoModal = ref("create");
-    const empleadoSeleccionado = ref(null);
+    const modalMode = ref("create");
+    const selectedEmployee = ref(null);
 
-    function abrirModalGeneral() {
+    function openCreateModal() {
         if (!can("empleados.crear")) return;
 
-        modoModal.value = "create";
-        empleadoSeleccionado.value = null;
+        modalMode.value = "create";
+        selectedEmployee.value = null;
         showModal.value = true;
     }
 
-    function abrirModalEditar(empleado) {
+    function openEditModal(employee) {
         if (!can("empleados.editar")) return;
 
-        modoModal.value = "edit";
-        empleadoSeleccionado.value = empleado;
+        modalMode.value = "edit";
+        selectedEmployee.value = employee;
         showModal.value = true;
     }
 
-    function abrirModalVisualizar(empleado) {
+    function openViewModal(employee) {
         if (!can("empleados.ver")) return;
 
-        modoModal.value = "view";
-        empleadoSeleccionado.value = empleado;
+        modalMode.value = "view";
+        selectedEmployee.value = employee;
         showModal.value = true;
     }
 
-    function cerrarModal() {
+    function closeModal() {
         showModal.value = false;
     }
 
-    function eliminarEmpleado(empleado) {
+    function deleteEmployee(employee) {
         if (!can("empleados.eliminar")) return;
 
         UniversalActionModal({
             title: "Confirmar eliminación",
             message: "¿Deseas eliminar permanentemente a",
-            itemName: `${empleado.nombre} ${empleado.apellido}`,
+            itemName: `${employee.firstName} ${employee.lastName}`,
             confirmText: "Sí, eliminar",
         }).then((result) => {
             if (result.isConfirmed) {
-                router.delete(route("rh.empleados.destroy", empleado.id), {
+                router.delete(route("rh.empleados.destroy", employee.id), {
                     onSuccess: () => {
                         ToastAlert({
                             icon: "success",
@@ -74,12 +74,12 @@ export function useEmpleadoActions() {
 
     return {
         showModal,
-        modoModal,
-        empleadoSeleccionado,
-        abrirModalVisualizar,
-        abrirModalGeneral,
-        abrirModalEditar,
-        eliminarEmpleado,
-        cerrarModal,
+        modalMode,
+        selectedEmployee,
+        openViewModal,
+        openCreateModal,
+        openEditModal,
+        deleteEmployee,
+        closeModal,
     };
 }

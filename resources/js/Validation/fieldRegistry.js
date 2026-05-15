@@ -1,7 +1,7 @@
 // resources/js/Validation/fieldRegistry.js
 
 export const fieldRegistry = {
-    nombre: {
+    firstName: {
         type: "letters",
         required: true,
         min: 2,
@@ -12,7 +12,7 @@ export const fieldRegistry = {
         spamMessage: "Nombre no válido.",
     },
 
-    apellido: {
+    lastName: {
         type: "letters",
         required: true,
         min: 2,
@@ -23,7 +23,7 @@ export const fieldRegistry = {
         spamMessage: "Apellido no válido.",
     },
 
-    puesto: {
+    position: {
         type: "letters",
         required: true,
         min: 2,
@@ -34,7 +34,7 @@ export const fieldRegistry = {
         spamMessage: "Puesto no válido.",
     },
 
-    correo: {
+    email: {
         type: "email",
         required: true,
         min: 6,
@@ -43,14 +43,15 @@ export const fieldRegistry = {
         spamMessage: "Correo no válido.",
     },
 
-    telefono: {
+    phone: {
         type: "numeric",
         required: true,
         min: 10,
         max: 10,
         message: "Debe contener 10 dígitos.",
     },
-    calle: {
+
+    street: {
         type: "address",
         required: true,
         min: 2,
@@ -62,7 +63,7 @@ export const fieldRegistry = {
         spamMessage: "Calle no válida.",
     },
 
-    numeroExterior: {
+    externalNumber: {
         type: "alphanumeric",
         required: true,
         min: 1,
@@ -72,7 +73,7 @@ export const fieldRegistry = {
         message: "Número exterior inválido.",
     },
 
-    numeroInterior: {
+    internalNumber: {
         type: "alphanumeric",
         required: false,
         max: 20,
@@ -81,7 +82,7 @@ export const fieldRegistry = {
         message: "Número interior inválido.",
     },
 
-    codigoPostal: {
+    postalCode: {
         type: "numeric",
         required: true,
         min: 5,
@@ -89,7 +90,7 @@ export const fieldRegistry = {
         message: "El código postal debe tener exactamente 5 números.",
     },
 
-    colonia: {
+    neighborhood: {
         type: "address",
         required: true,
         min: 2,
@@ -101,7 +102,7 @@ export const fieldRegistry = {
         spamMessage: "Colonia no válida.",
     },
 
-    municipio: {
+    municipality: {
         type: "letters",
         required: true,
         min: 2,
@@ -111,7 +112,7 @@ export const fieldRegistry = {
         message: "Municipio inválido.",
     },
 
-    estadoDomicilio: {
+    addressState: {
         type: "letters",
         required: true,
         min: 2,
@@ -121,19 +122,20 @@ export const fieldRegistry = {
         message: "Estado inválido.",
     },
 
-    urlMaps: {
+    mapsUrl: {
         type: "text",
         required: false,
         max: 255,
         message: "URL inválida.",
     },
-    fechaInicio: {
+
+    startDate: {
         type: "date",
         required: true,
         message: "Fecha no válida.",
     },
 
-    departamento: {
+    department: {
         type: "text",
         required: true,
         min: 2,
@@ -144,7 +146,7 @@ export const fieldRegistry = {
         spamMessage: "Departamento no válido.",
     },
 
-    estado: {
+    employmentStatus: {
         type: "text",
         required: true,
         min: 2,
@@ -153,7 +155,7 @@ export const fieldRegistry = {
         message: "Estado inválido.",
     },
 
-    banco: {
+    bank: {
         type: "letters",
         required: true,
         min: 2,
@@ -164,7 +166,7 @@ export const fieldRegistry = {
         spamMessage: "Banco no válido.",
     },
 
-    cuenta: {
+    accountNumber: {
         type: "numeric",
         required: true,
         min: 10,
@@ -172,7 +174,7 @@ export const fieldRegistry = {
         message: "Cuenta bancaria inválida.",
     },
 
-    grado: {
+    educationLevel: {
         type: "letters",
         required: true,
         min: 2,
@@ -183,7 +185,7 @@ export const fieldRegistry = {
         spamMessage: "Grado académico no válido.",
     },
 
-    especialidad: {
+    specialty: {
         type: "text",
         required: true,
         min: 2,
@@ -195,7 +197,7 @@ export const fieldRegistry = {
         spamMessage: "Especialidad no válida.",
     },
 
-    tipoContrato: {
+    contractType: {
         type: "text",
         required: true,
         min: 2,
@@ -206,7 +208,7 @@ export const fieldRegistry = {
         spamMessage: "Tipo de contrato no válido.",
     },
 
-    antiguedad: {
+    seniority: {
         type: "text",
         required: false,
         max: 50,
@@ -216,7 +218,7 @@ export const fieldRegistry = {
 
     nss: {
         type: "numeric",
-        required: true,
+        required: false,
         min: 11,
         max: 11,
         message: "NSS inválido.",

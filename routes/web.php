@@ -3,7 +3,7 @@
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\EmpleadoController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
@@ -67,7 +67,7 @@ Route::middleware([
             );
             return Inertia::render('Sistemas/Empleados', [
 
-                'empleados' => \App\Models\Empleado::doesntHave('user')->get(),
+                'empleados' => \App\Models\Employee::doesntHave('user')->get(),
 
                 'usuarios' => \App\Models\User::with([
                     'role',
@@ -76,7 +76,7 @@ Route::middleware([
                 ])
                     ->select(
                         'id',
-                        'empleado_id',
+                        'employee_id',
                         'name',
                         'email',
                         'role_id',
@@ -120,13 +120,13 @@ Route::middleware([
         Route::get('/roles', fn() => Inertia::render('Recursos-humanos/Roles'))->name('rh.roles');
 
         Route::get('/usuarios', fn() => Inertia::render('Recursos-humanos/Usuarios'))->name('rh.usuarios');
-        Route::get('/empleados', [EmpleadoController::class, 'index'])->name('rh.empleados');
-        Route::post('/empleados', [EmpleadoController::class, 'store'])->name('rh.empleados.store');
-        Route::post('/empleados/store', [EmpleadoController::class, 'store'])->name('rh.empleados.store');
-        Route::put('/empleados/{id}', [EmpleadoController::class, 'update'])->name('rh.empleados.update');
-        Route::delete('/empleados/{id}', [EmpleadoController::class, 'destroy'])->name('rh.empleados.destroy');
+        Route::get('/empleados', [EmployeeController::class, 'index'])->name('rh.empleados');
+        Route::post('/empleados', [EmployeeController::class, 'store'])->name('rh.empleados.store');
+        Route::post('/empleados/store', [EmployeeController::class, 'store'])->name('rh.empleados.store');
+        Route::put('/empleados/{id}', [EmployeeController::class, 'update'])->name('rh.empleados.update');
+        Route::delete('/empleados/{id}', [EmployeeController::class, 'destroy'])->name('rh.empleados.destroy');
 
-        Route::get('/empleados/exportar-excel', [EmpleadoController::class, 'exportarExcel'])
+        Route::get('/empleados/exportar-excel', [EmployeeController::class, 'exportExcel'])
             ->name('rh.empleados.exportarExcel');
     });
 
