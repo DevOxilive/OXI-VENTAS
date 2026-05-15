@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('areas', function (Blueprint $table) {
-            $table->string('name')->after('id');
-            $table->boolean('active')->default(true)->after('name');
+          //  $table->string('name')->after('id');
+           // $table->boolean('active')->default(true)->after('name');
         });
     }
 

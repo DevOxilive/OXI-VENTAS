@@ -9,7 +9,7 @@ class TripSeeder extends Seeder
 {
     public function run(): void
     {
-        $employeeId = DB::table('empleados')->value('id') ?? 1;
+        $employeeId = DB::table('employees')->value('id') ?? 1;
 
         DB::table('trips')->updateOrInsert(
             ['id' => 1],

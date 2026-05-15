@@ -9,7 +9,7 @@ class InventoryMovementSeeder extends Seeder
 {
     public function run(): void
     {
-        $branchId = DB::table('sucursales')->value('id') ?? 1;
+        $branchId = DB::table('branches')->value('id') ?? 1;
 
         $movements = [
             ['id' => 1, 'branch_id' => $branchId, 'product_id' => 1, 'lot_id' => 1, 'type' => 'entry', 'quantity' => 50, 'date' => now(), 'reference' => 'PURCHASE001'],

@@ -9,7 +9,7 @@ class BranchInventorySeeder extends Seeder
 {
     public function run(): void
     {
-        $branchId = DB::table('sucursales')->value('id') ?? 1;
+        $branchId = DB::table('branches')->value('id') ?? 1;
 
         $items = [
             ['id' => 1, 'branch_id' => $branchId, 'product_id' => 1, 'current_stock' => 50, 'minimum_stock' => 10, 'maximum_stock' => 100],

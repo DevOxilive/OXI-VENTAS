@@ -53,10 +53,13 @@ onBeforeUnmount(() => {
                             <strong>Sucursales:</strong>
 
                             <div class="flex flex-wrap gap-2 mt-2">
-                                <span v-for="sucursal in usuario.sucursales" :key="sucursal.id"
-                                    class="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs border border-green-300">
-                                    {{ sucursal.nombre }}
-                                </span>
+                                <span
+    v-for="branch in usuario.branches"
+    :key="branch.id"
+    class="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs border border-green-300"
+>
+    {{ branch.name }}
+</span>
                             </div>
                         </div>
                     </div>
