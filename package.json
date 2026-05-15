@@ -4,7 +4,8 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "dev:full": "concurrently \"php artisan serve\" \"php artisan reverb:start\" \"npm run dev\""
     },
     "devDependencies": {
         "@inertiajs/vue3": "^2.0",
@@ -15,7 +16,7 @@
         "@vitejs/plugin-vue": "^6.0.0",
         "autoprefixer": "^10.4.16",
         "axios": "^1.11.0",
-        "concurrently": "^9.0.1",
+        "concurrently": "^9.2.1",
         "laravel-echo": "^2.3.4",
         "laravel-vite-plugin": "^2.0.0",
         "postcss": "^8.4.32",
