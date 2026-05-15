@@ -281,8 +281,17 @@ class EmpleadoSeeder extends Seeder
             ],
         ];
 
-        foreach ($empleados as $empleado) {
-            Empleado::create($empleado);
-        }
+       foreach ($empleados as $empleado) {
+
+    Empleado::updateOrCreate(
+
+        [
+            'correo' => $empleado['correo']
+        ],
+
+        $empleado
+
+    );
+}
     }
 }
