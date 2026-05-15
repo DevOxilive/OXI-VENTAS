@@ -1,4 +1,4 @@
-import { ref, computed } from "vue";
+import { ref, computed, unref } from "vue";
 
 export function useEmployeeFilters(employeesDB) {
     const statusFilter = ref("");
@@ -8,7 +8,7 @@ export function useEmployeeFilters(employeesDB) {
     const search = ref("");
 
     const filteredEmployees = computed(() => {
-        return employeesDB
+        return unref(employeesDB)
             .filter((employee) => {
                 const fullName =
                     `${employee.firstName} ${employee.lastName}`.toLowerCase();

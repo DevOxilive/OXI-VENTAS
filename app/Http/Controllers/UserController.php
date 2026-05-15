@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Models\Role;
+use Inertia\Inertia;
+use App\Models\Sucursal;
+use App\Models\Employee;
+use App\Models\Permission;
+use App\Events\UserChanged;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
-use App\Models\User;
-use App\Models\Role;
-use App\Models\Permission;
-use App\Models\Employee;
-use App\Models\Branch;
-use Inertia\Inertia;
 
 class UserController extends Controller
 {
@@ -33,7 +34,7 @@ class UserController extends Controller
     public function index()
     {
         return Inertia::render('Sistemas/Empleados', [
-            'employees' => Employee::with('user.role')
+            'empleados' => Employee::with('user.role')
                 ->orderBy('id', 'desc')
                 ->get(),
 
@@ -96,7 +97,7 @@ class UserController extends Controller
         } else {
             $user->branches()->sync([]);
         }
-
+        broadcast(new UserChanged('created', $user->id))->toOthers();
         return redirect()->route('sistemas.empleados')
             ->with('success', 'Usuario creado correctamente');
     }
@@ -150,7 +151,7 @@ class UserController extends Controller
         } else {
             $user->branches()->sync([]);
         }
-
+        broadcast(new UserChanged('updated', $user->id))->toOthers();
         return redirect()->route('sistemas.empleados')
             ->with('success', 'Usuario actualizado');
     }
@@ -161,10 +162,14 @@ class UserController extends Controller
 
         $user = User::findOrFail($id);
 
+        $userId = $user->id;
+
         $user->permissions()->detach();
         $user->branches()->detach();
 
         $user->delete();
+
+        broadcast(new UserChanged('deleted', $userId))->toOthers();
 
         return redirect()->route('sistemas.empleados')
             ->with('success', 'Usuario eliminado');

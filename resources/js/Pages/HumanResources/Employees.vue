@@ -1,6 +1,7 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-
+import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { router } from '@inertiajs/vue3'
 import EmployeeMobileCards from '@/Components/HumanResources/EmployeeMobileCards.vue'
 import { useEmployeeActions } from '@/Composables/HumanResources/useEmployeeActions'
 import { useEmployeeFilters } from '@/Composables/HumanResources/useEmployeeFilters'
@@ -14,9 +15,11 @@ defineOptions({ layout: AdminLayout })
 
 const { can } = usePermissions()
 
-const { employeesDB } = defineProps({
+const props = defineProps({
     employeesDB: Array
 })
+
+const employeesDB = computed(() => props.employeesDB ?? [])
 
 const {
     statusFilter,
@@ -44,6 +47,31 @@ const {
     closeModal,
     deleteEmployee
 } = useEmployeeActions()
+
+function reloadEmployees() {
+    router.reload({
+        only: ['employeesDB'],
+        preserveScroll: true,
+        preserveState: true,
+    })
+}
+
+onMounted(() => {
+    if (!window.Echo) return
+
+    window.Echo.channel('systems')
+        .listen('.employee.changed', (event) => {
+            console.log('Empleado actualizado en tiempo real desde RH', event)
+
+            reloadEmployees()
+        })
+})
+
+onBeforeUnmount(() => {
+    if (!window.Echo) return
+
+    window.Echo.leave('systems')
+})
 </script>
 
 <template>

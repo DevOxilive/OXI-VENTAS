@@ -1,8 +1,8 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
-import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { usePage, useForm, router } from '@inertiajs/vue3'
 import { usePermissions } from '@/Composables/usePermissions'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
 import UserRegisterModal from '@/Components/Forms/UserRegisterModal.vue'
 import UserDetailModal from '@/Components/Forms/UserDetailModal.vue'
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
@@ -381,6 +381,44 @@ function eliminarUsuario(id) {
     })
   })
 }
+
+function recargarSistema() {
+  router.reload({
+    only: [
+      'empleados',
+      'usuarios',
+      'roles',
+      'permissions',
+      'sucursales'
+    ],
+    preserveScroll: true,
+    preserveState: true,
+  })
+}
+
+onMounted(() => {
+  if (!window.Echo) return
+
+  window.Echo.channel('systems')
+
+    .listen('.employee.changed', (event) => {
+      console.log('Empleado actualizado en tiempo real', event)
+
+      recargarSistema()
+    })
+
+    .listen('.user.changed', (event) => {
+      console.log('Usuario actualizado en tiempo real', event)
+
+      recargarSistema()
+    })
+})
+
+onBeforeUnmount(() => {
+  if (!window.Echo) return
+
+  window.Echo.leave('systems')
+})
 </script>
 
 <template>
