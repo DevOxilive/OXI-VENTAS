@@ -2,7 +2,7 @@
 
 namespace App\Exports;
 
-use App\Models\Empleado;
+use App\Models\Employee;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\{
     FromCollection,
@@ -17,7 +17,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use Maatwebsite\Excel\Events\AfterSheet;
 
-class EmpleadosExport implements
+class EmployeeExport implements
     FromCollection,
     WithHeadings,
     WithMapping,
@@ -26,35 +26,35 @@ class EmpleadosExport implements
     WithEvents,
     WithTitle
 {
-    protected $estado;
-    protected $departamento;
-    protected $busqueda;
+    protected $employmentStatus;
+    protected $department;
+    protected $search;
 
-    public function __construct($estado = null, $departamento = null, $busqueda = null)
+    public function __construct($employmentStatus = null, $department = null, $search = null)
     {
-        $this->estado = $estado;
-        $this->departamento = $departamento;
-        $this->busqueda = $busqueda;
+        $this->employmentStatus = $employmentStatus;
+        $this->department = $department;
+        $this->search = $search;
     }
 
     public function collection()
     {
-        $query = Empleado::query();
+        $query = Employee::query();
 
-        if ($this->estado) {
-            $query->where('estado', $this->estado);
+        if ($this->employmentStatus) {
+            $query->where('employment_status', $this->employmentStatus);
         }
 
-        if ($this->departamento) {
-            $query->where('departamento', $this->departamento);
+        if ($this->department) {
+            $query->where('department', $this->department);
         }
 
-        if ($this->busqueda) {
+        if ($this->search) {
             $query->where(function ($q) {
-                $q->where('nombre', 'like', '%' . $this->busqueda . '%')
-                    ->orWhere('apellido', 'like', '%' . $this->busqueda . '%')
-                    ->orWhere('puesto', 'like', '%' . $this->busqueda . '%')
-                    ->orWhere('departamento', 'like', '%' . $this->busqueda . '%');
+                $q->where('first_name', 'like', '%' . $this->search . '%')
+                    ->orWhere('last_name', 'like', '%' . $this->search . '%')
+                    ->orWhere('position', 'like', '%' . $this->search . '%')
+                    ->orWhere('department', 'like', '%' . $this->search . '%');
             });
         }
 
@@ -83,25 +83,35 @@ class EmpleadosExport implements
         ];
     }
 
-    public function map($empleado): array
+    public function map($employee): array
     {
+        $address = collect([
+            $employee->street,
+            $employee->external_number,
+            $employee->internal_number,
+            $employee->neighborhood,
+            $employee->municipality,
+            $employee->address_state,
+            $employee->postal_code,
+        ])->filter()->join(', ');
+
         return [
-            $empleado->nombre . ' ' . $empleado->apellido,
-            $empleado->correo,
-            $empleado->telefono,
-            $empleado->domicilio,
-            $empleado->fecha_inicio,
-            $empleado->estado,
-            $empleado->puesto,
-            $empleado->departamento,
-            $empleado->banco,
-            $empleado->numero_cuenta,
-            $empleado->grado_estudios,
-            $empleado->especialidad,
-            $empleado->tipo_contrato,
-            $empleado->antiguedad,
-            $empleado->nss,
-            $empleado->rfc
+            $employee->first_name . ' ' . $employee->last_name,
+            $employee->email,
+            $employee->phone,
+            $address,
+            $employee->start_date,
+            $employee->employment_status,
+            $employee->position,
+            $employee->department,
+            $employee->bank,
+            $employee->account_number,
+            $employee->education_level,
+            $employee->specialty,
+            $employee->contract_type,
+            $employee->seniority,
+            $employee->nss,
+            $employee->rfc
         ];
     }
 
@@ -132,13 +142,9 @@ class EmpleadosExport implements
                 $highestRow = $sheet->getHighestRow();
                 $highestColumn = $sheet->getHighestColumn();
 
-                // Filtro automático
                 $sheet->setAutoFilter("A1:{$highestColumn}{$highestRow}");
-
-                // Congelar encabezado
                 $sheet->freezePane('A2');
 
-                // Insertar título superior
                 $sheet->insertNewRowBefore(1, 2);
                 $sheet->mergeCells("A1:{$highestColumn}1");
                 $sheet->setCellValue('A1', 'REPORTE GENERAL DE EMPLEADOS');

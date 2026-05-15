@@ -1,9 +1,9 @@
 <script setup>
 import { computed, onMounted, onBeforeUnmount } from 'vue'
 
-import EmpleadoModalHeader from '@/Components/Formularios/EmpleadoModalHeader.vue'
-import EmpleadoModalFooter from '@/Components/Formularios/EmpleadoModalFooter.vue'
-import ModalContent from '@/Components/Formularios/ModalContent.vue'
+import GeneralModalHeader from '../Forms/GeneralModalHeader.vue'
+import GeneralModalFooter from '../Forms/GeneralModalFooter.vue'
+import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
 
 const props = defineProps({
     form: Object,
@@ -60,9 +60,9 @@ onBeforeUnmount(() => {
 
         <div
             class="relative bg-white w-full h-[100dvh] md:h-[94vh] md:w-[96%] md:max-w-5xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-            <EmpleadoModalHeader :modo="modo" :totalErrores="totalErrores" @close="cerrar" />
+            <GeneralModalHeader :modo="modo" :totalErrores="totalErrores" @close="cerrar" />
 
-            <ModalContent :columns="2">
+            <GeneralModalContent :columns="2">
                 <section class="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 md:p-6 shadow-sm">
                     <h3 class="font-bold text-base border-b pb-3 mb-4">
                         Datos de usuario
@@ -201,10 +201,10 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
                 </section>
-            </ModalContent>
+            </GeneralModalContent>
 
-            <EmpleadoModalFooter :empleado="form" :modo="canGuardar ? modo : 'view'"
-                :textoBotonGuardar="textoBotonGuardar" @guardar="$emit('guardar')" @close="cerrar" />
+            <GeneralModalFooter :employee="form" :modo="canGuardar ? modo : 'view'" :saveButtonText="textoBotonGuardar"
+                @save="$emit('guardar')" @close="cerrar" />
         </div>
     </div>
 </template>

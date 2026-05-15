@@ -5,14 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use App\Models\Empleado;
+use App\Models\Employee;
 
 class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
     protected $fillable = [
-        'empleado_id',
+        'employee_id',
         'name',
         'email',
         'password',
@@ -21,13 +21,11 @@ class User extends Authenticatable
     ];
 
     protected $hidden = [
-        'password', 
+        'password',
         'remember_token',
         'two_factor_recovery_codes',
         'two_factor_secret',
     ];
-
-   
 
     protected function casts(): array
     {
@@ -47,29 +45,30 @@ class User extends Authenticatable
         return $this->belongsTo(\App\Models\Role::class);
     }
 
-    public function empleado()
+    public function employee()
     {
-        return $this->belongsTo(Empleado::class);
+        return $this->belongsTo(Employee::class);
     }
 
     public function getAllPermissionsAttribute()
     {
-        $directos = $this->permissions ?? collect();
+        $directPermissions = $this->permissions ?? collect();
 
-        $delRol = $this->role
+        $rolePermissions = $this->role
             ? $this->role->permissions
             : collect();
 
-        return $directos
-            ->merge($delRol)
+        return $directPermissions
+            ->merge($rolePermissions)
             ->unique('id')
             ->values();
     }
 
-public function sucursales()
-{
-    return $this->belongsToMany(\App\Models\Sucursal::class, 'sucursal_user');
-}
+    public function sucursales()
+    {
+        return $this->belongsToMany(\App\Models\Sucursal::class, 'sucursal_user');
+    }
+
     public function hasPermission($permission)
     {
         if ($this->permissions()->where('name', $permission)->exists()) {

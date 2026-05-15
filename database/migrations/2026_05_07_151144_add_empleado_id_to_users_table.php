@@ -10,23 +10,25 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-{
-    Schema::table('users', function (Blueprint $table) {
-        if (!Schema::hasColumn('users', 'empleado_id')) {
-            $table->unsignedBigInteger('empleado_id')->nullable()->after('id');
-        }
-    });
-}
+    {
+        Schema::table('users', function (Blueprint $table) {
+            if (!Schema::hasColumn('users', 'employee_id')) {
+                $table->unsignedBigInteger('employee_id')
+                    ->nullable()
+                    ->after('id');
+            }
+        });
+    }
 
     /**
      * Reverse the migrations.
      */
-  public function down(): void
-{
-    Schema::table('users', function (Blueprint $table) {
-        if (Schema::hasColumn('users', 'empleado_id')) {
-            $table->dropColumn('empleado_id');
-        }
-    });
-}
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            if (Schema::hasColumn('users', 'employee_id')) {
+                $table->dropColumn('employee_id');
+            }
+        });
+    }
 };
