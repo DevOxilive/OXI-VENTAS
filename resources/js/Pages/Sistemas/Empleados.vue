@@ -389,7 +389,7 @@ function recargarSistema() {
       'usuarios',
       'roles',
       'permissions',
-      'sucursales'
+      'branches'
     ],
     preserveScroll: true,
     preserveState: true,

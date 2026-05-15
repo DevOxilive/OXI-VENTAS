@@ -17,7 +17,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role_id',
-       'branch_id',
+        'branch_id',
     ];
 
     protected $hidden = [
@@ -64,10 +64,10 @@ class User extends Authenticatable
             ->values();
     }
 
- public function branches()
-{
-    return $this->belongsToMany(\App\Models\Branch::class, 'branch_user');
-}
+    public function branches()
+    {
+        return $this->belongsToMany(\App\Models\Branch::class, 'branch_user');
+    }
 
     public function hasPermission($permission)
     {

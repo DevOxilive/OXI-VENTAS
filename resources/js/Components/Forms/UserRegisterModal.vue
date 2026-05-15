@@ -73,13 +73,8 @@ onBeforeUnmount(() => {
                     <div class="grid grid-cols-1 gap-4">
 
                         <div>
-                            <input
-                                v-model="form.name"
-                                maxlength="50"
-                                minlength="1"
-                                placeholder="Nombre completo"
-                                class="border rounded-xl px-4 py-3 w-full"
-                            >
+                            <input v-model="form.name" maxlength="50" minlength="1" placeholder="Nombre completo"
+                                class="border rounded-xl px-4 py-3 w-full">
 
                             <p v-if="errores.name" class="text-red-500 text-xs mt-1">
                                 {{ errores.name }}
@@ -87,11 +82,8 @@ onBeforeUnmount(() => {
                         </div>
 
                         <div>
-                            <input
-                                v-model="form.email"
-                                placeholder="Correo electrónico"
-                                class="border rounded-xl px-4 py-3 bg-gray-100 w-full"
-                            >
+                            <input v-model="form.email" placeholder="Correo electrónico"
+                                class="border rounded-xl px-4 py-3 bg-gray-100 w-full">
 
                             <p v-if="errores.email" class="text-red-500 text-xs mt-1">
                                 {{ errores.email }}
@@ -99,20 +91,13 @@ onBeforeUnmount(() => {
                         </div>
 
                         <div>
-                            <select
-                                v-model="form.role_id"
-                                class="border rounded-xl px-4 py-3 w-full bg-white"
-                                @change="$emit('change-role')"
-                            >
+                            <select v-model="form.role_id" class="border rounded-xl px-4 py-3 w-full bg-white"
+                                @change="$emit('change-role')">
                                 <option value="">
                                     Seleccionar rol
                                 </option>
 
-                                <option
-                                    v-for="rol in roles"
-                                    :key="rol.id"
-                                    :value="rol.id"
-                                >
+                                <option v-for="rol in roles" :key="rol.id" :value="rol.id">
                                     {{ rol.name }}
                                 </option>
                             </select>
@@ -123,14 +108,8 @@ onBeforeUnmount(() => {
                         </div>
 
                         <div>
-                            <input
-                                type="password"
-                                v-model="form.password"
-                                maxlength="15"
-                                minlength="7"
-                                placeholder="Contraseña"
-                                class="border rounded-xl px-4 py-3 w-full"
-                            >
+                            <input type="password" v-model="form.password" maxlength="15" minlength="7"
+                                placeholder="Contraseña" class="border rounded-xl px-4 py-3 w-full">
 
                             <p v-if="errores.password" class="text-red-500 text-xs mt-1">
                                 {{ errores.password }}
@@ -138,14 +117,8 @@ onBeforeUnmount(() => {
                         </div>
 
                         <div>
-                            <input
-                                type="password"
-                                v-model="form.password_confirmation"
-                                maxlength="15"
-                                minlength="7"
-                                placeholder="Confirmar contraseña"
-                                class="border rounded-xl px-4 py-3 w-full"
-                            >
+                            <input type="password" v-model="form.password_confirmation" maxlength="15" minlength="7"
+                                placeholder="Confirmar contraseña" class="border rounded-xl px-4 py-3 w-full">
 
                             <p v-if="errores.password_confirmation" class="text-red-500 text-xs mt-1">
                                 {{ errores.password_confirmation }}
@@ -169,16 +142,9 @@ onBeforeUnmount(() => {
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
 
-                            <label
-                                v-for="branch in branches"
-                                :key="branch.id"
-                                class="border rounded-xl px-3 py-3 cursor-pointer flex items-center gap-2 hover:bg-slate-50"
-                            >
-                                <input
-                                    type="checkbox"
-                                    :value="branch.id"
-                                    v-model="form.branch_ids"
-                                >
+                            <label v-for="branch in branches" :key="branch.id"
+                                class="border rounded-xl px-3 py-3 cursor-pointer flex items-center gap-2 hover:bg-slate-50">
+                                <input type="checkbox" :value="branch.id" v-model="form.branch_ids">
 
                                 <span>{{ branch.name }}</span>
                             </label>
@@ -211,11 +177,8 @@ onBeforeUnmount(() => {
 
                         <div class="grid grid-cols-1 gap-4">
 
-                            <div
-                                v-for="(grupo, modulo) in permisosAgrupados"
-                                :key="modulo"
-                                class="border rounded-2xl p-4 bg-gray-50"
-                            >
+                            <div v-for="(grupo, modulo) in permisosAgrupados" :key="modulo"
+                                class="border rounded-2xl p-4 bg-gray-50">
                                 <div class="flex items-center justify-between mb-3">
 
                                     <h4 class="font-semibold capitalize text-slate-700">
@@ -223,7 +186,7 @@ onBeforeUnmount(() => {
                                     </h4>
 
                                     <span class="text-xs text-gray-500">
-                                        {{ grupo.filter(p => form.permissions.includes(p.id)).length }}
+                                        {{grupo.filter(p => form.permissions.includes(p.id)).length}}
                                         /
                                         {{ grupo.length }}
                                     </span>
@@ -232,28 +195,21 @@ onBeforeUnmount(() => {
 
                                 <div class="space-y-2">
 
-                                    <div
-                                        v-for="perm in grupo"
-                                        :key="perm.id"
-                                        class="flex items-center justify-between bg-white px-3 py-2 rounded-xl border"
-                                    >
+                                    <div v-for="perm in grupo" :key="perm.id"
+                                        class="flex items-center justify-between bg-white px-3 py-2 rounded-xl border">
                                         <span class="text-sm capitalize">
                                             {{ perm.name }}
                                         </span>
 
-                                        <div
-                                            @click="$emit('toggle-permiso', perm.id)"
+                                        <div @click="$emit('toggle-permiso', perm.id)"
                                             class="w-10 h-5 flex items-center rounded-full p-1 cursor-pointer transition"
                                             :class="form.permissions.includes(perm.id)
                                                 ? 'bg-green-500'
-                                                : 'bg-gray-300'"
-                                        >
-                                            <div
-                                                class="w-4 h-4 bg-white rounded-full shadow transform transition"
+                                                : 'bg-gray-300'">
+                                            <div class="w-4 h-4 bg-white rounded-full shadow transform transition"
                                                 :class="form.permissions.includes(perm.id)
                                                     ? 'translate-x-5'
-                                                    : 'translate-x-0'"
-                                            />
+                                                    : 'translate-x-0'" />
                                         </div>
 
                                     </div>
@@ -269,13 +225,8 @@ onBeforeUnmount(() => {
                 </section>
             </GeneralModalContent>
 
-            <GeneralModalFooter
-                :employee="form"
-                :modo="canGuardar ? modo : 'view'"
-                :saveButtonText="textoBotonGuardar"
-                @save="$emit('guardar')"
-                @close="cerrar"
-            />
+            <GeneralModalFooter :employee="form" :modo="canGuardar ? modo : 'view'" :saveButtonText="textoBotonGuardar"
+                @save="$emit('guardar')" @close="cerrar" />
         </div>
     </div>
 </template>
