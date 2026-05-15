@@ -26,8 +26,8 @@ Route::get('/register', function () {
             ->orderBy('name')
             ->get(),
 
-        'sucursales' => \App\Models\Sucursal::where('activa', true)
-            ->orderBy('nombre')
+        'branches' => \App\Models\Branch::where('active', true)
+            ->orderBy('name')
             ->get(),
     ]);
 })->name('register');
@@ -72,7 +72,7 @@ Route::middleware([
                 'usuarios' => \App\Models\User::with([
                     'role',
                     'permissions',
-                    'sucursales'
+                    'branches'
                 ])
                     ->select(
                         'id',
@@ -88,7 +88,7 @@ Route::middleware([
 
                 'permissions' => \App\Models\Permission::all(),
 
-                'sucursales' => \App\Models\Sucursal::where('activa', true)->get(),
+                'branches' => \App\Models\Branch::where('active', true)->get(),
 
             ]);
         })->name('sistemas.empleados');

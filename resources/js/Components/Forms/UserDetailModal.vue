@@ -46,20 +46,17 @@ onBeforeUnmount(() => {
                         <p><strong>ID:</strong> {{ usuario.id }}</p>
                         <p><strong>Nombre:</strong> {{ usuario.name || '—' }}</p>
                         <p><strong>Correo:</strong> {{ usuario.email || '—' }}</p>
-                        <p><strong>Empleado ID:</strong> {{ usuario.empleado_id || '—' }}</p>
+                        <p><strong>Empleado ID:</strong> {{ usuario.employee_id || '—' }}</p>
                         <p><strong>Rol:</strong> {{ usuario.role?.name || 'Sin rol' }}</p>
 
                         <div v-if="usuario.role?.name === 'Ventas'" class="sm:col-span-2">
                             <strong>Sucursales:</strong>
 
                             <div class="flex flex-wrap gap-2 mt-2">
-                                <span
-    v-for="branch in usuario.branches"
-    :key="branch.id"
-    class="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs border border-green-300"
->
-    {{ branch.name }}
-</span>
+                                <span v-for="branch in usuario.branches" :key="branch.id"
+                                    class="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs border border-green-300">
+                                    {{ branch.name }}
+                                </span>
                             </div>
                         </div>
                     </div>

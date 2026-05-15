@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Role;
 use Inertia\Inertia;
-use App\Models\Sucursal;
+use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Events\UserChanged;
