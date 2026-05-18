@@ -1,62 +1,43 @@
 <script setup>
-import ExportButton from '@/Components/ExportButton.vue'
+import { usePermissions } from '@/Composables/usePermissions'
+
+const { can } = usePermissions()
 
 defineProps({
-    filteredProducts: {
-        type: Array,
-        default: () => []
-    },
-
-    productsDB: {
-        type: Array,
-        default: () => []
-    },
-
-    recordsToShow: {
+    total: {
         type: Number,
-        default: 10
+        default: 0
     }
 })
 
-defineEmits([
-    'create',
-    'excel',
-    'update:recordsToShow'
-])
+defineEmits(['create'])
 </script>
 
 <template>
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 
-        <div class="flex items-center gap-3">
-            <button @click="$emit('create')"
-                class="bg-[#1f1d2b] text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 shadow-sm">
-                <span class="material-symbols-outlined text-[18px]">
-                    add_circle
-                </span>
+        <div>
+            <h1 class="text-xl md:text-2xl font-bold text-slate-800">
+                Gestión de Productos
+            </h1>
 
-                Nuevo producto
-            </button>
-
-            <ExportButton @click="$emit('excel')" />
+            <p class="text-sm text-slate-500 mt-1">
+                Control de productos, stock, costos y precios
+            </p>
         </div>
 
         <div class="flex items-center gap-3">
-            <div class="text-sm text-slate-500">
-                Mostrando
-                {{ filteredProducts.length }}
-                de
-                {{ productsDB.length }}
-                registros
-            </div>
+            <span class="px-4 py-2 rounded-full bg-blue-600 text-white text-sm font-semibold">
+                {{ total }} productos
+            </span>
 
-            <select :value="recordsToShow" @change="$emit('update:recordsToShow', Number($event.target.value))"
-                class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
-                <option :value="10">10</option>
-                <option :value="25">25</option>
-                <option :value="50">50</option>
-                <option :value="100">100</option>
-            </select>
+            <button
+                v-if="can('productos.crear')"
+                @click="$emit('create')"
+                class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold transition"
+            >
+                + Nuevo producto
+            </button>
         </div>
 
     </div>

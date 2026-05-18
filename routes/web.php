@@ -7,7 +7,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
-
+use App\Http\Controllers\Inventory\ProductController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC (sin login)
@@ -149,23 +149,22 @@ Route::middleware([
             )->name('ventas.home');
         });
     });
+Route::middleware(['auth', 'role:Inventario,Administrador'])
+    ->prefix('inventario')
+    ->name('inventory.')
+    ->group(function () {
 
-    /*
-|--------------------------------------------------------------------------
-| 📦 INVENTARIO
-|--------------------------------------------------------------------------
-*/
-    Route::middleware(['auth', 'role:Inventario,Administrador'])->group(function () {
+        Route::get('/', [ProductController::class, 'index'])
+            ->name('home');
 
-        Route::prefix('inventario')->group(function () {
+        Route::post('/productos', [ProductController::class, 'store'])
+            ->name('products.store');
 
-            Route::get('/dashboard', fn() => Inertia::render('Inventory/Home'))->name('inventario.dashboard');
-            Route::get('/productos', fn() => Inertia::render('Inventory/Products'))->name('inventario.productos');
-            Route::get('/movimientos', fn() => Inertia::render('Inventory/Movements'))->name('inventario.movimientos');
-            Route::get('/caducidades', fn() => Inertia::render('Inventory/Expirations'))->name('inventario.caducidades');
-            Route::get('/transferencias', fn() => Inertia::render('Inventory/Transfers'))->name('inventario.transferencias');
-            Route::get('/ajustes', fn() => Inertia::render('Inventory/Adjustments'))->name('inventario.ajustes');
-            Route::get('/reportes', fn() => Inertia::render('Inventory/Reports'))->name('inventario.reportes');
-        });
+        Route::put('/productos/{product}', [ProductController::class, 'update'])
+            ->name('products.update');
+
+        Route::delete('/productos/{product}', [ProductController::class, 'destroy'])
+            ->name('products.destroy');
+
     });
-});
+    });

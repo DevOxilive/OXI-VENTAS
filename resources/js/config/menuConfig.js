@@ -78,84 +78,10 @@ export function generateMenu(role, permissions = []) {
 */
     if (isAdmin || isInventario || can("inventario.ver")) {
         menu.push({
-            text: "Inventario",
-            icon: "inventory_2",
-            isOpen: true,
-
-            children: [
-                ...(isAdmin || isInventario || can("inventario.dashboard.ver")
-                    ? [
-                          {
-                              text: "Dashboard",
-                              icon: "dashboard",
-                              url: route("inventario.dashboard"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin || isInventario || can("inventario.productos.ver")
-                    ? [
-                          {
-                              text: "Productos",
-                              icon: "inventory",
-                              url: route("inventario.productos"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin || isInventario || can("inventario.movimientos.ver")
-                    ? [
-                          {
-                              text: "Movimientos",
-                              icon: "sync_alt",
-                              url: route("inventario.movimientos"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin || isInventario || can("inventario.caducidades.ver")
-                    ? [
-                          {
-                              text: "Caducidades",
-                              icon: "event_busy",
-                              url: route("inventario.caducidades"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin ||
-                isInventario ||
-                can("inventario.transferencias.ver")
-                    ? [
-                          {
-                              text: "Transferencias",
-                              icon: "compare_arrows",
-                              url: route("inventario.transferencias"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin || isInventario || can("inventario.ajustes.ver")
-                    ? [
-                          {
-                              text: "Ajustes",
-                              icon: "tune",
-                              url: route("inventario.ajustes"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin || isInventario || can("inventario.reportes.ver")
-                    ? [
-                          {
-                              text: "Reportes",
-                              icon: "bar_chart",
-                              url: route("inventario.reportes"),
-                          },
-                      ]
-                    : []),
-            ],
-        });
+            text: 'Inventario',
+            icon: 'inventory_2',
+            url: route('inventory.home')
+        })
     }
 
     return menu;

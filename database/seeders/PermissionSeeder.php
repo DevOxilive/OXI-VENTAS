@@ -32,6 +32,12 @@ class PermissionSeeder extends Seeder
             'usuarios.crear',
             'usuarios.editar',
             'usuarios.eliminar',
+
+            // INVENTARIO
+'inventario.ver',
+'inventario.crear',
+'inventario.editar',
+'inventario.eliminar',
         ];
 
         foreach ($permissions as $permission) {
