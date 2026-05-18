@@ -31,11 +31,8 @@ defineEmits(['create'])
                 {{ total }} productos
             </span>
 
-            <button
-                v-if="can('productos.crear')"
-                @click="$emit('create')"
-                class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold transition"
-            >
+            <button v-if="can('productos.crear')" @click="$emit('create')"
+                class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold transition">
                 + Nuevo producto
             </button>
         </div>

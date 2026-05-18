@@ -91,11 +91,7 @@ function stockColor(stock) {
 
                 <tbody>
 
-                    <tr
-                        v-for="product in products"
-                        :key="product.id"
-                        class="border-b hover:bg-slate-50 transition"
-                    >
+                    <tr v-for="product in products" :key="product.id" class="border-b hover:bg-slate-50 transition">
 
                         <!-- CODIGO -->
                         <td class="px-5 py-4 text-slate-500">
@@ -109,10 +105,7 @@ function stockColor(stock) {
                                 {{ product.name }}
                             </div>
 
-                            <div
-                                v-if="product.presentation"
-                                class="text-xs text-slate-400 mt-1"
-                            >
+                            <div v-if="product.presentation" class="text-xs text-slate-400 mt-1">
                                 {{ product.presentation }}
                             </div>
 
@@ -135,10 +128,8 @@ function stockColor(stock) {
                         <!-- STOCK -->
                         <td class="px-5 py-4">
 
-                            <span
-                                class="text-white text-xs font-semibold px-3 py-1 rounded-full"
-                                :class="stockColor(product.stock)"
-                            >
+                            <span class="text-white text-xs font-semibold px-3 py-1 rounded-full"
+                                :class="stockColor(product.stock)">
                                 {{ product.stock }}
                             </span>
 
@@ -159,45 +150,27 @@ function stockColor(stock) {
                             ${{ product.profit }}
                         </td>
 
-                       <td class="px-5 py-4">
+                        <td class="px-5 py-4">
 
-    <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2">
 
-<ActionIconButton
-    v-if="can('inventario.ver')"
-    icon="visibility"
-    title="Ver producto"
-    variant="blue"
-    @click.stop="$emit('view', product)"
-/>
-        <ActionIconButton
-            v-if="can('inventario.editar')"
-            icon="edit"
-            title="Editar producto"
-            variant="amber"
-            @click.stop="$emit('edit', product)"
-        />
+                                <ActionIconButton v-if="can('inventario.ver')" icon="visibility" title="Ver producto"
+                                    variant="blue" @click.stop="$emit('view', product)" />
+                                <ActionIconButton v-if="can('inventario.editar')" icon="edit" title="Editar producto"
+                                    variant="amber" @click.stop="$emit('edit', product)" />
 
-   <ActionIconButton
-    v-if="can('inventario.eliminar')"
-    icon="delete"
-    title="Eliminar producto"
-    variant="red"
-    @click.stop="$emit('delete', product)"
-/>
+                                <ActionIconButton v-if="can('inventario.eliminar')" icon="delete"
+                                    title="Eliminar producto" variant="red" @click.stop="$emit('delete', product)" />
 
-    </div>
+                            </div>
 
-</td>
+                        </td>
                     </tr>
 
                     <!-- VACIO -->
                     <tr v-if="products.length === 0">
 
-                        <td
-                            colspan="9"
-                            class="text-center py-16 text-slate-400"
-                        >
+                        <td colspan="9" class="text-center py-16 text-slate-400">
                             No se encontraron productos
                         </td>
 

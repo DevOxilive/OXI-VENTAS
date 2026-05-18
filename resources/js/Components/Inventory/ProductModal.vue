@@ -84,10 +84,7 @@ function submit() {
 
                 </h2>
 
-                <button
-                    @click="$emit('close')"
-                    class="text-slate-400 hover:text-slate-700 text-2xl"
-                >
+                <button @click="$emit('close')" class="text-slate-400 hover:text-slate-700 text-2xl">
                     ×
                 </button>
 
@@ -101,12 +98,8 @@ function submit() {
                         Nombre
                     </label>
 
-                    <input
-                        v-model="form.name"
-                        :disabled="mode === 'view'"
-                        type="text"
-                        class="w-full mt-2 rounded-2xl border-slate-200"
-                    />
+                    <input v-model="form.name" :disabled="mode === 'view'" type="text"
+                        class="w-full mt-2 rounded-2xl border-slate-200" />
                 </div>
 
                 <div>
@@ -114,13 +107,8 @@ function submit() {
                         Precio
                     </label>
 
-                    <input
-                        v-model="form.price"
-                        :disabled="mode === 'view'"
-                        type="number"
-                        step="0.01"
-                        class="w-full mt-2 rounded-2xl border-slate-200"
-                    />
+                    <input v-model="form.price" :disabled="mode === 'view'" type="number" step="0.01"
+                        class="w-full mt-2 rounded-2xl border-slate-200" />
                 </div>
 
                 <div class="md:col-span-2">
@@ -128,12 +116,8 @@ function submit() {
                         Descripción
                     </label>
 
-                    <textarea
-                        v-model="form.description"
-                        :disabled="mode === 'view'"
-                        rows="4"
-                        class="w-full mt-2 rounded-2xl border-slate-200"
-                    />
+                    <textarea v-model="form.description" :disabled="mode === 'view'" rows="4"
+                        class="w-full mt-2 rounded-2xl border-slate-200" />
                 </div>
 
                 <div>
@@ -141,20 +125,13 @@ function submit() {
                         Categoría
                     </label>
 
-                    <select
-                        v-model="form.category_id"
-                        :disabled="mode === 'view'"
-                        class="w-full mt-2 rounded-2xl border-slate-200"
-                    >
+                    <select v-model="form.category_id" :disabled="mode === 'view'"
+                        class="w-full mt-2 rounded-2xl border-slate-200">
                         <option value="">
                             Selecciona categoría
                         </option>
 
-                        <option
-                            v-for="category in categoriesDB"
-                            :key="category.id"
-                            :value="category.id"
-                        >
+                        <option v-for="category in categoriesDB" :key="category.id" :value="category.id">
                             {{ category.name }}
                         </option>
                     </select>
@@ -165,18 +142,12 @@ function submit() {
             <!-- FOOTER -->
             <div class="flex justify-end gap-3 px-6 py-5 border-t">
 
-                <button
-                    @click="$emit('close')"
-                    class="px-5 py-3 rounded-2xl bg-slate-200 text-slate-700 font-semibold"
-                >
+                <button @click="$emit('close')" class="px-5 py-3 rounded-2xl bg-slate-200 text-slate-700 font-semibold">
                     Cancelar
                 </button>
 
-                <button
-                    v-if="mode !== 'view'"
-                    @click="submit"
-                    class="px-5 py-3 rounded-2xl bg-slate-900 text-white font-semibold"
-                >
+                <button v-if="mode !== 'view'" @click="submit"
+                    class="px-5 py-3 rounded-2xl bg-slate-900 text-white font-semibold">
                     {{
                         mode === 'create'
                             ? 'Crear producto'

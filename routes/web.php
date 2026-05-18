@@ -1,12 +1,12 @@
 <?php
 
 use Inertia\Inertia;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\EmployeeController;
-use App\Http\Controllers\UserController;
-use Illuminate\Support\Facades\Auth;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\Inventory\ProductController;
 /*
 |--------------------------------------------------------------------------
@@ -149,22 +149,100 @@ Route::middleware([
             )->name('ventas.home');
         });
     });
-Route::middleware(['auth', 'role:Inventario,Administrador'])
-    ->prefix('inventario')
-    ->name('inventory.')
-    ->group(function () {
 
-        Route::get('/', [ProductController::class, 'index'])
-            ->name('home');
+    /*
+    |--------------------------------------------------------------------------
+    | 💰 Inventario
+    |--------------------------------------------------------------------------
+    */
 
-        Route::post('/productos', [ProductController::class, 'store'])
-            ->name('products.store');
+    Route::middleware(['auth', 'role:Inventario,Administrador'])
+        ->prefix('inventario')
+        ->name('inventario.')
+        ->group(function () {
 
-        Route::put('/productos/{product}', [ProductController::class, 'update'])
-            ->name('products.update');
+            /*
+        |----------------------------------------------------------------------
+        | DASHBOARD
+        |----------------------------------------------------------------------
+        */
 
-        Route::delete('/productos/{product}', [ProductController::class, 'destroy'])
-            ->name('products.destroy');
+            Route::get(
+                '/dashboard',
+                fn() =>
+                Inertia::render('Inventory/Dashboard')
+            )->name('dashboard');
 
-    });
-    });
+            /*
+        |----------------------------------------------------------------------
+        | PRODUCTOS
+        |----------------------------------------------------------------------
+        */
+            Route::get('/productos', [ProductController::class, 'index'])
+                ->name('productos');
+
+            Route::post('/productos', [ProductController::class, 'store'])
+                ->name('products.store');
+
+            Route::put('/productos/{product}', [ProductController::class, 'update'])
+                ->name('products.update');
+
+            Route::delete('/productos/{product}', [ProductController::class, 'destroy'])
+                ->name('products.destroy');
+
+            /*
+        |----------------------------------------------------------------------
+        | MOVIMIENTOS
+        |----------------------------------------------------------------------
+        */
+            Route::get(
+                '/movimientos',
+                fn() =>
+                Inertia::render('Inventory/Movements')
+            )->name('movimientos');
+
+            /*
+        |----------------------------------------------------------------------
+        | CADUCIDADES
+        |----------------------------------------------------------------------
+        */
+            Route::get(
+                '/caducidades',
+                fn() =>
+                Inertia::render('Inventory/Expirations')
+            )->name('caducidades');
+
+            /*
+        |----------------------------------------------------------------------
+        | TRANSFERENCIAS
+        |----------------------------------------------------------------------
+        */
+            Route::get(
+                '/transferencias',
+                fn() =>
+                Inertia::render('Inventory/Transfers')
+            )->name('transferencias');
+
+            /*
+        |----------------------------------------------------------------------
+        | AJUSTES
+        |----------------------------------------------------------------------
+        */
+            Route::get(
+                '/ajustes',
+                fn() =>
+                Inertia::render('Inventory/Adjustments')
+            )->name('ajustes');
+
+            /*
+        |----------------------------------------------------------------------
+        | REPORTES
+        |----------------------------------------------------------------------
+        */
+            Route::get(
+                '/reportes',
+                fn() =>
+                Inertia::render('Inventory/Reports')
+            )->name('reportes');
+        });
+});
