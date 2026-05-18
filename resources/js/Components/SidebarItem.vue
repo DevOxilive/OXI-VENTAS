@@ -1,93 +1,75 @@
+<script setup>
+import { Link } from '@inertiajs/vue3'
+
+defineProps({
+    items: {
+        type: Array,
+        default: () => []
+    },
+
+    extended: {
+        type: Boolean,
+        default: true
+    }
+})
+</script>
+
 <template>
     <ul class="space-y-1">
-        <li v-for="(item, index) in localItems" :key="index">
 
-            <!-- ITEM NAVEGABLE -->
-            <Link v-if="item.url && !hasChildren(item)" :href="item.url"
-                class="flex items-center justify-between px-3 py-3 rounded-xl cursor-pointer transition-all duration-200"
-                :class="isActive(item.url)
-                    ? 'bg-slate-700 text-white shadow-sm'
-                    : 'hover:bg-slate-100 text-slate-700'">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined"
-                        :class="isActive(item.url) ? 'text-white' : 'text-slate-500'">
+        <li v-for="item in items" :key="item.text">
+
+            <!-- ITEM PRINCIPAL -->
+            <div>
+
+                <Link v-if="item.url" :href="item.url"
+                    class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-100 transition group">
+                    <!-- ICON -->
+                    <span
+                        class="material-symbols-outlined text-[22px] shrink-0 text-slate-500 group-hover:text-slate-700">
                         {{ item.icon }}
                     </span>
 
-                    <span v-if="extended" class="font-medium">
+                    <!-- TEXT -->
+                    <span v-if="extended" class="text-sm font-medium truncate">
                         {{ item.text }}
                     </span>
-                </div>
-            </Link>
+                </Link>
 
-            <!-- ITEM CON SUBMENU -->
-            <div v-else
-                class="flex items-center justify-between px-3 py-3 rounded-xl cursor-pointer transition-all duration-200 hover:bg-slate-100"
-                @click="toggle(item)">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-slate-500">
-                        {{ item.icon }}
+                <!-- ITEM CON CHILDREN -->
+                <button v-else type="button"
+                    class="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-100 transition group"
+                    @click="item.isOpen = !item.isOpen">
+                    <div class="flex items-center gap-3 min-w-0">
+
+                        <!-- ICON -->
+                        <span
+                            class="material-symbols-outlined text-[22px] shrink-0 text-slate-500 group-hover:text-slate-700">
+                            {{ item.icon }}
+                        </span>
+
+                        <!-- TEXT -->
+                        <span v-if="extended" class="text-sm font-medium truncate">
+                            {{ item.text }}
+                        </span>
+                    </div>
+
+                    <!-- ARROW -->
+                    <span v-if="item.children && extended"
+                        class="material-symbols-outlined text-[18px] text-slate-400 transition">
+                        {{ item.isOpen ? 'expand_more' : 'chevron_right' }}
                     </span>
+                </button>
 
-                    <span v-if="extended" class="text-slate-700 font-medium">
-                        {{ item.text }}
-                    </span>
-                </div>
-
-                <span v-if="hasChildren(item)" class="material-symbols-outlined text-slate-400 text-[20px]">
-                    {{ item.isOpen ? 'expand_less' : 'expand_more' }}
-                </span>
             </div>
 
             <!-- CHILDREN -->
-            <SidebarItem v-if="item.isOpen && hasChildren(item)" :items="item.children" :extended="extended"
-                class="ml-5 mt-1 border-l pl-2" />
+            <div v-if="item.children && item.isOpen && extended"
+                class="ml-6 mt-1 space-y-1 border-l border-slate-200 pl-3">
+                <SidebarItem :items="item.children" :extended="extended" />
+            </div>
+
         </li>
+
     </ul>
 </template>
-
-<script setup>
-import { Link, usePage } from '@inertiajs/vue3'
-import { reactive } from 'vue'
-
-defineOptions({ name: 'SidebarItem' })
-
-const props = defineProps({
-    items: Array,
-    extended: Boolean
-})
-
-const page = usePage()
-
-/*
-|--------------------------------------------------------------------------
-| COPIA LOCAL REACTIVA DEL MENÚ
-|--------------------------------------------------------------------------
-| Evita mutar props directamente al abrir/cerrar submenús.
-*/
-const localItems = reactive(
-    props.items.map(item => ({
-        ...item,
-        isOpen: item.isOpen || false
-    }))
-)
-
-function hasChildren(item) {
-    return item.children && item.children.length > 0
-}
-
-function toggle(item) {
-    if (hasChildren(item)) {
-        item.isOpen = !item.isOpen
-    }
-}
-
-/*
-|--------------------------------------------------------------------------
-| DETECTAR RUTA ACTIVA
-|--------------------------------------------------------------------------
-*/
-function isActive(url) {
-    return page.url === new URL(url, window.location.origin).pathname
-}
-</script>

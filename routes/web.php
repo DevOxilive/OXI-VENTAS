@@ -151,20 +151,21 @@ Route::middleware([
     });
 
     /*
-    |--------------------------------------------------------------------------
-    | 📦 INVENTARIO
-    |--------------------------------------------------------------------------
-    */
-    // Solo Inventario y Administradores pueden acceder a estas rutas
-    Route::middleware(['auth', 'role:Inventario, Administrador'])->group(function () {
+|--------------------------------------------------------------------------
+| 📦 INVENTARIO
+|--------------------------------------------------------------------------
+*/
+    Route::middleware(['auth', 'role:Inventario,Administrador'])->group(function () {
 
         Route::prefix('inventario')->group(function () {
 
-            Route::get(
-                '/',
-                fn() =>
-                Inertia::render('Inventario/Home')
-            )->name('inventario.home');
+            Route::get('/dashboard', fn() => Inertia::render('Inventory/Home'))->name('inventario.dashboard');
+            Route::get('/productos', fn() => Inertia::render('Inventory/Products'))->name('inventario.productos');
+            Route::get('/movimientos', fn() => Inertia::render('Inventory/Movements'))->name('inventario.movimientos');
+            Route::get('/caducidades', fn() => Inertia::render('Inventory/Expirations'))->name('inventario.caducidades');
+            Route::get('/transferencias', fn() => Inertia::render('Inventory/Transfers'))->name('inventario.transferencias');
+            Route::get('/ajustes', fn() => Inertia::render('Inventory/Adjustments'))->name('inventario.ajustes');
+            Route::get('/reportes', fn() => Inertia::render('Inventory/Reports'))->name('inventario.reportes');
         });
     });
 });
