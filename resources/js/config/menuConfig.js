@@ -29,7 +29,7 @@ export function generateMenu(role, permissions = []) {
         menu.push({
             text: "Sistemas",
             icon: "settings",
-            isOpen: true,
+            isOpen: false,
 
             children: [
                 ...(isAdmin || isSistemas || can("usuarios.ver")
@@ -59,29 +59,90 @@ export function generateMenu(role, permissions = []) {
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | VENTAS
-    |--------------------------------------------------------------------------
-    */
-    if (isAdmin || isVentas || can("ventas.ver")) {
-        menu.push({
-            text: "Ventas",
-            icon: "paid",
-            url: route("ventas.home"),
-        });
-    }
-
-    /*
 |--------------------------------------------------------------------------
 | INVENTARIO
 |--------------------------------------------------------------------------
 */
     if (isAdmin || isInventario || can("inventario.ver")) {
         menu.push({
-            text: 'Inventario',
-            icon: 'inventory_2',
-            url: route('inventory.home')
-        })
+            text: "Inventario",
+            icon: "inventory_2",
+            isOpen: false,
+
+            children: [
+                ...(isAdmin || isInventario || can("inventario.dashboard.ver")
+                    ? [
+                          {
+                              text: "Dashboard",
+                              icon: "dashboard",
+                              url: route("inventario.dashboard"),
+                          },
+                      ]
+                    : []),
+
+                ...(isAdmin || isInventario || can("inventario.productos.ver")
+                    ? [
+                          {
+                              text: "Productos",
+                              icon: "inventory",
+                              url: route("inventario.productos"),
+                          },
+                      ]
+                    : []),
+
+                ...(isAdmin || isInventario || can("inventario.movimientos.ver")
+                    ? [
+                          {
+                              text: "Movimientos",
+                              icon: "sync_alt",
+                              url: route("inventario.movimientos"),
+                          },
+                      ]
+                    : []),
+
+                ...(isAdmin || isInventario || can("inventario.caducidades.ver")
+                    ? [
+                          {
+                              text: "Caducidades",
+                              icon: "event_busy",
+                              url: route("inventario.caducidades"),
+                          },
+                      ]
+                    : []),
+
+                ...(isAdmin ||
+                isInventario ||
+                can("inventario.transferencias.ver")
+                    ? [
+                          {
+                              text: "Transferencias",
+                              icon: "compare_arrows",
+                              url: route("inventario.transferencias"),
+                          },
+                      ]
+                    : []),
+
+                ...(isAdmin || isInventario || can("inventario.ajustes.ver")
+                    ? [
+                          {
+                              text: "Ajustes",
+                              icon: "tune",
+                              url: route("inventario.ajustes"),
+                          },
+                      ]
+                    : []),
+
+                ...(isAdmin || isInventario || can("inventario.reportes.ver")
+                    ? [
+                          {
+                              text: "Reportes",
+                              icon: "bar_chart",
+                              url: route("inventario.reportes"),
+                          },
+                      ]
+                    : []),
+            ],
+        });
     }
 
     return menu;

@@ -221,15 +221,8 @@ function deleteProduct(selectedProduct) {
         <ProductMobileCards :filtered-products="filteredProducts" @view="openViewModal" @edit="openEditModal"
             @adjust="adjustStock" @delete="deleteProduct" />
 
-<ProductRegisterModal
-    v-if="showModal"
-    :modo="modalMode"
-    :product="product"
-    :frontend-errors="frontendErrors"
-    @close="closeModal"
-    @save="submitProduct"
-    @validate="validateField"
-/>
+        <ProductRegisterModal v-if="showModal" :modo="modalMode" :product="product" :frontend-errors="frontendErrors"
+            @close="closeModal" @save="submitProduct" @validate="validateField" />
 
     </section>
 </template>

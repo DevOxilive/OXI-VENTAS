@@ -2,9 +2,9 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { computed } from 'vue'
 
-import ProductToolbar from '@/Components/Inventory/ProductToolbar.vue'
-import ProductTable from '@/Components/Inventory/ProductTable.vue'
-import ProductMobileCards from '@/Components/Inventory/ProductMobileCards.vue'
+import InventoryToolbar from '@/Components/Inventory/InventoryToolbar.vue'
+import InventoryTable from '@/Components/Inventory/ProductTable.vue'
+import InventoryMobileCards from '@/Components/Inventory/ProductMobileCards.vue'
 import ProductModal from '@/Components/Inventory/ProductModal.vue'
 
 import { useProductFilters } from '@/Composables/Inventory/useProductFilters'
@@ -47,21 +47,21 @@ const {
 <template>
     <div class="bg-[#f6f3f7] min-h-screen rounded-2xl md:rounded-3xl p-4 md:p-6">
 
-        <ProductToolbar
+        <InventoryToolbar
             :total="filteredProducts.length"
             @create="openCreateModal"
         />
 
        <div class="mt-5">
 
-    <ProductTable
+    <InventoryTable
         :products="filteredProducts"
         @view="openViewModal"
         @edit="openEditModal"
         @delete="deleteProduct"
     />
 
-    <ProductMobileCards
+    <InventoryMobileCards
         :products="filteredProducts"
         @view="openViewModal"
         @edit="openEditModal"
