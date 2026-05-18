@@ -106,7 +106,7 @@ isOpen: true,
         menu.push({
             text: 'Inventario',
             icon: 'inventory_2',
-            url: route('inventario.home')
+            url: route('inventory.home')
         })
     }
 
