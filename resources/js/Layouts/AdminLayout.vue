@@ -7,7 +7,7 @@ import { ref } from 'vue'
 const page = usePage()
 const role = page.props.auth.user?.role?.name
 const permissions = page.props.auth.permissions || []
-const menuItems = generateMenu(role, permissions)
+const menuItems = ref(generateMenu(role, permissions))
 
 const sidebarOpen = ref(false)
 const desktopSidebarCollapsed = ref(false)
@@ -63,9 +63,7 @@ function toggleDesktopSidebar() {
                 </div>
             </div>
 
-            <nav class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3">
-                <SidebarItem :items="menuItems" :extended="!desktopSidebarCollapsed" />
-            </nav>
+            <SidebarItem :items="menuItems" :extended="!desktopSidebarCollapsed" />
         </aside>
 
         <section class="flex-1 min-w-0 flex flex-col overflow-hidden">

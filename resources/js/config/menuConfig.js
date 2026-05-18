@@ -29,7 +29,7 @@ export function generateMenu(role, permissions = []) {
         menu.push({
             text: "Sistemas",
             icon: "settings",
-            isOpen: true,
+            isOpen: false,
 
             children: [
                 ...(isAdmin || isSistemas || can("usuarios.ver")
@@ -67,7 +67,7 @@ export function generateMenu(role, permissions = []) {
         menu.push({
             text: "Inventario",
             icon: "inventory_2",
-            isOpen: true,
+            isOpen: false,
 
             children: [
                 ...(isAdmin || isInventario || can("inventario.dashboard.ver")
