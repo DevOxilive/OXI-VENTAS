@@ -29,8 +29,8 @@ watch(
         if (!product) return
 
         form.name = product.name ?? ''
-        form.description = product.presentation ?? ''
-        form.price = product.price ?? ''
+        form.description = product.description ?? '',
+            form.price = product.price ?? ''
         form.category_id = product.category_id ?? ''
         form.active = true
 
@@ -39,10 +39,8 @@ watch(
 )
 
 function submit() {
-
     if (props.mode === 'create') {
-
-        form.post(route('inventory.products.store'), {
+        form.post(route('inventario.products.store'), {
             preserveScroll: true,
             onSuccess: () => emit('close')
         })
@@ -51,9 +49,8 @@ function submit() {
     }
 
     if (props.mode === 'edit') {
-
         form.put(
-            route('inventory.products.update', props.product.id),
+            route('inventario.products.update', props.product.id),
             {
                 preserveScroll: true,
                 onSuccess: () => emit('close')

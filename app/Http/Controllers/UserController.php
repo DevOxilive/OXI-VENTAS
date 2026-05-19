@@ -97,7 +97,9 @@ class UserController extends Controller
         } else {
             $user->branches()->sync([]);
         }
-        broadcast(new UserChanged('created', $user->id))->toOthers();
+        $user->load(['role', 'permissions']);
+
+        broadcast(new UserChanged($user, 'created'))->toOthers();
         return redirect()->route('sistemas.empleados')
             ->with('success', 'Usuario creado correctamente');
     }
@@ -151,7 +153,8 @@ class UserController extends Controller
         } else {
             $user->branches()->sync([]);
         }
-        broadcast(new UserChanged('updated', $user->id))->toOthers();
+        $user->load(['role', 'permissions']);
+        broadcast(new UserChanged($user, 'updated'))->toOthers();
         return redirect()->route('sistemas.empleados')
             ->with('success', 'Usuario actualizado');
     }
@@ -162,14 +165,14 @@ class UserController extends Controller
 
         $user = User::findOrFail($id);
 
-        $userId = $user->id;
+        $user->load(['role', 'permissions']);
+
+        broadcast(new UserChanged($user, 'deleted'))->toOthers();
 
         $user->permissions()->detach();
         $user->branches()->detach();
 
         $user->delete();
-
-        broadcast(new UserChanged('deleted', $userId))->toOthers();
 
         return redirect()->route('sistemas.empleados')
             ->with('success', 'Usuario eliminado');
