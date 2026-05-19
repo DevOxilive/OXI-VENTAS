@@ -401,13 +401,13 @@ onMounted(() => {
 
   window.Echo.channel('systems')
 
-    .listen('.employee.changed', (event) => {
+    .listen('.EmployeeChanged', (event) => {
       console.log('Empleado actualizado en tiempo real', event)
 
       recargarSistema()
     })
 
-    .listen('.user.changed', (event) => {
+    .listen('.UserChanged', (event) => {
       console.log('Usuario actualizado en tiempo real', event)
 
       recargarSistema()
