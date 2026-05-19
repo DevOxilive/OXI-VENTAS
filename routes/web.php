@@ -161,23 +161,9 @@ Route::middleware([
         ->name('inventario.')
         ->group(function () {
 
-            /*
-        |----------------------------------------------------------------------
-        | DASHBOARD
-        |----------------------------------------------------------------------
-        */
+            Route::get('/dashboard', fn() => Inertia::render('Inventory/Dashboard'))
+                ->name('dashboard');
 
-            Route::get(
-                '/dashboard',
-                fn() =>
-                Inertia::render('Inventory/Dashboard')
-            )->name('dashboard');
-
-            /*
-        |----------------------------------------------------------------------
-        | PRODUCTOS
-        |----------------------------------------------------------------------
-        */
             Route::get('/productos', [ProductController::class, 'index'])
                 ->name('productos');
 
@@ -190,59 +176,19 @@ Route::middleware([
             Route::delete('/productos/{product}', [ProductController::class, 'destroy'])
                 ->name('products.destroy');
 
-            /*
-        |----------------------------------------------------------------------
-        | MOVIMIENTOS
-        |----------------------------------------------------------------------
-        */
-            Route::get(
-                '/movimientos',
-                fn() =>
-                Inertia::render('Inventory/Movements')
-            )->name('movimientos');
+            Route::get('/movimientos', fn() => Inertia::render('Inventory/Movements'))
+                ->name('movimientos');
 
-            /*
-        |----------------------------------------------------------------------
-        | CADUCIDADES
-        |----------------------------------------------------------------------
-        */
-            Route::get(
-                '/caducidades',
-                fn() =>
-                Inertia::render('Inventory/Expirations')
-            )->name('caducidades');
+            Route::get('/caducidades', fn() => Inertia::render('Inventory/Expirations'))
+                ->name('caducidades');
 
-            /*
-        |----------------------------------------------------------------------
-        | TRANSFERENCIAS
-        |----------------------------------------------------------------------
-        */
-            Route::get(
-                '/transferencias',
-                fn() =>
-                Inertia::render('Inventory/Transfers')
-            )->name('transferencias');
+            Route::get('/transferencias', fn() => Inertia::render('Inventory/Transfers'))
+                ->name('transferencias');
 
-            /*
-        |----------------------------------------------------------------------
-        | AJUSTES
-        |----------------------------------------------------------------------
-        */
-            Route::get(
-                '/ajustes',
-                fn() =>
-                Inertia::render('Inventory/Adjustments')
-            )->name('ajustes');
+            Route::get('/ajustes', fn() => Inertia::render('Inventory/Adjustments'))
+                ->name('ajustes');
 
-            /*
-        |----------------------------------------------------------------------
-        | REPORTES
-        |----------------------------------------------------------------------
-        */
-            Route::get(
-                '/reportes',
-                fn() =>
-                Inertia::render('Inventory/Reports')
-            )->name('reportes');
+            Route::get('/reportes', fn() => Inertia::render('Inventory/Reports'))
+                ->name('reportes');
         });
 });
