@@ -1,7 +1,17 @@
 <script setup>
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
-import { usePage, useForm, router } from '@inertiajs/vue3'
-import { usePermissions } from '@/Composables/usePermissions'
+
+import {
+  usePage,
+  useForm,
+  router
+} from '@inertiajs/vue3'
+
+import {
+  usePermissions,
+  updateLivePermissions
+} from '@/Composables/usePermissions'
+
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import UserRegisterModal from '@/Components/Forms/UserRegisterModal.vue'
 import UserDetailModal from '@/Components/Forms/UserDetailModal.vue'
@@ -395,21 +405,56 @@ function recargarSistema() {
     preserveState: true,
   })
 }
-
 onMounted(() => {
   if (!window.Echo) return
 
   window.Echo.channel('systems')
 
-    .listen('.employee.changed', (event) => {
+    .listen('.EmployeeChanged', (event) => {
       console.log('Empleado actualizado en tiempo real', event)
 
       recargarSistema()
     })
 
-    .listen('.user.changed', (event) => {
+    .listen('.UserChanged', (event) => {
       console.log('Usuario actualizado en tiempo real', event)
 
+      /*
+      |--------------------------------------------------------------------------
+      | ACTUALIZAR PERMISOS DEL USUARIO LOGUEADO
+      |--------------------------------------------------------------------------
+      */
+      if (page.props.auth.user.id === event.userId) {
+
+        updateLivePermissions({
+          permissions: event.permissions,
+          role: event.role
+        })
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | REFRESCAR MODAL ABIERTO
+      |--------------------------------------------------------------------------
+      */
+      if (
+        showModal.value &&
+        userId.value === event.userId
+      ) {
+        const permisosActualizados = permissions.value
+          .filter(permission =>
+            event.permissions.includes(permission.name)
+          )
+          .map(permission => permission.id)
+
+        form.permissions = permisosActualizados
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | RECARGAR TABLAS
+      |--------------------------------------------------------------------------
+      */
       recargarSistema()
     })
 })
