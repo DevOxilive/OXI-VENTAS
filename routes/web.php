@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\Inventory\ProductController;
+use App\Http\Controllers\Inventory\StockMovementController;
+use App\Http\Controllers\Inventory\BranchInventoryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -71,21 +73,7 @@ Route::middleware([
 
             return Inertia::render('Sistemas/Empleados', [
                 'empleados' => \App\Models\Employee::doesntHave('user')->get(),
-
-                'usuarios' => \App\Models\User::with([
-                    'role',
-                    'permissions',
-                    'branches',
-                ])
-                    ->select(
-                        'id',
-                        'employee_id',
-                        'name',
-                        'email',
-                        'role_id'
-                    )
-                    ->get(),
-
+                'usuarios' => \App\Models\User::with(['role',    'permissions',    'branches',])->select('id',        'employee_id',        'name',        'email',        'role_id')->get(),
                 'roles' => \App\Models\Role::all(),
                 'permissions' => \App\Models\Permission::all(),
                 'branches' => \App\Models\Branch::where('active', true)->get(),
@@ -101,7 +89,9 @@ Route::middleware([
         Route::delete('/Empleados/{id}', [UserController::class, 'destroy'])
             ->name('sistemas.empleados.destroy');
 
-        Route::get('/usuarios', fn() =>
+        Route::get(
+            '/usuarios',
+            fn() =>
             Inertia::render('Sistemas/Usuarios')
         )->name('sistemas.usuarios');
     });
@@ -115,37 +105,37 @@ Route::middleware([
     Route::middleware(['auth', 'role:Recursos Humanos,Administrador'])
         ->group(function () {
 
-            Route::get('/home', fn() =>
-                Inertia::render('Recursos-humanos/Home')
+            Route::get(
+                '/home',
+                fn() => Inertia::render('Recursos-humanos/Home')
             )->name('rh.home');
 
-            Route::get('/roles', fn() =>
-                Inertia::render('Recursos-humanos/Roles')
+            Route::get(
+                '/roles',
+                fn() => Inertia::render('Recursos-humanos/Roles')
             )->name('rh.roles');
 
-            Route::get('/usuarios', fn() =>
-                Inertia::render('Recursos-humanos/Usuarios')
+            Route::get(
+                '/usuarios',
+                fn() => Inertia::render('Recursos-humanos/Usuarios')
             )->name('rh.usuarios');
 
-            Route::get('/empleados', [EmployeeController::class, 'index'])
-                ->name('rh.empleados');
+            Route::get('/empleados', [EmployeeController::class, 'index'])->name('rh.empleados');
 
-            Route::post('/empleados', [EmployeeController::class, 'store'])
-                ->name('rh.empleados.store');
+            Route::post('/empleados', [EmployeeController::class, 'store'])->name('rh.empleados.store');
 
-            Route::put('/empleados/{id}', [EmployeeController::class, 'update'])
-                ->name('rh.empleados.update');
+            Route::post('/empleados/store', [EmployeeController::class, 'store'])->name('rh.empleados.store.alt');
 
-            Route::delete('/empleados/{id}', [EmployeeController::class, 'destroy'])
-                ->name('rh.empleados.destroy');
+            Route::put('/empleados/{id}', [EmployeeController::class, 'update'])->name('rh.empleados.update');
 
-            Route::get('/empleados/exportar-excel', [EmployeeController::class, 'exportExcel'])
-                ->name('rh.empleados.exportarExcel');
+            Route::delete('/empleados/{id}', [EmployeeController::class, 'destroy'])->name('rh.empleados.destroy');
+
+            Route::get('/empleados/exportar-excel', [EmployeeController::class, 'exportExcel'])->name('rh.empleados.exportarExcel');
         });
 
     /*
     |--------------------------------------------------------------------------
-    | SALES
+    | SALES / VENTAS
     |--------------------------------------------------------------------------
     */
 
@@ -154,15 +144,26 @@ Route::middleware([
         ->name('sales.')
         ->group(function () {
 
-            Route::get('/', fn() =>
-                Inertia::render('Ventas/Home')
+            Route::get(
+                '/',
+                fn() => Inertia::render('Ventas/Home')
             )->name('home');
+        });
 
+    Route::middleware(['auth', 'role:Ventas,Administrador'])
+        ->prefix('ventas')
+        ->name('ventas.')
+        ->group(function () {
+
+            Route::get(
+                '/',
+                fn() => Inertia::render('Ventas/Home')
+            )->name('home');
         });
 
     /*
     |--------------------------------------------------------------------------
-    | INVENTORY
+    | INVENTORY - RUTAS ACTUALES EN INGLÉS
     |--------------------------------------------------------------------------
     */
 
@@ -171,42 +172,97 @@ Route::middleware([
         ->name('inventory.')
         ->group(function () {
 
-            Route::get('/dashboard', fn() =>
-                Inertia::render('Inventory/Dashboard')
+            Route::get(
+                '/dashboard',
+                fn() => Inertia::render('Inventory/Dashboard')
             )->name('dashboard');
 
-            Route::get('/products', [ProductController::class, 'index'])
-                ->name('products.index');
+            Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 
-            Route::post('/products', [ProductController::class, 'store'])
-                ->name('products.store');
+            Route::post('/products', [ProductController::class, 'store'])->name('products.store');
 
-            Route::put('/products/{product}', [ProductController::class, 'update'])
-                ->name('products.update');
+            Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
 
-            Route::delete('/products/{product}', [ProductController::class, 'destroy'])
-                ->name('products.destroy');
+            Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
 
-            Route::get('/movements', fn() =>
-                Inertia::render('Inventory/Movements')
+            Route::get(
+                '/movements',
+                fn() => Inertia::render('Inventory/Movements')
             )->name('movements');
 
-            Route::get('/expirations', fn() =>
-                Inertia::render('Inventory/Expirations')
+            Route::get(
+                '/expirations',
+                fn() => Inertia::render('Inventory/Expirations')
             )->name('expirations');
 
-            Route::get('/transfers', fn() =>
-                Inertia::render('Inventory/Transfers')
+            Route::get(
+                '/transfers',
+                fn() => Inertia::render('Inventory/Transfers')
             )->name('transfers');
 
-            Route::get('/adjustments', fn() =>
-                Inertia::render('Inventory/Adjustments')
+            Route::get(
+                '/adjustments',
+                fn() => Inertia::render('Inventory/Adjustments')
             )->name('adjustments');
 
-            Route::get('/reports', fn() =>
-                Inertia::render('Inventory/Reports')
+            Route::get(
+                '/reports',
+                fn() => Inertia::render('Inventory/Reports')
             )->name('reports');
-
         });
 
+    /*
+    |--------------------------------------------------------------------------
+    | INVENTARIO - TUS RUTAS EN ESPAÑOL
+    |--------------------------------------------------------------------------
+    */
+
+    Route::middleware(['auth', 'role:Inventario,Administrador'])
+        ->prefix('inventario')
+        ->name('inventario.')
+        ->group(function () {
+
+            Route::get(
+                '/dashboard',
+                fn() => Inertia::render('Inventory/Dashboard')
+            )->name('dashboard');
+
+            Route::get('/productos', [ProductController::class, 'index'])->name('productos');
+
+            Route::post('/productos', [ProductController::class, 'store'])->name('products.store');
+
+            Route::put('/productos/{product}', [ProductController::class, 'update'])->name('products.update');
+
+            Route::delete('/productos/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+
+            Route::get(
+                '/caducidades',
+                fn() => Inertia::render('Inventory/Expirations')
+            )->name('caducidades');
+
+            Route::get(
+                '/transferencias',
+                fn() => Inertia::render('Inventory/Transfers')
+            )->name('transferencias');
+
+            Route::get(
+                '/ajustes',
+                fn() => Inertia::render('Inventory/Adjustments')
+            )->name('ajustes');
+
+            Route::get(
+                '/reportes',
+                fn() => Inertia::render('Inventory/Reports')
+            )->name('reportes');
+
+            Route::get('/stock-movements', [StockMovementController::class, 'index'])->name('stock-movements.index');
+
+            Route::post('/stock-movements', [StockMovementController::class, 'store'])->name('stock-movements.store');
+
+            Route::get('/inventario-sucursales', [BranchInventoryController::class, 'index'])->name('sucursales');
+
+            Route::post('/inventario-sucursales', [BranchInventoryController::class, 'store'])->name('branch-inventory.store');
+
+            Route::get('/movimientos', [StockMovementController::class, 'index'])->name('movimientos');
+        });
 });

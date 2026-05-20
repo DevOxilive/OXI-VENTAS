@@ -74,48 +74,47 @@ const productsDB = ref([
         status: 'Disponible'
     }
 ])
-
 const inventoryModules = [
     {
         title: 'Productos',
         description: 'Alta, edición, consulta y control de stock.',
         icon: 'inventory_2',
-        routeName: 'inventory.products',
+        routeName: 'inventory.products.index',
         color: 'bg-blue-50 text-blue-700 border-blue-100'
     },
     {
         title: 'Movimientos',
         description: 'Historial de entradas, salidas y ajustes.',
         icon: 'sync_alt',
-        routeName: 'inventario.movimientos',
+        routeName: 'inventory.movements',
         color: 'bg-violet-50 text-violet-700 border-violet-100'
     },
     {
         title: 'Caducidades',
         description: 'Productos próximos a vencer y lotes críticos.',
         icon: 'event_busy',
-        routeName: 'inventario.caducidades',
+        routeName: 'inventory.expirations',
         color: 'bg-amber-50 text-amber-700 border-amber-100'
     },
     {
         title: 'Transferencias',
         description: 'Movimientos de stock entre sucursales.',
         icon: 'compare_arrows',
-        routeName: 'inventario.transferencias',
+        routeName: 'inventory.transfers',
         color: 'bg-cyan-50 text-cyan-700 border-cyan-100'
     },
     {
         title: 'Ajustes',
         description: 'Correcciones auditadas de inventario físico.',
         icon: 'tune',
-        routeName: 'inventario.ajustes',
+        routeName: 'inventory.adjustments',
         color: 'bg-rose-50 text-rose-700 border-rose-100'
     },
     {
         title: 'Reportes',
         description: 'Exportaciones, análisis y reportes operativos.',
         icon: 'bar_chart',
-        routeName: 'inventario.reportes',
+        routeName: 'inventory.reports',
         color: 'bg-emerald-50 text-emerald-700 border-emerald-100'
     }
 ]
