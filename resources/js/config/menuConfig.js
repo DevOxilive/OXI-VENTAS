@@ -84,15 +84,15 @@ export function generateMenu(role, permissions = []) {
               ]
             : []),
 
-        // ...(isAdmin || isInventario || can("inventario.movimientos.ver")
-        //     ? [
-        //           {
-        //               text: "Movimientos",
-        //               icon: "sync_alt",
-        //               url: route("inventario.movimientos"),
-        //           },
-        //       ]
-        //     : []),
+        ...(isAdmin || isInventario || can("inventario.sucursales.ver")
+            ? [
+                  {
+                      text: "Movimientos",
+                      icon: "sync_alt",
+                      url: route("inventario.sucursales"),
+                  },
+              ]
+            : []),
 
         // ...(isAdmin || isInventario || can("inventario.caducidades.ver")
         //     ? [

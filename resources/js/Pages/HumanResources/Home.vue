@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
-import RecursosHumanosLayout from '@/Layouts/RecursosHumanosLayout.vue'
-defineOptions({ layout: RecursosHumanosLayout })
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+defineOptions({ layout: AdminLayout })
 </script>
 
 <template>
