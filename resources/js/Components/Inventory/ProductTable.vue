@@ -17,9 +17,16 @@ defineEmits([
     'delete'
 ])
 
-function stockColor(stock) {
-    if (stock <= 10) return 'bg-red-500'
-    if (stock <= 30) return 'bg-yellow-500'
+function stockColor(product) {
+
+    if (product.stock <= product.minimum_stock) {
+        return 'bg-red-500'
+    }
+
+    if (product.stock >= product.maximum_stock) {
+        return 'bg-blue-500'
+    }
+
     return 'bg-green-600'
 }
 </script>
@@ -128,10 +135,14 @@ function stockColor(stock) {
                         <!-- STOCK -->
                         <td class="px-5 py-4">
 
-                            <span class="text-white text-xs font-semibold px-3 py-1 rounded-full"
-                                :class="stockColor(product.stock)">
-                                {{ product.stock }}
-                            </span>
+                         <span
+    class="text-white text-xs font-semibold px-3 py-1 rounded-full"
+    :class="stockColor(product)"
+>
+    {{ product.stock }}
+</span>
+
+                             
 
                         </td>
 

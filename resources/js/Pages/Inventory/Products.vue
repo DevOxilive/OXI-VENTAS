@@ -196,6 +196,7 @@ function adjustStock(selectedProduct) {
 function deleteProduct(selectedProduct) {
     console.log('Eliminar producto', selectedProduct)
 }
+
 </script>
 
 <template>
