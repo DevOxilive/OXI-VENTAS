@@ -63,85 +63,97 @@ export function generateMenu(role, permissions = []) {
 | INVENTARIO
 |--------------------------------------------------------------------------
 */
+    const inventoryOptions = () => [
+        ...(isAdmin || isInventario || can("inventario.dashboard.ver")
+            ? [
+                  {
+                      text: "Dashboard",
+                      icon: "dashboard",
+                      url: route("inventario.dashboard"),
+                  },
+              ]
+            : []),
+
+        ...(isAdmin || isInventario || can("inventario.productos.ver")
+            ? [
+                  {
+                      text: "Productos",
+                      icon: "inventory",
+                      url: route("inventario.productos"),
+                  },
+              ]
+            : []),
+
+        ...(isAdmin || isInventario || can("inventario.sucursales.ver")
+            ? [
+                  {
+                      text: "Movimientos",
+                      icon: "sync_alt",
+                      url: route("inventario.sucursales"),
+                  },
+              ]
+            : []),
+
+        // ...(isAdmin || isInventario || can("inventario.caducidades.ver")
+        //     ? [
+        //           {
+        //               text: "Caducidades",
+        //               icon: "event_busy",
+        //               url: route("inventario.caducidades"),
+        //           },
+        //       ]
+        //     : []),
+
+        // ...(isAdmin || isInventario || can("inventario.transferencias.ver")
+        //     ? [
+        //           {
+        //               text: "Transferencias",
+        //               icon: "compare_arrows",
+        //               url: route("inventario.transferencias"),
+        //           },
+        //       ]
+        //     : []),
+
+        // ...(isAdmin || isInventario || can("inventario.ajustes.ver")
+        //     ? [
+        //           {
+        //               text: "Ajustes",
+        //               icon: "tune",
+        //               url: route("inventario.ajustes"),
+        //           },
+        //       ]
+        //     : []),
+
+        // ...(isAdmin || isInventario || can("inventario.reportes.ver")
+        //     ? [
+        //           {
+        //               text: "Reportes",
+        //               icon: "bar_chart",
+        //               url: route("inventario.reportes"),
+        //           },
+        //       ]
+        //     : []),
+    ];
+
+    const branches = [
+        { text: "Ajusco", key: "ajusco", icon: "store" },
+        { text: "Diana", key: "diana", icon: "store" },
+        { text: "Lago", key: "lago", icon: "store" },
+        { text: "Cecilia", key: "cecilia", icon: "store" },
+    ];
+
     if (isAdmin || isInventario || can("inventario.ver")) {
         menu.push({
-            text: "Inventario",
+            text: "Sucursales",
             icon: "inventory_2",
             isOpen: false,
-
-            children: [
-                ...(isAdmin || isInventario || can("inventario.dashboard.ver")
-                    ? [
-                          {
-                              text: "Dashboard",
-                              icon: "dashboard",
-                              url: route("inventario.dashboard"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin || isInventario || can("inventario.productos.ver")
-                    ? [
-                          {
-                              text: "Productos",
-                              icon: "inventory",
-                              url: route("inventario.productos"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin || isInventario || can("inventario.movimientos.ver")
-                    ? [
-                          {
-                              text: "Movimientos",
-                              icon: "sync_alt",
-                              url: route("inventario.movimientos"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin || isInventario || can("inventario.caducidades.ver")
-                    ? [
-                          {
-                              text: "Caducidades",
-                              icon: "event_busy",
-                              url: route("inventario.caducidades"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin ||
-                isInventario ||
-                can("inventario.transferencias.ver")
-                    ? [
-                          {
-                              text: "Transferencias",
-                              icon: "compare_arrows",
-                              url: route("inventario.transferencias"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin || isInventario || can("inventario.ajustes.ver")
-                    ? [
-                          {
-                              text: "Ajustes",
-                              icon: "tune",
-                              url: route("inventario.ajustes"),
-                          },
-                      ]
-                    : []),
-
-                ...(isAdmin || isInventario || can("inventario.reportes.ver")
-                    ? [
-                          {
-                              text: "Reportes",
-                              icon: "bar_chart",
-                              url: route("inventario.reportes"),
-                          },
-                      ]
-                    : []),
-            ],
+            children: branches.map((branch) => ({
+                text: branch.text,
+                key: branch.key,
+                icon: branch.icon,
+                isOpen: false,
+                children: inventoryOptions(),
+            })),
         });
     }
 

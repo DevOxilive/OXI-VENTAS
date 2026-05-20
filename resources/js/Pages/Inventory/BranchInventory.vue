@@ -7,43 +7,41 @@ defineOptions({
     layout: AdminLayout
 })
 
+const branchFilter = ref('')
+
+const filteredBranchProducts = computed(() => {
+
+    if (!branchFilter.value) {
+        return branchProducts.value
+    }
+
+    return branchProducts.value.filter(item =>
+        item.branch_id == branchFilter.value
+    )
+})
+
 const props = defineProps({
     branchProductsDB: Array,
-    movementsDB: Array,
+    productsDB: Array,
+    branchesDB: Array,
 })
 
 const branchProducts = computed(() => props.branchProductsDB ?? [])
-const movements = computed(() => props.movementsDB ?? [])
+const products = computed(() => props.productsDB ?? [])
+const branches = computed(() => props.branchesDB ?? [])
 
 const showModal = ref(false)
 
-const typeOptions = [
-    { label: 'Entrada', value: 'IN' },
-    { label: 'Salida', value: 'OUT' },
-    { label: 'Ajuste', value: 'ADJUSTMENT' },
-]
-
-const reasonOptions = [
-    { label: 'Compra', value: 'PURCHASE' },
-    { label: 'Venta', value: 'SALE' },
-    { label: 'Producto dañado', value: 'DAMAGED' },
-    { label: 'Producto robado', value: 'STOLEN' },
-    { label: 'Producto caducado', value: 'EXPIRED' },
-    { label: 'Transferencia', value: 'TRANSFER' },
-    { label: 'Ajuste manual', value: 'MANUAL' },
-]
-
 const form = useForm({
-    branch_product_id: '',
-    type: 'OUT',
-    reason: '',
-    quantity: '',
-    notes: '',
+    branch_id: '',
+    product_id: '',
+    price: '',
+    stock: '',
+    min_stock: '',
 })
 
 const openModal = () => {
     form.reset()
-    form.type = 'OUT'
     showModal.value = true
 }
 
@@ -52,7 +50,7 @@ const closeModal = () => {
 }
 
 const submit = () => {
-    form.post(route('inventario.stock-movements.store'), {
+    form.post(route('inventario.branch-inventory.store'), {
         preserveScroll: true,
 
         onSuccess: () => {
@@ -70,26 +68,41 @@ const submit = () => {
         <div class="flex items-center justify-between mb-6">
 
             <div>
-
                 <h1 class="text-2xl font-bold text-[#1f1d2b]">
-                    Movimientos de inventario
+                    Inventario por sucursal
                 </h1>
 
                 <p class="text-sm text-slate-500 mt-1">
-                    Entradas, salidas, robos, daños y caducidades
+                    Gestión de productos asignados a sucursales
                 </p>
-
             </div>
 
             <button @click="openModal"
                 class="bg-[#1f1d2b] hover:bg-[#2a2738] text-white px-5 py-3 rounded-xl text-sm font-medium transition">
-                Nuevo movimiento
+                Asignar producto
             </button>
 
         </div>
 
+
+        <div class="flex items-center gap-3 mb-5">
+
+            <select v-model="branchFilter"
+                class="rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]">
+                <option value="">
+                    Todas las sucursales
+                </option>
+
+                <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                    {{ branch.name }}
+                </option>
+
+            </select>
+
+        </div>
+
         <!-- TABLE -->
-        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
 
             <div class="overflow-x-auto">
 
@@ -108,27 +121,19 @@ const submit = () => {
                             </th>
 
                             <th class="px-5 py-4 font-semibold">
-                                Tipo
+                                Precio
                             </th>
 
                             <th class="px-5 py-4 font-semibold">
-                                Motivo
+                                Stock
                             </th>
 
                             <th class="px-5 py-4 font-semibold">
-                                Cantidad
+                                Stock mínimo
                             </th>
 
                             <th class="px-5 py-4 font-semibold">
-                                Stock anterior
-                            </th>
-
-                            <th class="px-5 py-4 font-semibold">
-                                Nuevo stock
-                            </th>
-
-                            <th class="px-5 py-4 font-semibold">
-                                Fecha
+                                Estado
                             </th>
 
                         </tr>
@@ -137,55 +142,53 @@ const submit = () => {
 
                     <tbody>
 
-                        <tr v-for="movement in movements" :key="movement.id"
+                        <tr v-for="item in filteredBranchProducts"   :key="item.id"
                             class="border-t border-slate-100 hover:bg-slate-50 transition">
 
-                            <td class="px-5 py-4 font-medium text-slate-800">
-                                {{ movement.branch_product?.product?.name }}
+                            <td class="px-5 py-4">
+                                <div class="font-medium text-slate-800">
+                                    {{ item.product?.name }}
+                                </div>
                             </td>
 
                             <td class="px-5 py-4 text-slate-600">
-                                {{ movement.branch_product?.branch?.name }}
+                                {{ item.branch?.name }}
+                            </td>
+
+                            <td class="px-5 py-4 text-slate-600">
+                                ${{ item.price }}
                             </td>
 
                             <td class="px-5 py-4">
 
-                                <span class="px-3 py-1 rounded-full text-xs font-medium" :class="movement.type === 'IN'
-                                    ? 'bg-green-100 text-green-700'
-                                    : movement.type === 'OUT'
-                                        ? 'bg-red-100 text-red-700'
-                                        : 'bg-yellow-100 text-yellow-700'">
-                                    {{ movement.type }}
+                                <span class="px-3 py-1 rounded-full text-xs font-medium" :class="item.stock <= item.min_stock
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-green-100 text-green-700'">
+                                    {{ item.stock }}
                                 </span>
 
                             </td>
 
                             <td class="px-5 py-4 text-slate-600">
-                                {{ movement.reason }}
+                                {{ item.min_stock }}
                             </td>
 
-                            <td class="px-5 py-4 text-slate-600">
-                                {{ movement.quantity }}
-                            </td>
+                            <td class="px-5 py-4">
 
-                            <td class="px-5 py-4 text-slate-600">
-                                {{ movement.previous_stock }}
-                            </td>
+                                <span class="px-3 py-1 rounded-full text-xs font-medium" :class="item.active
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-slate-200 text-slate-600'">
+                                    {{ item.active ? 'Activo' : 'Inactivo' }}
+                                </span>
 
-                            <td class="px-5 py-4 text-slate-600">
-                                {{ movement.new_stock }}
-                            </td>
-
-                            <td class="px-5 py-4 text-slate-500 text-sm">
-                                {{ movement.created_at }}
                             </td>
 
                         </tr>
 
-                        <tr v-if="movements.length === 0">
+                        <tr v-if="branchProducts.length === 0">
 
-                            <td colspan="8" class="text-center py-10 text-slate-400">
-                                No hay movimientos registrados.
+                            <td colspan="6" class="text-center py-10 text-slate-400">
+                                No hay productos asignados.
                             </td>
 
                         </tr>
@@ -210,11 +213,11 @@ const submit = () => {
                     <div>
 
                         <h2 class="text-xl font-bold text-[#1f1d2b]">
-                            Nuevo movimiento
+                            Asignar producto
                         </h2>
 
                         <p class="text-sm text-slate-500 mt-1">
-                            Registrar movimiento de inventario
+                            Configura inventario por sucursal
                         </p>
 
                     </div>
@@ -229,87 +232,81 @@ const submit = () => {
                 <form @submit.prevent="submit" class="grid grid-cols-1 md:grid-cols-2 gap-5">
 
                     <!-- PRODUCT -->
-                    <div class="md:col-span-2">
+                    <div>
 
                         <label class="block text-sm font-medium text-slate-700 mb-2">
-                            Producto / Sucursal
+                            Producto
                         </label>
 
-                        <select v-model="form.branch_product_id"
+                        <select v-model="form.product_id"
                             class="w-full rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]">
 
                             <option value="">
                                 Selecciona un producto
                             </option>
 
-                            <option v-for="item in branchProducts" :key="item.id" :value="item.id">
-                                {{ item.product?.name }} - {{ item.branch?.name }}
+                            <option v-for="product in products" :key="product.id" :value="product.id">
+                                {{ product.name }}
                             </option>
 
                         </select>
 
                     </div>
 
-                    <!-- TYPE -->
+                    <!-- BRANCH -->
                     <div>
 
                         <label class="block text-sm font-medium text-slate-700 mb-2">
-                            Tipo
+                            Sucursal
                         </label>
 
-                        <select v-model="form.type"
-                            class="w-full rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]">
-
-                            <option v-for="option in typeOptions" :key="option.value" :value="option.value">
-                                {{ option.label }}
-                            </option>
-
-                        </select>
-
-                    </div>
-
-                    <!-- REASON -->
-                    <div>
-
-                        <label class="block text-sm font-medium text-slate-700 mb-2">
-                            Motivo
-                        </label>
-
-                        <select v-model="form.reason"
+                        <select v-model="form.branch_id"
                             class="w-full rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]">
 
                             <option value="">
-                                Selecciona un motivo
+                                Selecciona una sucursal
                             </option>
 
-                            <option v-for="option in reasonOptions" :key="option.value" :value="option.value">
-                                {{ option.label }}
+                            <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                                {{ branch.name }}
                             </option>
 
                         </select>
 
                     </div>
 
-                    <!-- QUANTITY -->
-                    <div class="md:col-span-2">
+                    <!-- PRICE -->
+                    <div>
 
                         <label class="block text-sm font-medium text-slate-700 mb-2">
-                            Cantidad
+                            Precio
                         </label>
 
-                        <input v-model="form.quantity" type="number" min="1"
+                        <input v-model="form.price" type="number" step="0.01"
                             class="w-full rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]" />
 
                     </div>
 
-                    <!-- NOTES -->
+                    <!-- STOCK -->
+                    <div>
+
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            Stock inicial
+                        </label>
+
+                        <input v-model="form.stock" type="number"
+                            class="w-full rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]" />
+
+                    </div>
+
+                    <!-- MIN STOCK -->
                     <div class="md:col-span-2">
 
                         <label class="block text-sm font-medium text-slate-700 mb-2">
-                            Observaciones
+                            Stock mínimo
                         </label>
 
-                        <textarea v-model="form.notes" rows="4"
+                        <input v-model="form.min_stock" type="number"
                             class="w-full rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]" />
 
                     </div>
@@ -324,7 +321,7 @@ const submit = () => {
 
                         <button type="submit" :disabled="form.processing"
                             class="bg-[#1f1d2b] hover:bg-[#2a2738] text-white px-5 py-3 rounded-xl transition">
-                            Guardar movimiento
+                            Guardar
                         </button>
 
                     </div>
