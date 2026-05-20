@@ -80,7 +80,7 @@ const inventoryModules = [
         title: 'Productos',
         description: 'Alta, edición, consulta y control de stock.',
         icon: 'inventory_2',
-        routeName: 'inventario.productos',
+        routeName: 'inventory.products',
         color: 'bg-blue-50 text-blue-700 border-blue-100'
     },
     {
@@ -216,7 +216,7 @@ function movementClass(type) {
 }
 
 function openCreateModal() {
-    window.location.href = route('inventario.productos')
+    window.location.href = route('inventory.products.index')
 }
 function exportExcel() {
     console.log('Exportar Excel')

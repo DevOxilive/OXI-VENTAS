@@ -9,8 +9,10 @@ class Product extends Model
     protected $fillable = [
         'name',
         'description',
-        'price',
+        'cost',
+        'sale_price',
         'category_id',
+        'subcategory_id',
         'active',
     ];
 
@@ -18,4 +20,23 @@ class Product extends Model
     {
         return $this->belongsTo(Category::class);
     }
+
+    public function subcategory()
+    {
+        return $this->belongsTo(Subcategory::class);
+    }
+
+    public function branchInventories()
+    {
+        return $this->hasMany(BranchInventory::class);
+    }
+
+    public function inventories()
+    {
+        return $this->hasMany(BranchInventory::class);
+    }
+    public function barcodes()
+{
+    return $this->hasMany(Barcode::class);
+}
 }

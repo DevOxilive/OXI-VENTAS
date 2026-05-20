@@ -10,11 +10,12 @@ class CategorySeeder extends Seeder
     public function run(): void
     {
         $categories = [
-            ['id' => 1, 'name' => 'Drinks', 'active' => true],
-            ['id' => 2, 'name' => 'Snacks', 'active' => true],
-            ['id' => 3, 'name' => 'Dairy', 'active' => true],
-            ['id' => 4, 'name' => 'Cleaning', 'active' => true],
-        ];
+    ['id' => 1, 'name' => 'Abarrotes', 'active' => true],
+    ['id' => 2, 'name' => 'Farmacia', 'active' => true],
+    ['id' => 3, 'name' => 'Mascotas', 'active' => true],
+    ['id' => 4, 'name' => 'Papelería', 'active' => true],
+    ['id' => 5, 'name' => 'Hogar', 'active' => true],
+];
 
         foreach ($categories as $category) {
             DB::table('categories')->updateOrInsert(
