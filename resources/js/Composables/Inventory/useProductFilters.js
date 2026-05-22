@@ -1,10 +1,14 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 export function useProductFilters(productsDB) {
 
     const search = ref('')
     const categoryFilter = ref('Todas')
     const subcategoryFilter = ref('Todas')
+
+    // 🔥 PAGINACIÓN
+    const recordsToShow = ref(10)
+    const currentPage = ref(1)
 
     const filteredProducts = computed(() => {
 
@@ -66,10 +70,57 @@ export function useProductFilters(productsDB) {
 
     })
 
+    // 🔥 PRODUCTOS PAGINADOS
+    const paginatedProducts = computed(() => {
+
+        const start =
+            (currentPage.value - 1) *
+            recordsToShow.value
+
+        const end =
+            start +
+            recordsToShow.value
+
+        return filteredProducts.value.slice(start, end)
+
+    })
+
+    // 🔥 TOTAL DE PÁGINAS
+    const totalPages = computed(() => {
+
+        return Math.max(
+            1,
+            Math.ceil(
+                filteredProducts.value.length /
+                recordsToShow.value
+            )
+        )
+
+    })
+
+    // 🔥 RESET PAGE
+    watch([
+        search,
+        categoryFilter,
+        subcategoryFilter,
+        recordsToShow
+    ], () => {
+
+        currentPage.value = 1
+
+    })
+
     return {
         search,
         categoryFilter,
         subcategoryFilter,
+
         filteredProducts,
+
+        // 🔥 NUEVO
+        paginatedProducts,
+        recordsToShow,
+        currentPage,
+        totalPages,
     }
 }

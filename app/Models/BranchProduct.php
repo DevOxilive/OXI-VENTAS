@@ -6,14 +6,19 @@ use Illuminate\Database\Eloquent\Model;
 
 class BranchProduct extends Model
 {
-    protected $fillable = [
-        'branch_id',
-        'product_id',
-        'price',
-        'stock',
-        'min_stock',
-        'active',
-    ];
+  protected $fillable = [
+    'branch_id',
+    'product_id',
+    'price',
+    'cost',
+    'stock',
+    'min_stock',
+    'entry_date',
+    'active',
+    'name',
+'barcode',
+'category_id',
+];
 
     public function branch()
     {
@@ -29,4 +34,8 @@ class BranchProduct extends Model
     {
         return $this->hasMany(StockMovement::class);
     }
+    public function category()
+{
+    return $this->belongsTo(Category::class);
+}
 }

@@ -262,4 +262,105 @@ export const fieldRegistry = {
         message: "Código inválido.",
         spamMessage: "Código de producto no válido.",
     },
+       name: {
+        required: true,
+        type: 'alphanumeric',
+        min: 3,
+        max: 80,
+        titleCase: true,
+        message: 'El nombre solo puede contener letras, números, espacios, guiones y guiones bajos.',
+        preventSpam: true,
+        spamLevel: 'soft',
+        spamMessage: 'El nombre parece texto de prueba o inválido.',
+    },
+
+    description: {
+        required: false,
+        type: 'text',
+        max: 500,
+        message: 'La descripción contiene caracteres no permitidos.',
+    },
+
+    cost: {
+        required: true,
+        type: 'decimal',
+        max: 10,
+        message: 'El costo debe ser un número válido con máximo 2 decimales.',
+    },
+
+    sale_price: {
+        required: true,
+        type: 'decimal',
+        max: 10,
+        message: 'El precio de venta debe ser un número válido con máximo 2 decimales.',
+    },
+
+    barcode: {
+        required: false,
+        type: 'numeric',
+        min: 8,
+        max: 14,
+        message: 'El código de barras debe tener entre 8 y 14 números.',
+    },
+
+    barcode_secondary: {
+        required: false,
+        type: 'numeric',
+        min: 8,
+        max: 14,
+        message: 'El código alternativo debe tener entre 8 y 14 números.',
+    },
+
+    base_quantity: {
+        required: true,
+        type: 'numeric',
+        min: 1,
+        max: 3,
+        message: 'La cantidad base debe ser un número válido.',
+    },
+
+    initial_stock: {
+        required: true,
+        type: 'numeric',
+        max: 6,
+        message: 'El stock inicial debe ser un número válido.',
+    },
+
+    minimum_stock: {
+        required: true,
+        type: 'numeric',
+        max: 6,
+        message: 'El stock mínimo debe ser un número válido.',
+    },
+
+    maximum_stock: {
+        required: true,
+        type: 'numeric',
+        max: 6,
+        message: 'El stock máximo debe ser un número válido.',
+    },
+
+    category_id: {
+        required: true,
+        type: 'numeric',
+        message: 'Selecciona una categoría.',
+    },
+
+    subcategory_id: {
+        required: false,
+        type: 'numeric',
+        message: 'Selecciona una subcategoría válida.',
+    },
+    cost: {
+    required: true,
+    type: 'decimal',
+    max: 10,
+},
+
+sale_price: {
+    required: true,
+    type: 'decimal',
+    max: 10,
+},
+
 };

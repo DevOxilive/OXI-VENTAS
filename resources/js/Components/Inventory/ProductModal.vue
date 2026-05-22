@@ -1,292 +1,261 @@
 <script setup>
-import { useForm } from '@inertiajs/vue3'
-import { computed, watch } from 'vue'
+import { useForm } from "@inertiajs/vue3";
+import { watch } from "vue";
+import InputField from "@/Components/Forms/InputField.vue";
+import SelectField from "@/Components/Forms/SelectField.vue";
 
 const props = defineProps({
-    mode: String,
-    product: Object,
+  mode: String,
+  product: Object,
+  branch: Object,
 
-    categoriesDB: {
-        type: Array,
-        default: () => []
-    },
+  categoriesDB: {
+    type: Array,
+    default: () => [],
+  },
+});
 
-    subcategoriesDB: {
-        type: Array,
-        default: () => []
-    }
-})
-
-const emit = defineEmits(['close'])
+const emit = defineEmits(["close"]);
 
 const form = useForm({
-    name: '',
-    description: '',
-    cost: '',
-    sale_price: '',
-    category_id: '',
-    subcategory_id: '',
-
-    barcode: '',
-    barcode_type: 'EAN13',
-    base_quantity: 1,
-
-    initial_stock: 0,
-    minimum_stock: 0,
-    maximum_stock: 0,
-
-    active: true,
-})
-
-const visibleSubcategories = computed(() => {
-    if (!form.category_id) return []
-
-    return props.subcategoriesDB.filter((subcategory) => {
-        return String(subcategory.category_id) === String(form.category_id)
-    })
-})
+  barcode: "",
+  name: "",
+  stock: 0,
+  category_id: "",
+  cost: "",
+  sale_price: "",
+  entry_date: new Date().toISOString().slice(0, 10),
+  active: true,
+  image: null,
+});
 
 watch(
-    () => props.product,
-    (product) => {
-        form.reset()
+  () => props.product,
+  (product) => {
+    form.reset();
 
-        if (!product) return
+    if (!product) return;
 
-        form.name = product.name ?? ''
-        form.description = product.presentation ?? ''
-        form.cost = product.cost ?? ''
-        form.sale_price = product.price ?? ''
-        form.category_id = product.category_id ?? ''
-        form.subcategory_id = product.subcategory_id ?? ''
-
-        form.barcode = product.barcode ?? ''
-        form.barcode_type = product.barcode_type ?? 'EAN13'
-        form.base_quantity = product.base_quantity ?? 1
-
-        form.initial_stock = product.stock ?? 0
-        form.minimum_stock = product.minimum_stock ?? 0
-        form.maximum_stock = product.maximum_stock ?? 0
-
-        form.active = true
-    },
-    { immediate: true }
-)
-
-watch(
-    () => form.category_id,
-    () => {
-        if (
-            form.subcategory_id &&
-            !visibleSubcategories.value.some(
-                subcategory => String(subcategory.id) === String(form.subcategory_id)
-            )
-        ) {
-            form.subcategory_id = ''
-        }
-    }
-)
+    form.barcode = product.barcode ?? "";
+    form.name = product.name ?? "";
+    form.stock = product.stock ?? 0;
+    form.category_id = product.category_id ?? "";
+    form.cost = product.cost ?? "";
+    form.sale_price = product.price ?? "";
+    form.entry_date =
+      product.entry_date ?? new Date().toISOString().slice(0, 10);
+    form.active = true;
+  },
+  { immediate: true }
+);
 
 function submit() {
-    if (props.mode === 'create') {
-        form.post(route('inventory.products.store'), {
-            preserveScroll: true,
-            onSuccess: () => emit('close')
-        })
+  const branchSlug = props.branch?.slug
 
-        return
-    }
+  if (!branchSlug) {
+    console.error('No llegó branch.slug al modal:', props.branch)
+    return
+  }
 
-    if (props.mode === 'edit') {
-        form.put(route('inventory.products.update', props.product.id), {
-            preserveScroll: true,
-            onSuccess: () => emit('close')
-        })
-    }
+  if (props.mode === "create") {
+    form.post(
+      route("inventory.branches.products.store", {
+        branch: branchSlug,
+      }),
+      {
+        preserveScroll: true,
+        onSuccess: () => emit("close"),
+        onError: (errors) => {
+          console.log("ERRORES CREAR PRODUCTO:", errors);
+        },
+      }
+    )
+
+    return
+  }
+
+  if (props.mode === "edit") {
+    form.put(
+      route("inventory.branches.products.update", {
+        branch: props.product.branch_slug ?? branchSlug,
+        product: props.product.id,
+      }),
+      {
+        preserveScroll: true,
+        onSuccess: () => emit("close"),
+        onError: (errors) => {
+          console.log("ERRORES PRODUCTO:", errors);
+        },
+      }
+    )
+  }
 }
 </script>
 
 <template>
-    <div class="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden">
+  <div
+    class="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4"
+  >
+    <div
+      class="bg-white rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden"
+    >
+      <div class="flex items-center justify-between px-6 py-5 border-b">
+        <h2 class="text-2xl font-bold text-slate-800">
+          {{
+            mode === "create"
+              ? "Nuevo producto"
+              : mode === "edit"
+              ? "Editar producto"
+              : "Ver producto"
+          }}
+        </h2>
 
-            <div class="flex items-center justify-between px-6 py-5 border-b">
-                <h2 class="text-2xl font-bold text-slate-800">
-                    {{
-                        mode === 'create'
-                            ? 'Nuevo producto'
-                            : mode === 'edit'
-                                ? 'Editar producto'
-                                : 'Ver producto'
-                    }}
-                </h2>
+        <button
+          @click="$emit('close')"
+          class="text-slate-400 hover:text-slate-700 text-2xl"
+        >
+          ×
+        </button>
+      </div>
 
-                <button
-                    @click="$emit('close')"
-                    class="text-slate-400 hover:text-slate-700 text-2xl"
-                >
-                    ×
-                </button>
-            </div>
+      <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+        <InputField
+          label="Código de barras"
+          field="barcode"
+          v-model="form.barcode"
+          icon="barcode_scanner"
+          :error="form.errors.barcode"
+        />
+      <div>
 
-            <div class="p-6 max-h-[70vh] overflow-y-auto">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+    <label class="block text-sm font-semibold text-slate-600 mb-2">
+        Imagen del producto
+    </label>
 
-                    <div>
-                        <label class="text-sm font-semibold text-slate-500">Nombre</label>
-                        <input
-                            v-model="form.name"
-                            :disabled="mode === 'view'"
-                            type="text"
-                            class="w-full mt-2 rounded-2xl border-slate-200"
-                        />
-                    </div>
+    <div
+    class="border-2 border-dashed border-slate-300 rounded-2xl px-6 py-4 flex items-center gap-5 bg-slate-50"
+>
 
-                    <div>
-                        <label class="text-sm font-semibold text-slate-500">Categoría</label>
-                        <select
-                            v-model="form.category_id"
-                            :disabled="mode === 'view'"
-                            class="w-full mt-2 rounded-2xl border-slate-200"
-                        >
-                            <option value="">Selecciona categoría</option>
-                            <option
-                                v-for="category in categoriesDB"
-                                :key="category.id"
-                                :value="category.id"
-                            >
-                                {{ category.name }}
-                            </option>
-                        </select>
-                    </div>
+        <template v-if="form.image">
 
-                    <div>
-                        <label class="text-sm font-semibold text-slate-500">Subcategoría</label>
-                        <select
-                            v-model="form.subcategory_id"
-                            :disabled="mode === 'view' || !form.category_id"
-                            class="w-full mt-2 rounded-2xl border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                        >
-                            <option value="">Selecciona subcategoría</option>
-                            <option
-                                v-for="subcategory in visibleSubcategories"
-                                :key="subcategory.id"
-                                :value="subcategory.id"
-                            >
-                                {{ subcategory.name }}
-                            </option>
-                        </select>
-                    </div>
+    <img
+        :src="URL.createObjectURL(form.image)"
+        class="w-20 h-20 object-cover rounded-2xl shadow border"
+    />
 
-                    <div>
-                        <label class="text-sm font-semibold text-slate-500">Costo</label>
-                        <input
-                            v-model="form.cost"
-                            :disabled="mode === 'view'"
-                            type="number"
-                            step="0.01"
-                            class="w-full mt-2 rounded-2xl border-slate-200"
-                        />
-                    </div>
+</template>
 
-                    <div>
-                        <label class="text-sm font-semibold text-slate-500">Precio de venta</label>
-                        <input
-                            v-model="form.sale_price"
-                            :disabled="mode === 'view'"
-                            type="number"
-                              autofocus
-                            step="0.01"
-                            class="w-full mt-2 rounded-2xl border-slate-200"
-                        />
-                    </div>
+<template v-else>
 
-                    <div>
-                        <label class="text-sm font-semibold text-slate-500">Código de barras</label>
-                        <input
-                            v-model="form.barcode"
-                            :disabled="mode === 'view'"
-                            type="text"
-                            placeholder="Escanea o escribe el código"
-                            class="w-full mt-2 rounded-2xl border-slate-200"
-                        />
-                    </div>
-
-
-                    <div>
-                        <label class="text-sm font-semibold text-slate-500">Cantidad base</label>
-                        <input
-                            v-model="form.base_quantity"
-                            :disabled="mode === 'view'"
-                            type="number"
-                            min="1"
-                            class="w-full mt-2 rounded-2xl border-slate-200"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="text-sm font-semibold text-slate-500">Stock inicial</label>
-                        <input
-                            v-model="form.initial_stock"
-                            :disabled="mode === 'view'"
-                            type="number"
-                            min="0"
-                            class="w-full mt-2 rounded-2xl border-slate-200"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="text-sm font-semibold text-slate-500">Stock mínimo</label>
-                        <input
-                            v-model="form.minimum_stock"
-                            :disabled="mode === 'view'"
-                            type="number"
-                            min="0"
-                            class="w-full mt-2 rounded-2xl border-slate-200"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="text-sm font-semibold text-slate-500">Stock máximo</label>
-                        <input
-                            v-model="form.maximum_stock"
-                            :disabled="mode === 'view'"
-                            type="number"
-                            min="0"
-                            class="w-full mt-2 rounded-2xl border-slate-200"
-                        />
-                    </div>
-
-                    <div class="md:col-span-3">
-                        <label class="text-sm font-semibold text-slate-500">Descripción</label>
-                        <textarea
-                            v-model="form.description"
-                            :disabled="mode === 'view'"
-                            rows="4"
-                            class="w-full mt-2 rounded-2xl border-slate-200"
-                        />
-                    </div>
-
-                </div>
-            </div>
-
-            <div class="flex justify-end gap-3 px-6 py-5 border-t">
-                <button
-                    @click="$emit('close')"
-                    class="px-5 py-3 rounded-2xl bg-slate-200 text-slate-700 font-semibold"
-                >
-                    Cancelar
-                </button>
-
-                <button
-                    v-if="mode !== 'view'"
-                    @click="submit"
-                    class="px-5 py-3 rounded-2xl bg-slate-900 text-white font-semibold"
-                >
-                    {{ mode === 'create' ? 'Crear producto' : 'Actualizar producto' }}
-                </button>
-            </div>
-
-        </div>
+    <div
+        class="w-20 h-20 rounded-2xl bg-white border flex items-center justify-center"
+    >
+        <span class="material-symbols-outlined text-4xl text-slate-400">
+            image
+        </span>
     </div>
+
+</template>
+
+<div class="flex-1">
+
+    <p class="text-sm font-semibold text-slate-700">
+        Imagen del producto
+    </p>
+
+    <p class="text-xs text-slate-500 mt-1">
+        JPG, PNG o WEBP
+    </p>
+
+    <input
+        type="file"
+        accept="image/*"
+        class="mt-3 text-sm"
+        @change="form.image = $event.target.files[0]"
+    />
+
+</div>
+</div>
+
+</div>
+
+        <InputField
+          label="Nombre"
+          field="name"
+          v-model="form.name"
+          :error="form.errors.name"
+          :readonly="mode === 'view'"
+        />
+        <InputField
+          label="Stock"
+          field="stock"
+          v-model="form.stock"
+          icon="package_2"
+        />
+
+        <SelectField
+          label="Categoría"
+          field="category_id"
+          v-model="form.category_id"
+          :error="form.errors.category_id"
+          :disabled="mode === 'view'"
+          :options="
+            categoriesDB.map((category) => ({
+              value: category.id,
+              label: category.name,
+            }))
+          "
+          placeholder="Selecciona categoría"
+        />
+
+        <InputField
+          label="Precio inicial"
+          field="cost"
+          v-model="form.cost"
+          prefix="$"
+          :error="form.errors.cost"
+          type="text"
+          step="0.01"
+          :readonly="mode === 'view'"
+        />
+
+        <InputField
+          label="Precio venta"
+          field="sale_price"
+          v-model="form.sale_price"
+          prefix="$"
+          :error="form.errors.sale_price"
+          type="text"
+          step="0.01"
+          :readonly="mode === 'view'"
+        />
+
+        <InputField
+          label="Fecha de ingreso"
+          field="entry_date"
+          v-model="form.entry_date"
+          :error="form.errors.entry_date"
+          type="date"
+          :readonly="mode === 'view'"
+        />
+      </div>
+
+      <div class="flex justify-end gap-3 px-6 py-5 border-t">
+        <button
+          @click="$emit('close')"
+          class="px-5 py-3 rounded-2xl bg-slate-200 text-slate-700 font-semibold"
+        >
+          Cancelar
+        </button>
+
+        <button
+          v-if="mode !== 'view'"
+          @click="submit"
+          class="px-5 py-3 rounded-2xl bg-slate-900 text-white font-semibold"
+        >
+          {{ mode === "create" ? "Crear producto" : "Actualizar producto" }}
+        </button>
+      </div>
+    </div>
+  </div>
 </template>

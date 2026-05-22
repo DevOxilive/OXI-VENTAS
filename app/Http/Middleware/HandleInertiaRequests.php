@@ -4,7 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
-
+use App\Models\Branch;
 class HandleInertiaRequests extends Middleware
 {
     /**
@@ -50,7 +50,10 @@ public function share(Request $request): array
                 ? $user->all_permissions->pluck('name')->values()
                 : [],
         ],
-
+'branches' => fn () => Branch::where('active', true)
+    ->select('id', 'name', 'slug')
+    ->orderBy('name')
+    ->get(),
         'flash' => [
             'success' => fn () => $request->session()->get('success'),
             'error' => fn () => $request->session()->get('error'),

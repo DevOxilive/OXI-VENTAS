@@ -34,39 +34,37 @@ defineEmits(['view', 'edit', 'delete'])
             </div>
 
             <div class="grid grid-cols-2 gap-3 mt-4 text-sm">
-                <div>
-                    <p class="text-slate-400 text-xs">Tienda</p>
-                    <p class="font-medium">{{ product.branch_name }}</p>
-                </div>
+              
 
                 <div>
                     <p class="text-slate-400 text-xs">Stock</p>
                     <p class="font-medium">{{ product.stock }}</p>
                 </div>
 
-                <div>
-                    <p class="text-slate-400 text-xs">Costo</p>
-                    <p class="font-medium">${{ product.cost }}</p>
-                </div>
+              
 
                 <div>
                     <p class="text-slate-400 text-xs">Precio</p>
                     <p class="font-medium">${{ product.price }}</p>
                 </div>
+                <div>
+    <p class="text-slate-400 text-xs">Fecha ingreso</p>
+    <p class="font-medium">{{ product.entry_date }}</p>
+</div>
             </div>
 
             <div class="flex justify-end gap-2 mt-4">
-                <button v-if="can('productos.ver')" @click="$emit('view', product)"
+                <button v-if="can('inventario.ver')" @click="$emit('view', product)"
                     class="px-3 py-2 rounded-xl bg-sky-100 text-sky-600 text-sm">
                     Ver
                 </button>
 
-                <button v-if="can('productos.editar')" @click="$emit('edit', product)"
+                <button v-if="can('inventario.editar')" @click="$emit('edit', product)"
                     class="px-3 py-2 rounded-xl bg-amber-100 text-amber-600 text-sm">
                     Editar
                 </button>
 
-                <button v-if="can('productos.eliminar')" @click="$emit('delete', product)"
+                <button v-if="can('inventario.eliminar')" @click="$emit('delete', product)"
                     class="px-3 py-2 rounded-xl bg-red-100 text-red-600 text-sm">
                     Eliminar
                 </button>
