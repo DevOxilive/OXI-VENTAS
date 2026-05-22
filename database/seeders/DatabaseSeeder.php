@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             SubcategorySeeder::class,
 
+
             SupplierSeeder::class,
             CustomerSeeder::class,
             PaymentMethodSeeder::class,
@@ -45,6 +46,7 @@ class DatabaseSeeder extends Seeder
             TripSeeder::class,
             TripDetailSeeder::class,
             IncidentSeeder::class,
+            BranchProductSeeder::class,
         ]);
     }
 }

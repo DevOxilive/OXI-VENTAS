@@ -61,7 +61,9 @@ onBeforeUnmount(() => {
         <div
             class="relative bg-white w-full h-[100dvh] md:h-[94vh] md:w-[96%] md:max-w-5xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
 
-            <GeneralModalHeader :modo="modo" :totalErrores="totalErrores" @close="cerrar" />
+            <GeneralModalHeader :title="editando ? 'Actualizar usuario' : 'Registrar usuario'"
+                subtitle="Configuración de acceso y permisos" :total-errors="totalErrores" :mode="modo"
+                @close="cerrar" />
 
             <GeneralModalContent :columns="2">
 
@@ -224,8 +226,8 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
             </GeneralModalContent>
-
-            <GeneralModalFooter :employee="form" :modo="canGuardar ? modo : 'view'" :saveButtonText="textoBotonGuardar"
+            
+            <GeneralModalFooter :processing="form.processing" :save-button-text="textoBotonGuardar" :mode="modo"
                 @save="$emit('guardar')" @close="cerrar" />
         </div>
     </div>

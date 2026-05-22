@@ -60,15 +60,17 @@ const isReadOnly = computed(() => props.modo === 'view')
 
         <div
             class="relative bg-white w-full h-[100dvh] sm:h-[100dvh] md:h-[94vh] md:w-[96%] md:max-w-6xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-            <GeneralModalHeader :modo="modo" :totalErrors="totalErrors" @close="closeModal" />
-
+            <GeneralModalHeader
+                :title="props.modo === 'create' ? 'Registrar empleado' : props.modo === 'edit' ? 'Actualizar empleado' : 'Detalle del empleado'"
+                subtitle="Información general del empleado" :total-errors="totalErrors" :mode="props.modo"
+                @close="closeModal" />
             <GeneralModalContent :columns="1">
                 <EmployeeData :employee="employee" :frontendErrors="frontendErrors" :departments="departments"
                     :readonly="isReadOnly" @validate="validateField" />
             </GeneralModalContent>
 
-            <GeneralModalFooter :employee="employee" :modo="modo" :saveButtonText="saveButtonText" @save="saveEmployee"
-                @close="closeModal" />
+            <GeneralModalFooter :processing="employee.processing" :save-button-text="saveButtonText" :mode="props.modo"
+                @save="saveEmployee" @close="closeModal" />
         </div>
     </div>
 </template>
