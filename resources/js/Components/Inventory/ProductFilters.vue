@@ -14,13 +14,18 @@ const props = defineProps({
     subcategoriesDB: {
         type: Array,
         default: () => []
-    }
+    },
+    recordsToShow: {
+    type: Number,
+    default: 10
+}
 })
 
 defineEmits([
     'update:search',
     'update:categoryFilter',
     'update:subcategoryFilter',
+    'update:recordsToShow',
     'create',
     'export'
 ])
@@ -29,15 +34,13 @@ const visibleSubcategories = computed(() => {
     if (props.categoryFilter === 'Todas') return []
 
     return props.subcategoriesDB.filter((subcategory) => {
-       return String(subcategory.category_id) === String(props.categoryFilter)
+        return String(subcategory.category_id) === String(props.categoryFilter)
     })
 })
 </script>
 
-<template>  
-  <section class="bg-white rounded-3xl shadow-xl border border-slate-200 p-5">
-        
-
+<template>
+    <section class="bg-white rounded-3xl shadow-xl border border-slate-200 p-5">
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.4fr_1fr_1fr_auto_auto] gap-4 items-end">
 
             <div>
@@ -45,13 +48,16 @@ const visibleSubcategories = computed(() => {
                     Buscar producto
                 </label>
 
-                <input
-                    :value="search"
-                    @input="$emit('update:search', $event.target.value)"
-                    type="text"
-                    placeholder="Nombre, código o descripción..."
-                    class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
+               <input
+    :value="search"
+    @input="$emit('update:search', $event.target.value)"
+    @keydown.enter.prevent="$emit('update:search', $event.target.value)"
+    type="text"
+    inputmode="search"
+    autocomplete="off"
+    placeholder="Nombre, código o descripción..."
+    class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+/>
             </div>
 
             <div>
@@ -82,25 +88,43 @@ const visibleSubcategories = computed(() => {
                 <label class="block text-sm font-semibold text-slate-500 mb-2">
                     Subcategoría
                 </label>
-<select
-    :value="subcategoryFilter"
-    :disabled="categoryFilter === 'Todas'"
-    @change="$emit('update:subcategoryFilter', $event.target.value)"
-    class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
->
-    <option value="Todas">
-        Todas
-    </option>
 
-    <option
-        v-for="subcategory in visibleSubcategories"
-        :key="subcategory.id"
-        :value="subcategory.id"
-    >
-        {{ subcategory.name }}
-    </option>
-</select>
+                <select
+                    :value="subcategoryFilter"
+                    :disabled="categoryFilter === 'Todas'"
+                    @change="$emit('update:subcategoryFilter', $event.target.value)"
+                    class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                    <option value="Todas">
+                        Todas
+                    </option>
+
+                    <option
+                        v-for="subcategory in visibleSubcategories"
+                        :key="subcategory.id"
+                        :value="subcategory.id"
+                    >
+                        {{ subcategory.name }}
+                    </option>
+                </select>
             </div>
+            <div>
+    <label class="block text-sm font-semibold text-slate-500 mb-2">
+        Mostrar
+    </label>
+
+    <select
+        :value="recordsToShow"
+        @change="$emit('update:recordsToShow', Number($event.target.value))"
+        class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+    >
+        <option :value="10">10</option>
+        <option :value="20">20</option>
+        <option :value="50">50</option>
+        <option :value="100">100</option>
+        <option :value="200">200</option>
+    </select>
+</div>
 
             <button
                 @click="$emit('create')"
@@ -109,14 +133,8 @@ const visibleSubcategories = computed(() => {
                 + Agregar
             </button>
 
-            <button
-                @click="$emit('export')"
-                class="px-5 py-3 rounded-2xl bg-white border border-blue-300 text-blue-600 hover:bg-blue-50 text-sm font-semibold transition"
-            >
-                Exportar
-            </button>
+        
 
         </div>
-
     </section>
 </template>

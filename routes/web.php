@@ -11,6 +11,8 @@ use App\Http\Controllers\Inventory\ProductController;
 use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\Inventory\BranchInventoryController;
 
+
+
 /*
 |--------------------------------------------------------------------------
 | PUBLIC
@@ -168,49 +170,86 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(['auth', 'role:Inventario,Administrador'])
-        ->prefix('inventory')
-        ->name('inventory.')
-        ->group(function () {
+  /*
+|--------------------------------------------------------------------------
+| INVENTORY
+|--------------------------------------------------------------------------
+*/
 
-            Route::get(
-                '/dashboard',
-                fn() => Inertia::render('Inventory/Dashboard')
-            )->name('dashboard');
+Route::middleware(['auth', 'role:Inventario,Administrador'])
+    ->prefix('inventory')
+    ->name('inventory.')
+    ->group(function () {
 
-            Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+        Route::get('/dashboard', fn() =>
+            Inertia::render('Inventory/Dashboard')
+        )->name('dashboard');
 
-            Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+        /*
+        |--------------------------------------------------------------------------
+        | PRODUCTS BY BRANCH
+        |--------------------------------------------------------------------------
+        */
 
-            Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
+        Route::get('/branches/{branch:slug}/products', [ProductController::class, 'index'])
+            ->name('branches.products.index');
 
-            Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+        Route::post('/branches/{branch:slug}/products', [ProductController::class, 'store'])
+            ->name('branches.products.store');
 
-            Route::get(
+Route::put('/branches/{branch:slug}/products/{product}', [ProductController::class, 'update'])
+    ->name('branches.products.update');
+
+        Route::delete('/branches/{branch:slug}/products/{product}', [ProductController::class, 'destroy'])
+            ->name('branches.products.destroy');
+
+        /*
+        |--------------------------------------------------------------------------
+        | GENERAL INVENTORY
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/expirations', fn() =>
+            Inertia::render('Inventory/Expirations')
+        )->name('expirations');
+
+        Route::get('/transfers', fn() =>
+            Inertia::render('Inventory/Transfers')
+        )->name('transfers');
+
+        Route::get('/adjustments', fn() =>
+            Inertia::render('Inventory/Adjustments')
+        )->name('adjustments');
+Route::get('/reports', fn() =>
+    Inertia::render('Inventory/Reports')
+)->name('reports');
+
+        Route::get('/stock-movements', [StockMovementController::class, 'index'])
+            ->name('stock-movements.index');
+
+        Route::post('/stock-movements', [StockMovementController::class, 'store'])
+            ->name('stock-movements.store');
+
+        Route::get('/movements', [StockMovementController::class, 'index'])
+            ->name('movements');
+            
+    Route::get('/reports', fn() =>
+    Inertia::render('Inventory/Reports')
+)->name('reports');
+
+            Route::get('/stock-movements', [StockMovementController::class, 'index'])->name('stock-movements.index');
+
+            Route::post('/stock-movements', [StockMovementController::class, 'store'])->name('stock-movements.store');
+            
+                 Route::get(
                 '/movements',
                 fn() => Inertia::render('Inventory/Movements')
             )->name('movements');
-
-            Route::get(
-                '/expirations',
-                fn() => Inertia::render('Inventory/Expirations')
-            )->name('expirations');
-
-            Route::get(
-                '/transfers',
-                fn() => Inertia::render('Inventory/Transfers')
-            )->name('transfers');
-
-            Route::get(
-                '/adjustments',
-                fn() => Inertia::render('Inventory/Adjustments')
-            )->name('adjustments');
-
             Route::get(
                 '/reports',
                 fn() => Inertia::render('Inventory/Reports')
             )->name('reports');
-        });
+    });
 
     /*
     |--------------------------------------------------------------------------

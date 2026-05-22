@@ -9,31 +9,36 @@ class BranchSeeder extends Seeder
 {
     public function run(): void
     {
-        Branch::insert([
+        $branches = [
             [
                 'name' => 'Lago',
-                'active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'slug' => 'lago',
             ],
             [
                 'name' => 'Ajusco',
-                'active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'slug' => 'ajusco',
             ],
             [
                 'name' => 'Diana',
-                'active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'slug' => 'diana',
             ],
             [
                 'name' => 'Cecilia',
-                'active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'slug' => 'cecilia',
             ],
-        ]);
+        ];
+
+        foreach ($branches as $branch) {
+
+            Branch::updateOrCreate(
+                [
+                    'slug' => $branch['slug']
+                ],
+                [
+                    'name' => $branch['name'],
+                    'active' => true,
+                ]
+            );
+        }
     }
 }

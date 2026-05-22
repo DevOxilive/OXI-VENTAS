@@ -1,27 +1,33 @@
-<script setup>
-import SidebarItem from '@/Components/SidebarItem.vue'
-import { Link, usePage } from '@inertiajs/vue3'
-import { generateMenu } from '@/config/menuConfig'
-import { ref } from 'vue'
+    <script setup>
+    import SidebarItem from '@/Components/SidebarItem.vue'
+    import { Link, usePage } from '@inertiajs/vue3'
+    import { generateMenu } from '@/config/menuConfig'
+    import { ref } from 'vue'
 
-const page = usePage()
-const role = page.props.auth.user?.role?.name
-const permissions = page.props.auth.permissions || []
-const menuItems = ref(generateMenu(role, permissions))
+    const page = usePage()
+   const menuItems = generateMenu(
+        page.props.auth.user?.role?.name,
+        page.props.auth.permissions,
+        page.props.branches ?? [])
 
-const sidebarOpen = ref(false)
-const desktopSidebarCollapsed = ref(false)
+    const role = page.props.auth.user?.role?.name
+    const permissions = page.props.auth.permissions || []
 
-function toggleSidebar() {
-    sidebarOpen.value = !sidebarOpen.value
-}
+    const sidebarOpen = ref(false)
+    const desktopSidebarCollapsed = ref(false)
 
-function toggleDesktopSidebar() {
-    desktopSidebarCollapsed.value = !desktopSidebarCollapsed.value
-}
-</script>
+    function toggleSidebar() {
+        sidebarOpen.value = !sidebarOpen.value
+    }
+
+    function toggleDesktopSidebar() {
+        desktopSidebarCollapsed.value = !desktopSidebarCollapsed.value
+    }
+console.log('BRANCHES:', page.props.branches)
+    </script>
 
 <template>
+    
     <div class="flex h-dvh bg-slate-100 overflow-hidden">
 
         <div v-if="sidebarOpen" class="fixed inset-0 bg-black/40 z-40 md:hidden" @click="toggleSidebar" />

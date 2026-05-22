@@ -1,5 +1,4 @@
-export function generateMenu(role, permissions = []) {
-    const can = (permiso) => permissions.includes(permiso);
+export function generateMenu(role, permissions = [], branches = []) {  
 
     const isAdmin = role === "Administrador";
     const isSistemas = role === "Sistemas";
@@ -64,7 +63,7 @@ export function generateMenu(role, permissions = []) {
 |--------------------------------------------------------------------------
 */
 
-    const inventoryOptions = (branch) => [
+   const inventoryOptions = (branch) => [
         ...(isAdmin ||
         isInventario ||
         can("inventario.dashboard.ver") ||
@@ -72,7 +71,7 @@ export function generateMenu(role, permissions = []) {
             ? [
                   {
                       text: "Dashboard",
-                      key: `inventario.${branch.key}.dashboard`,
+                      key: `inventario.${branch.slug}.dashboard`,
                       icon: "dashboard",
                       url: route("inventario.dashboard"),
                   },
@@ -86,9 +85,13 @@ export function generateMenu(role, permissions = []) {
             ? [
                   {
                       text: "Productos",
-                      key: `inventario.${branch.key}.productos`,
+                     key: `inventory.${branch.slug}.products`,
                       icon: "inventory",
-                      url: route("inventario.productos"),
+                
+                    url: route("inventory.branches.products.index", {
+    branch: branch.slug,
+}),
+                     
                   },
               ]
             : []),
@@ -99,29 +102,29 @@ export function generateMenu(role, permissions = []) {
         can("inventario.ver")
             ? [
                   {
-                      text: "Inventario",
-                      key: `inventario.${branch.key}.inventory`,
-                      icon: "inventory_2",
-                      url: route("inventario.branches.inventory", {
-                          branch: branch.id,
+                      text: "Movimientos",
+                      key: `inventory.${branch.slug}.movements`,
+                      icon: "sync_alt",
+                      url: route("inventario.sucursales", {
+                     branch: branch.slug 
                       }),
                   },
               ]
             : []),
 
-        // ...(isAdmin ||
-        // isInventario ||
-        // can("inventario.caducidades.ver") ||
-        // can("inventario.ver")
-        //     ? [
-        //           {
-        //               text: "Caducidades",
-        //               key: `inventario.${branch.key}.caducidades`,
-        //               icon: "event_busy",
-        //               url: route("inventario.caducidades"),
-        //           },
-        //       ]
-        //     : []),
+        ...(isAdmin ||
+        isInventario ||
+        can("inventario.caducidades.ver") ||
+        can("inventario.ver")
+            ? [
+                  {
+                      text: "Caducidades",
+                      key: `inventario.${branch.slug}.caducidades`,
+                      icon: "event_busy",
+                      url: route("inventario.caducidades"),
+                  },
+              ]
+            : []),
 
         // ...(isAdmin ||
         // isInventario ||
@@ -168,12 +171,7 @@ export function generateMenu(role, permissions = []) {
             : []),
     ];
 
-    const branches = [
-        { id: 1, text: "Ajusco", key: "ajusco", icon: "store" },
-        { id: 2, text: "Diana", key: "diana", icon: "store" },
-        { id: 3, text: "Lago", key: "lago", icon: "store" },
-        { id: 4, text: "Cecilia", key: "cecilia", icon: "store" },
-    ];
+
 
     if (isAdmin || isInventario || can("inventario.ver")) {
         menu.push({
@@ -181,12 +179,12 @@ export function generateMenu(role, permissions = []) {
             key: "sucursales",
             icon: "inventory_2",
             isOpen: false,
-            children: branches.map((branch) => ({
-                text: branch.text,
-                key: `branch.${branch.key}`,
-                icon: branch.icon,
+          children: branches.map((branch) => ({
+    text: branch.name,
+    key: `branch.${branch.slug}`,
+               icon: "store",
                 isOpen: false,
-                children: inventoryOptions(branch),
+       children: inventoryOptions(branch),
             })),
         });
     }

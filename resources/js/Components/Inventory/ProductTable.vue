@@ -15,6 +15,7 @@ defineEmits([
     'view',
     'edit',
     'delete'
+  
 ])
 
 function stockColor(product) {
@@ -68,25 +69,20 @@ function stockColor(product) {
                             Categoría
                         </th>
 
-                        <th class="text-left px-5 py-4 font-semibold">
-                            Tienda
-                        </th>
 
                         <th class="text-left px-5 py-4 font-semibold">
                             Stock
                         </th>
 
-                        <th class="text-left px-5 py-4 font-semibold">
-                            Costo
-                        </th>
+                       
 
                         <th class="text-left px-5 py-4 font-semibold">
                             Precio
                         </th>
 
-                        <th class="text-left px-5 py-4 font-semibold">
-                            Ganancia
-                        </th>
+                   <th class="text-left px-5 py-4 font-semibold">
+    Fecha ingreso
+</th>
 
                         <th class="text-center px-5 py-4 font-semibold">
                             Acciones
@@ -106,17 +102,34 @@ function stockColor(product) {
                         </td>
 
                         <!-- PRODUCTO -->
-                        <td class="px-5 py-4">
+                    <td class="px-5 py-4">
+    <div class="flex items-center gap-3">
+        <img
+            v-if="product.image"
+            :src="product.image"
+            class="w-12 h-12 rounded-xl object-cover border"
+        />
 
-                            <div class="font-semibold text-slate-800">
-                                {{ product.name }}
-                            </div>
+        <div
+            v-else
+            class="w-12 h-12 rounded-xl border bg-slate-100 flex items-center justify-center text-slate-400"
+        >
+            <span class="material-symbols-outlined text-[22px]">
+                image
+            </span>
+        </div>
 
-                            <div v-if="product.presentation" class="text-xs text-slate-400 mt-1">
-                                {{ product.presentation }}
-                            </div>
+        <div>
+            <div class="font-semibold text-slate-800">
+                {{ product.name }}
+            </div>
 
-                        </td>
+            <div v-if="product.presentation" class="text-xs text-slate-400 mt-1">
+                {{ product.presentation }}
+            </div>
+        </div>
+    </div>
+</td>
 
                         <!-- CATEGORIA -->
                         <td class="px-5 py-4">
@@ -127,10 +140,7 @@ function stockColor(product) {
 
                         </td>
 
-                        <!-- SUCURSAL -->
-                        <td class="px-5 py-4 text-slate-700">
-                            {{ product.branch_name }}
-                        </td>
+                     
 
                         <!-- STOCK -->
                         <td class="px-5 py-4">
@@ -146,20 +156,16 @@ function stockColor(product) {
 
                         </td>
 
-                        <!-- COSTO -->
-                        <td class="px-5 py-4 text-slate-700">
-                            ${{ product.cost }}
-                        </td>
+                     
 
                         <!-- PRECIO -->
                         <td class="px-5 py-4 font-semibold text-slate-800">
                             ${{ product.price }}
                         </td>
-
-                        <!-- GANANCIA -->
-                        <td class="px-5 py-4 font-semibold text-emerald-500">
-                            ${{ product.profit }}
-                        </td>
+ <!-- fecha -->
+                       <td class="px-5 py-4 text-slate-600">
+    {{ product.entry_date }}
+</td>
 
                         <td class="px-5 py-4">
 
@@ -167,6 +173,8 @@ function stockColor(product) {
 
                                 <ActionIconButton v-if="can('inventario.ver')" icon="visibility" title="Ver producto"
                                     variant="blue" @click.stop="$emit('view', product)" />
+                                
+
                                 <ActionIconButton v-if="can('inventario.editar')" icon="edit" title="Editar producto"
                                     variant="amber" @click.stop="$emit('edit', product)" />
 
@@ -181,7 +189,7 @@ function stockColor(product) {
                     <!-- VACIO -->
                     <tr v-if="products.length === 0">
 
-                        <td colspan="9" class="text-center py-16 text-slate-400">
+                        <td colspan="7" class="text-center py-16 text-slate-400">
                             No se encontraron productos
                         </td>
 
