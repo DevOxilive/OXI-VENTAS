@@ -1,16 +1,24 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-
 import InventoryStatsCards from '@/Components/Inventory/InventoryStatsCards.vue'
 
 defineOptions({ layout: AdminLayout })
+
+const page = usePage()
 
 const search = ref('')
 const branchFilter = ref('')
 const categoryFilter = ref('')
 const stockFilter = ref('')
 const recordsToShow = ref(10)
+
+const branches = computed(() => page.props.branches ?? [])
+
+const defaultBranchSlug = computed(() => {
+    return branches.value[0]?.slug ?? 'ajusco'
+})
 
 const productsDB = ref([
     {
@@ -74,50 +82,57 @@ const productsDB = ref([
         status: 'Disponible'
     }
 ])
-const inventoryModules = [
+
+const inventoryModules = computed(() => [
     {
         title: 'Productos',
         description: 'Alta, edición, consulta y control de stock.',
         icon: 'inventory_2',
-        routeName: 'inventory.products.index',
+        routeName: 'inventory.branches.products.index',
+        routeParams: { branch: defaultBranchSlug.value },
         color: 'bg-blue-50 text-blue-700 border-blue-100'
     },
     {
         title: 'Movimientos',
         description: 'Historial de entradas, salidas y ajustes.',
         icon: 'sync_alt',
-        routeName: 'inventory.movements',
+        routeName: 'inventory.branches.products.index',
+        routeParams: { branch: defaultBranchSlug.value },
         color: 'bg-violet-50 text-violet-700 border-violet-100'
     },
     {
         title: 'Caducidades',
         description: 'Productos próximos a vencer y lotes críticos.',
         icon: 'event_busy',
-        routeName: 'inventory.expirations',
+        routeName: 'inventory.branches.products.index',
+        routeParams: { branch: defaultBranchSlug.value },
         color: 'bg-amber-50 text-amber-700 border-amber-100'
     },
     {
         title: 'Transferencias',
         description: 'Movimientos de stock entre sucursales.',
         icon: 'compare_arrows',
-        routeName: 'inventory.transfers',
+        routeName: 'inventory.branches.products.index',
+        routeParams: { branch: defaultBranchSlug.value },
         color: 'bg-cyan-50 text-cyan-700 border-cyan-100'
     },
     {
         title: 'Ajustes',
         description: 'Correcciones auditadas de inventario físico.',
         icon: 'tune',
-        routeName: 'inventory.adjustments',
+        routeName: 'inventory.branches.products.index',
+        routeParams: { branch: defaultBranchSlug.value },
         color: 'bg-rose-50 text-rose-700 border-rose-100'
     },
     {
         title: 'Reportes',
         description: 'Exportaciones, análisis y reportes operativos.',
         icon: 'bar_chart',
-        routeName: 'inventory.reports',
+        routeName: 'inventory.branches.products.index',
+        routeParams: { branch: defaultBranchSlug.value },
         color: 'bg-emerald-50 text-emerald-700 border-emerald-100'
     }
-]
+])
 
 const recentMovements = [
     {
@@ -150,9 +165,9 @@ const recentMovements = [
 ]
 
 const branchSummary = computed(() => {
-    const branches = [...new Set(productsDB.value.map(product => product.branch))]
+    const branchesList = [...new Set(productsDB.value.map(product => product.branch))]
 
-    return branches.map(branch => {
+    return branchesList.map(branch => {
         const products = productsDB.value.filter(product => product.branch === branch)
 
         return {
@@ -215,12 +230,14 @@ function movementClass(type) {
 }
 
 function openCreateModal() {
-    window.location.href = route('inventory.products.index')
+    window.location.href = route('inventory.branches.products.index', {
+        branch: defaultBranchSlug.value,
+    })
 }
+
 function exportExcel() {
     console.log('Exportar Excel')
 }
-
 </script>
 
 <template>
@@ -271,7 +288,8 @@ function exportExcel() {
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <a v-for="module in inventoryModules" :key="module.title" :href="route(module.routeName)"
+                    <a v-for="module in inventoryModules" :key="module.title"
+                        :href="route(module.routeName, module.routeParams)"
                         class="group border border-slate-200 rounded-2xl p-4 hover:border-slate-300 hover:shadow-md transition-all bg-white">
                         <div class="flex items-start gap-4">
                             <div class="w-11 h-11 rounded-xl border flex items-center justify-center shrink-0"
@@ -418,6 +436,5 @@ function exportExcel() {
                 </div>
             </div>
         </div>
-
     </section>
 </template>

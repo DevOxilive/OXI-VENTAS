@@ -5,7 +5,7 @@
     import { ref } from 'vue'
 
     const page = usePage()
-   const menuItems = generateMenu(
+    const menuItems = generateMenu(
         page.props.auth.user?.role?.name,
         page.props.auth.permissions,
         page.props.branches ?? [])
@@ -23,11 +23,12 @@
     function toggleDesktopSidebar() {
         desktopSidebarCollapsed.value = !desktopSidebarCollapsed.value
     }
-console.log('BRANCHES:', page.props.branches)
-    </script>
+    console.table(JSON.parse(JSON.stringify(page.props.branches ?? [])))
+
+</script>
 
 <template>
-    
+
     <div class="flex h-dvh bg-slate-100 overflow-hidden">
 
         <div v-if="sidebarOpen" class="fixed inset-0 bg-black/40 z-40 md:hidden" @click="toggleSidebar" />
