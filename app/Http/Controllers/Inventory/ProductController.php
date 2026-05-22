@@ -37,7 +37,9 @@ public function index(Branch $branch)
                 return [
                     'id' => $product->id,
                     'branch_product_id' => $item->id,
-                    'barcode' => $item->barcode,
+                    'barcode' => $item->barcode
+        ?? $product?->barcodes?->first()?->code
+        ?? 'Sin código',
                     'name' => $item->name,
                     'image' => $product->image ? asset('storage/' . $product->image) : null,
                     'presentation' => $product->description,
@@ -50,7 +52,10 @@ public function index(Branch $branch)
                     'cost' => number_format($item->cost, 2),
                     'price' => number_format($item->price, 2),
                     'profit' => number_format($item->price - $item->cost, 2),
-                    'entry_date' => $item->entry_date,
+               
+'entry_date' => $item->entry_date
+    ?? optional($item->created_at)->format('Y-m-d')
+    ?? 'Sin fecha',
                 ];
             }),
 
