@@ -32,7 +32,23 @@ const reasonOptions = [
     { label: 'Transferencia', value: 'TRANSFER' },
     { label: 'Ajuste manual', value: 'MANUAL' },
 ]
+const movementLabels = {
+    PURCHASE: 'Compra',
+    SALE: 'Venta',
+    DAMAGED: 'Producto dañado',
+    STOLEN: 'Producto robado',
+    EXPIRED: 'Producto caducado',
+    TRANSFER: 'Transferencia',
+    MANUAL: 'Ajuste manual',
 
+    IN: 'Entrada',
+    OUT: 'Salida',
+    ADJUSTMENT: 'Ajuste manual',
+}
+
+function translateMovement(value) {
+    return movementLabels[value] || value
+}
 const form = useForm({
     branch_product_id: '',
     type: 'OUT',
@@ -155,7 +171,7 @@ const submit = () => {
                                     : movement.type === 'OUT'
                                         ? 'bg-red-100 text-red-700'
                                         : 'bg-yellow-100 text-yellow-700'">
-                                    {{ movement.type }}
+                                    {{ translateMovement(movement.type) }}
                                 </span>
 
                             </td>

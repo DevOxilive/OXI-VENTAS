@@ -133,7 +133,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         //     ? [
         //           {
         //               text: "Transferencias",
-        //               key: `inventario.${branchKey}.transferencias`,
+        //               key: `inventario.${branch.key}.transferencias`,
         //               icon: "compare_arrows",
         //               url: route("inventario.transferencias"),
         //           },
@@ -147,26 +147,28 @@ export function generateMenu(role, permissions = [], branches = []) {
         //     ? [
         //           {
         //               text: "Ajustes",
-        //               key: `inventario.${branchKey}.ajustes`,
+        //               key: `inventario.${branch.key}.ajustes`,
         //               icon: "tune",
         //               url: route("inventario.ajustes"),
         //           },
         //       ]
         //     : []),
 
-        // ...(isAdmin ||
-        // isInventario ||
-        // can("inventario.reportes.ver") ||
-        // can("inventario.ver")
-        //     ? [
-        //           {
-        //               text: "Reportes",
-        //               key: `inventario.${branchKey}.reportes`,
-        //               icon: "bar_chart",
-        //               url: route("inventario.reportes"),
-        //           },
-        //       ]
-        //     : []),
+        ...(isAdmin ||
+        isInventario ||
+        can("inventario.reports.ver") ||
+        can("inventario.ver")
+            ? [
+                  {
+                      text: "Reportes",
+                      key: `inventario.${branch.key}.reports`,
+                      icon: "bar_chart",
+                      url: route("inventario.branches.reports", {
+                          branch: branch.id,
+                      }),
+                  },
+              ]
+            : []),
     ];
 
 
