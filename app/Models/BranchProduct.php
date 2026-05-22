@@ -13,6 +13,8 @@ class BranchProduct extends Model
         'stock',
         'min_stock',
         'active',
+        'tracks_batches',
+        'tracks_expiration',
     ];
 
     public function branch()
@@ -28,5 +30,17 @@ class BranchProduct extends Model
     public function movements()
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    public function batches()
+    {
+        return $this->hasMany(ProductBatch::class);
+    }
+
+    public function activeBatches()
+    {
+        return $this->hasMany(ProductBatch::class)
+            ->where('status', 'ACTIVE')
+            ->where('quantity', '>', 0);
     }
 }

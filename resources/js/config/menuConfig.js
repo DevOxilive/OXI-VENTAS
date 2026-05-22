@@ -64,7 +64,7 @@ export function generateMenu(role, permissions = []) {
 |--------------------------------------------------------------------------
 */
 
-    const inventoryOptions = (branchKey) => [
+    const inventoryOptions = (branch) => [
         ...(isAdmin ||
         isInventario ||
         can("inventario.dashboard.ver") ||
@@ -72,7 +72,7 @@ export function generateMenu(role, permissions = []) {
             ? [
                   {
                       text: "Dashboard",
-                      key: `inventario.${branchKey}.dashboard`,
+                      key: `inventario.${branch.key}.dashboard`,
                       icon: "dashboard",
                       url: route("inventario.dashboard"),
                   },
@@ -86,7 +86,7 @@ export function generateMenu(role, permissions = []) {
             ? [
                   {
                       text: "Productos",
-                      key: `inventario.${branchKey}.productos`,
+                      key: `inventario.${branch.key}.productos`,
                       icon: "inventory",
                       url: route("inventario.productos"),
                   },
@@ -99,29 +99,29 @@ export function generateMenu(role, permissions = []) {
         can("inventario.ver")
             ? [
                   {
-                      text: "Movimientos",
-                      key: `inventario.${branchKey}.movimientos`,
-                      icon: "sync_alt",
-                      url: route("inventario.sucursales", {
-                          branch: branchKey,
+                      text: "Inventario",
+                      key: `inventario.${branch.key}.inventory`,
+                      icon: "inventory_2",
+                      url: route("inventario.branches.inventory", {
+                          branch: branch.id,
                       }),
                   },
               ]
             : []),
 
-        ...(isAdmin ||
-        isInventario ||
-        can("inventario.caducidades.ver") ||
-        can("inventario.ver")
-            ? [
-                  {
-                      text: "Caducidades",
-                      key: `inventario.${branchKey}.caducidades`,
-                      icon: "event_busy",
-                      url: route("inventario.caducidades"),
-                  },
-              ]
-            : []),
+        // ...(isAdmin ||
+        // isInventario ||
+        // can("inventario.caducidades.ver") ||
+        // can("inventario.ver")
+        //     ? [
+        //           {
+        //               text: "Caducidades",
+        //               key: `inventario.${branch.key}.caducidades`,
+        //               icon: "event_busy",
+        //               url: route("inventario.caducidades"),
+        //           },
+        //       ]
+        //     : []),
 
         // ...(isAdmin ||
         // isInventario ||
@@ -130,7 +130,7 @@ export function generateMenu(role, permissions = []) {
         //     ? [
         //           {
         //               text: "Transferencias",
-        //               key: `inventario.${branchKey}.transferencias`,
+        //               key: `inventario.${branch.key}.transferencias`,
         //               icon: "compare_arrows",
         //               url: route("inventario.transferencias"),
         //           },
@@ -144,33 +144,35 @@ export function generateMenu(role, permissions = []) {
         //     ? [
         //           {
         //               text: "Ajustes",
-        //               key: `inventario.${branchKey}.ajustes`,
+        //               key: `inventario.${branch.key}.ajustes`,
         //               icon: "tune",
         //               url: route("inventario.ajustes"),
         //           },
         //       ]
         //     : []),
 
-        // ...(isAdmin ||
-        // isInventario ||
-        // can("inventario.reportes.ver") ||
-        // can("inventario.ver")
-        //     ? [
-        //           {
-        //               text: "Reportes",
-        //               key: `inventario.${branchKey}.reportes`,
-        //               icon: "bar_chart",
-        //               url: route("inventario.reportes"),
-        //           },
-        //       ]
-        //     : []),
+        ...(isAdmin ||
+        isInventario ||
+        can("inventario.reports.ver") ||
+        can("inventario.ver")
+            ? [
+                  {
+                      text: "Reportes",
+                      key: `inventario.${branch.key}.reports`,
+                      icon: "bar_chart",
+                      url: route("inventario.branches.reports", {
+                          branch: branch.id,
+                      }),
+                  },
+              ]
+            : []),
     ];
 
     const branches = [
-        { text: "Ajusco", key: "ajusco", icon: "store" },
-        { text: "Diana", key: "diana", icon: "store" },
-        { text: "Lago", key: "lago", icon: "store" },
-        { text: "Cecilia", key: "cecilia", icon: "store" },
+        { id: 1, text: "Ajusco", key: "ajusco", icon: "store" },
+        { id: 2, text: "Diana", key: "diana", icon: "store" },
+        { id: 3, text: "Lago", key: "lago", icon: "store" },
+        { id: 4, text: "Cecilia", key: "cecilia", icon: "store" },
     ];
 
     if (isAdmin || isInventario || can("inventario.ver")) {
@@ -184,7 +186,7 @@ export function generateMenu(role, permissions = []) {
                 key: `branch.${branch.key}`,
                 icon: branch.icon,
                 isOpen: false,
-                children: inventoryOptions(branch.key),
+                children: inventoryOptions(branch),
             })),
         });
     }

@@ -215,7 +215,7 @@ function deleteProduct(selectedProduct) {
         <ProductToolbar :filtered-products="filteredProducts" :products-d-b="productsDB"
             v-model:records-to-show="recordsToShow" @create="openCreateModal" @excel="exportExcel" />
 
-        <ProductTable :filtered-products="filteredProducts" v-model:search="search" v-model:branch-filter="branchFilter"
+        <ProductTable :filtered-products="filteredProducts" v-model:search="search"
             v-model:category-filter="categoryFilter" v-model:stock-filter="stockFilter" @view="openViewModal"
             @edit="openEditModal" @adjust="adjustStock" @delete="deleteProduct" />
 

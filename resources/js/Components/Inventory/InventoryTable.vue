@@ -7,14 +7,12 @@ defineProps({
         default: () => []
     },
     search: String,
-    branchFilter: String,
     categoryFilter: String,
     stockFilter: String
 })
 
 defineEmits([
     'update:search',
-    'update:branchFilter',
     'update:categoryFilter',
     'update:stockFilter',
     'view',
@@ -35,7 +33,7 @@ function statusClass(status) {
 </script>
 
 <template>
-    <div class="hidden md:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+    <div class="block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm min-w-[1100px]">
                 <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
@@ -55,16 +53,6 @@ function statusClass(status) {
                                 <option value="Equipo médico">Equipo médico</option>
                                 <option value="Accesorios">Accesorios</option>
                                 <option value="Refacciones">Refacciones</option>
-                            </select>
-                        </th>
-
-                        <th class="text-left px-4 py-3 font-semibold">
-                            <select :value="branchFilter" @change="$emit('update:branchFilter', $event.target.value)"
-                                class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
-                                <option value="">Sucursal...</option>
-                                <option value="Sucursal Centro">Sucursal Centro</option>
-                                <option value="Sucursal Norte">Sucursal Norte</option>
-                                <option value="Sucursal Sur">Sucursal Sur</option>
                             </select>
                         </th>
 
@@ -112,9 +100,6 @@ function statusClass(status) {
                             {{ product.category }}
                         </td>
 
-                        <td class="px-4 py-4 text-slate-600">
-                            {{ product.branch }}
-                        </td>
 
                         <td class="px-4 py-4">
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold"
@@ -142,17 +127,9 @@ function statusClass(status) {
 
                         <td class="px-4 py-4">
                             <div class="flex items-center justify-center gap-2">
-                                <ActionIconButton icon="visibility" title="Visualizar producto" variant="blue"
-                                    @click="$emit('view', product)" />
-
-                                <ActionIconButton icon="edit" title="Editar producto" variant="amber"
-                                    @click="$emit('edit', product)" />
-
-                                <ActionIconButton icon="inventory" title="Ajustar stock" variant="green"
-                                    @click="$emit('adjust', product)" />
-
-                                <ActionIconButton icon="delete" title="Eliminar producto" variant="red"
-                                    @click="$emit('delete', product)" />
+                                <ActionIconButton :icon="product.tracksBatches ? 'inventory_2' : 'sync_alt'" :title="product.tracksBatches
+                                    ? 'Movimiento con control por lotes'
+                                    : 'Movimiento simple de stock'" variant="green" @click="$emit('adjust', product)" />
                             </div>
                         </td>
                     </tr>

@@ -262,4 +262,38 @@ export const fieldRegistry = {
         message: "Código inválido.",
         spamMessage: "Código de producto no válido.",
     },
+
+    type: {
+        type: "text",
+        required: true,
+        min: 2,
+        max: 20,
+        message: "Tipo de movimiento inválido.",
+    },
+
+    reason: {
+        type: "text",
+        required: true,
+        min: 2,
+        max: 30,
+        message: "Motivo inválido.",
+    },
+
+    quantity: {
+        type: "numeric",
+        required: true,
+        min: 1,
+        max: 5,
+        message: "Cantidad inválida.",
+    },
+
+    notes: {
+        type: "text",
+        required: false,
+        max: 255,
+        preventSpam: true,
+        spamLevel: "soft",
+        message: "Notas inválidas.",
+        spamMessage: "Notas no válidas.",
+    },
 };
