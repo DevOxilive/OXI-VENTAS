@@ -18,7 +18,7 @@ class ImportInventoryExcel extends Command
 
     public function handle()
     {
-        $path = storage_path('app/imports/RepInventario.xlsx');
+       $path = database_path('imports/RepInventario.xlsx');
 
         if (!file_exists($path)) {
             $this->error('No existe el archivo Excel.');
@@ -136,11 +136,14 @@ $name = preg_replace('/\s+/', ' ', $name);
                     'branch_id' => $branch->id,
                     'product_id' => $product->id,
                     'stock' => $stock,
-                    'cost' => $cost,
+                  
                     'price' => round($cost * 1.30, 2),
                     'min_stock' => 5,
-                    'entry_date' => now()->toDateString(),
+          
                     'active' => true,
+                    'barcode' => $barcode,
+'name' => $name,
+'category_id' => $category->id,
                 ]);
             }
 

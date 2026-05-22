@@ -47,9 +47,14 @@ defineEmits(['view', 'edit', 'delete'])
                     <p class="text-slate-400 text-xs">Precio</p>
                     <p class="font-medium">${{ product.price }}</p>
                 </div>
-                <div>
+              <p class="text-xs text-slate-400 break-all">
+    {{ product.barcode || 'Sin código' }}
+</p>
+<div>
     <p class="text-slate-400 text-xs">Fecha ingreso</p>
-    <p class="font-medium">{{ product.entry_date }}</p>
+    <p class="font-medium">
+        {{ product.entry_date || 'Sin fecha' }}
+    </p>
 </div>
             </div>
 
