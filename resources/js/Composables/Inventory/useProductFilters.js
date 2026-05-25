@@ -1,126 +1,80 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch } from "vue";
 
 export function useProductFilters(productsDB) {
+    const search = ref("");
+    const categoryFilter = ref("Todas");
+    const subcategoryFilter = ref("Todas");
 
-    const search = ref('')
-    const categoryFilter = ref('Todas')
-    const subcategoryFilter = ref('Todas')
+    const recordsToShow = ref(50);
+    const currentPage = ref(1);
 
-    // 🔥 PAGINACIÓN
-    const recordsToShow = ref(10)
-    const currentPage = ref(1)
+    const productList = computed(() => {
+        const value = productsDB.value ?? productsDB;
+
+        if (Array.isArray(value)) {
+            return value;
+        }
+
+        return value?.data ?? [];
+    });
 
     const filteredProducts = computed(() => {
-
-        return productsDB.value.filter((product) => {
-
-            /*
-            |--------------------------------------------------------------------------
-            | SEARCH
-            |--------------------------------------------------------------------------
-            */
-
-            const searchValue = search.value.toLowerCase().trim()
+        return productList.value.filter((product) => {
+            const searchValue = search.value.toLowerCase().trim();
 
             const searchableText = `
-                ${product.name ?? ''}
-                ${product.barcode ?? ''}
-                ${product.presentation ?? ''}
-                ${product.category_name ?? ''}
-                ${product.subcategory_name ?? ''}
-            `.toLowerCase()
+                ${product.name ?? ""}
+                ${product.barcode ?? ""}
+                ${product.presentation ?? ""}
+                ${product.category_name ?? ""}
+                ${product.subcategory_name ?? ""}
+            `.toLowerCase();
 
             const matchesSearch =
-                searchValue === '' ||
-                searchableText.includes(searchValue)
-
-            /*
-            |--------------------------------------------------------------------------
-            | CATEGORY
-            |--------------------------------------------------------------------------
-            */
+                searchValue === "" || searchableText.includes(searchValue);
 
             const matchesCategory =
-                categoryFilter.value === 'Todas' ||
-                String(product.category_id) === String(categoryFilter.value)
-
-            /*
-            |--------------------------------------------------------------------------
-            | SUBCATEGORY
-            |--------------------------------------------------------------------------
-            */
+                categoryFilter.value === "Todas" ||
+                String(product.category_id) === String(categoryFilter.value);
 
             const matchesSubcategory =
-                subcategoryFilter.value === 'Todas' ||
-                String(product.subcategory_id) === String(subcategoryFilter.value)
+                subcategoryFilter.value === "Todas" ||
+                String(product.subcategory_id) ===
+                    String(subcategoryFilter.value);
 
-            /*
-            |--------------------------------------------------------------------------
-            | FINAL
-            |--------------------------------------------------------------------------
-            */
+            return matchesSearch && matchesCategory && matchesSubcategory;
+        });
+    });
 
-            return (
-                matchesSearch &&
-                matchesCategory &&
-                matchesSubcategory
-            )
-
-        })
-
-    })
-
-    // 🔥 PRODUCTOS PAGINADOS
     const paginatedProducts = computed(() => {
+        return filteredProducts.value;
+    });
 
-        const start =
-            (currentPage.value - 1) *
-            recordsToShow.value
-
-        const end =
-            start +
-            recordsToShow.value
-
-        return filteredProducts.value.slice(start, end)
-
-    })
-
-    // 🔥 TOTAL DE PÁGINAS
     const totalPages = computed(() => {
+        const value = productsDB.value ?? productsDB;
+
+        if (!Array.isArray(value) && value?.last_page) {
+            return value.last_page;
+        }
 
         return Math.max(
             1,
-            Math.ceil(
-                filteredProducts.value.length /
-                recordsToShow.value
-            )
-        )
+            Math.ceil(filteredProducts.value.length / recordsToShow.value),
+        );
+    });
 
-    })
-
-    // 🔥 RESET PAGE
-    watch([
-        search,
-        categoryFilter,
-        subcategoryFilter,
-        recordsToShow
-    ], () => {
-
-        currentPage.value = 1
-
-    })
+    watch([search, categoryFilter, subcategoryFilter, recordsToShow], () => {
+        currentPage.value = 1;
+    });
 
     return {
         search,
         categoryFilter,
         subcategoryFilter,
-
         filteredProducts,
-
-        // 🔥 NUEVO
         paginatedProducts,
         recordsToShow,
         currentPage,
         totalPages,
-    }
+    };
 }

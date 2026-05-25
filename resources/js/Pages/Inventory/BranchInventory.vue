@@ -1,8 +1,7 @@
 <script setup>
-
 import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { useForm } from '@inertiajs/vue3'
+import { router, useForm } from '@inertiajs/vue3'
 
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
@@ -18,27 +17,41 @@ import InventoryTable from '@/Components/Inventory/InventoryTable.vue'
 defineOptions({ layout: AdminLayout })
 
 const props = defineProps({
-    branchProductsDB: Array,
-    productsDB: Array,
-    branchesDB: Array,
-    currentBranch: Object,
-})
-
-const branchProducts = ref([])
-
-watch(
-    () => props.branchProductsDB,
-    (products) => {
-        branchProducts.value = products
-            ? products.map(item => ({
-                ...item,
-                product: item.product ? { ...item.product } : null,
-                branch: item.branch ? { ...item.branch } : null,
-            }))
-            : []
+    branchProductsDB: {
+        type: [Object, Array],
+        default: () => ({ data: [] }),
     },
-    { immediate: true }
-)
+    productsDB: {
+        type: Array,
+        default: () => [],
+    },
+    branchesDB: {
+        type: Array,
+        default: () => [],
+    },
+    currentBranch: {
+        type: Object,
+        default: null,
+    },
+    inventoryStats: {
+        type: Object,
+        default: () => ({
+            total_products: 0,
+            total_stock: 0,
+            inventory_value: 0,
+            low_stock: 0,
+            out_of_stock: 0,
+            expiring_soon: 0,
+        }),
+    },
+    filters: {
+        type: Object,
+        default: () => ({
+            search: '',
+            per_page: 50,
+        }),
+    },
+})
 
 const products = computed(() => props.productsDB ?? [])
 const branches = computed(() => props.branchesDB ?? [])
@@ -48,16 +61,39 @@ const showModal = ref(false)
 const showAdjustModal = ref(false)
 const selectedProduct = ref(null)
 
-const search = ref('')
+const search = ref(props.filters?.search ?? '')
 const categoryFilter = ref('')
 const stockFilter = ref('')
-const recordsToShow = ref(10)
+const recordsToShow = ref(Number(props.filters?.per_page ?? 50))
+
+const realtimeUpdates = ref({})
+
+const rawBranchProducts = computed(() => {
+    if (Array.isArray(props.branchProductsDB)) {
+        return props.branchProductsDB
+    }
+
+    return props.branchProductsDB?.data ?? []
+})
+
+const paginationLinks = computed(() => {
+    return Array.isArray(props.branchProductsDB?.links)
+        ? props.branchProductsDB.links
+        : []
+})
+
+const hasPagination = computed(() => {
+    return !Array.isArray(props.branchProductsDB) && paginationLinks.value.length > 0
+})
 
 const visualProducts = computed(() => {
-    return branchProducts.value.map(item => {
-        const stock = Number(item.stock ?? 0)
+    return rawBranchProducts.value.map(item => {
+        const realtime = realtimeUpdates.value[item.id] ?? {}
+
+        const stock = Number(realtime.stock ?? item.stock ?? 0)
         const minStock = Number(item.min_stock ?? 0)
         const price = Number(item.price ?? item.product?.sale_price ?? 0)
+        const tracksBatches = Boolean(item.tracks_batches ?? item.tracksBatches ?? false)
 
         let status = 'Disponible'
 
@@ -69,81 +105,105 @@ const visualProducts = computed(() => {
 
         return {
             id: item.id,
-            name: item.product?.name ?? 'Producto sin nombre',
-            code: item.product?.barcodes?.[0]?.code ?? `BP-${item.id}`,
+            name: item.product?.name ?? item.name ?? 'Producto sin nombre',
+            code: item.product?.barcodes?.[0]?.code ?? item.barcode ?? `BP-${item.id}`,
             category: item.product?.category?.name ?? 'Sin categoría',
             branch: item.branch?.name ?? currentBranch.value?.name ?? 'Sucursal',
             status,
             stock,
             minStock,
             price,
-            expirationDate: item.expiration_date ?? null,
+            tracksBatches,
+            expirationDate: item.next_expiration_date ?? item.expiration_date ?? null,
             active: item.active ?? true,
-            recentMovements: item.movements ?? [],
-            raw: item,
+            activeBatchesCount: item.active_batches_count ?? 0,
             batches: item.batches ?? [],
             recentMovements: item.movements ?? [],
+            raw: item,
         }
     })
 })
 
+const filteredProducts = computed(() => {
+    return visualProducts.value.filter(product => {
+        const matchesCategory =
+            !categoryFilter.value ||
+            product.category === categoryFilter.value
+
+        const matchesStock =
+            !stockFilter.value ||
+            product.status === stockFilter.value
+
+        return matchesCategory && matchesStock
+    })
+})
+
+const stats = computed(() => ({
+    total: props.inventoryStats?.total_products ?? 0,
+    totalStock: props.inventoryStats?.total_stock ?? 0,
+    inventoryValue: props.inventoryStats?.inventory_value ?? 0,
+    lowStock: props.inventoryStats?.low_stock ?? 0,
+    outOfStock: props.inventoryStats?.out_of_stock ?? 0,
+    expiringSoon: props.inventoryStats?.expiring_soon ?? 0,
+}))
+
+let searchTimeout = null
+
+watch(search, () => {
+    clearTimeout(searchTimeout)
+
+    searchTimeout = setTimeout(() => {
+        reloadInventory()
+    }, 400)
+})
+
+watch(recordsToShow, () => {
+    reloadInventory()
+})
+
+const reloadInventory = () => {
+    router.get(
+        window.location.pathname,
+        {
+            search: search.value || undefined,
+            per_page: recordsToShow.value,
+        },
+        {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        }
+    )
+}
+
+const goToPage = (url) => {
+    if (!url) return
+
+    router.visit(url, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    })
+}
+
 onMounted(() => {
     window.Echo.channel('inventory')
         .listen('.stock.updated', (event) => {
-            const product = branchProducts.value.find(
-                item => item.id === event.branch_product_id
-            )
-
-            if (!product) return
-
-            product.stock = Number(event.stock)
-            product.updated_at = event.updated_at
-            product.batches = event.batches ?? []
-            product.movements = event.recent_movements ?? []
+            realtimeUpdates.value = {
+                ...realtimeUpdates.value,
+                [event.branch_product_id]: {
+                    stock: Number(event.stock),
+                    updated_at: event.updated_at,
+                    batches: event.batches ?? [],
+                    movements: event.recent_movements ?? [],
+                },
+            }
         })
 })
 
 onBeforeUnmount(() => {
     window.Echo.leave('inventory')
 })
-
-const filteredProducts = computed(() => {
-    return visualProducts.value
-        .filter(product => {
-            const searchText = search.value.toLowerCase()
-
-            const matchesSearch =
-                !search.value ||
-                product.name.toLowerCase().includes(searchText) ||
-                product.code.toLowerCase().includes(searchText)
-
-            const matchesCategory =
-                !categoryFilter.value ||
-                product.category === categoryFilter.value
-
-            const matchesStock =
-                !stockFilter.value ||
-                product.status === stockFilter.value
-
-            return matchesSearch && matchesCategory && matchesStock
-        })
-        .slice(0, Number(recordsToShow.value))
-})
-
-const inventoryValue = computed(() => {
-    return visualProducts.value.reduce((acc, item) => {
-        return acc + (item.stock * item.price)
-    }, 0)
-})
-
-const stats = computed(() => ({
-    total: visualProducts.value.length,
-    totalStock: visualProducts.value.reduce((acc, item) => acc + item.stock, 0),
-    inventoryValue: inventoryValue.value,
-    lowStock: visualProducts.value.filter(item => item.status === 'Stock bajo').length,
-    outOfStock: visualProducts.value.filter(item => item.status === 'Agotado').length,
-    expiringSoon: visualProducts.value.filter(item => item.expirationDate).length,
-}))
 
 const form = useForm({
     branch_id: '',
@@ -228,6 +288,15 @@ const deleteProduct = (product) => {
             @update:categoryFilter="categoryFilter = $event" @update:stockFilter="stockFilter = $event"
             @view="viewProduct" @edit="editProduct" @adjust="adjustStock" @delete="deleteProduct" />
 
+        <div v-if="hasPagination" class="flex flex-wrap items-center justify-center gap-2">
+            <button v-for="link in paginationLinks" :key="link.label" type="button" :disabled="!link.url"
+                class="px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 disabled:cursor-not-allowed"
+                :class="link.active
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'" @click="goToPage(link.url)"
+                v-html="link.label" />
+        </div>
+
         <div v-if="showModal"
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
             <div class="bg-white rounded-3xl w-full max-w-2xl overflow-hidden">
@@ -238,12 +307,12 @@ const deleteProduct = (product) => {
                     <form id="inventoryForm" @submit.prevent="submit" class="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <SelectField v-model="form.product_id" label="Producto" :options="products.map(product => ({
                             label: product.name,
-                            value: product.id
+                            value: product.id,
                         }))" />
 
                         <SelectField v-model="form.branch_id" label="Sucursal" :options="branches.map(branch => ({
                             label: branch.name,
-                            value: branch.id
+                            value: branch.id,
                         }))" />
 
                         <InputField v-model="form.price" label="Precio" type="number" />
@@ -258,9 +327,9 @@ const deleteProduct = (product) => {
 
                 <GeneralModalFooter :processing="form.processing" save-button-text="Guardar" mode="create"
                     @save="submit" @close="closeModal" />
-
             </div>
         </div>
+
         <AdjustStockModal v-if="showAdjustModal && selectedProduct" :product="selectedProduct"
             @close="closeAdjustModal" />
     </div>
