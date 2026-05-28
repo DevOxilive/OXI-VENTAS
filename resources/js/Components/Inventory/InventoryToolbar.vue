@@ -4,30 +4,33 @@ import ExportButton from '@/Components/ExportButton.vue'
 defineProps({
     filteredProducts: {
         type: Array,
-        default: () => []
+        default: () => [],
     },
     productsDb: {
         type: Array,
-        default: () => []
+        default: () => [],
     },
     recordsToShow: {
         type: Number,
-        default: 10
-    }
+        default: 10,
+    },
 })
 
 defineEmits([
     'create',
     'excel',
-    'update:recordsToShow'
+    'update:recordsToShow',
 ])
 </script>
 
 <template>
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div class="flex items-center gap-3">
-            <button @click="$emit('create')"
-                class="bg-[#1f1d2b] text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+            <button
+                type="button"
+                class="bg-[#1f1d2b] text-white px-4 py-2 rounded-lg text-sm flex items-center justify-center gap-2 hover:bg-[#2d2a3d] transition"
+                @click="$emit('create')"
+            >
                 <span class="material-symbols-outlined text-[18px]">
                     add_circle
                 </span>
@@ -38,7 +41,7 @@ defineEmits([
             <ExportButton @click="$emit('excel')" />
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
             <div class="text-sm text-slate-500">
                 Mostrando
                 {{ filteredProducts.length }}
@@ -47,8 +50,11 @@ defineEmits([
                 registros
             </div>
 
-            <select :value="recordsToShow" @change="$emit('update:recordsToShow', Number($event.target.value))"
-                class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <select
+                :value="recordsToShow"
+                class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                @change="$emit('update:recordsToShow', Number($event.target.value))"
+            >
                 <option :value="10">10</option>
                 <option :value="25">25</option>
                 <option :value="50">50</option>

@@ -1,59 +1,112 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
     stats: {
         type: Object,
-        required: true
-    }
+        required: true,
+    },
+    alerts: {
+        type: Object,
+        default: () => ({
+            expiredBatches: 0,
+            nearExpirationBatches: 0,
+            lowStockProducts: 0,
+        }),
+    },
 })
 
-const cards = [
+const emit = defineEmits([
+    'open-alert',
+])
+
+const cards = computed(() => [
     {
         key: 'total',
-        label: 'Productos registrados',
+        label: 'Productos',
+        value: props.stats.total,
         icon: 'inventory_2',
-        color: 'bg-blue-50 text-blue-700 border-blue-100'
+        tone: 'slate',
     },
     {
-        key: 'lowStock',
+        key: 'totalStock',
+        label: 'Unidades',
+        value: props.stats.totalStock,
+        icon: 'warehouse',
+        tone: 'slate',
+    },
+    {
+        key: 'lowStockProducts',
         label: 'Stock bajo',
+        value: props.alerts.lowStockProducts,
         icon: 'warning',
-        color: 'bg-amber-50 text-amber-700 border-amber-100'
+        tone: 'amber',
+        alertType: 'lowStock',
     },
     {
-        key: 'outOfStock',
-        label: 'Agotados',
-        icon: 'error',
-        color: 'bg-red-50 text-red-700 border-red-100'
+        key: 'expiredBatches',
+        label: 'Vencidos',
+        value: props.alerts.expiredBatches,
+        icon: 'dangerous',
+        tone: 'red',
+        alertType: 'expired',
     },
     {
-        key: 'expiringSoon',
-        label: 'Con caducidad',
+        key: 'nearExpirationBatches',
+        label: 'Por vencer',
+        value: props.alerts.nearExpirationBatches,
         icon: 'event_busy',
-        color: 'bg-emerald-50 text-emerald-700 border-emerald-100'
-    }
-]
+        tone: 'orange',
+        alertType: 'nearExpiration',
+    },
+])
+
+function toneClass(tone) {
+    return {
+        slate: 'bg-white border-slate-200 text-slate-700',
+        red: 'bg-red-50 border-red-200 text-red-700',
+        orange: 'bg-orange-50 border-orange-200 text-orange-700',
+        amber: 'bg-amber-50 border-amber-200 text-amber-700',
+    }[tone]
+}
+
+function openCard(card) {
+    if (!card.alertType || Number(card.value) <= 0) return
+
+    emit('open-alert', card.alertType)
+}
 </script>
 
 <template>
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div v-for="card in cards" :key="card.key" class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-slate-500">
-                        {{ card.label }}
-                    </p>
+    <div>
+        <p class="text-sm font-black text-slate-700 mb-3">
+            Estado rápido del inventario
+        </p>
 
-                    <h2 class="text-2xl font-bold text-slate-800 mt-1">
-                        {{ stats[card.key] }}
-                    </h2>
-                </div>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <button v-for="card in cards" :key="card.key" type="button"
+                class="rounded-2xl border px-4 py-3 shadow-sm text-left transition" :class="[
+                    toneClass(card.tone),
+                    card.alertType && Number(card.value) > 0
+                        ? 'hover:scale-[1.01] cursor-pointer'
+                        : 'cursor-default'
+                ]" @click="openCard(card)">
+                <div class="flex items-center justify-between gap-2">
+                    <div>
+                        <p class="text-xs font-bold opacity-70">
+                            {{ card.label }}
+                        </p>
 
-                <div class="w-12 h-12 rounded-2xl border flex items-center justify-center" :class="card.color">
-                    <span class="material-symbols-outlined text-[24px]">
+                        <p class="text-xl font-black leading-tight mt-1">
+                            {{ card.value }}
+                        </p>
+                    </div>
+
+                    <span class="material-symbols-outlined text-[22px] opacity-70">
                         {{ card.icon }}
                     </span>
                 </div>
-            </div>
+            </button>
         </div>
     </div>
 </template>

@@ -1,0 +1,147 @@
+<script setup>
+import InputField from '@/Components/Forms/InputField.vue'
+import CurrentBatchesList from './CurrentBatchesList.vue'
+
+defineProps({
+    form: {
+        type: Object,
+        required: true,
+    },
+    product: {
+        type: Object,
+        required: true,
+    },
+    frontendErrors: {
+        type: Object,
+        default: () => ({}),
+    },
+    totalManualBatchQuantity: {
+        type: Number,
+        default: 0,
+    },
+})
+
+defineEmits(['add-manual-batch', 'remove-manual-batch'])
+</script>
+
+<template>
+    <div class="flex-1 min-h-0 overflow-y-auto rounded-3xl border border-slate-200 bg-slate-50 p-5 pr-3">
+        <div class="mb-4">
+            <h3 class="font-black text-slate-900">
+                Selección de lote
+            </h3>
+
+            <p class="text-sm text-slate-500">
+                Puedes dejar que el sistema sugiera por FEFO o confirmar manualmente los lotes afectados.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 2xl:grid-cols-2 gap-3 mb-5">
+            <button type="button" class="rounded-2xl border px-4 py-3 text-left transition" :class="form.batch_allocation_method === 'FEFO_AUTO'
+                ? 'border-[#1f1d2b] bg-[#1f1d2b] text-white'
+                : 'border-slate-200 bg-white text-slate-700'"
+                @click="form.batch_allocation_method = 'FEFO_AUTO'; form.manual_batches = []">
+                <p class="font-black text-sm">
+                    FEFO automático
+                </p>
+
+                <p class="text-xs opacity-70">
+                    Descuenta primero del lote más próximo a caducar.
+                </p>
+            </button>
+
+            <button type="button" class="rounded-2xl border px-4 py-3 text-left transition" :class="form.batch_allocation_method === 'MANUAL'
+                ? 'border-[#1f1d2b] bg-[#1f1d2b] text-white'
+                : 'border-slate-200 bg-white text-slate-700'"
+                @click="form.batch_allocation_method = 'MANUAL'">
+                <p class="font-black text-sm">
+                    Selección manual
+                </p>
+
+                <p class="text-xs opacity-70">
+                    Confirma exactamente qué lote se está afectando.
+                </p>
+            </button>
+        </div>
+
+        <div>
+            <p class="text-sm font-bold text-slate-700 mb-2">
+                Lotes disponibles
+            </p>
+
+            <CurrentBatchesList
+                v-if="product.batches?.length"
+                :batches="product.batches"
+                clickable
+                :allocation-method="form.batch_allocation_method"
+                @select-batch="$emit('add-manual-batch', $event)"
+            />
+
+            <div v-else class="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center">
+                <p class="text-sm font-bold text-slate-600">
+                    Sin lotes disponibles
+                </p>
+            </div>
+        </div>
+
+        <div v-if="form.batch_allocation_method === 'MANUAL'" class="space-y-4 mt-5">
+            <div v-if="form.manual_batches?.length" class="space-y-3">
+                <p class="text-sm font-bold text-slate-700">
+                    Lotes seleccionados
+                </p>
+
+                <div v-for="(batch, index) in form.manual_batches" :key="batch.product_batch_id || index"
+                    class="bg-white border border-slate-200 rounded-2xl p-4">
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                            <p class="font-black text-slate-800">
+                                {{ batch.lot_number || 'Sin lote' }}
+                            </p>
+
+                            <p class="text-xs text-slate-500">
+                                Disponible: {{ batch.available_quantity }}
+                            </p>
+                        </div>
+
+                        <button type="button" class="text-sm font-bold text-red-500"
+                            @click="$emit('remove-manual-batch', index)">
+                            Quitar
+                        </button>
+                    </div>
+
+                    <InputField v-model="batch.quantity" label="Cantidad a descontar" type="number" />
+
+                    <p v-if="frontendErrors[`manual_batch_${index}`]" class="text-sm text-red-600 font-semibold mt-2">
+                        {{ frontendErrors[`manual_batch_${index}`] }}
+                    </p>
+                </div>
+
+                <div class="flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-3">
+                    <span class="text-sm font-bold text-slate-600">
+                        Total seleccionado
+                    </span>
+
+                    <span class="text-sm font-black" :class="Number(totalManualBatchQuantity) === Number(form.quantity)
+                        ? 'text-emerald-600'
+                        : 'text-red-600'">
+                        {{ totalManualBatchQuantity }} / {{ form.quantity || 0 }}
+                    </span>
+                </div>
+            </div>
+
+            <div v-else class="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center">
+                <p class="text-sm font-bold text-slate-600">
+                    Selecciona uno o más lotes
+                </p>
+
+                <p class="text-xs text-slate-400 mt-1">
+                    Haz click sobre un lote disponible para agregarlo.
+                </p>
+            </div>
+
+            <p v-if="frontendErrors.manual_batches" class="text-sm text-red-600 font-semibold">
+                {{ frontendErrors.manual_batches }}
+            </p>
+        </div>
+    </div>
+</template>

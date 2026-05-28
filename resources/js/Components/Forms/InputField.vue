@@ -30,11 +30,18 @@ const fieldConfig = computed(() => fieldRegistry[props.field])
 
 const isDateField = computed(() =>
     props.type === 'date' || fieldConfig.value?.type === 'date'
-    
+
 )
 const hasLeftAddon = computed(() => props.icon || props.prefix)
 const hasRightAddon = computed(() => props.suffix
 )
+
+function preventNumberWheel(e) {
+    if (props.type !== 'number') return
+
+    e.preventDefault()
+    e.target.blur()
+}
 
 function handleInput(e) {
     const config = fieldConfig.value
@@ -72,56 +79,50 @@ function blockExtraInput(e) {
     if (e.ctrlKey || e.metaKey) return
     if (allowedKeys.includes(e.key)) return
 
- const currentLength = (props.modelValue || '').toString().length
+    const currentLength = (props.modelValue || '').toString().length
 
-if (config.type === 'decimal' && e.key === '.') {
-    if ((props.modelValue || '').toString().includes('.')) {
-        e.preventDefault()
+    if (config.type === 'decimal' && e.key === '.') {
+        if ((props.modelValue || '').toString().includes('.')) {
+            e.preventDefault()
+        }
+
+        return
     }
 
-    return
-}
-
-if (config.max && currentLength >= config.max) {
-    e.preventDefault()
-}
+    if (config.max && currentLength >= config.max) {
+        e.preventDefault()
+    }
 }
 </script>
 
 <template>
-  <div class="relative">
+    <div class="relative">
         <label :for="inputId" class="block text-sm font-semibold mb-1 text-slate-700">
             {{ label }}
         </label>
-<span
-    v-if="hasLeftAddon"
-    class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
->
-    <span v-if="prefix">
-        {{ prefix }}
-    </span>
+        <span v-if="hasLeftAddon"
+            class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">
+            <span v-if="prefix">
+                {{ prefix }}
+            </span>
 
-    <span
-        v-else
-        class="material-symbols-outlined text-[20px]"
-    >
-        {{ icon }}
-    </span>
-</span>
-        <input :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue" :readonly="readonly"
-            :inputmode="isDateField ? 'none' : undefined" @keydown="blockExtraInput" @input="handleInput"
-            @blur="emit('validate', field)" :class="[
-'w-full py-3 rounded-xl border outline-none transition text-sm',
-hasLeftAddon ? 'pl-11 pr-4' : 'px-4',
-hasRightAddon ? 'pr-12' : '',                readonly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white',
+            <span v-else class="material-symbols-outlined text-[20px]">
+                {{ icon }}
+            </span>
+        </span>
+        <input :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
+            :readonly="readonly" :inputmode="isDateField ? 'none' : undefined" @keydown="blockExtraInput"
+            @wheel="preventNumberWheel" @input="handleInput" @blur="emit('validate', field)" :class="[
+                'w-full py-3 rounded-xl border outline-none transition text-sm',
+                hasLeftAddon ? 'pl-11 pr-4' : 'px-4',
+                hasRightAddon ? 'pr-12' : '',
+                readonly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white',
                 error ? 'border-red-500 bg-red-50' : 'border-slate-300 focus:border-[#1f1d2b]'
-            ]">
-<span
-    v-if="suffix"
-    class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold pointer-events-none"
->
-    {{ suffix }}
-</span>
+            ]" />
+        <span v-if="suffix"
+            class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold pointer-events-none">
+            {{ suffix }}
+        </span>
         <div class="flex justify-between items-center mt-1">
             <p v-if="error" class="text-red-500 text-xs">
                 {{ error }}

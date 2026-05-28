@@ -1,18 +1,16 @@
 <script setup>
-import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { router, useForm } from '@inertiajs/vue3'
-
-import InputField from '@/Components/Forms/InputField.vue'
-import SelectField from '@/Components/Forms/SelectField.vue'
-import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
-import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
-import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
+import { useForm } from '@inertiajs/vue3'
 
 import InventoryStatsCards from '@/Components/Inventory/InventoryStatsCards.vue'
-import AdjustStockModal from '@/Components/Inventory/AdjustStockModal.vue'
 import InventoryToolbar from '@/Components/Inventory/InventoryToolbar.vue'
 import InventoryTable from '@/Components/Inventory/InventoryTable.vue'
+import InventoryMobileCards from '@/Components/Inventory/InventoryMobileCards.vue'
+import InventoryCreateModal from '@/Components/Inventory/InventoryCreateModal.vue'
+import InventoryAlertsModal from '@/Components/Inventory/InventoryAlertsModal.vue'
+import AdjustStockModal from '@/Components/Inventory/AdjustStockModal.vue'
+
+import { useBranchInventory } from '@/Composables/Inventory/useBranchInventory'
 
 defineOptions({ layout: AdminLayout })
 
@@ -51,159 +49,59 @@ const props = defineProps({
             per_page: 50,
         }),
     },
+    inventoryAlerts: {
+        type: Object,
+        default: () => ({
+            expired_batches: 0,
+            near_expiration_batches: 0,
+            low_stock_products: 0,
+            expired_batches_list: [],
+            near_expiration_batches_list: [],
+        }),
+    },
 })
 
-const products = computed(() => props.productsDB ?? [])
-const branches = computed(() => props.branchesDB ?? [])
-const currentBranch = computed(() => props.currentBranch ?? null)
+const {
+    products,
+    branches,
+    currentBranch,
 
-const showModal = ref(false)
-const showAdjustModal = ref(false)
-const selectedProduct = ref(null)
+    showCreateModal,
+    showAdjustModal,
+    liveSelectedProduct,
 
-const search = ref(props.filters?.search ?? '')
-const categoryFilter = ref('')
-const stockFilter = ref('')
-const recordsToShow = ref(Number(props.filters?.per_page ?? 50))
+    search,
+    categoryFilter,
+    stockFilter,
+    recordsToShow,
 
-const realtimeUpdates = ref({})
+    paginationLinks,
+    hasPagination,
+    visualProducts,
+    filteredProducts,
+    stats,
+    alerts,
 
-const rawBranchProducts = computed(() => {
-    if (Array.isArray(props.branchProductsDB)) {
-        return props.branchProductsDB
-    }
+    selectedAlertType,
+    selectedAlertTitle,
+    selectedAlertBatches,
+    showAlertModal,
 
-    return props.branchProductsDB?.data ?? []
-})
+    openCreateModal,
+    closeCreateModal,
+    openAlertModal,
+    closeAlertModal,
 
-const paginationLinks = computed(() => {
-    return Array.isArray(props.branchProductsDB?.links)
-        ? props.branchProductsDB.links
-        : []
-})
+    adjustStock,
+    closeAdjustModal,
 
-const hasPagination = computed(() => {
-    return !Array.isArray(props.branchProductsDB) && paginationLinks.value.length > 0
-})
+    goToPage,
 
-const visualProducts = computed(() => {
-    return rawBranchProducts.value.map(item => {
-        const realtime = realtimeUpdates.value[item.id] ?? {}
-
-        const stock = Number(realtime.stock ?? item.stock ?? 0)
-        const minStock = Number(item.min_stock ?? 0)
-        const price = Number(item.price ?? item.product?.sale_price ?? 0)
-        const tracksBatches = Boolean(item.tracks_batches ?? item.tracksBatches ?? false)
-
-        let status = 'Disponible'
-
-        if (stock <= 0) {
-            status = 'Agotado'
-        } else if (stock <= minStock) {
-            status = 'Stock bajo'
-        }
-
-        return {
-            id: item.id,
-            name: item.product?.name ?? item.name ?? 'Producto sin nombre',
-            code: item.product?.barcodes?.[0]?.code ?? item.barcode ?? `BP-${item.id}`,
-            category: item.product?.category?.name ?? 'Sin categoría',
-            branch: item.branch?.name ?? currentBranch.value?.name ?? 'Sucursal',
-            status,
-            stock,
-            minStock,
-            price,
-            tracksBatches,
-            expirationDate: item.next_expiration_date ?? item.expiration_date ?? null,
-            active: item.active ?? true,
-            activeBatchesCount: item.active_batches_count ?? 0,
-            batches: item.batches ?? [],
-            recentMovements: item.movements ?? [],
-            raw: item,
-        }
-    })
-})
-
-const filteredProducts = computed(() => {
-    return visualProducts.value.filter(product => {
-        const matchesCategory =
-            !categoryFilter.value ||
-            product.category === categoryFilter.value
-
-        const matchesStock =
-            !stockFilter.value ||
-            product.status === stockFilter.value
-
-        return matchesCategory && matchesStock
-    })
-})
-
-const stats = computed(() => ({
-    total: props.inventoryStats?.total_products ?? 0,
-    totalStock: props.inventoryStats?.total_stock ?? 0,
-    inventoryValue: props.inventoryStats?.inventory_value ?? 0,
-    lowStock: props.inventoryStats?.low_stock ?? 0,
-    outOfStock: props.inventoryStats?.out_of_stock ?? 0,
-    expiringSoon: props.inventoryStats?.expiring_soon ?? 0,
-}))
-
-let searchTimeout = null
-
-watch(search, () => {
-    clearTimeout(searchTimeout)
-
-    searchTimeout = setTimeout(() => {
-        reloadInventory()
-    }, 400)
-})
-
-watch(recordsToShow, () => {
-    reloadInventory()
-})
-
-const reloadInventory = () => {
-    router.get(
-        window.location.pathname,
-        {
-            search: search.value || undefined,
-            per_page: recordsToShow.value,
-        },
-        {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        }
-    )
-}
-
-const goToPage = (url) => {
-    if (!url) return
-
-    router.visit(url, {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-    })
-}
-
-onMounted(() => {
-    window.Echo.channel('inventory')
-        .listen('.stock.updated', (event) => {
-            realtimeUpdates.value = {
-                ...realtimeUpdates.value,
-                [event.branch_product_id]: {
-                    stock: Number(event.stock),
-                    updated_at: event.updated_at,
-                    batches: event.batches ?? [],
-                    movements: event.recent_movements ?? [],
-                },
-            }
-        })
-})
-
-onBeforeUnmount(() => {
-    window.Echo.leave('inventory')
-})
+    exportExcel,
+    viewProduct,
+    editProduct,
+    deleteProduct,
+} = useBranchInventory(props)
 
 const form = useForm({
     branch_id: '',
@@ -213,58 +111,32 @@ const form = useForm({
     min_stock: '',
 })
 
-const openModal = () => {
+const openCreateInventoryModal = () => {
     form.reset()
+    form.clearErrors()
 
     if (currentBranch.value?.id) {
         form.branch_id = currentBranch.value.id
     }
 
-    showModal.value = true
+    openCreateModal()
 }
 
-const closeModal = () => {
-    showModal.value = false
+const closeCreateInventoryModal = () => {
+    closeCreateModal()
 }
 
 const submit = () => {
     form.post(route('inventario.branch-inventory.store'), {
         preserveScroll: true,
-        onSuccess: () => closeModal(),
+        onSuccess: () => closeCreateInventoryModal(),
     })
-}
-
-const exportExcel = () => {
-    console.log('Exportar inventario', visualProducts.value)
-}
-
-const viewProduct = (product) => {
-    console.log('Ver producto', product)
-}
-
-const editProduct = (product) => {
-    console.log('Editar producto', product)
-}
-
-const adjustStock = (product) => {
-    selectedProduct.value = product
-    showAdjustModal.value = true
-}
-
-const closeAdjustModal = () => {
-    showAdjustModal.value = false
-    selectedProduct.value = null
-}
-
-const deleteProduct = (product) => {
-    console.log('Eliminar producto', product)
 }
 </script>
 
 <template>
     <div class="space-y-6">
-
-        <div>
+        <header>
             <h1 class="text-3xl font-black text-slate-800">
                 Inventario
                 <span v-if="currentBranch" class="text-slate-500">
@@ -275,12 +147,12 @@ const deleteProduct = (product) => {
             <p class="text-slate-500 mt-1">
                 Gestión operativa del inventario por sucursal
             </p>
-        </div>
+        </header>
 
-        <InventoryStatsCards :stats="stats" />
+        <InventoryStatsCards :stats="stats" :alerts="alerts" @open-alert="openAlertModal" />
 
         <InventoryToolbar :filtered-products="filteredProducts" :products-db="visualProducts"
-            :records-to-show="recordsToShow" @create="openModal" @excel="exportExcel"
+            :records-to-show="recordsToShow" @create="openCreateInventoryModal" @excel="exportExcel"
             @update:recordsToShow="recordsToShow = $event" />
 
         <InventoryTable :filtered-products="filteredProducts" :search="search" :category-filter="categoryFilter"
@@ -288,49 +160,25 @@ const deleteProduct = (product) => {
             @update:categoryFilter="categoryFilter = $event" @update:stockFilter="stockFilter = $event"
             @view="viewProduct" @edit="editProduct" @adjust="adjustStock" @delete="deleteProduct" />
 
-        <div v-if="hasPagination" class="flex flex-wrap items-center justify-center gap-2">
+        <InventoryMobileCards :filtered-products="filteredProducts" @view="viewProduct" @edit="editProduct"
+            @adjust="adjustStock" @delete="deleteProduct" />
+
+        <nav v-if="hasPagination" class="flex flex-wrap items-center justify-center gap-2">
             <button v-for="link in paginationLinks" :key="link.label" type="button" :disabled="!link.url"
                 class="px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 disabled:cursor-not-allowed"
                 :class="link.active
                     ? 'bg-slate-900 text-white border-slate-900'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'" @click="goToPage(link.url)"
                 v-html="link.label" />
-        </div>
+        </nav>
 
-        <div v-if="showModal"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div class="bg-white rounded-3xl w-full max-w-2xl overflow-hidden">
-                <GeneralModalHeader title="Ajustar stock" subtitle="Registrar movimiento de inventario"
-                    :total-errors="Object.keys(form.errors).length" mode="create" @close="closeModal" />
+        <InventoryCreateModal v-if="showCreateModal" :form="form" :products="products" :branches="branches"
+            @submit="submit" @close="closeCreateInventoryModal" />
 
-                <GeneralModalContent>
-                    <form id="inventoryForm" @submit.prevent="submit" class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <SelectField v-model="form.product_id" label="Producto" :options="products.map(product => ({
-                            label: product.name,
-                            value: product.id,
-                        }))" />
-
-                        <SelectField v-model="form.branch_id" label="Sucursal" :options="branches.map(branch => ({
-                            label: branch.name,
-                            value: branch.id,
-                        }))" />
-
-                        <InputField v-model="form.price" label="Precio" type="number" />
-
-                        <InputField v-model="form.stock" label="Stock inicial" type="number" />
-
-                        <div class="md:col-span-2">
-                            <InputField v-model="form.min_stock" label="Stock mínimo" type="number" />
-                        </div>
-                    </form>
-                </GeneralModalContent>
-
-                <GeneralModalFooter :processing="form.processing" save-button-text="Guardar" mode="create"
-                    @save="submit" @close="closeModal" />
-            </div>
-        </div>
-
-        <AdjustStockModal v-if="showAdjustModal && selectedProduct" :product="selectedProduct"
+        <AdjustStockModal v-if="showAdjustModal && liveSelectedProduct" :product="liveSelectedProduct"
             @close="closeAdjustModal" />
+
+        <InventoryAlertsModal v-if="showAlertModal" :title="selectedAlertTitle" :type="selectedAlertType"
+            :batches="selectedAlertBatches" @close="closeAlertModal" />
     </div>
 </template>

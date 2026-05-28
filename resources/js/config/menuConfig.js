@@ -73,7 +73,7 @@ export function generateMenu(role, permissions = [], branches = []) {
                       text: "Dashboard",
                       key: `inventario.${branch.slug}.dashboard`,
                       icon: "dashboard",
-                      url: route("inventario.dashboard"),
+                      url: route("inventory.dashboard"),
                   },
               ]
             : []),

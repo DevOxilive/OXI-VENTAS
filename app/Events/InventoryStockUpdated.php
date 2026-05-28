@@ -18,7 +18,9 @@ class InventoryStockUpdated implements ShouldBroadcastNow
 
     public function broadcastOn(): Channel
     {
-        return new Channel('inventory');
+        return new Channel(
+            'inventory.branch.' . $this->branchProduct->branch_id
+        );
     }
 
     public function broadcastAs(): string

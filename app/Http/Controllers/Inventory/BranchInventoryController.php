@@ -8,6 +8,7 @@ use App\Models\BranchProduct;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Models\ProductBatch;
 
 class BranchInventoryController extends Controller
 {
@@ -56,6 +57,29 @@ class BranchInventoryController extends Controller
                 'product:id,name,category_id,sale_price,cost,active',
                 'product.category:id,name',
                 'product.barcodes:id,product_id,code',
+
+                'batches' => fn($query) => $query
+                    ->select([
+                        'id',
+                        'branch_product_id',
+                        'lot_number',
+                        'expiration_date',
+                        'initial_quantity',
+                        'quantity',
+                        'supplier',
+                        'received_at',
+                        'status',
+                    ])
+                    ->where('status', 'ACTIVE')
+                    ->where('quantity', '>', 0)
+                    ->orderByRaw('expiration_date IS NULL')
+                    ->orderBy('expiration_date')
+                    ->orderBy('id'),
+
+                'movements' => fn($query) => $query
+                    ->with('user:id,name')
+                    ->latest()
+                    ->limit(5),
             ])
             ->withCount([
                 'activeBatches as active_batches_count',
@@ -68,6 +92,40 @@ class BranchInventoryController extends Controller
         $baseStatsQuery = BranchProduct::query()
             ->where('active', true)
             ->when($branch, fn($query) => $query->where('branch_id', $branch->id));
+
+        $batchAlertsQuery = ProductBatch::query()
+            ->where('status', 'ACTIVE')
+            ->where('quantity', '>', 0)
+            ->whereHas('branchProduct', function ($query) use ($branch) {
+                $query->where('active', true)
+                    ->when($branch, fn($query) => $query->where('branch_id', $branch->id));
+            });
+
+        $today = now()->toDateString();
+        $nearExpirationLimit = now()->addDays(30)->toDateString();
+
+        $expiredBatchesList = (clone $batchAlertsQuery)
+            ->with([
+                'branchProduct:id,branch_id,product_id,name,barcode,stock',
+                'branchProduct.branch:id,name',
+                'branchProduct.product:id,name',
+            ])
+            ->whereDate('expiration_date', '<', $today)
+            ->orderBy('expiration_date')
+            ->limit(50)
+            ->get();
+
+        $nearExpirationBatchesList = (clone $batchAlertsQuery)
+            ->with([
+                'branchProduct:id,branch_id,product_id,name,barcode,stock',
+                'branchProduct.branch:id,name',
+                'branchProduct.product:id,name',
+            ])
+            ->whereDate('expiration_date', '>=', $today)
+            ->whereDate('expiration_date', '<=', $nearExpirationLimit)
+            ->orderBy('expiration_date')
+            ->limit(50)
+            ->get();
 
         return Inertia::render('Inventory/BranchInventory', [
             'currentBranch' => $branch,
@@ -92,6 +150,26 @@ class BranchInventoryController extends Controller
                 'inventory_value' => (clone $baseStatsQuery)
                     ->selectRaw('COALESCE(SUM(stock * price), 0) as total')
                     ->value('total'),
+            ],
+
+            'inventoryAlerts' => [
+                'expired_batches' => (clone $batchAlertsQuery)
+                    ->whereDate('expiration_date', '<', $today)
+                    ->count(),
+
+                'near_expiration_batches' => (clone $batchAlertsQuery)
+                    ->whereDate('expiration_date', '>=', $today)
+                    ->whereDate('expiration_date', '<=', $nearExpirationLimit)
+                    ->count(),
+
+                'low_stock_products' => (clone $baseStatsQuery)
+                    ->whereColumn('stock', '<=', 'min_stock')
+                    ->where('stock', '>', 0)
+                    ->count(),
+
+                'expired_batches_list' => $expiredBatchesList,
+
+                'near_expiration_batches_list' => $nearExpirationBatchesList,
             ],
 
             'productsDB' => Product::query()
