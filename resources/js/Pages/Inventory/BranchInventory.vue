@@ -2,13 +2,13 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useForm } from '@inertiajs/vue3'
 
-import InventoryStatsCards from '@/Components/Inventory/InventoryStatsCards.vue'
-import InventoryToolbar from '@/Components/Inventory/InventoryToolbar.vue'
-import InventoryTable from '@/Components/Inventory/InventoryTable.vue'
-import InventoryMobileCards from '@/Components/Inventory/InventoryMobileCards.vue'
-import InventoryCreateModal from '@/Components/Inventory/InventoryCreateModal.vue'
-import InventoryAlertsModal from '@/Components/Inventory/InventoryAlertsModal.vue'
-import AdjustStockModal from '@/Components/Inventory/AdjustStockModal.vue'
+import InventoryStatsCards from '@/Components/Inventory/BranchProducts/InventoryStatsCards.vue'
+import InventoryToolbar from '@/Components/Inventory/BranchProducts/InventoryToolbar.vue'
+import InventoryTable from '@/Components/Inventory/BranchProducts/InventoryTable.vue'
+import InventoryMobileCards from '@/Components/Inventory/BranchProducts/InventoryMobileCards.vue'
+import InventoryCreateModal from '@/Components/Inventory/BranchProducts/InventoryCreateModal.vue'
+import InventoryAlertsModal from '@/Components/Inventory/BranchProducts/InventoryAlertsModal.vue'
+import AdjustStockModal from '@/Components/Inventory/BranchProducts/AdjustStockModal.vue'
 
 import { useBranchInventory } from '@/Composables/Inventory/useBranchInventory'
 

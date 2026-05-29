@@ -10,6 +10,7 @@ use App\Http\Controllers\Inventory\ReportController;
 use App\Http\Controllers\Inventory\ProductController;
 use App\Http\Controllers\Inventory\ProductBatchController;
 use App\Http\Controllers\Inventory\StockMovementController;
+use App\Http\Controllers\Inventory\PurchaseReportController;
 use App\Http\Controllers\Inventory\BranchInventoryController;
 
 
@@ -307,6 +308,24 @@ Route::middleware([
 
             Route::post('/inventario-sucursales', [BranchInventoryController::class, 'store'])
                 ->name('branch-inventory.store');
+
+            Route::get('/branches/{branch}/purchase-reports/create', [PurchaseReportController::class, 'create'])
+                ->name('branches.purchase-reports.create');
+
+            Route::post('/branches/{branch}/purchase-reports', [PurchaseReportController::class, 'store'])
+                ->name('branches.purchase-reports.store');
+
+            Route::put('/branches/{branch}/purchase-reports/{purchaseReport}', [PurchaseReportController::class, 'update'])
+                ->name('branches.purchase-reports.update');
+
+            Route::post('/branches/{branch}/purchase-reports/{purchaseReport}/generate', [PurchaseReportController::class, 'generate'])
+                ->name('branches.purchase-reports.generate');
+
+            Route::get('/branches/{branch}/purchase-reports', [PurchaseReportController::class, 'index'])
+                ->name('branches.purchase-reports.index');
+
+            Route::get('/branches/{branch}/purchase-reports/{purchaseReport}', [PurchaseReportController::class, 'show'])
+                ->name('branches.purchase-reports.show');
 
             Route::get('/movimientos', [StockMovementController::class, 'index'])
                 ->name('movimientos');

@@ -1,9 +1,10 @@
 <script setup>
-import ProductStockSummary from './ProductStockSummary.vue'
-import StockMovementForm from './StockMovementForm.vue'
+import StockMovementForm from '../StockMovementForm.vue'
 import IncomingBatchesForm from './IncomingBatchesForm.vue'
 import OutgoingBatchSelector from './OutgoingBatchSelector.vue'
-import RecentStockMovements from './RecentStockMovements.vue'
+
+import RecentStockMovements from '../RecentStockMovements.vue'
+import ProductStockSummary from '../ProductStockSummary.vue'
 
 defineProps({
     form: Object,

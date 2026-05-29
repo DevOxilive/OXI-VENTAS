@@ -8,8 +8,8 @@ import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
 import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
 import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
 
-import AdjustStockData from '@/Components/Inventory/AdjustStockData.vue'
-import EditBatchModal from '@/Components/Inventory/EditBatchModal.vue'
+import AdjustStockData from '@/Components/Inventory/BranchProducts/AdjustStockData.vue'
+import EditBatchModal from '@/Components/Inventory/BranchProducts/EditBatchModal.vue'
 
 const emit = defineEmits(['close'])
 

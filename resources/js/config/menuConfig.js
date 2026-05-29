@@ -112,6 +112,22 @@ export function generateMenu(role, permissions = [], branches = []) {
 
         ...(isAdmin ||
         isInventario ||
+        can("inventario.reportes-compra.ver") ||
+        can("inventario.ver")
+            ? [
+                  {
+                      text: "Reporte de compra",
+                      key: `inventario.${branch.slug}.purchase-report`,
+                      icon: "shopping_cart",
+                      url: route("inventario.branches.purchase-reports.index", {
+                          branch: branch.id,
+                      }),
+                  },
+              ]
+            : []),
+
+        ...(isAdmin ||
+        isInventario ||
         can("inventario.reports.ver") ||
         can("inventario.ver")
             ? [

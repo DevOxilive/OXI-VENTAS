@@ -1,6 +1,6 @@
 <script setup>
 import InputField from '@/Components/Forms/InputField.vue'
-import CurrentBatchesList from './CurrentBatchesList.vue'
+import CurrentBatchesList from './CurrentBatchesList.vue';
 
 defineProps({
     form: {
@@ -52,8 +52,7 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
 
             <button type="button" class="rounded-2xl border px-4 py-3 text-left transition" :class="form.batch_allocation_method === 'MANUAL'
                 ? 'border-[#1f1d2b] bg-[#1f1d2b] text-white'
-                : 'border-slate-200 bg-white text-slate-700'"
-                @click="form.batch_allocation_method = 'MANUAL'">
+                : 'border-slate-200 bg-white text-slate-700'" @click="form.batch_allocation_method = 'MANUAL'">
                 <p class="font-black text-sm">
                     Selección manual
                 </p>
@@ -69,13 +68,8 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
                 Lotes disponibles
             </p>
 
-            <CurrentBatchesList
-                v-if="product.batches?.length"
-                :batches="product.batches"
-                clickable
-                :allocation-method="form.batch_allocation_method"
-                @select-batch="$emit('add-manual-batch', $event)"
-            />
+            <CurrentBatchesList v-if="product.batches?.length" :batches="product.batches" clickable
+                :allocation-method="form.batch_allocation_method" @select-batch="$emit('add-manual-batch', $event)" />
 
             <div v-else class="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center">
                 <p class="text-sm font-bold text-slate-600">

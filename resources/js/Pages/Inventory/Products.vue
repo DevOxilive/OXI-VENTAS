@@ -4,10 +4,10 @@ import { router } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 
-import ProductToolbar from "@/Components/Inventory/ProductToolbar.vue";
-import ProductTable from "@/Components/Inventory/ProductTable.vue";
-import ProductMobileCards from "@/Components/Inventory/ProductMobileCards.vue";
-import ProductRegisterModal from "@/Components/Inventory/ProductRegisterModal.vue";
+import ProductToolbar from "@/Components/Inventory/BranchProducts/ProductToolbar.vue";
+import ProductTable from "@/Components/Inventory/BranchProducts/ProductTable.vue";
+import ProductMobileCards from "@/Components/Inventory/BranchProducts/ProductMobileCards.vue";
+import ProductRegisterModal from "@/Components/Inventory/BranchProducts/ProductRegisterModal.vue";
 
 defineOptions({
   layout: AdminLayout,
