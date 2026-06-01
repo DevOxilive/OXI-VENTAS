@@ -262,105 +262,152 @@ export const fieldRegistry = {
         message: "Código inválido.",
         spamMessage: "Código de producto no válido.",
     },
-       name: {
+    name: {
         required: true,
-        type: 'alphanumeric',
+        type: "alphanumeric",
         min: 3,
         max: 80,
         titleCase: true,
-        message: 'El nombre solo puede contener letras, números, espacios, guiones y guiones bajos.',
+        message:
+            "El nombre solo puede contener letras, números, espacios, guiones y guiones bajos.",
         preventSpam: true,
-        spamLevel: 'soft',
-        spamMessage: 'El nombre parece texto de prueba o inválido.',
+        spamLevel: "soft",
+        spamMessage: "El nombre parece texto de prueba o inválido.",
     },
 
     description: {
         required: false,
-        type: 'text',
+        type: "text",
         max: 500,
-        message: 'La descripción contiene caracteres no permitidos.',
+        message: "La descripción contiene caracteres no permitidos.",
     },
 
     cost: {
         required: true,
-        type: 'decimal',
+        type: "decimal",
         max: 10,
-        message: 'El costo debe ser un número válido con máximo 2 decimales.',
+        message: "El costo debe ser un número válido con máximo 2 decimales.",
     },
 
     sale_price: {
         required: true,
-        type: 'decimal',
+        type: "decimal",
         max: 10,
-        message: 'El precio de venta debe ser un número válido con máximo 2 decimales.',
+        message:
+            "El precio de venta debe ser un número válido con máximo 2 decimales.",
     },
 
     barcode: {
         required: false,
-        type: 'numeric',
+        type: "numeric",
         min: 8,
         max: 14,
-        message: 'El código de barras debe tener entre 8 y 14 números.',
+        message: "El código de barras debe tener entre 8 y 14 números.",
     },
 
     barcode_secondary: {
         required: false,
-        type: 'numeric',
+        type: "numeric",
         min: 8,
         max: 14,
-        message: 'El código alternativo debe tener entre 8 y 14 números.',
+        message: "El código alternativo debe tener entre 8 y 14 números.",
     },
 
     base_quantity: {
         required: true,
-        type: 'numeric',
+        type: "numeric",
         min: 1,
         max: 3,
-        message: 'La cantidad base debe ser un número válido.',
+        message: "La cantidad base debe ser un número válido.",
     },
 
     initial_stock: {
         required: true,
-        type: 'numeric',
+        type: "numeric",
         max: 6,
-        message: 'El stock inicial debe ser un número válido.',
+        message: "El stock inicial debe ser un número válido.",
     },
 
     minimum_stock: {
         required: true,
-        type: 'numeric',
+        type: "numeric",
         max: 6,
-        message: 'El stock mínimo debe ser un número válido.',
+        message: "El stock mínimo debe ser un número válido.",
     },
 
     maximum_stock: {
         required: true,
-        type: 'numeric',
+        type: "numeric",
         max: 6,
-        message: 'El stock máximo debe ser un número válido.',
+        message: "El stock máximo debe ser un número válido.",
     },
 
     category_id: {
         required: true,
-        type: 'numeric',
-        message: 'Selecciona una categoría.',
+        type: "numeric",
+        message: "Selecciona una categoría.",
     },
 
     subcategory_id: {
         required: false,
-        type: 'numeric',
-        message: 'Selecciona una subcategoría válida.',
+        type: "numeric",
+        message: "Selecciona una subcategoría válida.",
     },
-    cost: {
-    required: true,
-    type: 'decimal',
-    max: 10,
-},
+    lot_number: {
+        required: false,
+        type: "alphanumeric",
+        max: 40,
+        uppercase: true,
+        preventSpam: true,
+        spamLevel: "soft",
+        message: "Número de lote inválido.",
+        spamMessage: "Número de lote no válido.",
+    },
+    type: {
+        required: true,
+        type: "text",
+        min: 2,
+        max: 20,
+        message: "Selecciona un tipo de movimiento.",
+    },
 
-sale_price: {
-    required: true,
-    type: 'decimal',
-    max: 10,
-},
+    reason: {
+        required: true,
+        type: "text",
+        min: 2,
+        max: 30,
+        message: "Selecciona un motivo.",
+    },
 
+    quantity: {
+        required: true,
+        type: "numeric",
+        max: 6,
+        message: "La cantidad debe ser un número válido.",
+    },
+
+    notes: {
+        required: false,
+        type: "text",
+        max: 500,
+        message: "Las notas contienen caracteres no permitidos.",
+    },
+
+    supplier: {
+        required: false,
+        type: "text",
+        max: 80,
+        titleCase: true,
+        preventSpam: true,
+        spamLevel: "soft",
+        message: "Proveedor inválido.",
+        spamMessage: "Proveedor no válido.",
+    },
+
+    batch_quantity: {
+        required: true,
+        type: "numeric",
+        max: 6,
+        message: "Cantidad inválida.",
+    },
 };

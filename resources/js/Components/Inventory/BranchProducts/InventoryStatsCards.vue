@@ -12,6 +12,7 @@ const props = defineProps({
             expiredBatches: 0,
             nearExpirationBatches: 0,
             lowStockProducts: 0,
+            inactiveCandidateProducts: 0,
         }),
     },
 })
@@ -59,6 +60,14 @@ const cards = computed(() => [
         tone: 'orange',
         alertType: 'nearExpiration',
     },
+    {
+        key: 'inactiveCandidateProducts',
+        label: 'Sin surtir',
+        value: props.alerts.inactiveCandidateProducts,
+        icon: 'inventory',
+        tone: 'purple',
+        alertType: 'inactiveCandidates',
+    },
 ])
 
 function toneClass(tone) {
@@ -67,6 +76,7 @@ function toneClass(tone) {
         red: 'bg-red-50 border-red-200 text-red-700',
         orange: 'bg-orange-50 border-orange-200 text-orange-700',
         amber: 'bg-amber-50 border-amber-200 text-amber-700',
+        purple: 'bg-purple-50 border-purple-200 text-purple-700',
     }[tone]
 }
 
@@ -83,7 +93,7 @@ function openCard(card) {
             Estado rápido del inventario
         </p>
 
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
             <button v-for="card in cards" :key="card.key" type="button"
                 class="rounded-2xl border px-4 py-3 shadow-sm text-left transition" :class="[
                     toneClass(card.tone),

@@ -18,9 +18,13 @@ const props = defineProps({
         type: String,
         default: '',
     },
+    disabled: {
+        type: Boolean,
+        default: false,
+    },
 })
 
-defineEmits(['edit-batch', 'select-batch'])
+const emit = defineEmits(['edit-batch', 'select-batch'])
 
 const trackedBatches = computed(() => {
     return props.batches.filter(batch => batch.lot_number)
@@ -29,6 +33,22 @@ const trackedBatches = computed(() => {
 const untrackedBatches = computed(() => {
     return props.batches.filter(batch => !batch.lot_number)
 })
+
+function canSelectBatch() {
+    return props.clickable && props.allocationMethod === 'MANUAL' && !props.disabled
+}
+
+function selectBatch(batch) {
+    if (!canSelectBatch()) return
+
+    emit('select-batch', batch)
+}
+
+function editBatch(batch) {
+    if (props.disabled) return
+
+    emit('edit-batch', batch)
+}
 
 function batchStatusLabel(status) {
     return {
@@ -55,17 +75,21 @@ function batchStatusClass(status) {
 
 <template>
     <div v-if="batches.length" class="space-y-5">
-
-        <!-- LOTES REGISTRADOS -->
         <div v-if="trackedBatches.length" class="space-y-2">
             <p class="text-xs font-black uppercase tracking-wide text-slate-500">
                 Lotes registrados
             </p>
 
             <component :is="clickable ? 'button' : 'div'" v-for="batch in trackedBatches" :key="batch.id" type="button"
-                class="w-full rounded-2xl border border-slate-200 bg-white p-3 text-left transition" :class="clickable
-                    ? allocationMethod === 'MANUAL' ? 'hover:border-[#1f1d2b]' : 'cursor-default'
-                    : ''" @click="clickable && allocationMethod === 'MANUAL' ? $emit('select-batch', batch) : null">
+                :disabled="clickable && disabled"
+                class="w-full rounded-2xl border border-slate-200 bg-white p-3 text-left transition" :class="[
+                    clickable && allocationMethod === 'MANUAL' && !disabled
+                        ? 'hover:border-[#1f1d2b]'
+                        : '',
+                    clickable && (allocationMethod !== 'MANUAL' || disabled)
+                        ? 'cursor-default opacity-80'
+                        : '',
+                ]" @click="selectBatch(batch)">
                 <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                         <div class="flex items-center gap-2 flex-wrap">
@@ -97,9 +121,9 @@ function batchStatusClass(status) {
                             {{ batch.quantity }}
                         </p>
 
-                        <button v-if="showEdit" type="button"
-                            class="mt-2 inline-flex items-center gap-1 text-xs font-black text-[#1f1d2b] hover:underline"
-                            @click.stop="$emit('edit-batch', batch)">
+                        <button v-if="showEdit" type="button" :disabled="disabled"
+                            class="mt-2 inline-flex items-center gap-1 text-xs font-black text-[#1f1d2b] hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"
+                            @click.stop="editBatch(batch)">
                             <span class="material-symbols-outlined text-[14px]">
                                 edit
                             </span>
@@ -121,24 +145,29 @@ function batchStatusClass(status) {
                     </span>
                 </div>
 
-                <div v-if="clickable && allocationMethod === 'MANUAL'" class="mt-3 text-xs font-bold text-[#1f1d2b]">
+                <div v-if="clickable && allocationMethod === 'MANUAL' && !disabled"
+                    class="mt-3 text-xs font-bold text-[#1f1d2b]">
                     Click para usar este lote
                 </div>
             </component>
         </div>
 
-        <!-- CANTIDADES SIN LOTE -->
         <div v-if="untrackedBatches.length" class="space-y-2">
             <p class="text-xs font-black uppercase tracking-wide text-slate-500">
                 Cantidades sin lote
             </p>
 
             <component :is="clickable ? 'button' : 'div'" v-for="batch in untrackedBatches" :key="batch.id"
-                type="button"
+                type="button" :disabled="clickable && disabled"
                 class="w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-left transition"
-                :class="clickable
-                    ? allocationMethod === 'MANUAL' ? 'hover:border-[#1f1d2b] hover:bg-white' : 'cursor-default'
-                    : ''" @click="clickable && allocationMethod === 'MANUAL' ? $emit('select-batch', batch) : null">
+                :class="[
+                    clickable && allocationMethod === 'MANUAL' && !disabled
+                        ? 'hover:border-[#1f1d2b] hover:bg-white'
+                        : '',
+                    clickable && (allocationMethod !== 'MANUAL' || disabled)
+                        ? 'cursor-default opacity-80'
+                        : '',
+                ]" @click="selectBatch(batch)">
                 <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                         <div class="flex items-center gap-2 flex-wrap">
@@ -174,9 +203,9 @@ function batchStatusClass(status) {
                             {{ batch.quantity }}
                         </p>
 
-                        <button v-if="showEdit" type="button"
-                            class="mt-2 inline-flex items-center gap-1 text-xs font-black text-[#1f1d2b] hover:underline"
-                            @click.stop="$emit('edit-batch', batch)">
+                        <button v-if="showEdit" type="button" :disabled="disabled"
+                            class="mt-2 inline-flex items-center gap-1 text-xs font-black text-[#1f1d2b] hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"
+                            @click.stop="editBatch(batch)">
                             <span class="material-symbols-outlined text-[14px]">
                                 edit
                             </span>
@@ -186,7 +215,8 @@ function batchStatusClass(status) {
                     </div>
                 </div>
 
-                <div v-if="clickable && allocationMethod === 'MANUAL'" class="mt-3 text-xs font-bold text-[#1f1d2b]">
+                <div v-if="clickable && allocationMethod === 'MANUAL' && !disabled"
+                    class="mt-3 text-xs font-bold text-[#1f1d2b]">
                     Click para usar esta cantidad
                 </div>
             </component>

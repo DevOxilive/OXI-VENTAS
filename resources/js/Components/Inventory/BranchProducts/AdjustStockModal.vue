@@ -45,29 +45,36 @@ const {
     closeEditBatchModal,
 } = useEditBatchModal(props)
 
-const saveButtonText = computed(() => {
-    if (form.processing) return 'Procesando...'
+const modalTitle = computed(() => 'Ajustar stock')
 
-    return 'Guardar ajuste'
+const modalSubtitle = computed(() => {
+    const productName = props.product?.name ?? props.product?.product?.name
+
+    return productName
+        ? `Movimiento de inventario para ${productName}`
+        : 'Movimiento de inventario por sucursal'
 })
+
+const saveButtonText = computed(() => 'Guardar ajuste')
 
 const totalErrors = computed(() => errorSummary.value.length)
 
 function closeModal() {
+    if (form.processing) return
     if (showEditBatchModal.value) return
 
     emit('close')
 }
 
 function handleEsc(e) {
-    if (e.key === 'Escape') {
-        if (showEditBatchModal.value) {
-            closeEditBatchModal()
-            return
-        }
+    if (e.key !== 'Escape') return
 
-        closeModal()
+    if (showEditBatchModal.value) {
+        closeEditBatchModal()
+        return
     }
+
+    closeModal()
 }
 
 onMounted(() => {
@@ -80,16 +87,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center">
+    <div class="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" role="dialog"
+        aria-modal="true">
         <div class="absolute inset-0" @click="closeModal"></div>
 
-        <div
-            class="relative bg-white w-full h-[100dvh] sm:h-[100dvh] md:h-[94vh] md:w-[96%] md:max-w-7xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+        <div class="relative bg-white w-full h-[100dvh] sm:h-[100dvh] md:h-[94vh] md:w-[96%] md:max-w-7xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+            @click.stop>
+            <GeneralModalHeader :title="modalTitle" :subtitle="modalSubtitle" :total-errors="totalErrors" mode="create"
+                @close="closeModal" />
 
-            <GeneralModalHeader title="Ajustar stock" subtitle="Movimiento de inventario por sucursal"
-                :total-errors="totalErrors" mode="create" @close="closeModal" />
-
-            <GeneralModalContent :columns="1">
+            <GeneralModalContent :columns="1" scroll-mode="controlled">
                 <AdjustStockData :form="form" :product="product" :frontend-errors="frontendErrors"
                     :type-options="typeOptions" :reason-options="reasonOptions" :current-stock="currentStock"
                     :projected-stock="projectedStock" :recent-movements="product.recentMovements || []"
@@ -99,8 +106,8 @@ onBeforeUnmount(() => {
                     @edit-batch="editBatch" />
             </GeneralModalContent>
 
-            <GeneralModalFooter :processing="form.processing" :save-button-text="saveButtonText" mode="create"
-                @save="saveAdjustment" @close="closeModal" />
+            <GeneralModalFooter :processing="form.processing" :save-button-text="saveButtonText"
+                close-button-text="Cancelar" mode="create" @save="saveAdjustment" @close="closeModal" />
         </div>
 
         <EditBatchModal v-if="showEditBatchModal && liveSelectedBatch" :batch="liveSelectedBatch"

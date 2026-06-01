@@ -1,16 +1,10 @@
 <script setup>
 import InputField from '@/Components/Forms/InputField.vue'
-import CurrentBatchesList from './CurrentBatchesList.vue';
+import CurrentBatchesList from './CurrentBatchesList.vue'
 
 defineProps({
-    form: {
-        type: Object,
-        required: true,
-    },
-    product: {
-        type: Object,
-        required: true,
-    },
+    form: Object,
+    product: Object,
     frontendErrors: {
         type: Object,
         default: () => ({}),
@@ -37,9 +31,11 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
         </div>
 
         <div class="grid grid-cols-1 2xl:grid-cols-2 gap-3 mb-5">
-            <button type="button" class="rounded-2xl border px-4 py-3 text-left transition" :class="form.batch_allocation_method === 'FEFO_AUTO'
-                ? 'border-[#1f1d2b] bg-[#1f1d2b] text-white'
-                : 'border-slate-200 bg-white text-slate-700'"
+            <button type="button" :disabled="form.processing"
+                class="rounded-2xl border px-4 py-3 text-left transition disabled:opacity-50 disabled:cursor-not-allowed"
+                :class="form.batch_allocation_method === 'FEFO_AUTO'
+                    ? 'border-[#1f1d2b] bg-[#1f1d2b] text-white'
+                    : 'border-slate-200 bg-white text-slate-700'"
                 @click="form.batch_allocation_method = 'FEFO_AUTO'; form.manual_batches = []">
                 <p class="font-black text-sm">
                     FEFO automático
@@ -50,9 +46,11 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
                 </p>
             </button>
 
-            <button type="button" class="rounded-2xl border px-4 py-3 text-left transition" :class="form.batch_allocation_method === 'MANUAL'
-                ? 'border-[#1f1d2b] bg-[#1f1d2b] text-white'
-                : 'border-slate-200 bg-white text-slate-700'" @click="form.batch_allocation_method = 'MANUAL'">
+            <button type="button" :disabled="form.processing"
+                class="rounded-2xl border px-4 py-3 text-left transition disabled:opacity-50 disabled:cursor-not-allowed"
+                :class="form.batch_allocation_method === 'MANUAL'
+                    ? 'border-[#1f1d2b] bg-[#1f1d2b] text-white'
+                    : 'border-slate-200 bg-white text-slate-700'" @click="form.batch_allocation_method = 'MANUAL'">
                 <p class="font-black text-sm">
                     Selección manual
                 </p>
@@ -68,8 +66,9 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
                 Lotes disponibles
             </p>
 
-            <CurrentBatchesList v-if="product.batches?.length" :batches="product.batches" clickable
-                :allocation-method="form.batch_allocation_method" @select-batch="$emit('add-manual-batch', $event)" />
+            <CurrentBatchesList v-if="product.batches?.length" :batches="product.batches" :disabled="form.processing"
+                clickable :allocation-method="form.batch_allocation_method"
+                @select-batch="$emit('add-manual-batch', $event)" />
 
             <div v-else class="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center">
                 <p class="text-sm font-bold text-slate-600">
@@ -97,20 +96,21 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
                             </p>
                         </div>
 
-                        <button type="button" class="text-sm font-bold text-red-500"
+                        <button type="button" :disabled="form.processing"
+                            class="text-sm font-bold text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                             @click="$emit('remove-manual-batch', index)">
                             Quitar
                         </button>
                     </div>
 
-                    <InputField v-model="batch.quantity" label="Cantidad a descontar" type="number" />
-
-                    <p v-if="frontendErrors[`manual_batch_${index}`]" class="text-sm text-red-600 font-semibold mt-2">
-                        {{ frontendErrors[`manual_batch_${index}`] }}
-                    </p>
+                    <InputField v-model="batch.quantity" label="Cantidad a descontar" type="number"
+                        field="batch_quantity" :readonly="form.processing"
+                        :error="frontendErrors[`manual_batch_${index}`]" />
                 </div>
 
-                <div class="flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-3">
+                <div class="flex items-center justify-between bg-white border rounded-2xl px-4 py-3" :class="Number(totalManualBatchQuantity) === Number(form.quantity)
+                    ? 'border-emerald-200'
+                    : 'border-red-200'">
                     <span class="text-sm font-bold text-slate-600">
                         Total seleccionado
                     </span>
@@ -133,9 +133,11 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
                 </p>
             </div>
 
-            <p v-if="frontendErrors.manual_batches" class="text-sm text-red-600 font-semibold">
-                {{ frontendErrors.manual_batches }}
-            </p>
+            <div v-if="frontendErrors.manual_batches" class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+                <p class="text-sm font-semibold text-red-700">
+                    {{ frontendErrors.manual_batches }}
+                </p>
+            </div>
         </div>
     </div>
 </template>

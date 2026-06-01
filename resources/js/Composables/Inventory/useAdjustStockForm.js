@@ -87,7 +87,7 @@ export function useAdjustStockForm(props, emit) {
         () => {
             form.reason = reasonOptions.value[0]?.value ?? "MANUAL";
             form.batch_allocation_method =
-                form.type === "OUT" ? "FEFO_AUTO" : "UNKNOWN";
+                form.type === "OUT" ? "FEFO_AUTO" : null;
             form.manual_batches = [];
 
             frontendErrors.type = "";
@@ -185,9 +185,27 @@ export function useAdjustStockForm(props, emit) {
             form.batches.forEach((batch, index) => {
                 if (!batch.quantity || Number(batch.quantity) <= 0) {
                     frontendErrors[`batch_${index}`] =
-                        "Todos los lotes deben tener cantidad válida.";
+                        "La cantidad del lote debe ser mayor a cero.";
                 }
             });
+
+            const duplicatedLotNumbers = form.batches
+                .map((batch) => batch.lot_number?.trim().toUpperCase())
+                .filter(Boolean)
+                .filter((lotNumber, index, lotNumbers) => {
+                    return lotNumbers.indexOf(lotNumber) !== index;
+                });
+
+            if (duplicatedLotNumbers.length) {
+                form.batches.forEach((batch, index) => {
+                    const lotNumber = batch.lot_number?.trim().toUpperCase();
+
+                    if (duplicatedLotNumbers.includes(lotNumber)) {
+                        frontendErrors[`batch_${index}`] =
+                            "Este número de lote ya fue agregado. Si pertenece al mismo lote, ajusta la cantidad en un solo registro.";
+                    }
+                });
+            }
         }
 
         if (form.type === "OUT" && quantity > currentStock.value) {
@@ -243,6 +261,8 @@ export function useAdjustStockForm(props, emit) {
 
                 emit("close");
                 form.reset();
+                form.batches = [];
+                form.manual_batches = [];
                 clearFrontendErrors();
             },
 
