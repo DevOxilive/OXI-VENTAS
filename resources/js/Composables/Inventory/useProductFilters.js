@@ -22,13 +22,14 @@ export function useProductFilters(productsDB) {
         return productList.value.filter((product) => {
             const searchValue = search.value.toLowerCase().trim();
 
-            const searchableText = `
-                ${product.name ?? ""}
-                ${product.barcode ?? ""}
-                ${product.presentation ?? ""}
-                ${product.category_name ?? ""}
-                ${product.subcategory_name ?? ""}
-            `.toLowerCase();
+           const searchableText = `
+    ${product.name ?? ""}
+    ${product.barcode ?? ""}
+    ${(product.barcodes ?? []).join(" ")}
+    ${product.presentation ?? ""}
+    ${product.category_name ?? ""}
+    ${product.subcategory_name ?? ""}
+`.toLowerCase();
 
             const matchesSearch =
                 searchValue === "" || searchableText.includes(searchValue);
@@ -46,9 +47,12 @@ export function useProductFilters(productsDB) {
         });
     });
 
-    const paginatedProducts = computed(() => {
-        return filteredProducts.value;
-    });
+   const paginatedProducts = computed(() => {
+    const start = (currentPage.value - 1) * recordsToShow.value;
+    const end = start + recordsToShow.value;
+
+    return filteredProducts.value.slice(start, end);
+});
 
     const totalPages = computed(() => {
         const value = productsDB.value ?? productsDB;

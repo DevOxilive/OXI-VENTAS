@@ -24,7 +24,8 @@ function stockColor(product) {
 
   return "bg-green-600";
 }
-</script><template>
+</script>
+<template>
   <div class="hidden md:block w-full bg-white overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
