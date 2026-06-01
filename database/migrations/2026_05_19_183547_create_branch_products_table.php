@@ -4,15 +4,10 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('branch_products', function (Blueprint $table) {
-
             $table->id();
 
             /*
@@ -33,13 +28,6 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             | Inventario general
             |--------------------------------------------------------------------------
-            |
-            | stock:
-            | stock total vivo del producto en la sucursal.
-            |
-            | min_stock:
-            | mínimo permitido antes de alertar.
-            |
             */
 
             $table->decimal('price', 10, 2);
@@ -54,16 +42,6 @@ return new class extends Migration
             |--------------------------------------------------------------------------
             | Configuración operativa
             |--------------------------------------------------------------------------
-            |
-            | tracks_batches:
-            | indica si este producto maneja lotes.
-            |
-            | tracks_expiration:
-            | indica si maneja control de caducidad.
-            |
-            | IMPORTANTE:
-            | no todos los productos necesitan lotes/caducidad.
-            |
             */
 
             $table->boolean('tracks_batches')
@@ -74,12 +52,21 @@ return new class extends Migration
 
             /*
             |--------------------------------------------------------------------------
-            | Estado
+            | Estado administrativo y control de surtido
             |--------------------------------------------------------------------------
             */
 
-            $table->boolean('active')
-                ->default(true);
+            $table->enum('status', [
+                'active',
+                'inactive',
+                'seasonal',
+            ])->default('active');
+
+            $table->timestamp('last_restocked_at')
+                ->nullable();
+
+            $table->unsignedInteger('inactive_candidate_after_days')
+                ->default(90);
 
             $table->timestamps();
 
@@ -96,9 +83,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('branch_products');

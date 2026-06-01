@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class BranchProduct extends Model
 {
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_INACTIVE = 'inactive';
+    public const STATUS_SEASONAL = 'seasonal';
+
     protected $fillable = [
         'branch_id',
         'product_id',
@@ -14,12 +18,21 @@ class BranchProduct extends Model
         'stock',
         'min_stock',
         'entry_date',
-        'active',
+        'status',
+        'last_restocked_at',
+        'inactive_candidate_after_days',
         'name',
         'barcode',
         'category_id',
         'tracks_batches',
         'tracks_expiration',
+    ];
+
+    protected $casts = [
+        'tracks_batches' => 'boolean',
+        'tracks_expiration' => 'boolean',
+        'last_restocked_at' => 'datetime',
+        'inactive_candidate_after_days' => 'integer',
     ];
 
     public function branch()
@@ -36,6 +49,7 @@ class BranchProduct extends Model
     {
         return $this->hasMany(StockMovement::class);
     }
+
     public function category()
     {
         return $this->belongsTo(Category::class);
@@ -51,5 +65,32 @@ class BranchProduct extends Model
         return $this->hasMany(ProductBatch::class)
             ->where('status', 'ACTIVE')
             ->where('quantity', '>', 0);
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE;
+    }
+
+    public function isInactive(): bool
+    {
+        return $this->status === self::STATUS_INACTIVE;
+    }
+
+    public function isSeasonal(): bool
+    {
+        return $this->status === self::STATUS_SEASONAL;
+    }
+
+    public function isInactiveCandidate(): bool
+    {
+        if (!$this->last_restocked_at) {
+            return false;
+        }
+
+        return $this->last_restocked_at
+            ->copy()
+            ->addDays($this->inactive_candidate_after_days)
+            ->isPast();
     }
 }

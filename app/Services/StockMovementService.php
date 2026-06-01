@@ -28,17 +28,7 @@ class StockMovementService
             throw new InvalidArgumentException('La cantidad debe ser mayor a 0.');
         }
 
-        return DB::transaction(function () use (
-            $branchProduct,
-            $type,
-            $reason,
-            $quantity,
-            $notes,
-            $userId,
-            $batches,
-            $batchAllocationMethod,
-            $manualBatches
-        ) {
+        return DB::transaction(function () use ($branchProduct, $type, $reason, $quantity, $notes, $userId, $batches, $batchAllocationMethod, $manualBatches) {
             $branchProduct = BranchProduct::whereKey($branchProduct->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -57,9 +47,15 @@ class StockMovementService
                 throw new InvalidArgumentException('No hay stock suficiente para realizar este movimiento.');
             }
 
-            $branchProduct->update([
+            $updateData = [
                 'stock' => $newStock,
-            ]);
+            ];
+
+            if ($type === 'IN' && $reason === 'PURCHASE') {
+                $updateData['last_restocked_at'] = now();
+            }
+
+            $branchProduct->update($updateData);
 
             $movement = StockMovement::create([
                 'branch_product_id' => $branchProduct->id,
@@ -73,8 +69,7 @@ class StockMovementService
             ]);
 
             if ($type === 'IN') {
-
-                if (! $tracksBatches) {
+                if (!$tracksBatches) {
                     $branchProduct->update([
                         'tracks_batches' => true,
                         'tracks_expiration' => true,
@@ -83,12 +78,7 @@ class StockMovementService
                     $tracksBatches = true;
                 }
 
-                /**
-                 * Si no se registraron lotes manualmente,
-                 * creamos un batch técnico sin lote.
-                 */
                 if (count($batches) === 0) {
-
                     $batches = [
                         [
                             'lot_number' => null,
@@ -238,32 +228,22 @@ class StockMovementService
         }
 
         foreach ($manualBatches as $manualBatch) {
-            $batch = ProductBatch::whereKey($manualBatch['product_batch_id'])
+            $batch = ProductBatch::whereKey($manualBatch['id'])
                 ->where('branch_product_id', $branchProduct->id)
                 ->lockForUpdate()
-                ->first();
-
-            if (! $batch) {
-                throw new InvalidArgumentException(
-                    'Uno de los lotes seleccionados no pertenece a este producto de sucursal.'
-                );
-            }
-
-            if ($batch->status !== 'ACTIVE' || (int) $batch->quantity <= 0) {
-                throw new InvalidArgumentException(
-                    'Uno de los lotes seleccionados no está disponible.'
-                );
-            }
+                ->firstOrFail();
 
             $quantityToConsume = (int) $manualBatch['quantity'];
-            $previousBatchQuantity = (int) $batch->quantity;
 
-            if ($quantityToConsume > $previousBatchQuantity) {
-                throw new InvalidArgumentException(
-                    'La cantidad excede el stock disponible del lote.'
-                );
+            if ($quantityToConsume <= 0) {
+                throw new InvalidArgumentException('La cantidad por lote debe ser mayor a 0.');
             }
 
+            if ((int) $batch->quantity < $quantityToConsume) {
+                throw new InvalidArgumentException('No hay suficiente stock en uno de los lotes seleccionados.');
+            }
+
+            $previousBatchQuantity = (int) $batch->quantity;
             $newBatchQuantity = $previousBatchQuantity - $quantityToConsume;
 
             $batch->update([

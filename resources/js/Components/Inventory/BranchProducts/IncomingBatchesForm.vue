@@ -3,14 +3,8 @@ import InputField from '@/Components/Forms/InputField.vue'
 import CurrentBatchesList from './CurrentBatchesList.vue'
 
 defineProps({
-    form: {
-        type: Object,
-        required: true,
-    },
-    product: {
-        type: Object,
-        required: true,
-    },
+    form: Object,
+    product: Object,
     frontendErrors: {
         type: Object,
         default: () => ({}),
@@ -31,14 +25,12 @@ defineEmits(['remove-batch', 'edit-batch'])
                 Lotes actuales
             </p>
 
-            <CurrentBatchesList
-                :batches="product.batches"
-                show-edit
-                @edit-batch="$emit('edit-batch', $event)"
-            />
+            <CurrentBatchesList :batches="product.batches" :disabled="form.processing" show-edit
+                @edit-batch="$emit('edit-batch', $event)" />
         </div>
 
-        <div v-else-if="!form.batches?.length" class="mb-5 rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center">
+        <div v-else-if="!form.batches?.length"
+            class="mb-5 rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center">
             <p class="text-sm font-bold text-slate-600">
                 Sin lotes registrados
             </p>
@@ -49,45 +41,61 @@ defineEmits(['remove-batch', 'edit-batch'])
         </div>
 
         <div v-if="form.batches?.length" class="space-y-4">
-            <div v-for="(batch, index) in form.batches" :key="index" class="bg-white border border-slate-200 rounded-2xl p-4">
-                <div class="flex items-center justify-between mb-4">
+            <div v-for="(batch, index) in form.batches" :key="index"
+                class="bg-white border border-slate-200 rounded-2xl p-4">
+                <div class="flex items-center justify-between gap-3 mb-4">
                     <p class="font-bold text-slate-800">
                         Nuevo lote #{{ index + 1 }}
                     </p>
 
-                    <button type="button" class="text-sm font-bold text-red-500 hover:text-red-700"
+                    <button type="button" :disabled="form.processing"
+                        class="text-sm font-bold text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         @click="$emit('remove-batch', index)">
                         Quitar
                     </button>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-3">
-                    <InputField v-model="batch.lot_number" label="Número de lote" placeholder="Ej. LALA-001" />
-                    <InputField v-model="batch.expiration_date" label="Fecha de caducidad" type="date" />
-                    <InputField v-model="batch.quantity" label="Cantidad" type="number" />
-                    <InputField v-model="batch.supplier" label="Proveedor" placeholder="Ej. Lala" />
+                    <InputField v-model="batch.lot_number" label="Número de lote" placeholder="Ej. LALA-001"
+                        field="lot_number" :readonly="form.processing" />
+
+                    <InputField v-model="batch.expiration_date" label="Fecha de caducidad" type="date"
+                        field="expiration_date" :readonly="form.processing" />
+
+                    <InputField v-model="batch.quantity" label="Cantidad" type="number" field="batch_quantity"
+                        :readonly="form.processing" />
+
+                    <InputField v-model="batch.supplier" label="Proveedor" placeholder="Ej. Lala" field="supplier"
+                        :readonly="form.processing" />
                 </div>
 
-                <p v-if="frontendErrors[`batch_${index}`]" class="text-sm text-red-600 font-semibold mt-3">
-                    {{ frontendErrors[`batch_${index}`] }}
-                </p>
+                <div v-if="frontendErrors[`batch_${index}`]"
+                    class="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+                    <p class="text-sm font-semibold text-red-700">
+                        {{ frontendErrors[`batch_${index}`] }}
+                    </p>
+                </div>
             </div>
 
-            <div class="flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-3">
+            <div class="flex items-center justify-between bg-white border rounded-2xl px-4 py-3" :class="Number(totalBatchQuantity) && Number(totalBatchQuantity) === Number(form.quantity)
+                ? 'border-emerald-200'
+                : 'border-red-200'">
                 <span class="text-sm font-bold text-slate-600">
                     Total registrado en lotes
                 </span>
 
-                <span class="text-sm font-black" :class="Number(totalBatchQuantity) === Number(form.quantity)
+                <span class="text-sm font-black" :class="Number(totalBatchQuantity) && Number(totalBatchQuantity) === Number(form.quantity)
                     ? 'text-emerald-600'
                     : 'text-red-600'">
                     {{ totalBatchQuantity }} / {{ form.quantity || 0 }}
                 </span>
             </div>
 
-            <p v-if="frontendErrors.batches" class="text-sm text-red-600 font-semibold">
-                {{ frontendErrors.batches }}
-            </p>
+            <div v-if="frontendErrors.batches" class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+                <p class="text-sm font-semibold text-red-700">
+                    {{ frontendErrors.batches }}
+                </p>
+            </div>
         </div>
     </div>
 </template>

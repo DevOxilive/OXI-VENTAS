@@ -6,7 +6,6 @@ import InventoryStatsCards from '@/Components/Inventory/BranchProducts/Inventory
 import InventoryToolbar from '@/Components/Inventory/BranchProducts/InventoryToolbar.vue'
 import InventoryTable from '@/Components/Inventory/BranchProducts/InventoryTable.vue'
 import InventoryMobileCards from '@/Components/Inventory/BranchProducts/InventoryMobileCards.vue'
-import InventoryCreateModal from '@/Components/Inventory/BranchProducts/InventoryCreateModal.vue'
 import InventoryAlertsModal from '@/Components/Inventory/BranchProducts/InventoryAlertsModal.vue'
 import AdjustStockModal from '@/Components/Inventory/BranchProducts/AdjustStockModal.vue'
 
@@ -31,6 +30,16 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+
+    categoriesDB: {
+        type: Array,
+        default: () => [],
+    },
+
+    subcategoriesDB: {
+        type: Array,
+        default: () => [],
+    },
     inventoryStats: {
         type: Object,
         default: () => ({
@@ -40,12 +49,19 @@ const props = defineProps({
             low_stock: 0,
             out_of_stock: 0,
             expiring_soon: 0,
+            inactive_candidates: 0,
         }),
     },
     filters: {
         type: Object,
         default: () => ({
             search: '',
+            category: '',
+            subcategory: '',
+            stock: '',
+            status: '',
+            expiration_status: '',
+            inactive_candidate: '',
             per_page: 50,
         }),
     },
@@ -55,8 +71,11 @@ const props = defineProps({
             expired_batches: 0,
             near_expiration_batches: 0,
             low_stock_products: 0,
+            inactive_candidate_products: 0,
             expired_batches_list: [],
             near_expiration_batches_list: [],
+            low_stock_products_list: [],
+            inactive_candidate_products_list: [],
         }),
     },
 })
@@ -64,6 +83,8 @@ const props = defineProps({
 const {
     products,
     branches,
+    categories,
+    subcategories,
     currentBranch,
 
     showCreateModal,
@@ -72,7 +93,14 @@ const {
 
     search,
     categoryFilter,
+    subcategoryFilter,
+
     stockFilter,
+
+    statusFilter,
+    expirationStatusFilter,
+    inactiveCandidateFilter,
+
     recordsToShow,
 
     paginationLinks,
@@ -109,11 +137,14 @@ const form = useForm({
     price: '',
     stock: '',
     min_stock: '',
+    status: 'active',
 })
 
 const openCreateInventoryModal = () => {
     form.reset()
     form.clearErrors()
+
+    form.status = 'active'
 
     if (currentBranch.value?.id) {
         form.branch_id = currentBranch.value.id
@@ -155,10 +186,15 @@ const submit = () => {
             :records-to-show="recordsToShow" @create="openCreateInventoryModal" @excel="exportExcel"
             @update:recordsToShow="recordsToShow = $event" />
 
-        <InventoryTable :filtered-products="filteredProducts" :search="search" :category-filter="categoryFilter"
-            :stock-filter="stockFilter" @update:search="search = $event"
-            @update:categoryFilter="categoryFilter = $event" @update:stockFilter="stockFilter = $event"
-            @view="viewProduct" @edit="editProduct" @adjust="adjustStock" @delete="deleteProduct" />
+        <InventoryTable :filtered-products="filteredProducts" :categories="categories" :subcategories="subcategories"
+            :search="search" :category-filter="categoryFilter" :subcategory-filter="subcategoryFilter"
+            :stock-filter="stockFilter" :status-filter="statusFilter" :expiration-status-filter="expirationStatusFilter"
+            :inactive-candidate-filter="inactiveCandidateFilter" @update:search="search = $event"
+            @update:categoryFilter="categoryFilter = $event" @update:subcategoryFilter="subcategoryFilter = $event"
+            @update:stockFilter="stockFilter = $event" @update:statusFilter="statusFilter = $event"
+            @update:expirationStatusFilter="expirationStatusFilter = $event"
+            @update:inactiveCandidateFilter="inactiveCandidateFilter = $event" @view="viewProduct" @edit="editProduct"
+            @adjust="adjustStock" @delete="deleteProduct" />
 
         <InventoryMobileCards :filtered-products="filteredProducts" @view="viewProduct" @edit="editProduct"
             @adjust="adjustStock" @delete="deleteProduct" />
@@ -171,9 +207,6 @@ const submit = () => {
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'" @click="goToPage(link.url)"
                 v-html="link.label" />
         </nav>
-
-        <InventoryCreateModal v-if="showCreateModal" :form="form" :products="products" :branches="branches"
-            @submit="submit" @close="closeCreateInventoryModal" />
 
         <AdjustStockModal v-if="showAdjustModal && liveSelectedProduct" :product="liveSelectedProduct"
             @close="closeAdjustModal" />

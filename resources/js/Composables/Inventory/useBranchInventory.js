@@ -8,8 +8,14 @@ export function useBranchInventory(props) {
     const selectedAlertType = ref(null);
 
     const search = ref(props.filters?.search ?? "");
-    const categoryFilter = ref("");
-    const stockFilter = ref("");
+    const categoryFilter = ref(props.filters?.category ?? "");
+    const subcategoryFilter = ref(props.filters?.subcategory ?? "");
+    const stockFilter = ref(props.filters?.stock ?? "");
+    const statusFilter = ref(props.filters?.status ?? "");
+    const expirationStatusFilter = ref(props.filters?.expiration_status ?? "");
+    const inactiveCandidateFilter = ref(
+        props.filters?.inactive_candidate ?? "",
+    );
     const recordsToShow = ref(Number(props.filters?.per_page ?? 50));
 
     const realtimeUpdates = ref({});
@@ -17,7 +23,11 @@ export function useBranchInventory(props) {
 
     const products = computed(() => props.productsDB ?? []);
     const branches = computed(() => props.branchesDB ?? []);
+    const categories = computed(() => props.categoriesDB ?? []);
+    const subcategories = computed(() => props.subcategoriesDB ?? []);
     const currentBranch = computed(() => props.currentBranch ?? null);
+
+    const inventoryAlerts = computed(() => props.inventoryAlerts ?? {});
 
     const rawBranchProducts = computed(() => {
         if (Array.isArray(props.branchProductsDB)) {
@@ -51,17 +61,21 @@ export function useBranchInventory(props) {
                 item.tracks_batches ?? item.tracksBatches ?? false,
             );
 
-            let status = "Disponible";
+            let operationalStatus = "Disponible";
 
             if (stock <= 0) {
-                status = "Agotado";
+                operationalStatus = "Agotado";
             } else if (stock <= minStock) {
-                status = "Stock bajo";
+                operationalStatus = "Stock bajo";
             }
 
             return {
                 id: item.id,
-                name: item.product?.name ?? item.name ?? "Producto sin nombre",
+                name:
+                    item.product?.name ||
+                    item.name ||
+                    item.barcode ||
+                    "Producto sin nombre",
                 code:
                     item.product?.barcodes?.[0]?.code ??
                     item.barcode ??
@@ -71,14 +85,17 @@ export function useBranchInventory(props) {
                     item.branch?.name ??
                     currentBranch.value?.name ??
                     "Sucursal",
-                status,
+                status: operationalStatus,
+                administrativeStatus: item.status ?? "active",
                 stock,
                 minStock,
                 price,
                 tracksBatches,
                 expirationDate:
                     item.next_expiration_date ?? item.expiration_date ?? null,
-                active: item.active ?? true,
+                lastRestockedAt: item.last_restocked_at ?? null,
+                inactiveCandidateAfterDays:
+                    item.inactive_candidate_after_days ?? 90,
                 activeBatchesCount: item.active_batches_count ?? 0,
                 batches: realtime.batches ?? item.batches ?? [],
                 recentMovements: realtime.movements ?? item.movements ?? [],
@@ -97,105 +114,61 @@ export function useBranchInventory(props) {
         );
     });
 
-    const filteredProducts = computed(() => {
-        return visualProducts.value.filter((product) => {
-            const matchesCategory =
-                !categoryFilter.value ||
-                product.category === categoryFilter.value;
-
-            const matchesStock =
-                !stockFilter.value || product.status === stockFilter.value;
-
-            return matchesCategory && matchesStock;
-        });
-    });
+    // El backend ya filtra y pagina. Esta lista queda como alias visual
+    // para no romper componentes existentes.
+    const filteredProducts = computed(() => visualProducts.value);
 
     const stats = computed(() => {
-        const products = visualProducts.value;
-
-        const totalStock = products.reduce((acc, product) => {
-            return acc + Number(product.stock || 0);
-        }, 0);
-
-        const inventoryValue = products.reduce((acc, product) => {
-            return (
-                acc + Number(product.stock || 0) * Number(product.price || 0)
-            );
-        }, 0);
-
-        const lowStock = products.filter((product) => {
-            return (
-                Number(product.stock || 0) > 0 &&
-                Number(product.stock || 0) <= Number(product.minStock || 0)
-            );
-        }).length;
-
-        const outOfStock = products.filter((product) => {
-            return Number(product.stock || 0) <= 0;
-        }).length;
-
-        const expiringSoon = products.filter((product) => {
-            return product.batches.some((batch) => {
-                return batch.expiration_status === "NEAR_EXPIRATION";
-            });
-        }).length;
+        const inventoryStats = props.inventoryStats ?? {};
 
         return {
-            total: products.length,
-            totalStock,
-            inventoryValue,
-            lowStock,
-            outOfStock,
-            expiringSoon,
+            total: Number(inventoryStats.total_products ?? 0),
+            totalStock: Number(inventoryStats.total_stock ?? 0),
+            inventoryValue: Number(inventoryStats.inventory_value ?? 0),
+            lowStock: Number(inventoryStats.low_stock ?? 0),
+            outOfStock: Number(inventoryStats.out_of_stock ?? 0),
+            expiringSoon: Number(inventoryStats.expiring_soon ?? 0),
+            inactiveCandidates: Number(inventoryStats.inactive_candidates ?? 0),
         };
     });
 
     const expiredBatchesList = computed(() => {
-        return visualProducts.value.flatMap((product) => {
-            return (product.batches || [])
-                .filter((batch) => batch.expiration_status === "EXPIRED")
-                .map((batch) => ({
-                    ...batch,
-                    product_name: product.name,
-                    product_code: product.code,
-                    branch_name: product.branch,
-                    stock: product.stock,
-                }));
-        });
+        return inventoryAlerts.value.expired_batches_list ?? [];
     });
 
     const nearExpirationBatchesList = computed(() => {
-        return visualProducts.value.flatMap((product) => {
-            return (product.batches || [])
-                .filter((batch) => {
-                    return batch.expiration_status === "NEAR_EXPIRATION";
-                })
-                .map((batch) => ({
-                    ...batch,
-                    product_name: product.name,
-                    product_code: product.code,
-                    branch_name: product.branch,
-                    stock: product.stock,
-                }));
-        });
+        return inventoryAlerts.value.near_expiration_batches_list ?? [];
     });
 
     const lowStockProductsList = computed(() => {
-        return visualProducts.value.filter((product) => {
-            return (
-                Number(product.stock || 0) > 0 &&
-                Number(product.stock || 0) <= Number(product.minStock || 0)
-            );
-        });
+        return inventoryAlerts.value.low_stock_products_list ?? [];
+    });
+
+    const inactiveCandidateProductsList = computed(() => {
+        return inventoryAlerts.value.inactive_candidate_products_list ?? [];
     });
 
     const alerts = computed(() => ({
-        expiredBatches: expiredBatchesList.value.length,
-        nearExpirationBatches: nearExpirationBatchesList.value.length,
-        lowStockProducts: lowStockProductsList.value.length,
+        expiredBatches:
+            inventoryAlerts.value.expired_batches ??
+            expiredBatchesList.value.length,
+
+        nearExpirationBatches:
+            inventoryAlerts.value.near_expiration_batches ??
+            nearExpirationBatchesList.value.length,
+
+        lowStockProducts:
+            inventoryAlerts.value.low_stock_products ??
+            lowStockProductsList.value.length,
+
+        inactiveCandidateProducts:
+            inventoryAlerts.value.inactive_candidate_products ??
+            inactiveCandidateProductsList.value.length,
 
         expiredBatchesList: expiredBatchesList.value,
         nearExpirationBatchesList: nearExpirationBatchesList.value,
+        lowStockProductsList: lowStockProductsList.value,
+        inactiveCandidateProductsList: inactiveCandidateProductsList.value,
     }));
 
     const selectedAlertTitle = computed(() => {
@@ -204,6 +177,7 @@ export function useBranchInventory(props) {
                 expired: "Lotes vencidos",
                 nearExpiration: "Lotes próximos a vencer",
                 lowStock: "Productos con stock bajo",
+                inactiveCandidates: "Productos candidatos a inactivar",
             }[selectedAlertType.value] || ""
         );
     });
@@ -214,6 +188,7 @@ export function useBranchInventory(props) {
                 expired: expiredBatchesList.value,
                 nearExpiration: nearExpirationBatchesList.value,
                 lowStock: lowStockProductsList.value,
+                inactiveCandidates: inactiveCandidateProductsList.value,
             }[selectedAlertType.value] || []
         );
     });
@@ -225,6 +200,12 @@ export function useBranchInventory(props) {
             window.location.pathname,
             {
                 search: search.value || undefined,
+                subcategory: subcategoryFilter.value || undefined,
+                category: categoryFilter.value || undefined,
+                stock: stockFilter.value || undefined,
+                status: statusFilter.value || undefined,
+                expiration_status: expirationStatusFilter.value || undefined,
+                inactive_candidate: inactiveCandidateFilter.value || undefined,
                 per_page: recordsToShow.value,
             },
             {
@@ -299,6 +280,30 @@ export function useBranchInventory(props) {
         reloadInventory();
     });
 
+    watch(categoryFilter, () => {
+        reloadInventory();
+    });
+
+    watch(subcategoryFilter, () => {
+        reloadInventory();
+    });
+
+    watch(stockFilter, () => {
+        reloadInventory();
+    });
+
+    watch(statusFilter, () => {
+        reloadInventory();
+    });
+
+    watch(expirationStatusFilter, () => {
+        reloadInventory();
+    });
+
+    watch(inactiveCandidateFilter, () => {
+        reloadInventory();
+    });
+
     onMounted(() => {
         if (!window.Echo || !currentBranch.value?.id) return;
 
@@ -329,6 +334,8 @@ export function useBranchInventory(props) {
     return {
         products,
         branches,
+        categories,
+        subcategories,
         currentBranch,
 
         showCreateModal,
@@ -338,7 +345,11 @@ export function useBranchInventory(props) {
 
         search,
         categoryFilter,
+        subcategoryFilter,
         stockFilter,
+        statusFilter,
+        expirationStatusFilter,
+        inactiveCandidateFilter,
         recordsToShow,
 
         paginationLinks,
