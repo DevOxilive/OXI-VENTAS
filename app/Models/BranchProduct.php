@@ -6,22 +6,21 @@ use Illuminate\Database\Eloquent\Model;
 
 class BranchProduct extends Model
 {
-protected $fillable = [
-    'branch_id',
-    'product_id',
-    'price',
-    'cost',
-    'stock',
-    'min_stock',
-    'entry_date',
-    'active',
-    'name',
-    'barcode',
-    'category_id',
-    'unit',
-    'tracks_batches',
-    'tracks_expiration',
-];
+    protected $fillable = [
+        'branch_id',
+        'product_id',
+        'price',
+        'cost',
+        'stock',
+        'min_stock',
+        'entry_date',
+        'active',
+        'name',
+        'barcode',
+        'category_id',
+        'tracks_batches',
+        'tracks_expiration',
+    ];
 
     public function branch()
     {
