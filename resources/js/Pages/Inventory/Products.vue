@@ -154,28 +154,82 @@ function resetProduct() {
 
   frontendErrors.value = {};
 }
-
 function openCreateModal() {
   resetProduct();
   modalMode.value = "create";
   showModal.value = true;
 }
 
-function openEditModal(selectedProduct) {
-  product.value = {
+function normalizeProduct(selectedProduct) {
+  return {
     ...selectedProduct,
+
+    code: selectedProduct.code || "",
+barcode:
+  selectedProduct.barcode ||
+  selectedProduct.bar_code ||
+  selectedProduct.codigo_barras ||
+  "",
+
+    name: selectedProduct.name || "",
+
+    category:
+      selectedProduct.category_name ||
+      selectedProduct.category ||
+      "",
+
+    unit: selectedProduct.unit || "",
+
+    status: selectedProduct.status || "Disponible",
+
+    branch:
+      selectedProduct.branch ||
+      selectedProduct.branch_name ||
+      "",
+
+    stock: selectedProduct.stock || 0,
+
+    minStock:
+      selectedProduct.minimum_stock ||
+      selectedProduct.minStock ||
+      0,
+
+    lot: selectedProduct.lot || "",
+
+    expirationDate:
+      selectedProduct.expiration_date ||
+      selectedProduct.expirationDate ||
+      "",
+
+    purchasePrice:
+      selectedProduct.cost ||
+      selectedProduct.purchasePrice ||
+      "",
+
+    salePrice:
+      selectedProduct.price ||
+      selectedProduct.salePrice ||
+      "",
+
+    supplier: selectedProduct.supplier || "",
+
+    responsible: selectedProduct.responsible || "",
+
+    notes: selectedProduct.notes || "",
+
     errors: {},
   };
+}
+
+function openEditModal(selectedProduct) {
+  product.value = normalizeProduct(selectedProduct);
 
   modalMode.value = "edit";
   showModal.value = true;
 }
 
 function openViewModal(selectedProduct) {
-  product.value = {
-    ...selectedProduct,
-    errors: {},
-  };
+  product.value = normalizeProduct(selectedProduct);
 
   modalMode.value = "view";
   showModal.value = true;
@@ -190,9 +244,42 @@ function validateField(field) {
 }
 
 function submitProduct() {
-  console.log("Guardar producto");
+
+  if (modalMode.value === "create") {
+
+    productsDB.value.push({
+      ...product.value,
+      id: Date.now(),
+    });
+
+  } else if (modalMode.value === "edit") {
+
+    const index = productsDB.value.findIndex(
+      p => p.id === product.value.id
+    );
+
+    if (index !== -1) {
+      productsDB.value[index] = {
+        ...product.value
+      };
+    }
+  }
+
+  closeModal();
 }
 
+function deleteProduct(selectedProduct) {
+
+  const confirmed = confirm(
+    `¿Eliminar ${selectedProduct.name}?`
+  );
+
+  if (!confirmed) return;
+
+  productsDB.value = productsDB.value.filter(
+    p => p.id !== selectedProduct.id
+  );
+}
 function exportExcel() {
   console.log("Exportar excel");
 }
@@ -206,14 +293,24 @@ function deleteProduct(selectedProduct) {
 }
 </script>
 
+</script>
 <template>
-  <section class="space-y-5">
-    <div>
-      <h1 class="text-xl font-bold text-slate-800">Productos</h1>
+  <section class="max-w-[1030px] mx-auto py-8 px-6 bg-white min-h-[calc(100vh-90px)]">
 
-      <p class="text-sm text-slate-500 mt-1">
-        Gestión general de productos, stock, sucursales y control operativo.
-      </p>
+    <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+      <ProductFilters
+        v-model:search="search"
+        v-model:category-filter="categoryFilter"
+        v-model:records-to-show="recordsToShow"
+        @create="openCreateModal"
+      />
+
+      <ProductTable
+        :products="paginatedProducts"
+        @view="openViewModal"
+        @edit="openEditModal"
+        @delete="deleteProduct"
+      />
     </div>
 
     <ProductToolbar :total="props.productsDB?.total ?? filteredProducts.length" v-model:records-to-show="recordsToShow"

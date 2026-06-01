@@ -6,10 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class BranchProduct extends Model
 {
-    public const STATUS_ACTIVE = 'active';
-    public const STATUS_INACTIVE = 'inactive';
-    public const STATUS_SEASONAL = 'seasonal';
-
     protected $fillable = [
         'branch_id',
         'product_id',
@@ -18,21 +14,12 @@ class BranchProduct extends Model
         'stock',
         'min_stock',
         'entry_date',
-        'status',
-        'last_restocked_at',
-        'inactive_candidate_after_days',
+        'active',
         'name',
         'barcode',
         'category_id',
         'tracks_batches',
         'tracks_expiration',
-    ];
-
-    protected $casts = [
-        'tracks_batches' => 'boolean',
-        'tracks_expiration' => 'boolean',
-        'last_restocked_at' => 'datetime',
-        'inactive_candidate_after_days' => 'integer',
     ];
 
     public function branch()

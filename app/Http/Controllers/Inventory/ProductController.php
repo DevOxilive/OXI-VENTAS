@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Inventory;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Category;
-use Inertia\Inertia;
-use Illuminate\Http\Request;
 use App\Models\Subcategory;
-use Illuminate\Support\Facades\DB;
 use App\Models\Branch;
 use App\Models\BranchProduct;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -178,36 +179,77 @@ class ProductController extends Controller
     {
         $barcodeId = optional($product->barcodes()->first())->id;
 
+        return back()->with('success', 'Producto creado correctamente');
+    }
+    public function update(Request $request, Branch $branch, Product $product)
+    {
         $data = $request->validate([
-            'barcode' => ['nullable', 'string', 'max:100', 'unique:barcodes,code,' . $barcodeId],
+            'barcodes' => ['nullable', 'array'],
+            'barcodes.*' => [
+    'nullable',
+    'string',
+    'max:100',
+    'distinct',
+],
+            'unit' => ['required', 'string', 'max:20'],
             'name' => ['required', 'string', 'max:255'],
-            'stock' => ['required', 'numeric', 'min:0'],
+            'image' => ['nullable', 'image', 'max:2048'],
+            'stock' => ['nullable', 'numeric', 'min:0'],
             'category_id' => ['required', 'exists:categories,id'],
             'cost' => ['required', 'numeric', 'min:0'],
-            'sale_price' => ['required', 'numeric', 'min:0'],
+'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
             'entry_date' => ['required', 'date'],
             'active' => ['boolean'],
         ]);
 
-        DB::transaction(function () use ($data, $product, $branch) {
+        $barcodes = collect($data['barcodes'] ?? [])
+            ->filter(fn($code) => filled($code))
+            ->values();
+            $duplicatedBarcode = DB::table('barcodes')  
+    ->whereIn('code', $barcodes)
+    ->where('product_id', '!=', $product->id)
+    ->first();
+
+if ($duplicatedBarcode) {
+    return back()->withErrors([
+        'barcodes.0' => 'Este código de barras ya pertenece a otro producto.',
+    ]);
+}
+
+        DB::transaction(function () use ($request, $data, $product, $branch, $barcodes) {
+            $imagePath = $product->image;
+
+            if ($request->hasFile('image')) {
+                if ($product->image) {
+                    Storage::disk('public')->delete($product->image);
+                }
+
+                $imagePath = $request->file('image')->store('products', 'public');
+            }
+
             $product->update([
                 'name' => $data['name'],
+                'image' => $imagePath,
                 'category_id' => $data['category_id'],
+                'cost' => $data['cost'],
+                'sale_price' => $data['sale_price'],
                 'active' => $data['active'] ?? true,
             ]);
 
-            if (!empty($data['barcode'])) {
-                DB::table('barcodes')->updateOrInsert(
-                    ['product_id' => $product->id],
-                    [
-                        'code' => $data['barcode'],
-                        'type' => 'EAN13',
-                        'base_quantity' => 1,
-                        'active' => true,
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ]
-                );
+            DB::table('barcodes')
+                ->where('product_id', $product->id)
+                ->delete();
+
+            foreach ($barcodes as $index => $code) {
+                DB::table('barcodes')->insert([
+                    'product_id' => $product->id,
+                    'code' => $code,
+                    'type' => $index === 0 ? 'PRINCIPAL' : 'ALTERNO',
+                    'base_quantity' => 1,
+                    'active' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
             }
 
             BranchProduct::updateOrCreate(
@@ -216,10 +258,11 @@ class ProductController extends Controller
                     'product_id' => $product->id,
                 ],
                 [
-                    'barcode' => $data['barcode'],
+                    'barcode' => $barcodes->first(),
                     'name' => $data['name'],
                     'category_id' => $data['category_id'],
-                    'stock' => $data['stock'],
+                    'unit' => $data['unit'],
+                    'stock' => $data['stock'] ?? 0,
                     'cost' => $data['cost'],
                     'price' => $data['sale_price'],
                     'entry_date' => $data['entry_date'],

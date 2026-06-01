@@ -16,7 +16,6 @@ const gridClass = {
     3: 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3',
 }
 </script>
-
 <template>
     <div class="flex-1 min-h-0 p-4 sm:p-5 md:p-8 bg-slate-50" :class="scrollMode === 'controlled'
         ? 'overflow-hidden'
