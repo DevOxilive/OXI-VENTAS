@@ -29,13 +29,22 @@ export function useProductActions() {
         selectedProduct.value = null;
     }
 
-    function deleteProduct(product) {
-        if (!confirm(`¿Eliminar el producto "${product.name}"?`)) return;
+   function deleteProduct(product) {
+    if (!confirm(`¿Eliminar el producto "${product.name}"?`)) return;
 
-        router.delete(route("inventario.products.destroy", product.id), {
+    router.delete(
+        route("inventory.branches.products.destroy", {
+            branch: product.branch_slug,
+            product: product.id,
+        }),
+        {
             preserveScroll: true,
-        });
-    }
+            onSuccess: () => {
+                console.log("Producto eliminado");
+            },
+        }
+    );
+}
 
     return {
         showModal,

@@ -1,140 +1,95 @@
 <script setup>
-import { computed } from 'vue'
-
 const props = defineProps({
-    search: String,
-    categoryFilter: [String, Number],
-    subcategoryFilter: [String, Number],
+  search: String,
+  categoryFilter: [String, Number],
 
-    categoriesDB: {
-        type: Array,
-        default: () => []
-    },
+  categoriesDB: {
+    type: Array,
+    default: () => [],
+  },
 
-    subcategoriesDB: {
-        type: Array,
-        default: () => []
-    },
-    recordsToShow: {
+  recordsToShow: {
     type: Number,
-    default: 10
-}
+    default: 10,
+  },
 })
 
 defineEmits([
-    'update:search',
-    'update:categoryFilter',
-    'update:subcategoryFilter',
-    'update:recordsToShow',
-    'create',
-    'export'
+  'update:search',
+  'update:categoryFilter',
+  'update:recordsToShow',
+  'create',
+  'export',
 ])
+</script><template>
+  <section class="bg-transparent">
 
-const visibleSubcategories = computed(() => {
-    if (props.categoryFilter === 'Todas') return []
+    <!-- ENCABEZADO -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
 
-    return props.subcategoriesDB.filter((subcategory) => {
-        return String(subcategory.category_id) === String(props.categoryFilter)
-    })
-})
-</script>
+      <h2 class="text-3xl font-bold text-slate-800">
+        Productos
+      </h2>
 
-<template>
-    <section class="bg-white rounded-3xl shadow-xl border border-slate-200 p-5">
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.4fr_1fr_1fr_auto_auto] gap-4 items-end">
+      <div class="flex items-center gap-3">
 
-            <div>
-                <label class="block text-sm font-semibold text-slate-500 mb-2">
-                    Buscar producto
-                </label>
+        <span class="text-sm text-slate-500 hidden md:block">
+          Mostrando {{ recordsToShow }} registros
+        </span>
 
-               <input
-    :value="search"
-    @input="$emit('update:search', $event.target.value)"
-    @keydown.enter.prevent="$emit('update:search', $event.target.value)"
-    type="text"
-    inputmode="search"
-    autocomplete="off"
-    placeholder="Nombre, código o descripción..."
-    class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-/>
-            </div>
+        <select
+          :value="recordsToShow"
+          @change="$emit('update:recordsToShow', Number($event.target.value))"
+          class="rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
+        >
+          <option :value="10">10</option>
+          <option :value="20">20</option>
+          <option :value="50">50</option>
+          <option :value="100">100</option>
+          <option :value="200">200</option>
+        </select>
 
-            <div>
-                <label class="block text-sm font-semibold text-slate-500 mb-2">
-                    Categoría
-                </label>
+        <button
+          @click="$emit('create')"
+          class="px-5 py-2.5 rounded-2xl bg-black text-white font-medium shadow-sm hover:bg-slate-800 transition"
+        >
+          + Agregar
+        </button>
 
-                <select
-                    :value="categoryFilter"
-                    @change="$emit('update:categoryFilter', $event.target.value); $emit('update:subcategoryFilter', 'Todas')"
-                    class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                    <option value="Todas">
-                        Todas
-                    </option>
+      </div>
+    </div>
 
-                    <option
-                        v-for="category in categoriesDB"
-                        :key="category.id"
-                        :value="category.id"
-                    >
-                        {{ category.name }}
-                    </option>
-                </select>
-            </div>
+    <!-- FILTROS -->
+    <div class="grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-4">
 
-            <div>
-                <label class="block text-sm font-semibold text-slate-500 mb-2">
-                    Subcategoría
-                </label>
+      <input
+        :value="search"
+        @input="$emit('update:search', $event.target.value)"
+        @keydown.enter.prevent="$emit('update:search', $event.target.value)"
+        type="text"
+        inputmode="search"
+        autocomplete="off"
+        placeholder="Buscar producto"
+        class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
+      />
 
-                <select
-                    :value="subcategoryFilter"
-                    :disabled="categoryFilter === 'Todas'"
-                    @change="$emit('update:subcategoryFilter', $event.target.value)"
-                    class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                    <option value="Todas">
-                        Todas
-                    </option>
+      <select
+        :value="categoryFilter"
+        @change="$emit('update:categoryFilter', $event.target.value)"
+        class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
+      >
+        <option value="Todas">Categoría</option>
 
-                    <option
-                        v-for="subcategory in visibleSubcategories"
-                        :key="subcategory.id"
-                        :value="subcategory.id"
-                    >
-                        {{ subcategory.name }}
-                    </option>
-                </select>
-            </div>
-            <div>
-    <label class="block text-sm font-semibold text-slate-500 mb-2">
-        Mostrar
-    </label>
+        <option
+          v-for="category in categoriesDB"
+          :key="category.id"
+          :value="category.id"
+        >
+          {{ category.name }}
+        </option>
+      </select>
 
-    <select
-        :value="recordsToShow"
-        @change="$emit('update:recordsToShow', Number($event.target.value))"
-        class="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-    >
-        <option :value="10">10</option>
-        <option :value="20">20</option>
-        <option :value="50">50</option>
-        <option :value="100">100</option>
-        <option :value="200">200</option>
-    </select>
-</div>
+    </div>
 
-            <button
-                @click="$emit('create')"
-                class="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shadow-sm"
-            >
-                + Agregar
-            </button>
-
-        
-
-        </div>
-    </section>
+  </section>
 </template>
