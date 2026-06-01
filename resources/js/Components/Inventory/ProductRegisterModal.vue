@@ -63,19 +63,34 @@ onBeforeUnmount(() => {
 
         <div
             class="relative bg-white w-full h-[100dvh] sm:h-[100dvh] md:h-[94vh] md:w-[96%] md:max-w-6xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-            <GeneralModalHeader :title="props.modo === 'create'
-                ? 'Registrar producto'
-                : props.modo === 'edit'
-                    ? 'Actualizar producto'
-                    : 'Detalle del producto'" subtitle="Información general del producto" :total-errors="totalErrors"
-                :mode="props.modo" @close="cerrarModal" />
-            <GeneralModalContent :columns="1">
-                <ProductData :product="product" :frontend-errors="frontendErrors" :readonly="isReadOnly"
-                    @validate="$emit('validate', $event)" />
-            </GeneralModalContent>
+            <GeneralModalHeader
+    :title="props.modo === 'create'
+        ? 'Registrar producto'
+        : props.modo === 'edit'
+            ? 'Actualizar producto'
+            : 'Detalle del producto'"
+    subtitle="Información general del producto"
+    :total-errors="totalErrors"
+    :mode="props.modo"
+    @close="closeModal"
+/>
 
-            <GeneralModalFooter :processing="product.processing" :save-button-text="textoBotonGuardar"
-                :mode="props.modo" @save="guardarProducto" @close="cerrarModal" />
-        </div>
+<GeneralModalContent :columns="1">
+    <ProductData
+        :product="product"
+        :frontend-errors="frontendErrors"
+        :readonly="isReadOnly"
+        @validate="$emit('validate', $event)"
+    />
+</GeneralModalContent>
+
+<GeneralModalFooter
+    :processing="product.processing"
+    :save-button-text="saveButtonText"
+    :mode="props.modo"
+    @save="$emit('save')"
+    @close="closeModal"
+/>
+    </div>
     </div>
 </template>

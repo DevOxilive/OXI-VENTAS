@@ -1,6 +1,6 @@
 <script setup>
 import { useForm } from "@inertiajs/vue3";
-import { watch } from "vue";
+import { watch, computed } from "vue";
 import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
 
@@ -18,7 +18,8 @@ const props = defineProps({
 const emit = defineEmits(["close"]);
 
 const form = useForm({
-  barcode: "",
+  barcodes: [""],
+  unit: "",
   name: "",
   stock: 0,
   category_id: "",
@@ -27,6 +28,11 @@ const form = useForm({
   entry_date: new Date().toISOString().slice(0, 10),
   active: true,
   image: null,
+
+  quantity: null,
+  kilos: null,
+  grams: null,
+
 });
 
 watch(
@@ -36,7 +42,11 @@ watch(
 
     if (!product) return;
 
-    form.barcode = product.barcode ?? "";
+    form.barcodes = product.barcodes?.length
+      ? product.barcodes
+      : [product.barcode ?? ""];
+
+    form.unit = product.unit ?? "";
     form.name = product.name ?? "";
     form.stock = product.stock ?? 0;
     form.category_id = product.category_id ?? "";
@@ -45,16 +55,58 @@ watch(
     form.entry_date =
       product.entry_date ?? new Date().toISOString().slice(0, 10);
     form.active = true;
+    form.image = product.image ?? null;
+
+    form.quantity = product.quantity ?? null;
+    form.kilos = product.kilos ?? null;
+    form.liters = product.liters ?? null;
+
   },
   { immediate: true }
 );
 
-function submit() {
-  const branchSlug = props.branch?.slug
+const units = [
+  { label: "Pieza", value: "pza" },
+  { label: "Caja", value: "cj" },
+  { label: "Kilogramo", value: "kg" },
+  { label: "Gramo", value: "g" },
+  { label: "Litro", value: "l" },
 
-  if (!branchSlug) {
-    console.error('No llegó branch.slug al modal:', props.branch)
-    return
+];
+const imagePreview = computed(() => {
+  if (!form.image) return null;
+
+  if (form.image instanceof File) {
+    return URL.createObjectURL(form.image);
+  }
+
+  return form.image;
+});
+const invalidPrice = computed(() => {
+  const cost = Number(form.cost || 0);
+  const salePrice = Number(form.sale_price || 0);
+
+  return salePrice > 0 && cost > 0 && salePrice < cost;
+});
+function addBarcode() {
+  form.barcodes.push("");
+}
+
+function removeBarcode(index) {
+  if (form.barcodes.length === 1) return;
+  form.barcodes.splice(index, 1);
+}
+function submit() {
+  const branchSlug = props.branch?.slug;
+
+    if (!branchSlug) {
+    console.error("No llegó branch.slug al modal:", props.branch);
+    return;
+  }
+
+  if (invalidPrice.value) {
+    alert("El precio de venta no puede ser menor al precio inicial.");
+    return;
   }
 
   if (props.mode === "create") {
@@ -63,121 +115,165 @@ function submit() {
         branch: branchSlug,
       }),
       {
+        forceFormData: true,
         preserveScroll: true,
         onSuccess: () => emit("close"),
         onError: (errors) => {
           console.log("ERRORES CREAR PRODUCTO:", errors);
         },
       }
-    )
+    );
 
-    return
+    return;
   }
 
-  if (props.mode === "edit") {
-    form.put(
+ if (props.mode === "edit") {
+  form
+    .transform((data) => ({
+      ...data,
+      image: data.image instanceof File ? data.image : null,
+      _method: "PUT",
+    }))
+    .post(
       route("inventory.branches.products.update", {
         branch: props.product.branch_slug ?? branchSlug,
         product: props.product.id,
       }),
       {
+        forceFormData: true,
         preserveScroll: true,
         onSuccess: () => emit("close"),
         onError: (errors) => {
           console.log("ERRORES PRODUCTO:", errors);
         },
       }
-    )
-  }
+    );
+}
 }
 </script>
 
 <template>
-  <div
-    class="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4"
-  >
-    <div
-      class="bg-white rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden"
-    >
+  <div class="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden">
+      
       <div class="flex items-center justify-between px-6 py-5 border-b">
         <h2 class="text-2xl font-bold text-slate-800">
-          {{
-            mode === "create"
-              ? "Nuevo producto"
-              : mode === "edit"
-              ? "Editar producto"
-              : "Ver producto"
-          }}
+          {{ mode === "create" ? "Nuevo producto" : mode === "edit" ? "Editar producto" : "Ver producto" }}
         </h2>
 
-        <button
-          @click="$emit('close')"
-          class="text-slate-400 hover:text-slate-700 text-2xl"
-        >
+        <button @click="$emit('close')" class="text-slate-400 hover:text-slate-700 text-2xl">
           ×
         </button>
       </div>
 
       <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-        <InputField
-          label="Código de barras"
-          field="barcode"
-          v-model="form.barcode"
-          icon="barcode_scanner"
-          :error="form.errors.barcode"
+
+        <!-- CÓDIGOS -->
+        <div>
+          <label class="block text-sm font-semibold text-slate-600 mb-2">
+            Códigos de barras
+          </label>
+
+          <div class="space-y-3 max-h-[145px] overflow-y-auto pr-1">
+            <div
+              v-for="(barcode, index) in form.barcodes"
+              :key="index"
+              class="flex items-start gap-2"
+            >
+              <div class="flex-1">
+                <InputField
+                  label=""
+                  field="barcode"
+                  v-model="form.barcodes[index]"
+                  icon="barcode_scanner"
+                  :error="form.errors[`barcodes.${index}`]"
+                  :readonly="mode === 'view'"
+                />
+              </div>
+
+              <button
+                v-if="form.barcodes.length > 1 && mode !== 'view'"
+                type="button"
+                @click="removeBarcode(index)"
+                class="mt-[2px] h-[42px] min-w-[42px] rounded-xl border border-slate-300 bg-white text-black hover:bg-slate-100 transition"
+              >
+                −
+              </button>
+            </div>
+          </div>
+
+          <button
+            v-if="mode !== 'view'"
+            type="button"
+            @click="addBarcode"
+            class="mt-3 w-full h-11 rounded-xl border-2 border-dashed border-slate-300 bg-white text-slate-600 font-medium hover:border-black hover:text-black transition"
+          >
+            Agregar código alterno
+          </button>
+        </div>
+
+        <!-- IMAGEN -->
+        <div>
+          <label class="block text-sm font-semibold text-slate-600 mb-2">
+            Imagen del producto
+          </label>
+
+          <div class="border-2 border-dashed border-slate-300 rounded-2xl px-6 py-4 flex items-center gap-5 bg-slate-50">
+            <template v-if="imagePreview">
+              <img
+                :src="imagePreview"
+:class="mode === 'view'
+  ? 'w-40 h-40 object-contain rounded-2xl border bg-white'
+  : 'w-28 h-28 object-contain rounded-2xl shadow border bg-white'"              />
+            </template>
+
+            <template v-else>
+              <div class="w-28 h-28 rounded-2xl bg-white border flex items-center justify-center">
+                <span class="material-symbols-outlined text-4xl text-slate-400">
+                  image
+                </span>
+              </div>
+            </template>
+<div v-if="mode !== 'view'" class="flex-1">
+
+              <p class="text-sm font-semibold text-slate-900">
+                Imagen del producto
+              </p>
+
+              <p class="text-xs text-slate-500 mt-1">
+                JPG, PNG o WEBP
+              </p>
+
+              <template v-if="mode !== 'view'">
+                <input
+                  type="file"
+                  accept="image/*"
+                  class="mt-3 text-sm"
+                  @change="form.image = $event.target.files[0]"
+                />
+              </template>
+
+              <template v-else>
+                <p class="mt-3 text-xs text-green-600 font-medium">
+                  ✓ Imagen cargada
+                </p>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <SelectField
+          label="Categoría"
+          field="category_id"
+          v-model="form.category_id"
+          :error="form.errors.category_id"
+          :disabled="mode === 'view'"
+          :options="categoriesDB.map((category) => ({
+            value: category.id,
+            label: category.name,
+          }))"
+          placeholder="Selecciona categoría"
         />
-      <div>
-
-    <label class="block text-sm font-semibold text-slate-600 mb-2">
-        Imagen del producto
-    </label>
-
-    <div
-    class="border-2 border-dashed border-slate-300 rounded-2xl px-6 py-4 flex items-center gap-5 bg-slate-50"
->
-
-        <template v-if="form.image">
-
-    <img
-        :src="URL.createObjectURL(form.image)"
-        class="w-20 h-20 object-cover rounded-2xl shadow border"
-    />
-
-</template>
-
-<template v-else>
-
-    <div
-        class="w-20 h-20 rounded-2xl bg-white border flex items-center justify-center"
-    >
-        <span class="material-symbols-outlined text-4xl text-slate-400">
-            image
-        </span>
-    </div>
-
-</template>
-
-<div class="flex-1">
-
-    <p class="text-sm font-semibold text-slate-700">
-        Imagen del producto
-    </p>
-
-    <p class="text-xs text-slate-500 mt-1">
-        JPG, PNG o WEBP
-    </p>
-
-    <input
-        type="file"
-        accept="image/*"
-        class="mt-3 text-sm"
-        @change="form.image = $event.target.files[0]"
-    />
-
-</div>
-</div>
-
-</div>
 
         <InputField
           label="Nombre"
@@ -186,26 +282,14 @@ function submit() {
           :error="form.errors.name"
           :readonly="mode === 'view'"
         />
-        <InputField
-          label="Stock"
-          field="stock"
-          v-model="form.stock"
-          icon="package_2"
-        />
 
         <SelectField
-          label="Categoría"
-          field="category_id"
-          v-model="form.category_id"
-          :error="form.errors.category_id"
+          label="Unidad de medida"
+          field="unit"
+          v-model="form.unit"
+          :options="units"
+          placeholder="Selecciona unidad"
           :disabled="mode === 'view'"
-          :options="
-            categoriesDB.map((category) => ({
-              value: category.id,
-              label: category.name,
-            }))
-          "
-          placeholder="Selecciona categoría"
         />
 
         <InputField
@@ -219,25 +303,17 @@ function submit() {
           :readonly="mode === 'view'"
         />
 
-        <InputField
-          label="Precio venta"
-          field="sale_price"
-          v-model="form.sale_price"
-          prefix="$"
-          :error="form.errors.sale_price"
-          type="text"
-          step="0.01"
-          :readonly="mode === 'view'"
-        />
+       <InputField
+  label="Precio venta"
+  field="sale_price"
+  v-model="form.sale_price"
+  prefix="$"
+  :error="invalidPrice ? 'El precio de venta no puede ser menor al precio inicial' : form.errors.sale_price"
+  type="text"
+  step="0.01"
+  :readonly="mode === 'view'"
+/>
 
-        <InputField
-          label="Fecha de ingreso"
-          field="entry_date"
-          v-model="form.entry_date"
-          :error="form.errors.entry_date"
-          type="date"
-          :readonly="mode === 'view'"
-        />
       </div>
 
       <div class="flex justify-end gap-3 px-6 py-5 border-t">
@@ -256,6 +332,7 @@ function submit() {
           {{ mode === "create" ? "Crear producto" : "Actualizar producto" }}
         </button>
       </div>
+
     </div>
   </div>
 </template>

@@ -24,59 +24,45 @@ function stockColor(product) {
 
   return "bg-green-600";
 }
-</script>
-
-<template>
-  <div class="hidden md:block bg-white rounded-2xl shadow-sm overflow-hidden">
-    <!-- HEADER -->
-    <div class="flex items-center justify-between p-5 border-b">
-      <div>
-        <h2 class="text-lg font-semibold text-slate-800">
-          Gestión de Productos
-        </h2>
-
-        <p class="text-sm text-slate-500 mt-1">
-          {{ products.length }} productos encontrados
-        </p>
-      </div>
-    </div>
-
-    <!-- TABLA -->
+</script><template>
+  <div class="hidden md:block w-full bg-white overflow-hidden">
     <div class="overflow-x-auto">
-  <table class="w-full min-w-[1050px] text-sm">
-       <thead>
-    <tr class="border-b bg-slate-50">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-left px-5 py-4 font-semibold">
+              Código barras
+            </th>
 
-        <th class="text-left px-5 py-4 font-semibold">
-            Código barras
-        </th>
+            <th class="text-left px-5 py-4 font-semibold">
+              Imagen
+            </th>
 
-        <th class="text-left px-5 py-4 font-semibold">
-            Producto
-        </th>
+            <th class="text-left px-5 py-4 font-semibold">
+              Producto
+            </th>
 
-        <th class="text-left px-5 py-4 font-semibold">
-            Categoría
-        </th>
+            <th class="text-left px-5 py-4 font-semibold">
+              Categoría
+            </th>
 
-        <th class="text-left px-5 py-4 font-semibold">
-            Stock
-        </th>
+            <th class="text-left px-5 py-4 font-semibold">
+              Unidad de medida
+            </th>
 
-        <th class="text-left px-5 py-4 font-semibold">
-            Precio
-        </th>
+            <th class="text-left px-5 py-4 font-semibold">
+              Precio inicial
+            </th>
 
-        <th class="text-left px-5 py-4 font-semibold">
-            Fecha ingreso
-        </th>
+            <th class="text-left px-5 py-4 font-semibold">
+              Precio venta
+            </th>
 
-        <th class="text-center px-5 py-4 font-semibold">
-            Acciones
-        </th>
-
-    </tr>
-</thead>
+            <th class="text-center px-5 py-4 font-semibold">
+              Acciones
+            </th>
+          </tr>
+        </thead>
 
         <tbody>
           <tr
@@ -84,75 +70,68 @@ function stockColor(product) {
             :key="product.id"
             class="border-b hover:bg-slate-50 transition"
           >
-          <!-- CODIGO -->
-<td class="px-5 py-4 text-slate-500 whitespace-nowrap">
-    {{ product.barcode || 'Sin código' }}
+            <!-- CÓDIGO BARRAS -->
+            <td class="px-5 py-4 text-slate-500 whitespace-nowrap">
+              {{ product.barcode || product.barcodes?.[0] || "Sin código" }}
+            </td>
+
+            <!-- IMAGEN -->
+<td class="px-5 py-4">
+  <span
+    v-if="product.image"
+    class="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold"
+  >
+    ✓ Con imagen
+  </span>
+
+  <span
+    v-else
+    class="inline-flex items-center px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold"
+  >
+    ✕ Sin imagen
+  </span>
 </td>
 
+<!-- PRODUCTO -->
             <!-- PRODUCTO -->
             <td class="px-5 py-4">
-              <div class="flex items-center gap-3">
-                <img
-                  v-if="product.image"
-                  :src="product.image"
-                  class="w-12 h-12 rounded-xl object-cover border"
-                />
+              <div class="font-semibold text-slate-800">
+                {{ product.name }}
+              </div>
 
-                <div
-                  v-else
-                  class="w-12 h-12 rounded-xl border bg-slate-100 flex items-center justify-center text-slate-400"
-                >
-                  <span class="material-symbols-outlined text-[22px]">
-                    image
-                  </span>
-                </div>
-
-                <div>
-                  <div class="font-semibold text-slate-800">
-                    {{ product.name }}
-                  </div>
-
-                  <div
-                    v-if="product.presentation"
-                    class="text-xs text-slate-400 mt-1"
-                  >
-                    {{ product.presentation }}
-                  </div>
-                </div>
+              <div
+                v-if="product.presentation"
+                class="text-xs text-slate-400 mt-1"
+              >
+                {{ product.presentation }}
               </div>
             </td>
 
-            <!-- CATEGORIA -->
+            <!-- CATEGORÍA -->
             <td class="px-5 py-4">
-              <span
-                class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs"
-              >
-                {{ product.category_name }}
+              <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs">
+                {{ product.category_name || product.category || "Sin categoría" }}
               </span>
             </td>
 
-            <!-- STOCK -->
-            <td class="px-5 py-4">
-              <span
-                class="text-white text-xs font-semibold px-3 py-1 rounded-full"
-                :class="stockColor(product)"
-              >
-                {{ product.stock }}
-              </span>
+            <!-- UNIDAD DE MEDIDA -->
+            <td class="px-5 py-4 text-slate-600">
+              {{ product.unit || product.unit_name || "Sin unidad" }}
             </td>
 
-            <!-- PRECIO -->
-            <td class="px-5 py-4 font-semibold text-slate-800">
-              ${{ product.price }}
+            <!-- PRECIO INICIAL -->
+            <td class="px-5 py-4 font-semibold text-slate-800 whitespace-nowrap">
+              ${{ product.cost || product.initial_price || "0.00" }}
             </td>
-            <!-- fecha -->
-     
-<td class="px-5 py-4 text-slate-600 whitespace-nowrap">
-    {{ product.entry_date || 'Sin fecha' }}
-</td>
 
+            <!-- PRECIO VENTA -->
+            <td class="px-5 py-4 font-semibold text-slate-800 whitespace-nowrap">
+              ${{ product.price || product.sale_price || product.salePrice || "0.00" }}
+            </td>
+
+            <!-- ACCIONES -->
             <td class="px-5 py-4">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center justify-center gap-2">
                 <ActionIconButton
                   v-if="can('inventario.ver')"
                   icon="visibility"
@@ -180,9 +159,8 @@ function stockColor(product) {
             </td>
           </tr>
 
-          <!-- VACIO -->
           <tr v-if="products.length === 0">
-            <td colspan="7" class="text-center py-16 text-slate-400">
+            <td colspan="8" class="text-center py-16 text-slate-400">
               No se encontraron productos
             </td>
           </tr>
