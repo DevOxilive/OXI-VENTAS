@@ -17,6 +17,10 @@ const props = defineProps({
         type: Boolean,
         default: true,
     },
+    maxHeight: {
+        type: [Number, String],
+        default: 140,
+    },
 })
 
 const emit = defineEmits(['update:modelValue', 'validate'])
@@ -27,11 +31,28 @@ const textareaId = computed(() =>
 
 const fieldConfig = computed(() => fieldRegistry[props.field])
 
+const textareaMaxHeight = computed(() => {
+    return typeof props.maxHeight === 'number'
+        ? `${props.maxHeight}px`
+        : props.maxHeight
+})
+
 function resizeTextarea(textarea) {
     if (!props.autoResize || !textarea) return
 
     textarea.style.height = 'auto'
-    textarea.style.height = `${textarea.scrollHeight}px`
+
+    const scrollHeight = textarea.scrollHeight
+    const maxHeight = parseInt(textareaMaxHeight.value, 10)
+
+    if (scrollHeight > maxHeight) {
+        textarea.style.height = `${maxHeight}px`
+        textarea.style.overflowY = 'auto'
+        return
+    }
+
+    textarea.style.height = `${scrollHeight}px`
+    textarea.style.overflowY = 'hidden'
 }
 
 function handleInput(e) {
@@ -76,8 +97,9 @@ function blockExtraInput(e) {
         </label>
 
         <textarea :id="textareaId" :name="field" :value="modelValue" :rows="rows" :readonly="readonly"
-            @keydown="blockExtraInput" @input="handleInput" @blur="emit('validate', field)" :class="[
-                'w-full px-4 py-3 rounded-xl border outline-none transition text-sm resize-none overflow-hidden',
+            :style="{ maxHeight: textareaMaxHeight }" @keydown="blockExtraInput" @input="handleInput"
+            @blur="emit('validate', field)" :class="[
+                'w-full px-4 py-3 rounded-xl border outline-none transition text-sm resize-none',
                 readonly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white',
                 error ? 'border-red-500 bg-red-50' : 'border-slate-300 focus:border-[#1f1d2b]'
             ]" />

@@ -1,15 +1,30 @@
 <script setup>
 import { computed, ref, watch } from "vue";
+import { router } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 
-import ProductFilters from "@/Components/Inventory/ProductFilters.vue";
-import ProductTable from "@/Components/Inventory/ProductTable.vue";
-import ProductMobileCards from "@/Components/Inventory/ProductMobileCards.vue";
-import ProductRegisterModal from "@/Components/Inventory/ProductRegisterModal.vue";
+import ProductToolbar from "@/Components/Inventory/BranchProducts/ProductToolbar.vue";
+import ProductTable from "@/Components/Inventory/BranchProducts/ProductTable.vue";
+import ProductMobileCards from "@/Components/Inventory/BranchProducts/ProductMobileCards.vue";
+import ProductRegisterModal from "@/Components/Inventory/BranchProducts/ProductRegisterModal.vue";
 
 defineOptions({
   layout: AdminLayout,
+});
+
+const props = defineProps({
+  productsDB: {
+    type: [Object, Array],
+    default: () => ({ data: [] }),
+  },
+  filters: {
+    type: Object,
+    default: () => ({
+      search: "",
+      per_page: 50,
+    }),
+  },
 });
 
 const showModal = ref(false);
@@ -17,13 +32,12 @@ const modalMode = ref("create");
 const frontendErrors = ref({});
 const processing = ref(false);
 
-const search = ref("");
+const search = ref(props.filters?.search ?? "");
 const branchFilter = ref("");
 const categoryFilter = ref("");
 const stockFilter = ref("");
 
-const recordsToShow = ref(10);
-const currentPage = ref(1);
+const recordsToShow = ref(Number(props.filters?.per_page ?? 50));
 
 const product = ref({
   code: "",
@@ -45,93 +59,77 @@ const product = ref({
   errors: {},
 });
 
-const productsDB = ref([
-  {
-    id: 1,
-    code: "OXI-001",
-    barcode: "750100000001",
-    name: "Tanque de oxígeno 680L",
-    category: "Oxígeno medicinal",
-    branch: "Sucursal Centro",
-    stock: 8,
-    minStock: 10,
-    salePrice: 1450,
-    expirationDate: "2026-07-20",
-    status: "Stock bajo",
-  },
-  {
-    id: 2,
-    code: "OXI-002",
-    barcode: "750100000002",
-    name: "Concentrador de oxígeno",
-    category: "Equipo médico",
-    branch: "Sucursal Norte",
-    stock: 12,
-    minStock: 5,
-    salePrice: 12500,
-    expirationDate: "",
-    status: "Disponible",
-  },
-  {
-    id: 3,
-    code: "OXI-003",
-    barcode: "750100000003",
-    name: "Mascarilla nebulizadora",
-    category: "Accesorios",
-    branch: "Sucursal Sur",
-    stock: 0,
-    minStock: 15,
-    salePrice: 120,
-    expirationDate: "2026-06-01",
-    status: "Agotado",
-  },
-]);
+const products = computed(() => {
+  if (Array.isArray(props.productsDB)) {
+    return props.productsDB;
+  }
+
+  return props.productsDB?.data ?? [];
+});
+
+const paginationLinks = computed(() => {
+  return Array.isArray(props.productsDB?.links)
+    ? props.productsDB.links
+    : [];
+});
+
+const hasPagination = computed(() => {
+  return !Array.isArray(props.productsDB) && paginationLinks.value.length > 0;
+});
+
 const filteredProducts = computed(() => {
-
-  return productsDB.value.filter((product) => {
-
-    const term = search.value.toLowerCase();
-
-    const matchesSearch =
-      product.name.toLowerCase().includes(term) ||
-      product.code.toLowerCase().includes(term);
-
+  return products.value.filter((product) => {
     const matchesBranch =
-      !branchFilter.value || product.branch === branchFilter.value;
+      !branchFilter.value || product.branch_name === branchFilter.value || product.branch === branchFilter.value;
 
     const matchesCategory =
-      !categoryFilter.value || product.category === categoryFilter.value;
+      !categoryFilter.value || product.category_name === categoryFilter.value || product.category === categoryFilter.value;
 
     const matchesStock =
       !stockFilter.value || product.status === stockFilter.value;
 
-    return matchesSearch && matchesBranch && matchesCategory && matchesStock;
-    })
-
-  
+    return matchesBranch && matchesCategory && matchesStock;
+  });
 });
 
-const totalPages = computed(() => {
-  return Math.max(
-    1,
-    Math.ceil(filteredProducts.value.length / recordsToShow.value)
+let searchTimeout = null;
+
+watch(search, () => {
+  clearTimeout(searchTimeout);
+
+  searchTimeout = setTimeout(() => {
+    reloadProducts();
+  }, 400);
+});
+
+watch(recordsToShow, () => {
+  reloadProducts();
+});
+
+function reloadProducts() {
+  router.get(
+    window.location.pathname,
+    {
+      search: search.value || undefined,
+      per_page: recordsToShow.value,
+    },
+    {
+      preserveState: true,
+      preserveScroll: true,
+      replace: true,
+    }
   );
-});
+}
 
-const paginatedProducts = computed(() => {
-  const start = (currentPage.value - 1) * recordsToShow.value;
-  const end = start + recordsToShow.value;
+function goToPage(url) {
+  if (!url) return;
 
-  return filteredProducts.value.slice(start, end);
-});
-
-
-watch(
-  [search, branchFilter, categoryFilter, stockFilter, recordsToShow],
-  () => {
-    currentPage.value = 1;
-  }
-);
+  router.visit(url, {
+    preserveState: true,
+    preserveScroll: true,
+    replace: true,
+  });
+}
 
 function resetProduct() {
   product.value = {
@@ -290,7 +288,10 @@ function adjustStock(selectedProduct) {
   console.log("Ajustar stock", selectedProduct);
 }
 
-
+function deleteProduct(selectedProduct) {
+  console.log("Eliminar producto", selectedProduct);
+}
+</script>
 
 </script>
 <template>
@@ -312,36 +313,26 @@ function adjustStock(selectedProduct) {
       />
     </div>
 
-    <div class="flex items-center justify-between mt-6">
-      <button
-        @click="currentPage--"
-        :disabled="currentPage === 1"
-        class="px-4 py-2 rounded-xl border border-slate-300 bg-white text-sm disabled:opacity-40"
-      >
-        Anterior
-      </button>
+    <ProductToolbar :total="props.productsDB?.total ?? filteredProducts.length" v-model:records-to-show="recordsToShow"
+      @create="openCreateModal" />
 
-      <div class="text-sm text-slate-500">
-        Página {{ currentPage }} de {{ totalPages }}
-      </div>
+    <ProductTable :filtered-products="filteredProducts" v-model:search="search" v-model:branch-filter="branchFilter"
+      v-model:category-filter="categoryFilter" v-model:stock-filter="stockFilter" @view="openViewModal"
+      @edit="openEditModal" @adjust="adjustStock" @delete="deleteProduct" />
 
-      <button
-        @click="currentPage++"
-        :disabled="currentPage === totalPages"
-        class="px-4 py-2 rounded-xl border border-slate-300 bg-white text-sm disabled:opacity-40"
-      >
-        Siguiente
-      </button>
+
+    <ProductMobileCards :filtered-products="filteredProducts" @view="openViewModal" @edit="openEditModal"
+      @adjust="adjustStock" @delete="deleteProduct" />
+
+    <div v-if="hasPagination" class="flex flex-wrap items-center justify-center gap-2 mt-6">
+      <button v-for="link in paginationLinks" :key="link.label" type="button" :disabled="!link.url"
+        class="px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 disabled:cursor-not-allowed" :class="link.active
+          ? 'bg-slate-900 text-white border-slate-900'
+          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'" @click="goToPage(link.url)"
+        v-html="link.label" />
     </div>
 
-    <ProductRegisterModal
-      v-if="showModal"
-      :modo="modalMode"
-      :product="product"
-      :frontend-errors="frontendErrors"
-      @close="closeModal"
-      @save="submitProduct"
-      @validate="validateField"
-    />
+    <ProductRegisterModal v-if="showModal" :modo="modalMode" :product="product" :frontend-errors="frontendErrors"
+      @close="closeModal" @save="submitProduct" @validate="validateField" />
   </section>
 </template>

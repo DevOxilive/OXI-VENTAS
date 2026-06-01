@@ -8,7 +8,9 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\Inventory\ReportController;
 use App\Http\Controllers\Inventory\ProductController;
+use App\Http\Controllers\Inventory\ProductBatchController;
 use App\Http\Controllers\Inventory\StockMovementController;
+use App\Http\Controllers\Inventory\PurchaseReportController;
 use App\Http\Controllers\Inventory\BranchInventoryController;
 
 
@@ -170,78 +172,90 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-  /*
+    /*
 |--------------------------------------------------------------------------
 | INVENTORY
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:Inventario,Administrador'])
-    ->prefix('inventory')
-    ->name('inventory.')
-    ->group(function () {
+    Route::middleware(['auth', 'role:Inventario,Administrador'])
+        ->prefix('inventory')
+        ->name('inventory.')
+        ->group(function () {
 
-        Route::get('/dashboard', fn() =>
-            Inertia::render('Inventory/Dashboard')
-        )->name('dashboard');
+            Route::get(
+                '/dashboard',
+                fn() =>
+                Inertia::render('Inventory/Dashboard')
+            )->name('dashboard');
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | PRODUCTS BY BRANCH
         |--------------------------------------------------------------------------
         */
 
-        Route::get('/branches/{branch:slug}/products', [ProductController::class, 'index'])
-            ->name('branches.products.index');
+            Route::get('/branches/{branch:slug}/products', [ProductController::class, 'index'])
+                ->name('branches.products.index');
 
-        Route::post('/branches/{branch:slug}/products', [ProductController::class, 'store'])
-            ->name('branches.products.store');
+            Route::post('/branches/{branch:slug}/products', [ProductController::class, 'store'])
+                ->name('branches.products.store');
 
-Route::put('/branches/{branch:slug}/products/{product}', [ProductController::class, 'update'])
-    ->name('branches.products.update');
+            Route::put('/branches/{branch:slug}/products/{product}', [ProductController::class, 'update'])
+                ->name('branches.products.update');
 
-        Route::delete('/branches/{branch:slug}/products/{product}', [ProductController::class, 'destroy'])
-            ->name('branches.products.destroy');
+            Route::delete('/branches/{branch:slug}/products/{product}', [ProductController::class, 'destroy'])
+                ->name('branches.products.destroy');
 
-        /*
+            /*
         |--------------------------------------------------------------------------
         | GENERAL INVENTORY
         |--------------------------------------------------------------------------
         */
 
-        Route::get('/expirations', fn() =>
-            Inertia::render('Inventory/Expirations')
-        )->name('expirations');
+            Route::get(
+                '/expirations',
+                fn() =>
+                Inertia::render('Inventory/Expirations')
+            )->name('expirations');
 
-        Route::get('/transfers', fn() =>
-            Inertia::render('Inventory/Transfers')
-        )->name('transfers');
+            Route::get(
+                '/transfers',
+                fn() =>
+                Inertia::render('Inventory/Transfers')
+            )->name('transfers');
 
-        Route::get('/adjustments', fn() =>
-            Inertia::render('Inventory/Adjustments')
-        )->name('adjustments');
-Route::get('/reports', fn() =>
-    Inertia::render('Inventory/Reports')
-)->name('reports');
+            Route::get(
+                '/adjustments',
+                fn() =>
+                Inertia::render('Inventory/Adjustments')
+            )->name('adjustments');
+            Route::get(
+                '/reports',
+                fn() =>
+                Inertia::render('Inventory/Reports')
+            )->name('reports');
 
-        Route::get('/stock-movements', [StockMovementController::class, 'index'])
-            ->name('stock-movements.index');
+            Route::get('/stock-movements', [StockMovementController::class, 'index'])
+                ->name('stock-movements.index');
 
-        Route::post('/stock-movements', [StockMovementController::class, 'store'])
-            ->name('stock-movements.store');
+            Route::post('/stock-movements', [StockMovementController::class, 'store'])
+                ->name('stock-movements.store');
 
-        Route::get('/movements', [StockMovementController::class, 'index'])
-            ->name('movements');
-            
-    Route::get('/reports', fn() =>
-    Inertia::render('Inventory/Reports')
-)->name('reports');
+            Route::get('/movements', [StockMovementController::class, 'index'])
+                ->name('movements');
+
+            Route::get(
+                '/reports',
+                fn() =>
+                Inertia::render('Inventory/Reports')
+            )->name('reports');
 
             Route::get('/stock-movements', [StockMovementController::class, 'index'])->name('stock-movements.index');
 
             Route::post('/stock-movements', [StockMovementController::class, 'store'])->name('stock-movements.store');
-            
-                 Route::get(
+
+            Route::get(
                 '/movements',
                 fn() => Inertia::render('Inventory/Movements')
             )->name('movements');
@@ -249,14 +263,13 @@ Route::get('/reports', fn() =>
                 '/reports',
                 fn() => Inertia::render('Inventory/Reports')
             )->name('reports');
-    });
+        });
 
     /*
     |--------------------------------------------------------------------------
     | INVENTARIO - TUS RUTAS EN ESPAÑOL
     |--------------------------------------------------------------------------
     */
-
     Route::middleware(['auth', 'role:Inventario,Administrador'])
         ->prefix('inventario')
         ->name('inventario.')
@@ -278,16 +291,43 @@ Route::get('/reports', fn() =>
 
             Route::get('/ajustes', fn() => Inertia::render('Inventory/Adjustments'))->name('ajustes');
 
-            Route::get('/branches/{branch}/reports', [ReportController::class, 'index'])->name('branches.reports');
+            Route::get('/branches/{branch}/reports', [ReportController::class, 'index'])
+                ->name('branches.reports');
 
-            Route::get('/stock-movements', [StockMovementController::class, 'index'])->name('stock-movements.index');
+            Route::get('/stock-movements', [StockMovementController::class, 'index'])
+                ->name('stock-movements.index');
 
-            Route::post('/stock-movements', [StockMovementController::class, 'store'])->name('stock-movements.store');
+            Route::post('/stock-movements', [StockMovementController::class, 'store'])
+                ->name('stock-movements.store');
 
-            Route::get('/branches/{branch}/inventory', [BranchInventoryController::class, 'show'])->name('branches.inventory');
+            Route::put('/product-batches/{productBatch}', [ProductBatchController::class, 'update'])
+                ->name('product-batches.update');
 
-            Route::post('/inventario-sucursales', [BranchInventoryController::class, 'store'])->name('branch-inventory.store');
+            Route::get('/branches/{branch}/inventory', [BranchInventoryController::class, 'show'])
+                ->name('branches.inventory');
 
-            Route::get('/movimientos', [StockMovementController::class, 'index'])->name('movimientos');
+            Route::post('/inventario-sucursales', [BranchInventoryController::class, 'store'])
+                ->name('branch-inventory.store');
+
+            Route::get('/branches/{branch}/purchase-reports/create', [PurchaseReportController::class, 'create'])
+                ->name('branches.purchase-reports.create');
+
+            Route::post('/branches/{branch}/purchase-reports', [PurchaseReportController::class, 'store'])
+                ->name('branches.purchase-reports.store');
+
+            Route::put('/branches/{branch}/purchase-reports/{purchaseReport}', [PurchaseReportController::class, 'update'])
+                ->name('branches.purchase-reports.update');
+
+            Route::post('/branches/{branch}/purchase-reports/{purchaseReport}/generate', [PurchaseReportController::class, 'generate'])
+                ->name('branches.purchase-reports.generate');
+
+            Route::get('/branches/{branch}/purchase-reports', [PurchaseReportController::class, 'index'])
+                ->name('branches.purchase-reports.index');
+
+            Route::get('/branches/{branch}/purchase-reports/{purchaseReport}', [PurchaseReportController::class, 'show'])
+                ->name('branches.purchase-reports.show');
+
+            Route::get('/movimientos', [StockMovementController::class, 'index'])
+                ->name('movimientos');
         });
 });

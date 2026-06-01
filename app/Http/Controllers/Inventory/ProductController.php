@@ -18,6 +18,18 @@ class ProductController extends Controller
     public function index(Request $request, Branch $branch)
     {
         $query = BranchProduct::query()
+            ->select([
+                'id',
+                'branch_id',
+                'product_id',
+                'price',
+                'stock',
+                'min_stock',
+                'tracks_batches',
+                'tracks_expiration',
+                'active',
+                'created_at',
+            ])
             ->with([
                 'branch:id,name,slug',
                 'product:id,name,image,description,category_id,subcategory_id,cost,sale_price,active,created_at',
@@ -26,6 +38,16 @@ class ProductController extends Controller
             ])
             ->where('branch_id', $branch->id)
             ->where('active', true)
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = $request->search;
+
+                $query->whereHas('product', function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhereHas('barcodes', function ($query) use ($search) {
+                            $query->where('code', 'like', "%{$search}%");
+                        });
+                });
+            })
             ->orderByDesc('id');
 
         return Inertia::render('Inventory/Home', [
@@ -36,79 +58,52 @@ class ProductController extends Controller
             ],
 
             'productsDB' => $query
-                ->get()
-                ->map(function ($item) {
+                ->paginate((int) $request->input('per_page', 50))
+                ->through(function ($item) {
                     $product = $item->product;
 
                     return [
                         'id' => $product?->id,
                         'branch_product_id' => $item->id,
-                        'barcodes' => $product?->barcodes?->pluck('code')->values() ?? [],
-
-                        'barcode' => $product?->barcodes?->first()?->code
-                            ?? $item->barcode
-                            ?? 'Sin código',
-
-                        'unit' => $item->unit ?? '',
-
-                        'name' => $product?->name
-                            ?? $item->name
-                            ?? 'Producto sin nombre',
-
+                        'barcode' => $product?->barcodes?->first()?->code ?? 'Sin código',
+                        'name' => $product?->name ?? 'Producto sin nombre',
                         'image' => $product?->image
                             ? asset('storage/' . $product->image)
                             : null,
-
-                        'image_path' => $product?->image,
-
                         'presentation' => $product?->description,
-
-                        'category_id' => $product?->category_id
-                            ?? $item->category_id,
-
-                        'category_name' => $product?->category?->name
-                            ?? 'Sin categoría',
-
+                        'category_id' => $product?->category_id,
+                        'category_name' => $product?->category?->name ?? 'No category',
                         'branch_id' => $item->branch_id,
                         'branch_name' => $item->branch?->name ?? 'General',
                         'branch_slug' => $item->branch?->slug,
-
                         'stock' => $item->stock,
                         'min_stock' => $item->min_stock,
-
-                        'cost' => $item->cost ?? $product?->cost ?? 0,
-                        'price' => $item->price ?? $product?->sale_price ?? 0,
-                        'sale_price' => $item->price ?? $product?->sale_price ?? 0,
-                        'salePrice' => $item->price ?? $product?->sale_price ?? 0,
-
-
-
-
-
+                        'cost' => number_format($product?->cost ?? 0, 2),
+                        'price' => number_format($item->price ?? 0, 2),
+                        'salePrice' => number_format($product?->sale_price ?? 0, 2),
                         'profit' => number_format(
-                            ($item->price ?? 0) - ($item->cost ?? $product?->cost ?? 0),
+                            ($item->price ?? 0) - ($product?->cost ?? 0),
                             2
                         ),
-
                         'tracks_batches' => $item->tracks_batches,
                         'tracks_expiration' => $item->tracks_expiration,
-
-                        'entry_date' => $item->entry_date
-                            ?? optional($item->created_at)->format('Y-m-d')
-                            ?? 'Sin fecha',
+                        'entry_date' => optional($item->created_at)->format('Y-m-d') ?? 'Sin fecha',
                     ];
-                }),
+                })
+                ->withQueryString(),
 
-
-            'categoriesDB' => Category::select('id', 'name')
+            'categoriesDB' => Category::query()
+                ->select(['id', 'name'])
                 ->orderBy('name')
                 ->get(),
 
-            'subcategoriesDB' => Subcategory::select('id', 'category_id', 'name')
+            'subcategoriesDB' => Subcategory::query()
+                ->select(['id', 'category_id', 'name'])
                 ->orderBy('name')
                 ->get(),
 
-            'branchesDB' => Branch::select('id', 'name', 'slug')
+            'branchesDB' => Branch::query()
+                ->select(['id', 'name', 'slug'])
                 ->orderBy('name')
                 ->get(),
 
@@ -122,23 +117,16 @@ class ProductController extends Controller
     public function store(Request $request, Branch $branch)
     {
         $data = $request->validate([
-            'barcodes' => ['nullable', 'array'],
-            'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct', 'unique:barcodes,code'],
-
-            'unit' => ['required', 'string', 'max:20'],
+            'barcode' => ['nullable', 'string', 'max:100', 'unique:barcodes,code'],
             'name' => ['required', 'string', 'max:255'],
             'image' => ['nullable', 'image', 'max:2048'],
-            'stock' => ['nullable', 'numeric', 'min:0'],
+            'stock' => ['required', 'numeric', 'min:0'],
             'category_id' => ['required', 'exists:categories,id'],
             'cost' => ['required', 'numeric', 'min:0'],
-           'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
+            'sale_price' => ['required', 'numeric', 'min:0'],
             'entry_date' => ['required', 'date'],
             'active' => ['boolean'],
         ]);
-
-        $barcodes = collect($data['barcodes'] ?? [])
-            ->filter(fn($code) => filled($code))
-            ->values();
 
         $imagePath = null;
 
@@ -146,7 +134,7 @@ class ProductController extends Controller
             $imagePath = $request->file('image')->store('products', 'public');
         }
 
-        DB::transaction(function () use ($data, $branch, $imagePath, $barcodes) {
+        DB::transaction(function () use ($data, $branch, $imagePath) {
             $product = Product::create([
                 'name' => $data['name'],
                 'description' => null,
@@ -154,14 +142,15 @@ class ProductController extends Controller
                 'cost' => $data['cost'],
                 'sale_price' => $data['sale_price'],
                 'category_id' => $data['category_id'],
+                'subcategory_id' => null,
                 'active' => true,
             ]);
 
-            foreach ($barcodes as $index => $code) {
+            if (!empty($data['barcode'])) {
                 DB::table('barcodes')->insert([
                     'product_id' => $product->id,
-                    'code' => $code,
-                    'type' => $index === 0 ? 'PRINCIPAL' : 'ALTERNO',
+                    'code' => $data['barcode'],
+                    'type' => 'EAN13',
                     'base_quantity' => 1,
                     'active' => true,
                     'created_at' => now(),
@@ -172,11 +161,10 @@ class ProductController extends Controller
             BranchProduct::create([
                 'branch_id' => $branch->id,
                 'product_id' => $product->id,
-                'barcode' => $barcodes->first(),
+                'barcode' => $data['barcode'],
                 'name' => $data['name'],
                 'category_id' => $data['category_id'],
-                'unit' => $data['unit'],
-                'stock' => $data['stock'] ?? 0,
+                'stock' => $data['stock'],
                 'cost' => $data['cost'],
                 'price' => $data['sale_price'],
                 'min_stock' => 0,
@@ -184,6 +172,12 @@ class ProductController extends Controller
                 'active' => true,
             ]);
         });
+
+        return back()->with('success', 'Producto creado correctamente');
+    }
+    public function update(Request $request, Branch $branch, Product $product)
+    {
+        $barcodeId = optional($product->barcodes()->first())->id;
 
         return back()->with('success', 'Producto creado correctamente');
     }
@@ -279,23 +273,14 @@ if ($duplicatedBarcode) {
 
         return back()->with('success', 'Producto actualizado correctamente');
     }
-
-  public function destroy(Branch $branch, Product $product)
-{
-    DB::transaction(function () use ($branch, $product) {
+    public function destroy(Branch $branch, Product $product)
+    {
         BranchProduct::where('branch_id', $branch->id)
             ->where('product_id', $product->id)
-            ->delete();
+            ->update([
+                'active' => false,
+            ]);
 
-        $productStillExistsInBranches = BranchProduct::where('product_id', $product->id)
-            ->exists();
-
-        if (!$productStillExistsInBranches) {
-            $product->barcodes()->delete();
-            $product->delete();
-        }
-    });
-
-    return back()->with('success', 'Producto eliminado correctamente');
-}
+        return back()->with('success', 'Producto eliminado de esta sucursal correctamente');
+    }
 }

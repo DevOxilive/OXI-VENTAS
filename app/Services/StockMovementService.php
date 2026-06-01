@@ -72,7 +72,8 @@ class StockMovementService
                 'notes' => $notes,
             ]);
 
-            if ($type === 'IN' && count($batches) > 0) {
+            if ($type === 'IN') {
+
                 if (! $tracksBatches) {
                     $branchProduct->update([
                         'tracks_batches' => true,
@@ -80,6 +81,22 @@ class StockMovementService
                     ]);
 
                     $tracksBatches = true;
+                }
+
+                /**
+                 * Si no se registraron lotes manualmente,
+                 * creamos un batch técnico sin lote.
+                 */
+                if (count($batches) === 0) {
+
+                    $batches = [
+                        [
+                            'lot_number' => null,
+                            'expiration_date' => null,
+                            'quantity' => $quantity,
+                            'supplier' => null,
+                        ],
+                    ];
                 }
 
                 $this->createIncomingBatches(

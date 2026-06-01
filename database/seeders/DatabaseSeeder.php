@@ -20,33 +20,17 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
             PositionSeeder::class,
 
-            CategorySeeder::class,
-            SubcategorySeeder::class,
-
-
             SupplierSeeder::class,
             CustomerSeeder::class,
             PaymentMethodSeeder::class,
 
-            ProductSeeder::class,
-            BarcodeSeeder::class,
-
-            InventoryLotSeeder::class,
-            BranchInventorySeeder::class,
-
             PurchaseSeeder::class,
-            PurchaseDetailSeeder::class,
-
-            InventoryMovementSeeder::class,
-
-            SaleSeeder::class,
-            SaleDetailSeeder::class,
 
             VehicleSeeder::class,
             TripSeeder::class,
             TripDetailSeeder::class,
             IncidentSeeder::class,
-      
+
         ]);
     }
 }

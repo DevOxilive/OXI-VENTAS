@@ -1,11 +1,15 @@
 <script setup>
 import { onMounted, onBeforeUnmount, computed } from 'vue'
+
 import { useAdjustStockForm } from '@/Composables/Inventory/useAdjustStockForm'
+import { useEditBatchModal } from '@/Composables/Inventory/useEditBatchModal'
 
 import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
 import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
 import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
-import AdjustStockData from '@/Components/Inventory/AdjustStockData.vue'
+
+import AdjustStockData from '@/Components/Inventory/BranchProducts/AdjustStockData.vue'
+import EditBatchModal from '@/Components/Inventory/BranchProducts/EditBatchModal.vue'
 
 const emit = defineEmits(['close'])
 
@@ -34,9 +38,12 @@ const {
     totalManualBatchQuantity,
 } = useAdjustStockForm(props, emit)
 
-function closeModal() {
-    emit('close')
-}
+const {
+    showEditBatchModal,
+    liveSelectedBatch,
+    editBatch,
+    closeEditBatchModal,
+} = useEditBatchModal(props)
 
 const saveButtonText = computed(() => {
     if (form.processing) return 'Procesando...'
@@ -46,8 +53,21 @@ const saveButtonText = computed(() => {
 
 const totalErrors = computed(() => errorSummary.value.length)
 
+function closeModal() {
+    if (showEditBatchModal.value) return
+
+    emit('close')
+}
+
 function handleEsc(e) {
-    if (e.key === 'Escape') closeModal()
+    if (e.key === 'Escape') {
+        if (showEditBatchModal.value) {
+            closeEditBatchModal()
+            return
+        }
+
+        closeModal()
+    }
 }
 
 onMounted(() => {
@@ -65,6 +85,7 @@ onBeforeUnmount(() => {
 
         <div
             class="relative bg-white w-full h-[100dvh] sm:h-[100dvh] md:h-[94vh] md:w-[96%] md:max-w-7xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+
             <GeneralModalHeader title="Ajustar stock" subtitle="Movimiento de inventario por sucursal"
                 :total-errors="totalErrors" mode="create" @close="closeModal" />
 
@@ -74,11 +95,15 @@ onBeforeUnmount(() => {
                     :projected-stock="projectedStock" :recent-movements="product.recentMovements || []"
                     :total-batch-quantity="totalBatchQuantity" :total-manual-batch-quantity="totalManualBatchQuantity"
                     @validate="validateField" @add-batch="addBatch" @remove-batch="removeBatch"
-                    @add-manual-batch="addManualBatch" @remove-manual-batch="removeManualBatch" />
+                    @add-manual-batch="addManualBatch" @remove-manual-batch="removeManualBatch"
+                    @edit-batch="editBatch" />
             </GeneralModalContent>
 
             <GeneralModalFooter :processing="form.processing" :save-button-text="saveButtonText" mode="create"
                 @save="saveAdjustment" @close="closeModal" />
         </div>
+
+        <EditBatchModal v-if="showEditBatchModal && liveSelectedBatch" :batch="liveSelectedBatch"
+            @close="closeEditBatchModal" />
     </div>
 </template>

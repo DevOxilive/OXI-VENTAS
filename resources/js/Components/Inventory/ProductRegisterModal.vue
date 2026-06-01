@@ -4,7 +4,7 @@ import { computed, onMounted, onBeforeUnmount } from 'vue'
 import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
 import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
 import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
-import ProductData from '@/Components/Inventory/ProductData.vue'
+import ProductData from '@/Components/Inventory/BranchProducts/ProductData.vue'
 
 const emit = defineEmits(['close', 'save', 'validate'])
 

@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import InventoryStatsCards from '@/Components/Inventory/InventoryStatsCards.vue'
+import InventoryStatsCards from '@/Components/Inventory/BranchProducts/InventoryStatsCards.vue'
 
 defineOptions({ layout: AdminLayout })
 
