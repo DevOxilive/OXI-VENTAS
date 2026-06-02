@@ -17,7 +17,7 @@ export function useAdjustStockForm(props, emit) {
         quantity: "",
         notes: "",
         batches: [],
-        batch_allocation_method: "FEFO_AUTO",
+        batch_allocation_method: "MANUAL",
         manual_batches: [],
     });
 
@@ -31,25 +31,18 @@ export function useAdjustStockForm(props, emit) {
 
     const reasonOptions = computed(() => {
         if (form.type === "IN") {
-            return [
-                { label: "Compra", value: "PURCHASE" },
-                { label: "Transferencia", value: "TRANSFER" },
-                { label: "Ajuste manual", value: "MANUAL" },
-            ];
+            return [{ label: "Compra", value: "PURCHASE" }];
         }
 
         if (form.type === "OUT") {
             return [
                 { label: "Venta", value: "SALE" },
                 { label: "Producto dañado", value: "DAMAGED" },
-                { label: "Producto robado", value: "STOLEN" },
                 { label: "Producto caducado", value: "EXPIRED" },
-                { label: "Transferencia", value: "TRANSFER" },
-                { label: "Ajuste manual", value: "MANUAL" },
             ];
         }
 
-        return [{ label: "Ajuste manual", value: "MANUAL" }];
+        return [{ label: "Ajuste manual", value: "INVENTORY_DIFFERENCE" }];
     });
 
     const currentStock = computed(() => Number(props.product.stock ?? 0));
@@ -72,7 +65,7 @@ export function useAdjustStockForm(props, emit) {
         if (form.type === "IN") return currentStock.value + quantity;
         if (form.type === "OUT") return currentStock.value - quantity;
 
-        return quantity;
+        return currentStock.value + quantity;
     });
 
     const errorSummary = computed(() => {
@@ -85,14 +78,16 @@ export function useAdjustStockForm(props, emit) {
     watch(
         () => form.type,
         () => {
-            form.reason = reasonOptions.value[0]?.value ?? "MANUAL";
-            form.batch_allocation_method =
-                form.type === "OUT" ? "FEFO_AUTO" : null;
+            form.reason =
+                reasonOptions.value[0]?.value ?? "INVENTORY_DIFFERENCE";
+            form.batch_allocation_method = "MANUAL";
+            form.batches = [];
             form.manual_batches = [];
 
             frontendErrors.type = "";
             frontendErrors.reason = "";
             frontendErrors.stock = "";
+            frontendErrors.batches = "";
             frontendErrors.manual_batches = "";
         },
     );
@@ -120,14 +115,12 @@ export function useAdjustStockForm(props, emit) {
     }
 
     function addManualBatch(batch) {
-        const exists = form.manual_batches.find(
-            (item) => item.product_batch_id === batch.id,
-        );
+        const exists = form.manual_batches.find((item) => item.id === batch.id);
 
         if (exists) return;
 
         form.manual_batches.push({
-            product_batch_id: batch.id,
+            id: batch.id,
             lot_number: batch.lot_number,
             expiration_date: batch.expiration_date,
             available_quantity: Number(batch.quantity || 0),
@@ -213,7 +206,11 @@ export function useAdjustStockForm(props, emit) {
                 "La salida no puede ser mayor al stock actual.";
         }
 
-        if (form.type === "OUT" && form.batch_allocation_method === "MANUAL") {
+        if (
+            form.batch_allocation_method === "MANUAL" &&
+            (form.type === "OUT" ||
+                (form.type === "ADJUSTMENT" && Number(form.quantity) < 0))
+        ) {
             if (!form.manual_batches.length) {
                 frontendErrors.manual_batches = "Selecciona al menos un lote.";
             }

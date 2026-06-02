@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateProductBatchesTable extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('product_batches', function (Blueprint $table) {
@@ -18,11 +17,19 @@ class CreateProductBatchesTable extends Migration
             $table->string('lot_number')->nullable();
             $table->date('expiration_date')->nullable();
 
-            $table->integer('initial_quantity')->default(0);
-            $table->integer('quantity')->default(0);
+            $table->decimal('initial_quantity', 12, 3)->default(0);
+            $table->decimal('quantity', 12, 3)->default(0);
 
             $table->string('supplier')->nullable();
             $table->date('received_at')->nullable();
+
+            $table->boolean('has_real_lot')->default(false);
+
+            $table->enum('entry_type', [
+                'PURCHASE_BATCH',
+                'PURCHASE_NO_BATCH',
+                'BULK_PRODUCT',
+            ])->default('PURCHASE_NO_BATCH');
 
             $table->enum('status', [
                 'ACTIVE',
@@ -39,4 +46,4 @@ class CreateProductBatchesTable extends Migration
     {
         Schema::dropIfExists('product_batches');
     }
-}
+};

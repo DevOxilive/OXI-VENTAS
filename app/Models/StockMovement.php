@@ -6,6 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class StockMovement extends Model
 {
+    public const TYPE_IN = 'IN';
+    public const TYPE_OUT = 'OUT';
+    public const TYPE_ADJUSTMENT = 'ADJUSTMENT';
+
+    public const REASON_PURCHASE = 'PURCHASE';
+    public const REASON_SALE = 'SALE';
+    public const REASON_DAMAGED = 'DAMAGED';
+    public const REASON_EXPIRED = 'EXPIRED';
+    public const REASON_INVENTORY_DIFFERENCE = 'INVENTORY_DIFFERENCE';
+
     protected $fillable = [
         'branch_product_id',
         'type',
@@ -18,9 +28,9 @@ class StockMovement extends Model
     ];
 
     protected $casts = [
-        'quantity' => 'integer',
-        'previous_stock' => 'integer',
-        'new_stock' => 'integer',
+        'quantity' => 'decimal:2',
+        'previous_stock' => 'decimal:2',
+        'new_stock' => 'decimal:2',
     ];
 
     public function branchProduct()
@@ -36,5 +46,20 @@ class StockMovement extends Model
     public function batches()
     {
         return $this->hasMany(StockMovementBatch::class);
+    }
+
+    public function isIn(): bool
+    {
+        return $this->type === self::TYPE_IN;
+    }
+
+    public function isOut(): bool
+    {
+        return $this->type === self::TYPE_OUT;
+    }
+
+    public function isAdjustment(): bool
+    {
+        return $this->type === self::TYPE_ADJUSTMENT;
     }
 }

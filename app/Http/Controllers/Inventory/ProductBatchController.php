@@ -23,39 +23,49 @@ class ProductBatchController extends Controller
         ]);
 
         $branchProduct = DB::transaction(function () use ($validated, $productBatch, $request) {
+            $productBatch = ProductBatch::whereKey($productBatch->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $branchProduct = $productBatch->branchProduct()
+                ->lockForUpdate()
+                ->firstOrFail();
 
             $previousQuantity = (float) $productBatch->quantity;
             $newQuantity = (float) $validated['quantity'];
-
             $difference = $newQuantity - $previousQuantity;
 
-            $status = $newQuantity <= 0 ? 'EXHAUSTED' : 'ACTIVE';
-
-            $productBatch->update([
-                'lot_number' => $validated['lot_number'],
-                'expiration_date' => $validated['expiration_date'],
-                'supplier' => $validated['supplier'],
-                'received_at' => $validated['received_at'],
-                'quantity' => $newQuantity,
-                'status' => $status,
-            ]);
-
-            $branchProduct = $productBatch->branchProduct;
+            $status = $newQuantity <= 0
+                ? ProductBatch::STATUS_DEPLETED
+                : ProductBatch::STATUS_ACTIVE;
 
             $previousStock = (float) $branchProduct->stock;
             $newStock = $previousStock + $difference;
+
+            if ($newStock < 0) {
+                throw new \InvalidArgumentException('El ajuste no puede dejar stock negativo.');
+            }
+
+            $productBatch->update([
+                'lot_number' => $validated['lot_number'] ?? null,
+                'expiration_date' => $validated['expiration_date'] ?? null,
+                'supplier' => $validated['supplier'] ?? null,
+                'received_at' => $validated['received_at'] ?? null,
+                'quantity' => $newQuantity,
+                'status' => $status,
+            ]);
 
             $branchProduct->update([
                 'stock' => $newStock,
             ]);
 
-            if ($difference !== 0.0) {
+            if (round($difference, 3) !== 0.0) {
                 $movement = StockMovement::create([
                     'branch_product_id' => $branchProduct->id,
                     'user_id' => $request->user()?->id,
-                    'type' => 'ADJUSTMENT',
-                    'reason' => 'MANUAL',
-                    'quantity' => abs($difference),
+                    'type' => StockMovement::TYPE_ADJUSTMENT,
+                    'reason' => StockMovement::REASON_INVENTORY_DIFFERENCE,
+                    'quantity' => $difference,
                     'previous_stock' => $previousStock,
                     'new_stock' => $newStock,
                     'notes' => 'Corrección manual de lote',
@@ -67,7 +77,7 @@ class ProductBatchController extends Controller
                     'quantity' => abs($difference),
                     'previous_batch_quantity' => $previousQuantity,
                     'new_batch_quantity' => $newQuantity,
-                    'allocation_method' => 'MANUAL',
+                    'allocation_method' => StockMovementBatch::ALLOCATION_MANUAL,
                 ]);
             }
 

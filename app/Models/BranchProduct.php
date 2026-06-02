@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+
 class BranchProduct extends Model
 {
     public const STATUS_ACTIVE = 'active';
@@ -13,22 +14,18 @@ class BranchProduct extends Model
     protected $fillable = [
         'branch_id',
         'product_id',
-        'price',
-        'cost',
         'stock',
         'min_stock',
-        'entry_date',
         'status',
         'last_restocked_at',
         'inactive_candidate_after_days',
-        'name',
-        'barcode',
-        'category_id',
         'tracks_batches',
         'tracks_expiration',
     ];
 
     protected $casts = [
+        'stock' => 'decimal:2',
+        'min_stock' => 'decimal:2',
         'tracks_batches' => 'boolean',
         'tracks_expiration' => 'boolean',
         'last_restocked_at' => 'datetime',
@@ -50,11 +47,6 @@ class BranchProduct extends Model
         return $this->hasMany(StockMovement::class);
     }
 
-    public function category()
-    {
-        return $this->belongsTo(Category::class);
-    }
-
     public function batches()
     {
         return $this->hasMany(ProductBatch::class);
@@ -63,7 +55,7 @@ class BranchProduct extends Model
     public function activeBatches()
     {
         return $this->hasMany(ProductBatch::class)
-            ->where('status', 'ACTIVE')
+            ->where('status', ProductBatch::STATUS_ACTIVE)
             ->where('quantity', '>', 0);
     }
 
@@ -84,7 +76,7 @@ class BranchProduct extends Model
 
     public function isInactiveCandidate(): bool
     {
-        if (!$this->last_restocked_at) {
+        if (!$this->last_restocked_at || !$this->inactive_candidate_after_days) {
             return false;
         }
 
