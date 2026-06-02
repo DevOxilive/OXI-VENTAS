@@ -119,22 +119,24 @@ class ProductController extends Controller
         ]);
     }
 
-    public function store(Request $request, Branch $branch)
-    {
-        $data = $request->validate([
-            'barcodes' => ['nullable', 'array'],
-            'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct', 'unique:barcodes,code'],
+        public function store(Request $request, Branch $branch)
+        {
+            $data = $request->validate([
+                'barcodes' => ['nullable', 'array'],
+                'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct', 'unique:barcodes,code'],
 
-            'unit' => ['required', 'string', 'max:20'],
-            'name' => ['required', 'string', 'max:255'],
-            'image' => ['nullable', 'image', 'max:2048'],
-            'stock' => ['nullable', 'numeric', 'min:0'],
-            'category_id' => ['required', 'exists:categories,id'],
-            'cost' => ['required', 'numeric', 'min:0'],
-           'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
-            'entry_date' => ['required', 'date'],
-            'active' => ['boolean'],
-        ]);
+                'unit' => ['required', 'string', 'max:20'],
+                'name' => ['required', 'string', 'max:255'],
+                'image' => ['nullable', 'image', 'max:2048'],
+                'stock' => ['nullable', 'numeric', 'min:0'],
+                'category_id' => ['required', 'exists:categories,id'],
+                'cost' => ['required', 'numeric', 'min:0'],
+            'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
+                'entry_date' => ['required', 'date'],
+                'active' => ['boolean'],
+                'branch_ids' => ['required', 'array', 'min:1'],
+'branch_ids.*' => ['exists:branches,id'],
+            ]);
 
         $barcodes = collect($data['barcodes'] ?? [])
             ->filter(fn($code) => filled($code))
@@ -169,44 +171,50 @@ class ProductController extends Controller
                 ]);
             }
 
-            BranchProduct::create([
-                'branch_id' => $branch->id,
-                'product_id' => $product->id,
-                'barcode' => $barcodes->first(),
-                'name' => $data['name'],
-                'category_id' => $data['category_id'],
-                'unit' => $data['unit'],
-                'stock' => $data['stock'] ?? 0,
-                'cost' => $data['cost'],
-                'price' => $data['sale_price'],
-                'min_stock' => 0,
-                'entry_date' => $data['entry_date'],
-                'active' => true,
-            ]);
+        foreach ($data['branch_ids'] as $branchId) {
+
+    BranchProduct::create([
+        'branch_id' => $branchId,
+        'product_id' => $product->id,
+        'barcode' => $barcodes->first(),
+        'name' => $data['name'],
+        'category_id' => $data['category_id'],
+        'unit' => $data['unit'],
+        'stock' => $branchId == $branch->id
+            ? ($data['stock'] ?? 0)
+            : 0,
+        'cost' => $data['cost'],
+        'price' => $data['sale_price'],
+        'min_stock' => 0,
+        'entry_date' => $data['entry_date'],
+        'active' => true,
+    ]);
+}
         });
 
         return back()->with('success', 'Producto creado correctamente');
     }
     public function update(Request $request, Branch $branch, Product $product)
     {
-        $data = $request->validate([
-            'barcodes' => ['nullable', 'array'],
-            'barcodes.*' => [
-    'nullable',
-    'string',
-    'max:100',
-    'distinct',
-],
-            'unit' => ['required', 'string', 'max:20'],
-            'name' => ['required', 'string', 'max:255'],
-            'image' => ['nullable', 'image', 'max:2048'],
-            'stock' => ['nullable', 'numeric', 'min:0'],
-            'category_id' => ['required', 'exists:categories,id'],
-            'cost' => ['required', 'numeric', 'min:0'],
-'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
-            'entry_date' => ['required', 'date'],
-            'active' => ['boolean'],
-        ]);
+       $data = $request->validate([
+    'barcodes' => ['nullable', 'array'],
+    'barcodes.*' => [
+        'nullable',
+        'string',
+        'max:100',
+        'distinct',
+    ],
+
+    'unit' => ['required', 'string', 'max:20'],
+    'name' => ['required', 'string', 'max:255'],
+    'image' => ['nullable', 'image', 'max:2048'],
+    'stock' => ['nullable', 'numeric', 'min:0'],
+    'category_id' => ['required', 'exists:categories,id'],
+    'cost' => ['required', 'numeric', 'min:0'],
+    'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
+    'entry_date' => ['required', 'date'],
+    'active' => ['boolean'],
+]);
 
         $barcodes = collect($data['barcodes'] ?? [])
             ->filter(fn($code) => filled($code))

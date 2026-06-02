@@ -36,6 +36,14 @@ export function generateMenu(role, permissions = [], branches = []) {
                               icon: "security",
                               url: route("sistemas.empleados"),
                           },
+
+                          {
+   text: "Registro de Sucursales",
+    key: "systems.branches",
+    icon: "store",
+     url: "/sistemas/branches",
+
+}
                       ]
                     : []),
             ],
@@ -219,13 +227,17 @@ export function generateMenu(role, permissions = [], branches = []) {
             key: "sucursales",
             icon: "inventory_2",
             isOpen: false,
-            children: branches.map((branch) => ({
-                text: branch.name,
-                key: `branch.${branch.slug}`,
-                icon: "store",
-                isOpen: false,
-                children: inventoryOptions(branch),
-            })),
+           children: branches.map((branch) => ({
+    text: branch.name,
+    key: branch.slug,
+    slug: branch.slug,
+    color: branch.color,
+    bgColor: branch.color,    // para hover
+    icon: "store",
+    isBranch: true,
+    isOpen: false,
+    children: inventoryOptions(branch),
+})),
         });
     }
 

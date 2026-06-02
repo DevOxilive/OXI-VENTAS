@@ -51,9 +51,8 @@ public function share(Request $request): array
                 : [],
         ],
 'branches' => fn () => Branch::where('active', true)
-    ->select('id', 'name', 'slug')
     ->orderBy('name')
-    ->get(),
+    ->get(['id', 'name', 'slug', 'color']),
         'flash' => [
             'success' => fn () => $request->session()->get('success'),
             'error' => fn () => $request->session()->get('error'),

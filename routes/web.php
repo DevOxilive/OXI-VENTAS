@@ -12,7 +12,7 @@ use App\Http\Controllers\Inventory\ProductBatchController;
 use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\Inventory\PurchaseReportController;
 use App\Http\Controllers\Inventory\BranchInventoryController;
-
+use App\Http\Controllers\BranchController;
 
 
 /*
@@ -99,6 +99,18 @@ Route::middleware([
             fn() =>
             Inertia::render('Sistemas/Usuarios')
         )->name('sistemas.usuarios');
+
+   Route::get('/branches', [BranchController::class, 'index'])
+    ->name('systems.branches');
+
+Route::post('/branches', [BranchController::class, 'store'])
+    ->name('systems.branches.store');
+
+Route::put('/branches/{branch}', [BranchController::class, 'update'])
+    ->name('systems.branches.update');
+
+    Route::delete('/branches/{branch}', [BranchController::class, 'destroy'])
+    ->name('systems.branches.destroy');
     });
 
     /*
