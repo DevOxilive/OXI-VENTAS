@@ -22,6 +22,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    unit: {
+        type: String,
+        default: 'piezas',
+    },
 })
 
 const emit = defineEmits(['edit-batch', 'select-batch'])
@@ -118,8 +122,7 @@ function batchStatusClass(status) {
                         </p>
 
                         <p class="text-lg font-black text-slate-900">
-                            {{ batch.quantity }}
-                        </p>
+                            {{ batch.quantity }} {{ unit }} </p>
 
                         <button v-if="showEdit" type="button" :disabled="disabled"
                             class="mt-2 inline-flex items-center gap-1 text-xs font-black text-[#1f1d2b] hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"
@@ -131,18 +134,6 @@ function batchStatusClass(status) {
                             Editar
                         </button>
                     </div>
-                </div>
-
-                <div v-if="clickable && allocationMethod === 'FEFO_AUTO'"
-                    class="mt-3 flex items-center justify-between">
-                    <span
-                        class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-black text-emerald-700">
-                        FEFO sugerido
-                    </span>
-
-                    <span class="text-xs text-slate-400">
-                        Ordenado por caducidad
-                    </span>
                 </div>
 
                 <div v-if="clickable && allocationMethod === 'MANUAL' && !disabled"
@@ -200,8 +191,7 @@ function batchStatusClass(status) {
                         </p>
 
                         <p class="text-lg font-black text-slate-900">
-                            {{ batch.quantity }}
-                        </p>
+                            {{ batch.quantity }} {{ unit }} </p>
 
                         <button v-if="showEdit" type="button" :disabled="disabled"
                             class="mt-2 inline-flex items-center gap-1 text-xs font-black text-[#1f1d2b] hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:no-underline"

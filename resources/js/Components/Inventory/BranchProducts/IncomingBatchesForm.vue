@@ -25,8 +25,8 @@ defineEmits(['remove-batch', 'edit-batch'])
                 Lotes actuales
             </p>
 
-            <CurrentBatchesList :batches="product.batches" :disabled="form.processing" show-edit
-                @edit-batch="$emit('edit-batch', $event)" />
+            <CurrentBatchesList :batches="product.batches" :unit="product.unit ?? 'piezas'" :disabled="form.processing"
+                show-edit @edit-batch="$emit('edit-batch', $event)" />
         </div>
 
         <div v-else-if="!form.batches?.length"
@@ -62,8 +62,8 @@ defineEmits(['remove-batch', 'edit-batch'])
                     <InputField v-model="batch.expiration_date" label="Fecha de caducidad" type="date"
                         field="expiration_date" :readonly="form.processing" />
 
-                    <InputField v-model="batch.quantity" label="Cantidad" type="number" field="batch_quantity"
-                        :readonly="form.processing" />
+                    <InputField v-model="batch.quantity" :label="`Cantidad (${product.unit ?? 'piezas'})`" type="number"
+                        field="batch_quantity" :readonly="form.processing" />
 
                     <InputField v-model="batch.supplier" label="Proveedor" placeholder="Ej. Lala" field="supplier"
                         :readonly="form.processing" />
@@ -87,8 +87,7 @@ defineEmits(['remove-batch', 'edit-batch'])
                 <span class="text-sm font-black" :class="Number(totalBatchQuantity) && Number(totalBatchQuantity) === Number(form.quantity)
                     ? 'text-emerald-600'
                     : 'text-red-600'">
-                    {{ totalBatchQuantity }} / {{ form.quantity || 0 }}
-                </span>
+                    {{ totalBatchQuantity }} / {{ form.quantity || 0 }} {{ product.unit ?? 'piezas' }} </span>
             </div>
 
             <div v-if="frontendErrors.batches" class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3">

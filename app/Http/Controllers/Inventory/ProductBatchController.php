@@ -35,16 +35,14 @@ class ProductBatchController extends Controller
             $newQuantity = (float) $validated['quantity'];
             $difference = $newQuantity - $previousQuantity;
 
+            $previousStock = (float) ProductBatch::where('branch_product_id', $branchProduct->id)
+                ->where('status', ProductBatch::STATUS_ACTIVE)
+                ->where('quantity', '>', 0)
+                ->sum('quantity');
+
             $status = $newQuantity <= 0
                 ? ProductBatch::STATUS_DEPLETED
                 : ProductBatch::STATUS_ACTIVE;
-
-            $previousStock = (float) $branchProduct->stock;
-            $newStock = $previousStock + $difference;
-
-            if ($newStock < 0) {
-                throw new \InvalidArgumentException('El ajuste no puede dejar stock negativo.');
-            }
 
             $productBatch->update([
                 'lot_number' => $validated['lot_number'] ?? null,
@@ -54,6 +52,11 @@ class ProductBatchController extends Controller
                 'quantity' => $newQuantity,
                 'status' => $status,
             ]);
+
+            $newStock = (float) ProductBatch::where('branch_product_id', $branchProduct->id)
+                ->where('status', ProductBatch::STATUS_ACTIVE)
+                ->where('quantity', '>', 0)
+                ->sum('quantity');
 
             $branchProduct->update([
                 'stock' => $newStock,
@@ -65,7 +68,7 @@ class ProductBatchController extends Controller
                     'user_id' => $request->user()?->id,
                     'type' => StockMovement::TYPE_ADJUSTMENT,
                     'reason' => StockMovement::REASON_INVENTORY_DIFFERENCE,
-                    'quantity' => $difference,
+                    'quantity' => abs($difference),
                     'previous_stock' => $previousStock,
                     'new_stock' => $newStock,
                     'notes' => 'Corrección manual de lote',
@@ -81,7 +84,13 @@ class ProductBatchController extends Controller
                 ]);
             }
 
-            return $branchProduct->fresh();
+            return $branchProduct->fresh([
+                'product.category',
+                'product.barcodes',
+                'batches',
+                'movements.user',
+                'movements.batches.productBatch',
+            ]);
         });
 
         event(new InventoryStockUpdated($branchProduct));

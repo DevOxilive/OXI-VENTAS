@@ -8,6 +8,7 @@ import InventoryTable from '@/Components/Inventory/BranchProducts/InventoryTable
 import InventoryMobileCards from '@/Components/Inventory/BranchProducts/InventoryMobileCards.vue'
 import InventoryAlertsModal from '@/Components/Inventory/BranchProducts/InventoryAlertsModal.vue'
 import AdjustStockModal from '@/Components/Inventory/BranchProducts/AdjustStockModal.vue'
+import EditBranchProductConfigModal from '@/Components/Inventory/BranchProducts/EditBranchProductConfigModal.vue'
 
 import { useBranchInventory } from '@/Composables/Inventory/useBranchInventory'
 
@@ -88,8 +89,12 @@ const {
     currentBranch,
 
     showCreateModal,
+    showConfigModal,
     showAdjustModal,
     liveSelectedProduct,
+    selectedConfigProduct,
+    liveSelectedConfigProduct,
+    closeConfigModal,
 
     search,
     categoryFilter,
@@ -213,5 +218,8 @@ const submit = () => {
 
         <InventoryAlertsModal v-if="showAlertModal" :title="selectedAlertTitle" :type="selectedAlertType"
             :batches="selectedAlertBatches" @close="closeAlertModal" />
+
+        <EditBranchProductConfigModal v-if="showConfigModal && liveSelectedConfigProduct"
+            :product="liveSelectedConfigProduct" @close="closeConfigModal" />
     </div>
 </template>

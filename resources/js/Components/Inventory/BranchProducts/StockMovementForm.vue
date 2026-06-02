@@ -20,6 +20,10 @@ defineProps({
         type: Array,
         default: () => [],
     },
+    product: {
+        type: Object,
+        default: () => ({}),
+    },
 })
 
 defineEmits(['validate'])
@@ -47,8 +51,8 @@ defineEmits(['validate'])
                     :disabled="form.processing" :error="frontendErrors.reason || form.errors.reason"
                     @validate="$emit('validate', 'reason')" />
 
-                <InputField v-model="form.quantity" label="Cantidad" field="quantity" type="number"
-                    :disabled="form.processing" :error="frontendErrors.quantity || form.errors.quantity"
+                <InputField v-model="form.quantity" :label="`Cantidad (${product.unit ?? 'piezas'})`" field="quantity"
+                    type="number" :disabled="form.processing" :error="frontendErrors.quantity || form.errors.quantity"
                     @validate="$emit('validate', 'quantity')" />
 
                 <TextareaField v-model="form.notes" label="Notas" field="notes" :rows="3" :max-height="120"

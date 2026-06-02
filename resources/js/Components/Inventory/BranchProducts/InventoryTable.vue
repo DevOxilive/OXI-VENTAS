@@ -196,11 +196,11 @@ function administrativeStatusLabel(status) {
 
                         <td class="px-4 py-4 text-slate-700">
                             <span class="font-bold">
-                                {{ product.stock }}
+                                {{ product.stockLabel ?? product.stock }}
                             </span>
 
                             <span class="text-slate-400">
-                                / min. {{ product.minStock }}
+                                / min. {{ product.minStockLabel ?? product.minStock }}
                             </span>
                         </td>
 
@@ -218,6 +218,9 @@ function administrativeStatusLabel(status) {
                                     ? 'Movimiento con control por lotes'
                                     : 'Movimiento simple de stock'" variant="green"
                                     @click="$emit('adjust', product)" />
+
+                                <ActionIconButton icon="settings" title="Configurar producto" variant="slate"
+                                    @click="$emit('edit', product)" />
                             </div>
                         </td>
                     </tr>

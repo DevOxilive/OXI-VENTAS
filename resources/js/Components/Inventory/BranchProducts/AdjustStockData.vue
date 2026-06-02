@@ -77,8 +77,8 @@ function addBatch() {
                 <ProductStockSummary :product="product" :current-stock="currentStock"
                     :projected-stock="projectedStock" />
 
-                <StockMovementForm :form="form" :frontend-errors="frontendErrors" :type-options="typeOptions"
-                    :reason-options="reasonOptions" @validate="$emit('validate', $event)" />
+                <StockMovementForm :form="form" :product="product" :frontend-errors="frontendErrors"
+                    :type-options="typeOptions" :reason-options="reasonOptions" @validate="$emit('validate', $event)" />
             </div>
 
             <section class="xl:col-span-4 flex flex-col min-h-0">
@@ -117,7 +117,7 @@ function addBatch() {
             </section>
 
             <div class="xl:col-span-4 min-h-0 xl:overflow-y-auto xl:pr-2">
-                <RecentStockMovements :recent-movements="recentMovements" />
+                <RecentStockMovements :recent-movements="recentMovements" :unit="product.unit ?? 'piezas'" />
             </div>
         </div>
     </div>

@@ -26,39 +26,9 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
             </h3>
 
             <p class="text-sm text-slate-500">
-                Puedes dejar que el sistema sugiera por FEFO o confirmar manualmente los lotes afectados.
+                Selecciona explícitamente los lotes que serán afectados por este movimiento para mantener la
+                trazabilidad del inventario.
             </p>
-        </div>
-
-        <div class="grid grid-cols-1 2xl:grid-cols-2 gap-3 mb-5">
-            <button type="button" :disabled="form.processing"
-                class="rounded-2xl border px-4 py-3 text-left transition disabled:opacity-50 disabled:cursor-not-allowed"
-                :class="form.batch_allocation_method === 'FEFO_AUTO'
-                    ? 'border-[#1f1d2b] bg-[#1f1d2b] text-white'
-                    : 'border-slate-200 bg-white text-slate-700'"
-                @click="form.batch_allocation_method = 'FEFO_AUTO'; form.manual_batches = []">
-                <p class="font-black text-sm">
-                    FEFO automático
-                </p>
-
-                <p class="text-xs opacity-70">
-                    Descuenta primero del lote más próximo a caducar.
-                </p>
-            </button>
-
-            <button type="button" :disabled="form.processing"
-                class="rounded-2xl border px-4 py-3 text-left transition disabled:opacity-50 disabled:cursor-not-allowed"
-                :class="form.batch_allocation_method === 'MANUAL'
-                    ? 'border-[#1f1d2b] bg-[#1f1d2b] text-white'
-                    : 'border-slate-200 bg-white text-slate-700'" @click="form.batch_allocation_method = 'MANUAL'">
-                <p class="font-black text-sm">
-                    Selección manual
-                </p>
-
-                <p class="text-xs opacity-70">
-                    Confirma exactamente qué lote se está afectando.
-                </p>
-            </button>
         </div>
 
         <div>
@@ -66,8 +36,8 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
                 Lotes disponibles
             </p>
 
-            <CurrentBatchesList v-if="product.batches?.length" :batches="product.batches" :disabled="form.processing"
-                clickable :allocation-method="form.batch_allocation_method"
+            <CurrentBatchesList v-if="product.batches?.length" :batches="product.batches"
+                :unit="product.unit ?? 'piezas'" :disabled="form.processing" clickable allocation-method="MANUAL"
                 @select-batch="$emit('add-manual-batch', $event)" />
 
             <div v-else class="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center">
@@ -77,7 +47,7 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
             </div>
         </div>
 
-        <div v-if="form.batch_allocation_method === 'MANUAL'" class="space-y-4 mt-5">
+        <div class="space-y-4 mt-5">
             <div v-if="form.manual_batches?.length" class="space-y-3">
                 <p class="text-sm font-bold text-slate-700">
                     Lotes seleccionados
@@ -92,8 +62,7 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
                             </p>
 
                             <p class="text-xs text-slate-500">
-                                Disponible: {{ batch.available_quantity }}
-                            </p>
+                                Disponible: {{ batch.available_quantity }} {{ product.unit ?? 'piezas' }} </p>
                         </div>
 
                         <button type="button" :disabled="form.processing"
@@ -103,8 +72,8 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
                         </button>
                     </div>
 
-                    <InputField v-model="batch.quantity" label="Cantidad a descontar" type="number"
-                        field="batch_quantity" :readonly="form.processing"
+                    <InputField v-model="batch.quantity" :label="`Cantidad a descontar (${product.unit ?? 'piezas'})`"
+                        type="number" field="batch_quantity" :readonly="form.processing"
                         :error="frontendErrors[`manual_batch_${index}`]" />
                 </div>
 
@@ -118,8 +87,7 @@ defineEmits(['add-manual-batch', 'remove-manual-batch'])
                     <span class="text-sm font-black" :class="Number(totalManualBatchQuantity) === Number(form.quantity)
                         ? 'text-emerald-600'
                         : 'text-red-600'">
-                        {{ totalManualBatchQuantity }} / {{ form.quantity || 0 }}
-                    </span>
+                        {{ totalManualBatchQuantity }} / {{ form.quantity || 0 }} {{ product.unit ?? 'piezas' }} </span>
                 </div>
             </div>
 

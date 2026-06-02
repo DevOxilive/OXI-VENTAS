@@ -20,7 +20,7 @@ class ProductController extends Controller
         $query = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
-                'product:id,name,image,description,category_id,subcategory_id,cost,sale_price,active,created_at',
+                'product:id,name,image,description,category_id,subcategory_id,cost,sale_price,unit,active,created_at',
                 'product.category:id,name',
                 'product.barcodes:id,product_id,code',
             ])
@@ -120,6 +120,7 @@ class ProductController extends Controller
                 'image' => $imagePath,
                 'cost' => $data['cost'],
                 'sale_price' => $data['sale_price'],
+                'unit' => $data['unit'],
                 'category_id' => $data['category_id'],
                 'active' => true,
             ]);
@@ -201,6 +202,7 @@ class ProductController extends Controller
                 'category_id' => $data['category_id'],
                 'cost' => $data['cost'],
                 'sale_price' => $data['sale_price'],
+                'unit' => $data['unit'],
                 'active' => $data['active'] ?? true,
             ]);
 

@@ -16,6 +16,7 @@ return new class extends Migration {
 
             $table->decimal('cost', 10, 2)->default(0);
             $table->decimal('sale_price', 10, 2)->default(0);
+            $table->string('unit')->default('pieza');
 
             $table->foreignId('category_id')
                 ->constrained('categories')

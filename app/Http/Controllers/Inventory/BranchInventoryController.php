@@ -96,7 +96,7 @@ class BranchInventoryController extends Controller
             })
             ->with([
                 'branch:id,name',
-                'product:id,name,category_id,subcategory_id,sale_price,cost',
+                'product:id,name,category_id,subcategory_id,sale_price,cost,unit',
                 'product.category:id,name',
                 'product.subcategory:id,name,category_id',
                 'product.barcodes:id,product_id,code',
@@ -120,9 +120,12 @@ class BranchInventoryController extends Controller
                     ->orderBy('id'),
 
                 'movements' => fn($query) => $query
-                    ->with('user:id,name')
+                    ->with([
+                        'user:id,name',
+                        'batches.productBatch:id,lot_number',
+                    ])
                     ->latest()
-                    ->limit(5),
+                    ->limit(10),
             ])
 
             ->join('products', 'products.id', '=', 'branch_products.product_id')
@@ -173,6 +176,7 @@ class BranchInventoryController extends Controller
                 'expiration_date' => $batch->expiration_date,
                 'formatted_expiration_date' => $batch->formatted_expiration_date,
                 'quantity' => $batch->quantity,
+                'unit' => $product?->unit ?? 'piezas',
                 'initial_quantity' => $batch->initial_quantity,
                 'status' => $batch->status,
                 'expiration_status' => $batch->expiration_status,
@@ -203,6 +207,7 @@ class BranchInventoryController extends Controller
                 'name' => $productName ?: 'Producto sin nombre',
                 'code' => $productCode,
                 'stock' => $branchProduct->stock,
+                'unit' => $product?->unit ?? 'piezas',
                 'minStock' => $branchProduct->min_stock,
                 'min_stock' => $branchProduct->min_stock,
                 'status' => 'Stock bajo',
@@ -313,7 +318,7 @@ class BranchInventoryController extends Controller
             ],
 
             'productsDB' => Product::query()
-                ->select(['id', 'name', 'sale_price', 'cost', 'category_id', 'subcategory_id'])
+                ->select(['id', 'name', 'sale_price', 'cost', 'unit', 'category_id', 'subcategory_id'])
                 ->where('active', true)
                 ->orderBy('name')
                 ->limit(300)
@@ -369,5 +374,19 @@ class BranchInventoryController extends Controller
         ]);
 
         return back()->with('success', 'Producto asignado a sucursal correctamente.');
+    }
+    public function updateConfig(Request $request, BranchProduct $branchProduct)
+    {
+        $validated = $request->validate([
+            'min_stock' => ['required', 'numeric', 'min:0'],
+            'status' => ['required', 'in:active,inactive,seasonal'],
+        ]);
+
+        $branchProduct->update([
+            'min_stock' => $validated['min_stock'],
+            'status' => $validated['status'],
+        ]);
+
+        return back()->with('success', 'Configuración del producto actualizada correctamente.');
     }
 }

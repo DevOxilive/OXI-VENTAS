@@ -4,7 +4,10 @@ import { router } from "@inertiajs/vue3";
 export function useBranchInventory(props) {
     const showCreateModal = ref(false);
     const showAdjustModal = ref(false);
+    const showConfigModal = ref(false);
+
     const selectedProduct = ref(null);
+    const selectedConfigProduct = ref(null);
     const selectedAlertType = ref(null);
 
     const search = ref(props.filters?.search ?? "");
@@ -57,6 +60,8 @@ export function useBranchInventory(props) {
             const stock = Number(realtime.stock ?? item.stock ?? 0);
             const minStock = Number(item.min_stock ?? 0);
             const price = Number(item.price ?? item.product?.sale_price ?? 0);
+            const unit = item.product?.unit ?? "pieza";
+
             const tracksBatches = Boolean(
                 item.tracks_batches ?? item.tracksBatches ?? false,
             );
@@ -89,6 +94,9 @@ export function useBranchInventory(props) {
                 administrativeStatus: item.status ?? "active",
                 stock,
                 minStock,
+                unit,
+                stockLabel: `${stock} ${unit}`,
+                minStockLabel: `${minStock} ${unit}`,
                 price,
                 tracksBatches,
                 expirationDate:
@@ -114,8 +122,16 @@ export function useBranchInventory(props) {
         );
     });
 
-    // El backend ya filtra y pagina. Esta lista queda como alias visual
-    // para no romper componentes existentes.
+    const liveSelectedConfigProduct = computed(() => {
+        if (!selectedConfigProduct.value) return null;
+
+        return (
+            visualProducts.value.find((product) => {
+                return product.id === selectedConfigProduct.value.id;
+            }) ?? selectedConfigProduct.value
+        );
+    });
+
     const filteredProducts = computed(() => visualProducts.value);
 
     const stats = computed(() => {
@@ -252,16 +268,22 @@ export function useBranchInventory(props) {
         selectedProduct.value = null;
     };
 
+    const editProduct = (product) => {
+        selectedConfigProduct.value = product;
+        showConfigModal.value = true;
+    };
+
+    const closeConfigModal = () => {
+        showConfigModal.value = false;
+        selectedConfigProduct.value = null;
+    };
+
     const exportExcel = () => {
         console.log("Exportar inventario", visualProducts.value);
     };
 
     const viewProduct = (product) => {
         console.log("Ver producto", product);
-    };
-
-    const editProduct = (product) => {
-        console.log("Editar producto", product);
     };
 
     const deleteProduct = (product) => {
@@ -340,8 +362,12 @@ export function useBranchInventory(props) {
 
         showCreateModal,
         showAdjustModal,
+        showConfigModal,
+
         selectedProduct,
+        selectedConfigProduct,
         liveSelectedProduct,
+        liveSelectedConfigProduct,
 
         search,
         categoryFilter,
@@ -371,13 +397,14 @@ export function useBranchInventory(props) {
 
         adjustStock,
         closeAdjustModal,
+        editProduct,
+        closeConfigModal,
 
         reloadInventory,
         goToPage,
 
         exportExcel,
         viewProduct,
-        editProduct,
         deleteProduct,
     };
 }

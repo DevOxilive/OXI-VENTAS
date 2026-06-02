@@ -26,11 +26,8 @@ function statusClass(status) {
 
 <template>
     <div class="md:hidden space-y-3 mt-4">
-        <article
-            v-for="product in filteredProducts"
-            :key="product.id"
-            class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"
-        >
+        <article v-for="product in filteredProducts" :key="product.id"
+            class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
             <div class="flex justify-between items-start gap-3">
                 <div>
                     <p class="font-semibold text-slate-800">
@@ -42,10 +39,8 @@ function statusClass(status) {
                     </p>
                 </div>
 
-                <span
-                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold shrink-0"
-                    :class="statusClass(product.status)"
-                >
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold shrink-0"
+                    :class="statusClass(product.status)">
                     {{ product.status }}
                 </span>
             </div>
@@ -64,7 +59,7 @@ function statusClass(status) {
                         Stock:
                     </span>
 
-                    {{ product.stock }} / min. {{ product.minStock }}
+                    {{ product.stockLabel ?? product.stock }} / min. {{ product.minStockLabel ?? product.minStock }}
                 </p>
 
                 <p>
@@ -85,25 +80,29 @@ function statusClass(status) {
             </div>
 
             <div class="mt-4 flex justify-end gap-2">
-                <button
-                    type="button"
-                    :title="product.tracksBatches
-                        ? 'Movimiento con control por lotes'
-                        : 'Movimiento simple de stock'"
+                <button type="button" :title="product.tracksBatches
+                    ? 'Movimiento con control por lotes'
+                    : 'Movimiento simple de stock'"
                     class="group w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-green-50 hover:border-green-200 transition-all duration-200"
-                    @click="$emit('adjust', product)"
-                >
-                    <span class="material-symbols-outlined text-[20px] text-slate-500 group-hover:text-green-600 transition">
+                    @click="$emit('adjust', product)">
+                    <span
+                        class="material-symbols-outlined text-[20px] text-slate-500 group-hover:text-green-600 transition">
                         {{ product.tracksBatches ? 'inventory_2' : 'sync_alt' }}
+                    </span>
+                </button>
+
+                <button type="button" title="Configurar producto"
+                    class="group w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all duration-200"
+                    @click="$emit('edit', product)">
+                    <span class="material-symbols-outlined text-[20px] text-slate-500">
+                        settings
                     </span>
                 </button>
             </div>
         </article>
 
-        <div
-            v-if="!filteredProducts.length"
-            class="bg-white border border-slate-200 rounded-2xl p-6 text-center text-slate-500 shadow-sm"
-        >
+        <div v-if="!filteredProducts.length"
+            class="bg-white border border-slate-200 rounded-2xl p-6 text-center text-slate-500 shadow-sm">
             No se encontraron productos registrados.
         </div>
     </div>

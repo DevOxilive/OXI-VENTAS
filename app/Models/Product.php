@@ -12,6 +12,7 @@ class Product extends Model
         'image',
         'cost',
         'sale_price',
+        'unit',
         'category_id',
         'subcategory_id',
         'active',
@@ -36,8 +37,9 @@ class Product extends Model
     {
         return $this->hasMany(BranchInventory::class);
     }
+
     public function barcodes()
-{
-    return $this->hasMany(Barcode::class);
-}
+    {
+        return $this->hasMany(Barcode::class);
+    }
 }
