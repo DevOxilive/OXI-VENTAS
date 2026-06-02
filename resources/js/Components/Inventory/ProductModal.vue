@@ -57,7 +57,9 @@ watch(
 
     form.unit = product.unit ?? "";
     form.name = product.name ?? "";
-    form.branch_ids = product?.branch_ids ?? [props.branch?.id].filter(Boolean);
+    form.branch_ids = product?.branch_ids?.length
+  ? product.branch_ids
+  : [props.branch?.id].filter(Boolean);
     form.stock = product.stock ?? 0;
     form.category_id = product.category_id ?? "";
     form.cost = product.cost ?? "";
@@ -100,6 +102,9 @@ const invalidPrice = computed(() => {
 });
 function addBarcode() {
   form.barcodes.push("");
+}
+function isCurrentBranch(branchId) {
+  return Number(branchId) === Number(props.branch?.id);
 }
 
 function removeBarcode(index) {
@@ -303,8 +308,8 @@ onError: () => {
           </div>
         </div>
 <!-- SUCURSALES -->
-<div v-if="mode === 'create'" class="md:col-span-2">
-  <div class="flex items-center justify-between mb-2">
+<div v-if="mode !== 'view'" class="md:col-span-2">
+<div class="flex items-center justify-between mb-2">
     <label class="block text-sm font-semibold text-slate-600">
       Sucursales donde se agregará
     </label>
@@ -312,11 +317,11 @@ onError: () => {
     <button
       type="button"
       class="text-sm font-semibold text-slate-700 hover:text-black"
-      @click="
-        form.branch_ids.length === branchesDB.length
-          ? form.branch_ids = []
-          : form.branch_ids = branchesDB.map(branch => branch.id)
-      "
+    @click="
+  form.branch_ids.length === branchesDB.length
+    ? form.branch_ids = [props.branch?.id].filter(Boolean)
+    : form.branch_ids = branchesDB.map(branch => branch.id)
+"
     >
       {{ form.branch_ids.length === branchesDB.length ? 'Quitar todas' : 'Seleccionar todas' }}
     </button>
@@ -329,16 +334,21 @@ onError: () => {
         :key="branchItem.id"
         class="flex items-center gap-3 border rounded-xl px-4 py-3 bg-white cursor-pointer hover:bg-slate-100"
       >
-        <input
-          type="checkbox"
-          :value="branchItem.id"
-          v-model="form.branch_ids"
-          class="rounded border-slate-300"
-        />
+     <input
+  type="checkbox"
+  :value="branchItem.id"
+  v-model="form.branch_ids"
+  :disabled="isCurrentBranch(branchItem.id)"
+  class="rounded border-slate-300 disabled:opacity-60"
+/>
 
-        <span class="text-sm font-medium text-slate-700">
-          {{ branchItem.name }}
-        </span>
+     {{ branchItem.name }}
+<span
+  v-if="isCurrentBranch(branchItem.id)"
+  class="text-xs text-slate-400 ml-1"
+>
+  actual
+</span>
       </label>
     </div>
   </div>
