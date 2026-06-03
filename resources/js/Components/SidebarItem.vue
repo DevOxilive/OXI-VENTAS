@@ -22,47 +22,74 @@ function saveOpenItems() {
     localStorage.setItem('sidebarOpenItems', JSON.stringify(openItems))
 }
 
-function toggleItem(item) {
-    openItems[item.key] = !isOpen(item)
-    saveOpenItems()
-}
-
 function normalizeUrl(url) {
     return url?.replace(/\/$/, '')
 }
 
-function isActiveUrl(url) {
-    if (!url) return false
+function toggleItem(item) {
+    openItems[item.key] = !isOpen(item)
 
-    const current = normalizeUrl(window.location.pathname)
-    const target = normalizeUrl(url)
+    // Guardar sucursal activa
+    if (
+        item.key?.includes('ajusco') ||
+        item.key?.includes('cecilia') ||
+        item.key?.includes('diana') ||
+        item.key?.includes('lago')
+    ) {
+        localStorage.setItem('activeBranch', item.key)
+    }
 
-    return current === target || current.startsWith(target + '/')
+    saveOpenItems()
 }
 
+function isActiveItem(item) {
+    if (!item.url) return false
+
+    const current = normalizeUrl(window.location.pathname)
+
+    const target = normalizeUrl(
+        new URL(item.url, window.location.origin).pathname
+    )
+
+    // Caso especial Dashboard
+    if (target === '/inventory/dashboard') {
+        const activeBranch = localStorage.getItem('activeBranch')
+
+        return (
+            current === target &&
+            activeBranch &&
+            item.key?.includes(activeBranch)
+        )
+    }
+
+    return current === target
+}
 function hasActiveChild(item) {
-    return item.children?.some(child =>
-        isActiveUrl(child.url) || hasActiveChild(child)
+    if (!item.children || !item.children.length) {
+        return false
+    }
+
+    return item.children.some(child =>
+        isActiveItem(child) || hasActiveChild(child)
     )
 }
 
 function isOpen(item) {
-    if (hasActiveChild(item)) {
-        return true
-    }
-
-    return !!openItems[item.key]
+    return hasActiveChild(item) || !!openItems[item.key]
 }
 
 function itemStyle(item) {
-    if (hoveredItem.value === item.key && item.color) {
+    const active = isActiveItem(item)
+
+    if (active) {
         return {
-            backgroundColor: `${item.color}20`,
-            color: item.color
+            backgroundColor: '#eff6ff',
+            color: '#2563eb',
+            fontWeight: '700'
         }
     }
 
-    if (isActiveUrl(item.url) && item.color) {
+    if (hoveredItem.value === item.key && item.color) {
         return {
             backgroundColor: `${item.color}20`,
             color: item.color
@@ -73,6 +100,12 @@ function itemStyle(item) {
 }
 
 function iconStyle(item) {
+    if (isActiveItem(item)) {
+        return {
+            color: '#2563eb'
+        }
+    }
+
     if (item.color) {
         return {
             color: item.color
@@ -80,6 +113,13 @@ function iconStyle(item) {
     }
 
     return {}
+}
+function saveCurrentBranch(item) {
+    if (item.key?.includes('.dashboard')) {
+        const branch = item.key.split('.')[1]
+
+        localStorage.setItem('activeBranch', branch)
+    }
 }
 </script>
 
@@ -90,8 +130,10 @@ function iconStyle(item) {
                 <Link
                     v-if="item.url"
                     :href="item.url"
+                    @click="saveCurrentBranch(item)"
                     @mouseenter="hoveredItem = item.key"
                     @mouseleave="hoveredItem = null"
+                    
                     class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-100 transition group"
                     :style="itemStyle(item)"
                 >

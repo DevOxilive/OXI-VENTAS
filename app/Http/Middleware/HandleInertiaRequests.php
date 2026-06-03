@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use App\Models\Branch;
+use Illuminate\Support\Facades\Cache;
 class HandleInertiaRequests extends Middleware
 {
     /**
@@ -35,29 +36,33 @@ class HandleInertiaRequests extends Middleware
      */
 
 
-    
-public function share(Request $request): array
-{
-    $user = $request->user();
+    public function share(Request $request): array
+    {
+        $user = $request->user();
 
-    return array_merge(parent::share($request), [
-        'auth' => [
-            'user' => $user
-                ? $user->load('role.permissions', 'permissions')
-                : null,
+        return array_merge(parent::share($request), [
+            'auth' => [
+                'user' => $user
+                    ? $user->load('role.permissions', 'permissions')
+                    : null,
 
-            'permissions' => $user
-                ? $user->all_permissions->pluck('name')->values()
-                : [],
-        ],
-'branches' => fn () => Branch::where('active', true)
-    ->orderBy('name')
-    ->get(['id', 'name', 'slug', 'color']),
-        'flash' => [
-            'success' => fn () => $request->session()->get('success'),
-            'error' => fn () => $request->session()->get('error'),
-        ],
-    ]);
+                'permissions' => $user
+                    ? $user->all_permissions->pluck('name')->values()
+                    : [],
+            ],
+
+            'branches' => fn () => Cache::remember(
+                'active_branches',
+                3600,
+                fn () => Branch::where('active', true)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'slug', 'color'])
+            ),
+
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
+            ],
+        ]);
+    }
 }
-}
-

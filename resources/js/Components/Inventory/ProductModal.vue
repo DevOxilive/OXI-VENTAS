@@ -57,9 +57,11 @@ watch(
 
     form.unit = product.unit ?? "";
     form.name = product.name ?? "";
-    form.branch_ids = product?.branch_ids?.length
-  ? product.branch_ids
-  : [props.branch?.id].filter(Boolean);
+  form.branch_ids = product?.branch_ids?.length
+  ? [...product.branch_ids]
+  : []
+
+ensureCurrentBranchSelected()
     form.stock = product.stock ?? 0;
     form.category_id = product.category_id ?? "";
     form.cost = product.cost ?? "";
@@ -110,6 +112,19 @@ function isCurrentBranch(branchId) {
 function removeBarcode(index) {
   if (form.barcodes.length === 1) return;
   form.barcodes.splice(index, 1);
+} 
+function ensureCurrentBranchSelected() {
+  const currentBranchId = props.branch?.id
+
+  if (!currentBranchId) return
+
+  const exists = form.branch_ids.some(
+    branchId => Number(branchId) === Number(currentBranchId)
+  )
+
+  if (!exists) {
+    form.branch_ids.push(currentBranchId)
+  }
 }
 function submit() {
   const branchSlug = props.branch?.slug;
@@ -127,7 +142,7 @@ function submit() {
 
 return;
   }
-
+ensureCurrentBranchSelected()
   if (props.mode === "create") {
     form.post(
       route("inventory.branches.products.store", {
@@ -334,7 +349,7 @@ onError: () => {
         :key="branchItem.id"
         class="flex items-center gap-3 border rounded-xl px-4 py-3 bg-white cursor-pointer hover:bg-slate-100"
       >
-     <input
+  <input
   type="checkbox"
   :value="branchItem.id"
   v-model="form.branch_ids"
