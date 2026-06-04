@@ -22,6 +22,8 @@ return new class extends Migration {
 
             $table->string('supplier')->nullable();
             $table->date('received_at')->nullable();
+            $table->date('season_start_date')->nullable();
+            $table->date('season_end_date')->nullable();
 
             $table->boolean('has_real_lot')->default(false);
 
@@ -33,9 +35,8 @@ return new class extends Migration {
 
             $table->enum('status', [
                 'ACTIVE',
-                'EXPIRED',
-                'DEPLETED',
-                'RETURNED',
+                'INACTIVE',
+                'SEASONAL',
             ])->default('ACTIVE');
 
             $table->timestamps();

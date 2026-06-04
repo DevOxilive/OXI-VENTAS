@@ -1,14 +1,11 @@
 <script setup>
-import { onMounted, onBeforeUnmount, computed, ref, watch, reactive } from 'vue'
-import { useForm } from '@inertiajs/vue3'
-
+import { onMounted, onBeforeUnmount, computed, ref, watch } from 'vue'
 import { useAdjustStockForm } from '@/Composables/Inventory/useAdjustStockForm'
 
 import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
 import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
 import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
 import InputField from '@/Components/Forms/InputField.vue'
-import SelectField from '@/Components/Forms/SelectField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 
 const emit = defineEmits(['close'])
@@ -31,20 +28,6 @@ const {
 } = useAdjustStockForm(props, emit)
 
 const usesLot = ref(false)
-const configErrors = reactive({})
-
-const configForm = useForm({
-    min_stock: props.product.minStock ?? 0,
-    status: props.product.administrativeStatus ?? 'active',
-    season_start_date: props.product.seasonStartDate ?? '',
-    season_end_date: props.product.seasonEndDate ?? '',
-})
-
-const statusOptions = [
-    { label: 'Activo', value: 'active' },
-    { label: 'Inactivo', value: 'inactive' },
-    { label: 'Temporada', value: 'seasonal' },
-]
 
 const productName = computed(() => {
     return props.product?.name ?? props.product?.product?.name ?? 'Producto'
@@ -58,19 +41,9 @@ const today = computed(() => {
     return new Date().toISOString().slice(0, 10)
 })
 
-const hasConfigChanges = computed(() => {
-    return Number(configForm.min_stock) !== Number(props.product.minStock ?? 0)
-        || configForm.status !== (props.product.administrativeStatus ?? 'active')
-        || configForm.season_start_date !== (props.product.seasonStartDate ?? '')
-        || configForm.season_end_date !== (props.product.seasonEndDate ?? '')
-})
-
 const totalErrors = computed(() => {
     return errorSummary.value.length
-        + Object.values(configErrors).filter(Boolean).length
-        + Object.values(configForm.errors || {}).filter(Boolean).length
 })
-
 function ensureEntryReady() {
     form.type = 'IN'
     form.reason = 'PURCHASE'
@@ -129,72 +102,14 @@ function validateEntry() {
         && !frontendErrors.batches
 }
 
-function validateConfigField(field) {
-    configErrors[field] = ''
-
-    if (field === 'min_stock' && Number(configForm.min_stock) < 0) {
-        configErrors.min_stock = 'El stock mínimo no puede ser menor a cero.'
-    }
-
-    if (field === 'status' && !configForm.status) {
-        configErrors.status = 'Selecciona un estado operativo.'
-    }
-
-    if (configForm.status !== 'seasonal') return
-
-    if (field === 'season_start_date' && !configForm.season_start_date) {
-        configErrors.season_start_date = 'Indica cuándo inicia la temporada.'
-    }
-
-    if (field === 'season_end_date' && !configForm.season_end_date) {
-        configErrors.season_end_date = 'Indica cuándo termina la temporada.'
-    }
-
-    if (
-        field === 'season_end_date'
-        && configForm.season_start_date
-        && configForm.season_end_date
-        && configForm.season_end_date < configForm.season_start_date
-    ) {
-        configErrors.season_end_date = 'La fecha de fin no puede ser anterior al inicio.'
-    }
-}
-
-function validateConfig() {
-    configErrors.min_stock = ''
-    configErrors.status = ''
-    configErrors.season_start_date = ''
-    configErrors.season_end_date = ''
-
-    validateConfigField('min_stock')
-    validateConfigField('status')
-
-    if (configForm.status === 'seasonal') {
-        validateConfigField('season_start_date')
-        validateConfigField('season_end_date')
-    }
-
-    return !Object.values(configErrors).some(Boolean)
-}
-
 function saveEntry() {
     if (!validateEntry()) return
 
-    if (showConfig.value && !validateConfig()) return
-
-    if (!showConfig.value || !hasConfigChanges.value) {
-        saveAdjustment()
-        return
-    }
-
-    configForm.patch(route('inventario.branch-inventory.update-config', props.product.id), {
-        preserveScroll: true,
-        onSuccess: () => saveAdjustment(),
-    })
+    saveAdjustment()
 }
 
 function closeModal() {
-    if (form.processing || configForm.processing) return
+    if (form.processing) return
 
     emit('close')
 }
@@ -202,31 +117,10 @@ function closeModal() {
 function handleEsc(e) {
     if (e.key === 'Escape') closeModal()
 }
-const showConfig = ref(false)
-
-function toggleConfig() {
-    showConfig.value = !showConfig.value
-}
-watch(
-    () => entry.value?.quantity,
-    syncQuantity,
-    { immediate: true }
-)
 
 watch(
     entry,
     () => ensureEntryReady(),
-    { immediate: true }
-)
-
-watch(
-    () => props.product,
-    (product) => {
-        configForm.min_stock = product.minStock ?? 0
-        configForm.status = product.administrativeStatus ?? 'active'
-        configForm.season_start_date = product.seasonStartDate ?? ''
-        configForm.season_end_date = product.seasonEndDate ?? ''
-    },
     { immediate: true }
 )
 
@@ -264,11 +158,10 @@ onBeforeUnmount(() => {
                     </div>
 
                     <div class="p-5">
-                        <div class="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-5">
+                        <div class="grid grid-cols-1 gap-5">
                             <div class="space-y-4">
                                 <InputField v-model="entry.quantity" :label="`Cantidad (${unit})`" type="number"
-                                    field="quantity" :readonly="form.processing || configForm.processing"
-                                    @blur="validateField('quantity')" />
+                                    field="quantity" :readonly="form.processing" @blur="validateField('quantity')" />
 
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                                     <div class="flex items-center justify-between gap-4">
@@ -282,7 +175,7 @@ onBeforeUnmount(() => {
                                             </p>
                                         </div>
 
-                                        <button type="button" :disabled="form.processing || configForm.processing"
+                                        <button type="button" :disabled="form.processing"
                                             class="relative inline-flex h-8 w-16 items-center rounded-full transition disabled:opacity-50 shrink-0"
                                             :class="usesLot ? 'bg-[#1f1d2b]' : 'bg-slate-300'" @click="toggleLot">
                                             <span
@@ -298,84 +191,24 @@ onBeforeUnmount(() => {
                                 </div>
 
                                 <InputField v-if="usesLot" v-model="entry.lot_number" label="Número de lote"
-                                    placeholder="Ej. LALA-001" field="lot_number"
-                                    :readonly="form.processing || configForm.processing"
+                                    placeholder="Ej. LALA-001" field="lot_number" :readonly="form.processing"
                                     @blur="validateField('lot_number')" />
 
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <InputField v-model="entry.received_at" label="Fecha de entrada" type="date"
-                                        field="received_at" :readonly="form.processing || configForm.processing"
+                                        field="received_at" :readonly="form.processing"
                                         @blur="validateField('received_at')" />
 
                                     <InputField v-model="entry.expiration_date" label="Caducidad" type="date"
-                                        field="expiration_date" :readonly="form.processing || configForm.processing"
+                                        field="expiration_date" :readonly="form.processing"
                                         @blur="validateField('expiration_date')" />
                                 </div>
 
                                 <InputField v-model="entry.supplier" label="Proveedor" placeholder="Opcional"
-                                    field="supplier" :readonly="form.processing || configForm.processing" />
+                                    field="supplier" :readonly="form.processing" />
 
                                 <TextareaField v-model="form.notes" label="Notas" placeholder="Opcional" field="notes"
-                                    :readonly="form.processing || configForm.processing" />
-                            </div>
-
-                            <div class="space-y-4">
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <div class="flex items-center justify-between gap-4">
-                                        <div>
-                                            <p class="text-sm font-bold text-slate-800">
-                                                Configuración
-                                            </p>
-
-                                            <p class="text-xs text-slate-500 mt-0.5">
-                                                Modifica stock mínimo o estado si es necesario.
-                                            </p>
-                                        </div>
-
-                                        <button type="button" :disabled="form.processing || configForm.processing"
-                                            class="relative inline-flex h-8 w-16 items-center rounded-full transition disabled:opacity-50 shrink-0"
-                                            :class="showConfig ? 'bg-[#1f1d2b]' : 'bg-slate-300'" @click="toggleConfig">
-                                            <span
-                                                class="inline-block h-6 w-6 transform rounded-full bg-white shadow transition"
-                                                :class="showConfig ? 'translate-x-9' : 'translate-x-1'" />
-
-                                            <span class="absolute text-[10px] font-black uppercase"
-                                                :class="showConfig ? 'left-3 text-white' : 'right-3 text-slate-600'">
-                                                {{ showConfig ? 'Sí' : 'No' }}
-                                            </span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <section v-if="showConfig" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <div class="space-y-4">
-                                        <InputField v-model="configForm.min_stock" :label="`Stock mínimo (${unit})`"
-                                            field="min_stock" type="number"
-                                            :readonly="form.processing || configForm.processing"
-                                            :error="configErrors.min_stock || configForm.errors.min_stock"
-                                            @validate="validateConfigField" />
-
-                                        <SelectField v-model="configForm.status" label="Estado" field="status"
-                                            :options="statusOptions"
-                                            :disabled="form.processing || configForm.processing"
-                                            :error="configErrors.status || configForm.errors.status"
-                                            @validate="validateConfigField" />
-
-                                    </div>
-                                    <div v-if="configForm.status === 'seasonal'" class="grid grid-cols-1 gap-4">
-                                        <InputField v-model="configForm.season_start_date" label="Inicio de temporada"
-                                            field="season_start_date" type="date"
-                                            :readonly="form.processing || configForm.processing"
-                                            :error="configErrors.season_start_date || configForm.errors.season_start_date"
-                                            @validate="validateConfigField" />
-
-                                        <InputField v-model="configForm.season_end_date" label="Fin estimado"
-                                            field="season_end_date" type="date"
-                                            :readonly="form.processing || configForm.processing"
-                                            :error="configErrors.season_end_date || configForm.errors.season_end_date"
-                                            @validate="validateConfigField" />
-                                    </div>
-                                </section>
+                                    :readonly="form.processing" />
                             </div>
                         </div>
 
@@ -411,9 +244,8 @@ onBeforeUnmount(() => {
                 </section>
             </GeneralModalContent>
 
-            <GeneralModalFooter :processing="form.processing || configForm.processing"
-                save-button-text="Registrar entrada" close-button-text="Cancelar" mode="create" @save="saveEntry"
-                @close="closeModal" />
+            <GeneralModalFooter :processing="form.processing" save-button-text="Registrar entrada"
+                close-button-text="Cancelar" mode="create" @save="saveEntry" @close="closeModal" />
         </div>
     </div>
 </template>

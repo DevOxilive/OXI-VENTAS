@@ -7,9 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class ProductBatch extends Model
 {
     public const STATUS_ACTIVE = 'ACTIVE';
-    public const STATUS_EXPIRED = 'EXPIRED';
-    public const STATUS_DEPLETED = 'DEPLETED';
-    public const STATUS_RETURNED = 'RETURNED';
+    public const STATUS_INACTIVE = 'INACTIVE';
+    public const STATUS_SEASONAL = 'SEASONAL';
 
     public const EXPIRATION_STATUS_NO_EXPIRATION = 'NO_EXPIRATION';
     public const EXPIRATION_STATUS_EXPIRED = 'EXPIRED';
@@ -25,6 +24,8 @@ class ProductBatch extends Model
         'supplier',
         'received_at',
         'status',
+        'season_start_date',
+        'season_end_date',
     ];
 
     protected $casts = [
@@ -32,6 +33,8 @@ class ProductBatch extends Model
         'received_at' => 'date',
         'initial_quantity' => 'decimal:2',
         'quantity' => 'decimal:2',
+        'season_start_date' => 'date',
+        'season_end_date' => 'date',
     ];
 
     protected $appends = [
@@ -139,27 +142,6 @@ class ProductBatch extends Model
     public function getIsNearExpirationAttribute(): bool
     {
         return $this->expiration_status === self::EXPIRATION_STATUS_NEAR_EXPIRATION;
-    }
-
-    public function markAsDepleted(): void
-    {
-        $this->update([
-            'quantity' => 0,
-            'status' => self::STATUS_DEPLETED,
-        ]);
-    }
-
-    public function refreshStatus(): void
-    {
-        if ((float) $this->quantity <= 0) {
-            $this->status = self::STATUS_DEPLETED;
-        } elseif ($this->is_expired) {
-            $this->status = self::STATUS_EXPIRED;
-        } else {
-            $this->status = self::STATUS_ACTIVE;
-        }
-
-        $this->save();
     }
 
     private function formatDate($date): ?string

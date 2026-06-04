@@ -1,6 +1,5 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-
 import InventoryStatsCards from '@/Components/Inventory/BranchProducts/InventoryStatsCards.vue'
 import InventoryToolbar from '@/Components/Inventory/BranchProducts/InventoryToolbar.vue'
 import InventoryTable from '@/Components/Inventory/BranchProducts/InventoryTable.vue'
@@ -10,8 +9,9 @@ import StockEntryModal from '@/Components/Inventory/BranchProducts/StockEntryMod
 import StockExitModal from '@/Components/Inventory/BranchProducts/StockExitModal.vue'
 import ProductMovementsModal from '@/Components/Inventory/BranchProducts/ProductMovementsModal.vue'
 import EditBranchProductConfigModal from '@/Components/Inventory/BranchProducts/EditBranchProductConfigModal.vue'
-
+import BatchAdjustmentModal from '@/Components/Inventory/BranchProducts/BatchAdjustmentModal.vue'
 import { useBranchInventory } from '@/Composables/Inventory/useBranchInventory'
+import ProductBatchesModal from '@/Components/Inventory/BranchProducts/ProductBatchesModal.vue'
 
 defineOptions({ layout: AdminLayout })
 
@@ -89,12 +89,16 @@ const {
     showExitModal,
     showMovementsModal,
     showConfigModal,
+    showBatchAdjustmentModal,
 
     liveSelectedMovementProduct,
     liveSelectedMovementsProduct,
     liveSelectedConfigProduct,
+    liveSelectedBatch,
 
     closeConfigModal,
+    closeBatchAdjustmentModal,
+    adjustBatch,
 
     search,
     categoryFilter,
@@ -132,7 +136,28 @@ const {
     viewProduct,
     editProduct,
     deleteProduct,
+
+    showProductBatchesModal,
+    liveSelectedBatchesProduct,
+    openProductBatchesModal,
+    closeProductBatchesModal,
+    openBatchAdjustmentFromList,
+
+    batchAdjustmentProcessing,
+    batchAdjustmentUsesLot,
+    batchAdjustmentForm,
+    batchAdjustmentErrors,
+    batchAdjustmentTotalErrors,
+    batchAdjustmentIsSeasonal,
+    batchAdjustmentCalculatedQuantity,
+    batchAdjustmentText,
+    batchAdjustmentQuantityResultColor,
+    toggleBatchAdjustmentLot,
+    setBatchAdjustmentType,
+    validateBatchAdjustmentField,
+    saveEditedBatch,
 } = useBranchInventory(props)
+
 </script>
 
 <template>
@@ -164,7 +189,8 @@ const {
             @update:inactiveCandidateFilter="inactiveCandidateFilter = $event" />
 
         <InventoryTable :filtered-products="filteredProducts" @view="viewProduct" @edit="editProduct"
-            @entry="openEntryModal" @exit="openExitModal" @movements="openMovementsModal" @delete="deleteProduct" />
+            @entry="openEntryModal" @exit="openExitModal" @movements="openMovementsModal"
+            @batches="openProductBatchesModal" @delete="deleteProduct" />
 
         <InventoryMobileCards :filtered-products="filteredProducts" @view="viewProduct" @edit="editProduct"
             @entry="openEntryModal" @exit="openExitModal" @movements="openMovementsModal" @delete="deleteProduct" />
@@ -173,8 +199,8 @@ const {
             <button v-for="link in paginationLinks" :key="link.label" type="button" :disabled="!link.url"
                 class="px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 disabled:cursor-not-allowed"
                 :class="link.active
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                     " @click="goToPage(link.url)" v-html="link.label" />
         </nav>
 
@@ -186,6 +212,18 @@ const {
 
         <ProductMovementsModal v-if="showMovementsModal && liveSelectedMovementsProduct"
             :product="liveSelectedMovementsProduct" @close="closeMovementsModal" />
+
+        <ProductBatchesModal v-if="showProductBatchesModal && liveSelectedBatchesProduct"
+            :product="liveSelectedBatchesProduct" @close="closeProductBatchesModal"
+            @adjust-batch="openBatchAdjustmentFromList" />
+
+        <BatchAdjustmentModal v-if="showBatchAdjustmentModal && liveSelectedBatch" :form="batchAdjustmentForm"
+            :frontend-errors="batchAdjustmentErrors" :total-errors="batchAdjustmentTotalErrors"
+            :processing="batchAdjustmentProcessing" :uses-lot="batchAdjustmentUsesLot"
+            :is-seasonal="batchAdjustmentIsSeasonal" :calculated-quantity="batchAdjustmentCalculatedQuantity"
+            :adjustment-text="batchAdjustmentText" :quantity-result-color="batchAdjustmentQuantityResultColor"
+            :toggle-lot="toggleBatchAdjustmentLot" :set-adjustment-type="setBatchAdjustmentType"
+            :validate-field="validateBatchAdjustmentField" @save="saveEditedBatch" @close="closeBatchAdjustmentModal" />
 
         <InventoryAlertsModal v-if="showAlertModal" :title="selectedAlertTitle" :type="selectedAlertType"
             :batches="selectedAlertBatches" @close="closeAlertModal" />

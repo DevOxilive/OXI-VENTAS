@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useBatchAdjustmentModal } from "@/Composables/Inventory/useBatchAdjustmentModal";
 import { router } from "@inertiajs/vue3";
 
 export function useBranchInventory(props) {
@@ -114,6 +115,54 @@ export function useBranchInventory(props) {
             };
         });
     });
+
+    const {
+        showBatchAdjustmentModal,
+        liveSelectedBatch,
+        processing: batchAdjustmentProcessing,
+        usesLot: batchAdjustmentUsesLot,
+        form: batchAdjustmentForm,
+        frontendErrors: batchAdjustmentErrors,
+        totalErrors: batchAdjustmentTotalErrors,
+        isSeasonal: batchAdjustmentIsSeasonal,
+        calculatedQuantity: batchAdjustmentCalculatedQuantity,
+        adjustmentText: batchAdjustmentText,
+        quantityResultColor: batchAdjustmentQuantityResultColor,
+        adjustBatch,
+        closeBatchAdjustmentModal,
+        toggleLot: toggleBatchAdjustmentLot,
+        setAdjustmentType: setBatchAdjustmentType,
+        validateField: validateBatchAdjustmentField,
+        saveEditedBatch,
+    } = useBatchAdjustmentModal(visualProducts);
+
+    const showProductBatchesModal = ref(false);
+    const selectedBatchesProductId = ref(null);
+
+    const liveSelectedBatchesProduct = computed(() => {
+        if (!selectedBatchesProductId.value) return null;
+
+        return (
+            visualProducts.value.find((product) => {
+                return product.id === selectedBatchesProductId.value;
+            }) ?? null
+        );
+    });
+
+    function openProductBatchesModal(product) {
+        selectedBatchesProductId.value = product.id;
+        showProductBatchesModal.value = true;
+    }
+
+    function closeProductBatchesModal() {
+        showProductBatchesModal.value = false;
+        selectedBatchesProductId.value = null;
+    }
+
+    function openBatchAdjustmentFromList(batch) {
+        closeProductBatchesModal();
+        adjustBatch(batch);
+    }
 
     const liveSelectedMovementProduct = computed(() => {
         if (!selectedMovementProduct.value) return null;
@@ -382,6 +431,7 @@ export function useBranchInventory(props) {
         selectedMovementProduct,
         selectedMovementsProduct,
         selectedConfigProduct,
+
         liveSelectedMovementProduct,
         liveSelectedMovementsProduct,
         liveSelectedConfigProduct,
@@ -397,8 +447,10 @@ export function useBranchInventory(props) {
 
         paginationLinks,
         hasPagination,
+
         visualProducts,
         filteredProducts,
+
         stats,
         alerts,
 
@@ -409,24 +461,54 @@ export function useBranchInventory(props) {
 
         openCreateModal,
         closeCreateModal,
+
         openAlertModal,
         closeAlertModal,
 
         openEntryModal,
         closeEntryModal,
+
         openExitModal,
         closeExitModal,
+
         openMovementsModal,
         closeMovementsModal,
 
         editProduct,
         closeConfigModal,
 
-        reloadInventory,
-        goToPage,
-
         exportExcel,
         viewProduct,
         deleteProduct,
+
+        reloadInventory,
+        goToPage,
+
+        showProductBatchesModal,
+        liveSelectedBatchesProduct,
+        openProductBatchesModal,
+        closeProductBatchesModal,
+        openBatchAdjustmentFromList,
+
+        showBatchAdjustmentModal,
+        liveSelectedBatch,
+
+        adjustBatch,
+        closeBatchAdjustmentModal,
+
+        batchAdjustmentProcessing,
+        batchAdjustmentUsesLot,
+        batchAdjustmentForm,
+        batchAdjustmentErrors,
+        batchAdjustmentTotalErrors,
+        batchAdjustmentIsSeasonal,
+        batchAdjustmentCalculatedQuantity,
+        batchAdjustmentText,
+        batchAdjustmentQuantityResultColor,
+
+        toggleBatchAdjustmentLot,
+        setBatchAdjustmentType,
+        validateBatchAdjustmentField,
+        saveEditedBatch,
     };
 }

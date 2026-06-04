@@ -14,6 +14,7 @@ defineEmits([
     'entry',
     'exit',
     'movements',
+    'batches',
     'delete',
 ])
 
@@ -34,29 +35,12 @@ function statusClass(status) {
             <table class="w-full table-fixed text-sm">
                 <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
                     <tr>
-                        <th class="w-[13%] text-left px-4 py-3 font-semibold">
-                            Código
-                        </th>
-
-                        <th class="w-[28%] text-left px-4 py-3 font-semibold">
-                            Producto
-                        </th>
-
-                        <th class="w-[18%] text-left px-4 py-3 font-semibold">
-                            Categoría
-                        </th>
-
-                        <th class="w-[15%] text-left px-4 py-3 font-semibold">
-                            Stock
-                        </th>
-
-                        <th class="w-[13%] text-left px-4 py-3 font-semibold">
-                            Estado
-                        </th>
-
-                        <th class="w-[13%] text-center px-4 py-3 font-semibold">
-                            Acciones
-                        </th>
+                        <th class="w-[13%] text-left px-4 py-3 font-semibold">Código</th>
+                        <th class="w-[28%] text-left px-4 py-3 font-semibold">Producto</th>
+                        <th class="w-[18%] text-left px-4 py-3 font-semibold">Categoría</th>
+                        <th class="w-[15%] text-left px-4 py-3 font-semibold">Stock</th>
+                        <th class="w-[13%] text-left px-4 py-3 font-semibold">Estado</th>
+                        <th class="w-[13%] text-center px-4 py-3 font-semibold">Acciones</th>
                     </tr>
                 </thead>
 
@@ -85,6 +69,10 @@ function statusClass(status) {
                             <div class="text-xs text-slate-400 truncate">
                                 Mínimo: {{ product.minStockLabel ?? product.minStock }}
                             </div>
+
+                            <div v-if="product.batches?.length" class="text-xs text-blue-500 font-semibold truncate">
+                                {{ product.batches.length }} lote(s)
+                            </div>
                         </td>
 
                         <td class="px-4 py-4">
@@ -102,6 +90,12 @@ function statusClass(status) {
 
                                 <ActionIconButton icon="remove" title="Salida" variant="red"
                                     @click="$emit('exit', product)" />
+                                    
+                                <ActionIconButton icon="edit" title="Lotes" variant="blue"
+                                    :disabled="!product.batches?.length" @click="$emit('batches', product)" />
+
+                                <ActionIconButton icon="settings" title="Configurar" variant="amber"
+                                    @click="$emit('edit', product)" />
 
                                 <ActionIconButton icon="history" title="Historial" variant="slate"
                                     @click="$emit('movements', product)" />
