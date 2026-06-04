@@ -3,10 +3,13 @@ import { router } from "@inertiajs/vue3";
 
 export function useBranchInventory(props) {
     const showCreateModal = ref(false);
-    const showAdjustModal = ref(false);
+    const showEntryModal = ref(false);
+    const showExitModal = ref(false);
+    const showMovementsModal = ref(false);
     const showConfigModal = ref(false);
 
-    const selectedProduct = ref(null);
+    const selectedMovementProduct = ref(null);
+    const selectedMovementsProduct = ref(null);
     const selectedConfigProduct = ref(null);
     const selectedAlertType = ref(null);
 
@@ -112,13 +115,23 @@ export function useBranchInventory(props) {
         });
     });
 
-    const liveSelectedProduct = computed(() => {
-        if (!selectedProduct.value) return null;
+    const liveSelectedMovementProduct = computed(() => {
+        if (!selectedMovementProduct.value) return null;
 
         return (
             visualProducts.value.find((product) => {
-                return product.id === selectedProduct.value.id;
-            }) ?? null
+                return product.id === selectedMovementProduct.value.id;
+            }) ?? selectedMovementProduct.value
+        );
+    });
+
+    const liveSelectedMovementsProduct = computed(() => {
+        if (!selectedMovementsProduct.value) return null;
+
+        return (
+            visualProducts.value.find((product) => {
+                return product.id === selectedMovementsProduct.value.id;
+            }) ?? selectedMovementsProduct.value
         );
     });
 
@@ -258,14 +271,34 @@ export function useBranchInventory(props) {
         selectedAlertType.value = null;
     };
 
-    const adjustStock = (product) => {
-        selectedProduct.value = product;
-        showAdjustModal.value = true;
+    const openEntryModal = (product) => {
+        selectedMovementProduct.value = product;
+        showEntryModal.value = true;
     };
 
-    const closeAdjustModal = () => {
-        showAdjustModal.value = false;
-        selectedProduct.value = null;
+    const closeEntryModal = () => {
+        showEntryModal.value = false;
+        selectedMovementProduct.value = null;
+    };
+
+    const openExitModal = (product) => {
+        selectedMovementProduct.value = product;
+        showExitModal.value = true;
+    };
+
+    const closeExitModal = () => {
+        showExitModal.value = false;
+        selectedMovementProduct.value = null;
+    };
+
+    const openMovementsModal = (product) => {
+        selectedMovementsProduct.value = product;
+        showMovementsModal.value = true;
+    };
+
+    const closeMovementsModal = () => {
+        showMovementsModal.value = false;
+        selectedMovementsProduct.value = null;
     };
 
     const editProduct = (product) => {
@@ -298,33 +331,13 @@ export function useBranchInventory(props) {
         }, 400);
     });
 
-    watch(recordsToShow, () => {
-        reloadInventory();
-    });
-
-    watch(categoryFilter, () => {
-        reloadInventory();
-    });
-
-    watch(subcategoryFilter, () => {
-        reloadInventory();
-    });
-
-    watch(stockFilter, () => {
-        reloadInventory();
-    });
-
-    watch(statusFilter, () => {
-        reloadInventory();
-    });
-
-    watch(expirationStatusFilter, () => {
-        reloadInventory();
-    });
-
-    watch(inactiveCandidateFilter, () => {
-        reloadInventory();
-    });
+    watch(recordsToShow, reloadInventory);
+    watch(categoryFilter, reloadInventory);
+    watch(subcategoryFilter, reloadInventory);
+    watch(stockFilter, reloadInventory);
+    watch(statusFilter, reloadInventory);
+    watch(expirationStatusFilter, reloadInventory);
+    watch(inactiveCandidateFilter, reloadInventory);
 
     onMounted(() => {
         if (!window.Echo || !currentBranch.value?.id) return;
@@ -361,12 +374,16 @@ export function useBranchInventory(props) {
         currentBranch,
 
         showCreateModal,
-        showAdjustModal,
+        showEntryModal,
+        showExitModal,
+        showMovementsModal,
         showConfigModal,
 
-        selectedProduct,
+        selectedMovementProduct,
+        selectedMovementsProduct,
         selectedConfigProduct,
-        liveSelectedProduct,
+        liveSelectedMovementProduct,
+        liveSelectedMovementsProduct,
         liveSelectedConfigProduct,
 
         search,
@@ -395,8 +412,13 @@ export function useBranchInventory(props) {
         openAlertModal,
         closeAlertModal,
 
-        adjustStock,
-        closeAdjustModal,
+        openEntryModal,
+        closeEntryModal,
+        openExitModal,
+        closeExitModal,
+        openMovementsModal,
+        closeMovementsModal,
+
         editProduct,
         closeConfigModal,
 

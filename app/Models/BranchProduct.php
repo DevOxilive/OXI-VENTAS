@@ -21,6 +21,8 @@ class BranchProduct extends Model
         'inactive_candidate_after_days',
         'tracks_batches',
         'tracks_expiration',
+        'season_start_date',
+        'season_end_date',
     ];
 
     protected $casts = [
@@ -30,6 +32,8 @@ class BranchProduct extends Model
         'tracks_expiration' => 'boolean',
         'last_restocked_at' => 'datetime',
         'inactive_candidate_after_days' => 'integer',
+        'season_start_date' => 'date',
+        'season_end_date' => 'date',
     ];
 
     public function branch()

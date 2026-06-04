@@ -37,6 +37,8 @@ class BranchInventoryController extends Controller
                 'stock',
                 'min_stock',
                 'status',
+                'season_start_date',
+                'season_end_date',
                 'last_restocked_at',
                 'inactive_candidate_after_days',
                 'tracks_batches',
@@ -380,11 +382,20 @@ class BranchInventoryController extends Controller
         $validated = $request->validate([
             'min_stock' => ['required', 'numeric', 'min:0'],
             'status' => ['required', 'in:active,inactive,seasonal'],
+            'season_start_date' => ['nullable', 'date', 'required_if:status,seasonal'],
+            'season_end_date' => ['nullable', 'date', 'required_if:status,seasonal', 'after_or_equal:season_start_date'],
         ]);
 
         $branchProduct->update([
             'min_stock' => $validated['min_stock'],
             'status' => $validated['status'],
+            'season_start_date' => $validated['status'] === 'seasonal'
+                ? $validated['season_start_date']
+                : null,
+
+            'season_end_date' => $validated['status'] === 'seasonal'
+                ? $validated['season_end_date']
+                : null,
         ]);
 
         return back()->with('success', 'Configuración del producto actualizada correctamente.');
