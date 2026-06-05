@@ -100,8 +100,14 @@ Route::prefix('systems')->name('systems.')->group(function () {
         ]);
     })->name('employees');
 
-    Route::post('/employees', [UserController::class, 'store'])
-        ->name('employees.store');
+            return Inertia::render('Sistemas/Empleados', [
+                'empleados' => \App\Models\Employee::doesntHave('user')->get(),
+                'usuarios' => \App\Models\User::with(['role', 'permissions', 'branches',])->select('id', 'employee_id', 'name', 'email', 'role_id')->get(),
+                'roles' => \App\Models\Role::all(),
+                'permissions' => \App\Models\Permission::all(),
+                'branches' => \App\Models\Branch::where('active', true)->get(),
+            ]);
+        })->name('sistemas.empleados');
 
     Route::put('/employees/{id}', [UserController::class, 'update'])
         ->name('employees.update');
@@ -371,6 +377,9 @@ Route::prefix('audits')->group(function () {
 
             Route::post('/inventario-sucursales', [BranchInventoryController::class, 'store'])
                 ->name('branch-inventory.store');
+
+            Route::patch('/inventario-sucursales/{branchProduct}/config', [BranchInventoryController::class, 'updateConfig'])
+                ->name('branch-inventory.update-config');
 
             Route::get('/branches/{branch}/purchase-reports/create', [PurchaseReportController::class, 'create'])
                 ->name('branches.purchase-reports.create');

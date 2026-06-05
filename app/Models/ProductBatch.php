@@ -6,6 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProductBatch extends Model
 {
+    public const STATUS_ACTIVE = 'ACTIVE';
+    public const STATUS_INACTIVE = 'INACTIVE';
+    public const STATUS_SEASONAL = 'SEASONAL';
+
+    public const EXPIRATION_STATUS_NO_EXPIRATION = 'NO_EXPIRATION';
+    public const EXPIRATION_STATUS_EXPIRED = 'EXPIRED';
+    public const EXPIRATION_STATUS_NEAR_EXPIRATION = 'NEAR_EXPIRATION';
+    public const EXPIRATION_STATUS_VALID = 'VALID';
+
     protected $fillable = [
         'branch_product_id',
         'lot_number',
@@ -15,11 +24,17 @@ class ProductBatch extends Model
         'supplier',
         'received_at',
         'status',
+        'season_start_date',
+        'season_end_date',
     ];
 
     protected $casts = [
         'expiration_date' => 'date',
         'received_at' => 'date',
+        'initial_quantity' => 'decimal:2',
+        'quantity' => 'decimal:2',
+        'season_start_date' => 'date',
+        'season_end_date' => 'date',
     ];
 
     protected $appends = [
@@ -45,22 +60,20 @@ class ProductBatch extends Model
     public function getExpirationStatusAttribute(): string
     {
         if (!$this->expiration_date) {
-            return 'NO_EXPIRATION';
+            return self::EXPIRATION_STATUS_NO_EXPIRATION;
         }
 
-        $daysToExpire = now()
-            ->startOfDay()
-            ->diffInDays($this->expiration_date->copy()->startOfDay(), false);
+        $daysToExpire = $this->days_to_expire;
 
         if ($daysToExpire < 0) {
-            return 'EXPIRED';
+            return self::EXPIRATION_STATUS_EXPIRED;
         }
 
         if ($daysToExpire <= 30) {
-            return 'NEAR_EXPIRATION';
+            return self::EXPIRATION_STATUS_NEAR_EXPIRATION;
         }
 
-        return 'VALID';
+        return self::EXPIRATION_STATUS_VALID;
     }
 
     public function getExpirationHumanTextAttribute(): string
@@ -69,9 +82,7 @@ class ProductBatch extends Model
             return 'Sin fecha de caducidad';
         }
 
-        $daysToExpire = now()
-            ->startOfDay()
-            ->diffInDays($this->expiration_date->copy()->startOfDay(), false);
+        $daysToExpire = $this->days_to_expire;
 
         if ($daysToExpire < 0) {
             return 'Caducó hace ' . abs($daysToExpire) . ' día(s)';
@@ -125,12 +136,12 @@ class ProductBatch extends Model
 
     public function getIsExpiredAttribute(): bool
     {
-        return $this->expiration_status === 'EXPIRED';
+        return $this->expiration_status === self::EXPIRATION_STATUS_EXPIRED;
     }
 
     public function getIsNearExpirationAttribute(): bool
     {
-        return $this->expiration_status === 'NEAR_EXPIRATION';
+        return $this->expiration_status === self::EXPIRATION_STATUS_NEAR_EXPIRATION;
     }
 
     private function formatDate($date): ?string

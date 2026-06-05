@@ -4,6 +4,10 @@ defineProps({
         type: Array,
         default: () => [],
     },
+    unit: {
+        type: String,
+        default: 'piezas',
+    },
 })
 
 function movementTypeLabel(type) {
@@ -19,16 +23,15 @@ function movementReasonLabel(reason) {
         PURCHASE: 'Compra',
         SALE: 'Venta',
         DAMAGED: 'Producto dañado',
-        STOLEN: 'Producto robado',
         EXPIRED: 'Producto caducado',
-        TRANSFER: 'Transferencia',
-        MANUAL: 'Ajuste manual',
+        INVENTORY_DIFFERENCE: 'Diferencia de inventario',
     }[reason] || reason
 }
 </script>
 
 <template>
-    <aside class="xl:col-span-3 flex flex-col min-h-0 border-t xl:border-t-0 xl:border-l border-slate-200 pt-5 xl:pt-0 xl:pl-5">
+    <aside
+        class="xl:col-span-3 flex flex-col min-h-0 border-t xl:border-t-0 xl:border-l border-slate-200 pt-5 xl:pt-0 xl:pl-5">
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h3 class="font-bold text-base text-slate-900">
@@ -53,9 +56,15 @@ function movementReasonLabel(reason) {
                         {{ movementTypeLabel(movement.type) }}
                     </span>
 
-                    <span class="text-xs text-slate-400">
-                        #{{ movement.id }}
-                    </span>
+                    <div class="text-right">
+                        <p class="text-xs text-slate-400">
+                            #{{ movement.id }}
+                        </p>
+
+                        <p class="text-xs text-slate-400">
+                            {{ movement.created_at }}
+                        </p>
+                    </div>
                 </div>
 
                 <p class="mt-3 text-sm font-black text-slate-900">
@@ -63,14 +72,22 @@ function movementReasonLabel(reason) {
                 </p>
 
                 <p class="text-xs text-slate-500 mt-1">
-                    Movimiento {{ movementTypeLabel(movement.type).toLowerCase() }} por {{ movement.quantity }} unidad(es).
-                </p>
+                    Movimiento {{ movementTypeLabel(movement.type).toLowerCase() }}
+                    por {{ movement.quantity }} {{ unit }} </p>
 
                 <p class="text-xs text-slate-500 mt-1">
-                    Stock: {{ movement.previous_stock }} → {{ movement.new_stock }}
-                </p>
+                    Stock: {{ movement.previous_stock }} {{ unit }} → {{ movement.new_stock }} {{ unit }} </p>
 
-                <p class="text-xs text-slate-400 mt-2 truncate">
+                <div v-if="movement.batches?.length" class="mt-2 space-y-1">
+                    <p v-for="batch in movement.batches" :key="batch.id" class="text-xs text-slate-500">
+                        Lote:
+                        {{ batch.product_batch?.lot_number || 'Sin lote' }}
+                        · Cantidad:
+                        {{ batch.quantity }} {{ unit }} </p>
+                </div>
+
+                <p class="text-xs text-slate-400 mt-2">
+                    Responsable:
                     {{ movement.user?.name || 'Usuario no disponible' }}
                 </p>
             </div>

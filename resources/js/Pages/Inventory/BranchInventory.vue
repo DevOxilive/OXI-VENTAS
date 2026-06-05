@@ -1,15 +1,17 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { useForm } from '@inertiajs/vue3'
-
 import InventoryStatsCards from '@/Components/Inventory/BranchProducts/InventoryStatsCards.vue'
 import InventoryToolbar from '@/Components/Inventory/BranchProducts/InventoryToolbar.vue'
 import InventoryTable from '@/Components/Inventory/BranchProducts/InventoryTable.vue'
 import InventoryMobileCards from '@/Components/Inventory/BranchProducts/InventoryMobileCards.vue'
 import InventoryAlertsModal from '@/Components/Inventory/BranchProducts/InventoryAlertsModal.vue'
-import AdjustStockModal from '@/Components/Inventory/BranchProducts/AdjustStockModal.vue'
-
+import StockEntryModal from '@/Components/Inventory/BranchProducts/StockEntryModal.vue'
+import StockExitModal from '@/Components/Inventory/BranchProducts/StockExitModal.vue'
+import ProductMovementsModal from '@/Components/Inventory/BranchProducts/ProductMovementsModal.vue'
+import EditBranchProductConfigModal from '@/Components/Inventory/BranchProducts/EditBranchProductConfigModal.vue'
+import ProductBatchesModal from '@/Components/Inventory/BranchProducts/ProductBatchesModal.vue'
 import { useBranchInventory } from '@/Composables/Inventory/useBranchInventory'
+
 
 defineOptions({ layout: AdminLayout })
 
@@ -30,12 +32,10 @@ const props = defineProps({
         type: Object,
         default: null,
     },
-
     categoriesDB: {
         type: Array,
         default: () => [],
     },
-
     subcategoriesDB: {
         type: Array,
         default: () => [],
@@ -81,26 +81,32 @@ const props = defineProps({
 })
 
 const {
-    products,
-    branches,
     categories,
     subcategories,
     currentBranch,
 
-    showCreateModal,
-    showAdjustModal,
-    liveSelectedProduct,
+    showEntryModal,
+    showExitModal,
+    showMovementsModal,
+    showConfigModal,
+    showBatchAdjustmentModal,
+
+    liveSelectedMovementProduct,
+    liveSelectedMovementsProduct,
+    liveSelectedConfigProduct,
+    liveSelectedBatch,
+
+    closeConfigModal,
+    closeBatchAdjustmentModal,
+    adjustBatch,
 
     search,
     categoryFilter,
     subcategoryFilter,
-
     stockFilter,
-
     statusFilter,
     expirationStatusFilter,
     inactiveCandidateFilter,
-
     recordsToShow,
 
     paginationLinks,
@@ -115,103 +121,116 @@ const {
     selectedAlertBatches,
     showAlertModal,
 
-    openCreateModal,
-    closeCreateModal,
     openAlertModal,
     closeAlertModal,
 
-    adjustStock,
-    closeAdjustModal,
+    openEntryModal,
+    closeEntryModal,
+    openExitModal,
+    closeExitModal,
+    openMovementsModal,
+    closeMovementsModal,
 
     goToPage,
 
-    exportExcel,
     viewProduct,
     editProduct,
     deleteProduct,
+
+    showProductBatchesModal,
+    liveSelectedBatchesProduct,
+    openProductBatchesModal,
+    closeProductBatchesModal,
+    openBatchAdjustmentFromList,
+
+    batchAdjustmentProcessing,
+    batchAdjustmentUsesLot,
+    batchAdjustmentForm,
+    batchAdjustmentErrors,
+    batchAdjustmentTotalErrors,
+    batchAdjustmentIsSeasonal,
+    batchAdjustmentCalculatedQuantity,
+    batchAdjustmentText,
+    batchAdjustmentQuantityResultColor,
+    toggleBatchAdjustmentLot,
+    setBatchAdjustmentType,
+    validateBatchAdjustmentField,
+    saveEditedBatch,
 } = useBranchInventory(props)
 
-const form = useForm({
-    branch_id: '',
-    product_id: '',
-    price: '',
-    stock: '',
-    min_stock: '',
-    status: 'active',
-})
-
-const openCreateInventoryModal = () => {
-    form.reset()
-    form.clearErrors()
-
-    form.status = 'active'
-
-    if (currentBranch.value?.id) {
-        form.branch_id = currentBranch.value.id
-    }
-
-    openCreateModal()
-}
-
-const closeCreateInventoryModal = () => {
-    closeCreateModal()
-}
-
-const submit = () => {
-    form.post(route('inventario.branch-inventory.store'), {
-        preserveScroll: true,
-        onSuccess: () => closeCreateInventoryModal(),
-    })
-}
 </script>
 
 <template>
-    <div class="space-y-6">
-        <header>
-            <h1 class="text-3xl font-black text-slate-800">
+    <div class="space-y-5">
+        <header class="flex flex-col gap-1">
+            <h1 class="text-2xl md:text-3xl font-black text-slate-800">
                 Inventario
                 <span v-if="currentBranch" class="text-slate-500">
                     - {{ currentBranch.name }}
                 </span>
             </h1>
 
-            <p class="text-slate-500 mt-1">
-                Gestión operativa del inventario por sucursal
+            <p class="text-sm text-slate-500">
+                Consulta y movimientos por sucursal
             </p>
         </header>
 
         <InventoryStatsCards :stats="stats" :alerts="alerts" @open-alert="openAlertModal" />
 
         <InventoryToolbar :filtered-products="filteredProducts" :products-db="visualProducts"
-            :records-to-show="recordsToShow" @create="openCreateInventoryModal" @excel="exportExcel"
-            @update:recordsToShow="recordsToShow = $event" />
-
-        <InventoryTable :filtered-products="filteredProducts" :categories="categories" :subcategories="subcategories"
-            :search="search" :category-filter="categoryFilter" :subcategory-filter="subcategoryFilter"
-            :stock-filter="stockFilter" :status-filter="statusFilter" :expiration-status-filter="expirationStatusFilter"
-            :inactive-candidate-filter="inactiveCandidateFilter" @update:search="search = $event"
-            @update:categoryFilter="categoryFilter = $event" @update:subcategoryFilter="subcategoryFilter = $event"
-            @update:stockFilter="stockFilter = $event" @update:statusFilter="statusFilter = $event"
+            :records-to-show="recordsToShow" :categories="categories" :subcategories="subcategories" :search="search"
+            :category-filter="categoryFilter" :subcategory-filter="subcategoryFilter" :stock-filter="stockFilter"
+            :status-filter="statusFilter" :expiration-status-filter="expirationStatusFilter"
+            :inactive-candidate-filter="inactiveCandidateFilter" @update:recordsToShow="recordsToShow = $event"
+            @update:search="search = $event" @update:categoryFilter="categoryFilter = $event"
+            @update:subcategoryFilter="subcategoryFilter = $event" @update:stockFilter="stockFilter = $event"
+            @update:statusFilter="statusFilter = $event"
             @update:expirationStatusFilter="expirationStatusFilter = $event"
-            @update:inactiveCandidateFilter="inactiveCandidateFilter = $event" @view="viewProduct" @edit="editProduct"
-            @adjust="adjustStock" @delete="deleteProduct" />
+            @update:inactiveCandidateFilter="inactiveCandidateFilter = $event" />
+
+        <InventoryTable :filtered-products="filteredProducts" @view="viewProduct" @edit="editProduct"
+            @entry="openEntryModal" @exit="openExitModal" @movements="openMovementsModal"
+            @batches="openProductBatchesModal" @delete="deleteProduct" />
 
         <InventoryMobileCards :filtered-products="filteredProducts" @view="viewProduct" @edit="editProduct"
-            @adjust="adjustStock" @delete="deleteProduct" />
+            @entry="openEntryModal" @exit="openExitModal" @movements="openMovementsModal" @delete="deleteProduct" />
 
-        <nav v-if="hasPagination" class="flex flex-wrap items-center justify-center gap-2">
+        <nav v-if="hasPagination" class="flex flex-wrap items-center justify-center gap-2 pt-1">
             <button v-for="link in paginationLinks" :key="link.label" type="button" :disabled="!link.url"
                 class="px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 disabled:cursor-not-allowed"
                 :class="link.active
                     ? 'bg-slate-900 text-white border-slate-900'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'" @click="goToPage(link.url)"
-                v-html="link.label" />
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    " @click="goToPage(link.url)" v-html="link.label" />
         </nav>
 
-        <AdjustStockModal v-if="showAdjustModal && liveSelectedProduct" :product="liveSelectedProduct"
-            @close="closeAdjustModal" />
+        <StockEntryModal v-if="showEntryModal && liveSelectedMovementProduct" :product="liveSelectedMovementProduct"
+            @close="closeEntryModal" />
+
+        <StockExitModal v-if="showExitModal && liveSelectedMovementProduct" :product="liveSelectedMovementProduct"
+            @close="closeExitModal" />
+
+        <ProductMovementsModal v-if="showMovementsModal && liveSelectedMovementsProduct"
+            :product="liveSelectedMovementsProduct" @close="closeMovementsModal" />
+
+        <ProductBatchesModal v-if="showProductBatchesModal && liveSelectedBatchesProduct"
+            :product="liveSelectedBatchesProduct" @close="closeProductBatchesModal"
+            @adjust-batch="openBatchAdjustmentFromList" />
+
+        <ProductBatchesModal v-if="showProductBatchesModal && liveSelectedBatchesProduct"
+            :product="liveSelectedBatchesProduct" :selected-batch="liveSelectedBatch" :form="batchAdjustmentForm"
+            :frontend-errors="batchAdjustmentErrors" :total-errors="batchAdjustmentTotalErrors"
+            :processing="batchAdjustmentProcessing" :uses-lot="batchAdjustmentUsesLot"
+            :is-seasonal="batchAdjustmentIsSeasonal" :calculated-quantity="batchAdjustmentCalculatedQuantity"
+            :adjustment-text="batchAdjustmentText" :quantity-result-color="batchAdjustmentQuantityResultColor"
+            :toggle-lot="toggleBatchAdjustmentLot" :set-adjustment-type="setBatchAdjustmentType"
+            :validate-field="validateBatchAdjustmentField" @select-batch="adjustBatch" @save="saveEditedBatch"
+            @close="closeProductBatchesModal" />
 
         <InventoryAlertsModal v-if="showAlertModal" :title="selectedAlertTitle" :type="selectedAlertType"
             :batches="selectedAlertBatches" @close="closeAlertModal" />
+
+        <EditBranchProductConfigModal v-if="showConfigModal && liveSelectedConfigProduct"
+            :product="liveSelectedConfigProduct" @close="closeConfigModal" />
     </div>
 </template>

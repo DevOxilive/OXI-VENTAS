@@ -410,4 +410,15 @@ export const fieldRegistry = {
         max: 6,
         message: "Cantidad inválida.",
     },
+    received_at: {
+        required: true,
+        type: "date",
+        message: "La fecha de entrada es obligatoria.",
+    },
+
+    expiration_date: {
+        required: true,
+        type: "text",
+        message: "La caducidad es obligatoria.",
+    },
 };

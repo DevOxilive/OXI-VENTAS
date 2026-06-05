@@ -100,12 +100,12 @@ function stockTone(product) {
                     <td class="px-4 py-3 text-right">
                         <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-bold"
                             :class="stockTone(product)">
-                            {{ product.stock }}
+                            {{ product.stockLabel ?? product.stock }}
                         </span>
                     </td>
 
                     <td class="px-4 py-3 text-right text-sm font-semibold text-slate-600">
-                        {{ product.min_stock }}
+                        {{ product.minStockLabel ?? product.min_stock }}
                     </td>
                 </tr>
             </tbody>
@@ -130,7 +130,7 @@ function stockTone(product) {
 
                         <span class="shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold"
                             :class="stockTone(product)">
-                            {{ product.stock }}
+                            {{ product.stockLabel ?? product.stock }}
                         </span>
                     </div>
 
@@ -143,7 +143,7 @@ function stockTone(product) {
                     </p>
 
                     <p class="mt-2 text-sm text-slate-600">
-                        Mínimo: <b>{{ product.min_stock }}</b>
+                        Mínimo: <b>{{ product.minStockLabel ?? product.min_stock }}</b>
                     </p>
                 </div>
             </label>

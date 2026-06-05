@@ -17,7 +17,7 @@ export function useAdjustStockForm(props, emit) {
         quantity: "",
         notes: "",
         batches: [],
-        batch_allocation_method: "FEFO_AUTO",
+        batch_allocation_method: "MANUAL",
         manual_batches: [],
     });
 
@@ -31,28 +31,50 @@ export function useAdjustStockForm(props, emit) {
 
     const reasonOptions = computed(() => {
         if (form.type === "IN") {
-            return [
-                { label: "Compra", value: "PURCHASE" },
-                { label: "Transferencia", value: "TRANSFER" },
-                { label: "Ajuste manual", value: "MANUAL" },
-            ];
+            return [{ label: "Compra", value: "PURCHASE" }];
         }
 
         if (form.type === "OUT") {
             return [
                 { label: "Venta", value: "SALE" },
                 { label: "Producto dañado", value: "DAMAGED" },
-                { label: "Producto robado", value: "STOLEN" },
                 { label: "Producto caducado", value: "EXPIRED" },
-                { label: "Transferencia", value: "TRANSFER" },
-                { label: "Ajuste manual", value: "MANUAL" },
             ];
         }
 
-        return [{ label: "Ajuste manual", value: "MANUAL" }];
+        return [
+            {
+                label: "Diferencia de inventario",
+                value: "INVENTORY_DIFFERENCE",
+            },
+        ];
     });
 
     const currentStock = computed(() => Number(props.product.stock ?? 0));
+
+    const movementQuantity = computed(() => Number(form.quantity || 0));
+
+    const absoluteMovementQuantity = computed(() => {
+        return Math.abs(movementQuantity.value);
+    });
+
+    const isIncomingMovement = computed(() => form.type === "IN");
+    const isOutgoingMovement = computed(() => form.type === "OUT");
+    const isAdjustmentMovement = computed(() => form.type === "ADJUSTMENT");
+
+    const isNegativeAdjustment = computed(() => {
+        return isAdjustmentMovement.value && movementQuantity.value < 0;
+    });
+
+    const requiresManualBatchSelection = computed(() => {
+        return isOutgoingMovement.value || isNegativeAdjustment.value;
+    });
+
+    const manualBatchTargetQuantity = computed(() => {
+        return requiresManualBatchSelection.value
+            ? absoluteMovementQuantity.value
+            : 0;
+    });
 
     const totalBatchQuantity = computed(() => {
         return form.batches.reduce((acc, batch) => {
@@ -67,12 +89,15 @@ export function useAdjustStockForm(props, emit) {
     });
 
     const projectedStock = computed(() => {
-        const quantity = Number(form.quantity || 0);
+        if (isIncomingMovement.value) {
+            return currentStock.value + absoluteMovementQuantity.value;
+        }
 
-        if (form.type === "IN") return currentStock.value + quantity;
-        if (form.type === "OUT") return currentStock.value - quantity;
+        if (isOutgoingMovement.value) {
+            return currentStock.value - absoluteMovementQuantity.value;
+        }
 
-        return quantity;
+        return currentStock.value + movementQuantity.value;
     });
 
     const errorSummary = computed(() => {
@@ -85,21 +110,20 @@ export function useAdjustStockForm(props, emit) {
     watch(
         () => form.type,
         () => {
-            form.reason = reasonOptions.value[0]?.value ?? "MANUAL";
-            form.batch_allocation_method =
-                form.type === "OUT" ? "FEFO_AUTO" : null;
+            form.reason =
+                reasonOptions.value[0]?.value ?? "INVENTORY_DIFFERENCE";
+            form.batch_allocation_method = "MANUAL";
+            form.batches = [];
             form.manual_batches = [];
 
-            frontendErrors.type = "";
-            frontendErrors.reason = "";
-            frontendErrors.stock = "";
-            frontendErrors.manual_batches = "";
+            clearFrontendErrors();
         },
     );
 
     watch(
         () => form.quantity,
         () => {
+            frontendErrors.quantity = "";
             frontendErrors.stock = "";
             frontendErrors.batches = "";
             frontendErrors.manual_batches = "";
@@ -120,14 +144,12 @@ export function useAdjustStockForm(props, emit) {
     }
 
     function addManualBatch(batch) {
-        const exists = form.manual_batches.find(
-            (item) => item.product_batch_id === batch.id,
-        );
+        const exists = form.manual_batches.find((item) => item.id === batch.id);
 
         if (exists) return;
 
         form.manual_batches.push({
-            product_batch_id: batch.id,
+            id: batch.id,
             lot_number: batch.lot_number,
             expiration_date: batch.expiration_date,
             available_quantity: Number(batch.quantity || 0),
@@ -161,82 +183,125 @@ export function useAdjustStockForm(props, emit) {
         });
     }
 
-    function validateCompleteForm() {
-        clearFrontendErrors();
-
+    function validateBaseFields() {
         const errors = validateForm(adjustmentFields, form.data());
 
         Object.entries(errors).forEach(([field, message]) => {
             frontendErrors[field] = message;
         });
 
-        const quantity = Number(form.quantity);
+        if (!movementQuantity.value) {
+            frontendErrors.quantity = "La cantidad no puede ser cero.";
+            return;
+        }
 
-        if (!quantity || quantity <= 0) {
+        if (
+            (isIncomingMovement.value || isOutgoingMovement.value) &&
+            movementQuantity.value <= 0
+        ) {
             frontendErrors.quantity = "La cantidad debe ser mayor a cero.";
         }
 
-        if (form.type === "IN" && form.batches.length > 0) {
-            if (totalBatchQuantity.value !== quantity) {
-                frontendErrors.batches =
-                    "La suma de los lotes debe coincidir con la cantidad total.";
-            }
+        if (isAdjustmentMovement.value && movementQuantity.value === 0) {
+            frontendErrors.quantity = "El ajuste no puede ser cero.";
+        }
+    }
 
-            form.batches.forEach((batch, index) => {
-                if (!batch.quantity || Number(batch.quantity) <= 0) {
-                    frontendErrors[`batch_${index}`] =
-                        "La cantidad del lote debe ser mayor a cero.";
-                }
-            });
+    function validateIncomingBatches() {
+        if (!isIncomingMovement.value || !form.batches.length) return;
 
-            const duplicatedLotNumbers = form.batches
-                .map((batch) => batch.lot_number?.trim().toUpperCase())
-                .filter(Boolean)
-                .filter((lotNumber, index, lotNumbers) => {
-                    return lotNumbers.indexOf(lotNumber) !== index;
-                });
-
-            if (duplicatedLotNumbers.length) {
-                form.batches.forEach((batch, index) => {
-                    const lotNumber = batch.lot_number?.trim().toUpperCase();
-
-                    if (duplicatedLotNumbers.includes(lotNumber)) {
-                        frontendErrors[`batch_${index}`] =
-                            "Este número de lote ya fue agregado. Si pertenece al mismo lote, ajusta la cantidad en un solo registro.";
-                    }
-                });
-            }
+        if (totalBatchQuantity.value !== absoluteMovementQuantity.value) {
+            frontendErrors.batches =
+                "La suma de los lotes debe coincidir con la cantidad total.";
         }
 
-        if (form.type === "OUT" && quantity > currentStock.value) {
+        form.batches.forEach((batch, index) => {
+            if (!batch.quantity || Number(batch.quantity) <= 0) {
+                frontendErrors[`batch_${index}`] =
+                    "La cantidad del lote debe ser mayor a cero.";
+            }
+        });
+
+        const duplicatedLotNumbers = form.batches
+            .map((batch) => batch.lot_number?.trim().toUpperCase())
+            .filter(Boolean)
+            .filter((lotNumber, index, lotNumbers) => {
+                return lotNumbers.indexOf(lotNumber) !== index;
+            });
+
+        if (duplicatedLotNumbers.length) {
+            form.batches.forEach((batch, index) => {
+                const lotNumber = batch.lot_number?.trim().toUpperCase();
+
+                if (duplicatedLotNumbers.includes(lotNumber)) {
+                    frontendErrors[`batch_${index}`] =
+                        "Este número de lote ya fue agregado. Si pertenece al mismo lote, ajusta la cantidad en un solo registro.";
+                }
+            });
+        }
+    }
+
+    function validateOutgoingStock() {
+        if (!isOutgoingMovement.value && !isNegativeAdjustment.value) return;
+
+        if (absoluteMovementQuantity.value > currentStock.value) {
             frontendErrors.stock =
                 "La salida no puede ser mayor al stock actual.";
         }
+    }
 
-        if (form.type === "OUT" && form.batch_allocation_method === "MANUAL") {
-            if (!form.manual_batches.length) {
-                frontendErrors.manual_batches = "Selecciona al menos un lote.";
-            }
+    function validateManualBatchSelection() {
+        if (!requiresManualBatchSelection.value) return;
 
-            if (totalManualBatchQuantity.value !== quantity) {
-                frontendErrors.manual_batches =
-                    "La suma de los lotes seleccionados debe coincidir con la cantidad total.";
-            }
-
-            form.manual_batches.forEach((batch, index) => {
-                if (!batch.quantity || Number(batch.quantity) <= 0) {
-                    frontendErrors[`manual_batch_${index}`] =
-                        "La cantidad del lote debe ser mayor a cero.";
-                }
-
-                if (Number(batch.quantity) > Number(batch.available_quantity)) {
-                    frontendErrors[`manual_batch_${index}`] =
-                        "No puedes tomar más piezas de las disponibles en este lote.";
-                }
-            });
+        if (!form.manual_batches.length) {
+            frontendErrors.manual_batches =
+                "Selecciona al menos un lote o stock general.";
+            return;
         }
 
+        if (
+            totalManualBatchQuantity.value !== manualBatchTargetQuantity.value
+        ) {
+            frontendErrors.manual_batches =
+                "La suma del stock seleccionado debe coincidir con la cantidad total.";
+        }
+
+        form.manual_batches.forEach((batch, index) => {
+            if (!batch.quantity || Number(batch.quantity) <= 0) {
+                frontendErrors[`manual_batch_${index}`] =
+                    "La cantidad debe ser mayor a cero.";
+            }
+
+            if (Number(batch.quantity) > Number(batch.available_quantity)) {
+                frontendErrors[`manual_batch_${index}`] =
+                    "No puedes tomar más unidades de las disponibles.";
+            }
+        });
+    }
+
+    function validateCompleteForm() {
+        clearFrontendErrors();
+
+        validateBaseFields();
+        validateIncomingBatches();
+        validateOutgoingStock();
+        validateManualBatchSelection();
+
         return Object.values(frontendErrors).every((error) => !error);
+    }
+
+    function resetForm() {
+        form.reset();
+        form.branch_product_id = props.product.id;
+        form.type = "IN";
+        form.reason = "PURCHASE";
+        form.quantity = "";
+        form.notes = "";
+        form.batches = [];
+        form.manual_batches = [];
+        form.batch_allocation_method = "MANUAL";
+
+        clearFrontendErrors();
     }
 
     function saveAdjustment() {
@@ -256,20 +321,17 @@ export function useAdjustStockForm(props, emit) {
             onSuccess: () => {
                 ToastAlert({
                     icon: "success",
-                    title: "Stock ajustado correctamente",
+                    title: "Movimiento registrado correctamente",
                 });
 
                 emit("close");
-                form.reset();
-                form.batches = [];
-                form.manual_batches = [];
-                clearFrontendErrors();
+                resetForm();
             },
 
             onError: () => {
                 ErrorAlert({
                     title: "Error en la operación",
-                    message: "No fue posible registrar el ajuste de stock",
+                    message: "No fue posible registrar el movimiento de stock",
                 });
             },
         });
@@ -278,16 +340,31 @@ export function useAdjustStockForm(props, emit) {
     return {
         form,
         frontendErrors,
+
         typeOptions,
         reasonOptions,
+
         currentStock,
         projectedStock,
+        movementQuantity,
+        absoluteMovementQuantity,
+        manualBatchTargetQuantity,
+
+        isIncomingMovement,
+        isOutgoingMovement,
+        isAdjustmentMovement,
+        isNegativeAdjustment,
+        requiresManualBatchSelection,
+
         errorSummary,
+
         validateField,
         saveAdjustment,
+
         addBatch,
         removeBatch,
         totalBatchQuantity,
+
         addManualBatch,
         removeManualBatch,
         totalManualBatchQuantity,

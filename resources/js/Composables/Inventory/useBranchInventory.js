@@ -1,10 +1,17 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useBatchAdjustmentModal } from "@/Composables/Inventory/useBatchAdjustmentModal";
 import { router } from "@inertiajs/vue3";
 
 export function useBranchInventory(props) {
     const showCreateModal = ref(false);
-    const showAdjustModal = ref(false);
-    const selectedProduct = ref(null);
+    const showEntryModal = ref(false);
+    const showExitModal = ref(false);
+    const showMovementsModal = ref(false);
+    const showConfigModal = ref(false);
+
+    const selectedMovementProduct = ref(null);
+    const selectedMovementsProduct = ref(null);
+    const selectedConfigProduct = ref(null);
     const selectedAlertType = ref(null);
 
     const search = ref(props.filters?.search ?? "");
@@ -57,6 +64,8 @@ export function useBranchInventory(props) {
             const stock = Number(realtime.stock ?? item.stock ?? 0);
             const minStock = Number(item.min_stock ?? 0);
             const price = Number(item.price ?? item.product?.sale_price ?? 0);
+            const unit = item.product?.unit ?? "pieza";
+
             const tracksBatches = Boolean(
                 item.tracks_batches ?? item.tracksBatches ?? false,
             );
@@ -89,6 +98,9 @@ export function useBranchInventory(props) {
                 administrativeStatus: item.status ?? "active",
                 stock,
                 minStock,
+                unit,
+                stockLabel: `${stock} ${unit}`,
+                minStockLabel: `${minStock} ${unit}`,
                 price,
                 tracksBatches,
                 expirationDate:
@@ -104,18 +116,84 @@ export function useBranchInventory(props) {
         });
     });
 
-    const liveSelectedProduct = computed(() => {
-        if (!selectedProduct.value) return null;
+    const {
+        showBatchAdjustmentModal,
+        liveSelectedBatch,
+        processing: batchAdjustmentProcessing,
+        usesLot: batchAdjustmentUsesLot,
+        form: batchAdjustmentForm,
+        frontendErrors: batchAdjustmentErrors,
+        totalErrors: batchAdjustmentTotalErrors,
+        isSeasonal: batchAdjustmentIsSeasonal,
+        calculatedQuantity: batchAdjustmentCalculatedQuantity,
+        adjustmentText: batchAdjustmentText,
+        quantityResultColor: batchAdjustmentQuantityResultColor,
+        adjustBatch,
+        closeBatchAdjustmentModal,
+        toggleLot: toggleBatchAdjustmentLot,
+        setAdjustmentType: setBatchAdjustmentType,
+        validateField: validateBatchAdjustmentField,
+        saveEditedBatch,
+    } = useBatchAdjustmentModal(visualProducts);
+
+    const showProductBatchesModal = ref(false);
+    const selectedBatchesProductId = ref(null);
+
+    const liveSelectedBatchesProduct = computed(() => {
+        if (!selectedBatchesProductId.value) return null;
 
         return (
             visualProducts.value.find((product) => {
-                return product.id === selectedProduct.value.id;
+                return product.id === selectedBatchesProductId.value;
             }) ?? null
         );
     });
 
-    // El backend ya filtra y pagina. Esta lista queda como alias visual
-    // para no romper componentes existentes.
+    function openProductBatchesModal(product) {
+        selectedBatchesProductId.value = product.id;
+        showProductBatchesModal.value = true;
+    }
+
+    function closeProductBatchesModal() {
+        showProductBatchesModal.value = false;
+        selectedBatchesProductId.value = null;
+    }
+
+    function openBatchAdjustmentFromList(batch) {
+        closeProductBatchesModal();
+        adjustBatch(batch);
+    }
+
+    const liveSelectedMovementProduct = computed(() => {
+        if (!selectedMovementProduct.value) return null;
+
+        return (
+            visualProducts.value.find((product) => {
+                return product.id === selectedMovementProduct.value.id;
+            }) ?? selectedMovementProduct.value
+        );
+    });
+
+    const liveSelectedMovementsProduct = computed(() => {
+        if (!selectedMovementsProduct.value) return null;
+
+        return (
+            visualProducts.value.find((product) => {
+                return product.id === selectedMovementsProduct.value.id;
+            }) ?? selectedMovementsProduct.value
+        );
+    });
+
+    const liveSelectedConfigProduct = computed(() => {
+        if (!selectedConfigProduct.value) return null;
+
+        return (
+            visualProducts.value.find((product) => {
+                return product.id === selectedConfigProduct.value.id;
+            }) ?? selectedConfigProduct.value
+        );
+    });
+
     const filteredProducts = computed(() => visualProducts.value);
 
     const stats = computed(() => {
@@ -242,14 +320,44 @@ export function useBranchInventory(props) {
         selectedAlertType.value = null;
     };
 
-    const adjustStock = (product) => {
-        selectedProduct.value = product;
-        showAdjustModal.value = true;
+    const openEntryModal = (product) => {
+        selectedMovementProduct.value = product;
+        showEntryModal.value = true;
     };
 
-    const closeAdjustModal = () => {
-        showAdjustModal.value = false;
-        selectedProduct.value = null;
+    const closeEntryModal = () => {
+        showEntryModal.value = false;
+        selectedMovementProduct.value = null;
+    };
+
+    const openExitModal = (product) => {
+        selectedMovementProduct.value = product;
+        showExitModal.value = true;
+    };
+
+    const closeExitModal = () => {
+        showExitModal.value = false;
+        selectedMovementProduct.value = null;
+    };
+
+    const openMovementsModal = (product) => {
+        selectedMovementsProduct.value = product;
+        showMovementsModal.value = true;
+    };
+
+    const closeMovementsModal = () => {
+        showMovementsModal.value = false;
+        selectedMovementsProduct.value = null;
+    };
+
+    const editProduct = (product) => {
+        selectedConfigProduct.value = product;
+        showConfigModal.value = true;
+    };
+
+    const closeConfigModal = () => {
+        showConfigModal.value = false;
+        selectedConfigProduct.value = null;
     };
 
     const exportExcel = () => {
@@ -258,10 +366,6 @@ export function useBranchInventory(props) {
 
     const viewProduct = (product) => {
         console.log("Ver producto", product);
-    };
-
-    const editProduct = (product) => {
-        console.log("Editar producto", product);
     };
 
     const deleteProduct = (product) => {
@@ -276,33 +380,13 @@ export function useBranchInventory(props) {
         }, 400);
     });
 
-    watch(recordsToShow, () => {
-        reloadInventory();
-    });
-
-    watch(categoryFilter, () => {
-        reloadInventory();
-    });
-
-    watch(subcategoryFilter, () => {
-        reloadInventory();
-    });
-
-    watch(stockFilter, () => {
-        reloadInventory();
-    });
-
-    watch(statusFilter, () => {
-        reloadInventory();
-    });
-
-    watch(expirationStatusFilter, () => {
-        reloadInventory();
-    });
-
-    watch(inactiveCandidateFilter, () => {
-        reloadInventory();
-    });
+    watch(recordsToShow, reloadInventory);
+    watch(categoryFilter, reloadInventory);
+    watch(subcategoryFilter, reloadInventory);
+    watch(stockFilter, reloadInventory);
+    watch(statusFilter, reloadInventory);
+    watch(expirationStatusFilter, reloadInventory);
+    watch(inactiveCandidateFilter, reloadInventory);
 
     onMounted(() => {
         if (!window.Echo || !currentBranch.value?.id) return;
@@ -310,14 +394,45 @@ export function useBranchInventory(props) {
         window.Echo.channel(
             `inventory.branch.${currentBranch.value.id}`,
         ).listen(".stock.updated", (event) => {
+            const branchProductId =
+                event.branch_product_id ??
+                event.branchProduct?.id ??
+                event.branch_product?.id;
+
+            if (!branchProductId) return;
+
+            const currentProduct = visualProducts.value.find((product) => {
+                return product.id === branchProductId;
+            });
+
             realtimeUpdates.value = {
                 ...realtimeUpdates.value,
 
-                [event.branch_product_id]: {
-                    stock: Number(event.stock),
-                    updated_at: event.updated_at,
-                    batches: event.batches ?? [],
-                    movements: event.recent_movements ?? [],
+                [branchProductId]: {
+                    stock: Number(
+                        event.stock ??
+                            event.branchProduct?.stock ??
+                            event.branch_product?.stock ??
+                            currentProduct?.stock ??
+                            0,
+                    ),
+
+                    updated_at: event.updated_at ?? new Date().toISOString(),
+
+                    batches:
+                        event.batches ??
+                        event.branchProduct?.batches ??
+                        event.branch_product?.batches ??
+                        currentProduct?.batches ??
+                        [],
+
+                    movements:
+                        event.recent_movements ??
+                        event.movements ??
+                        event.branchProduct?.movements ??
+                        event.branch_product?.movements ??
+                        currentProduct?.recentMovements ??
+                        [],
                 },
             };
         });
@@ -339,9 +454,18 @@ export function useBranchInventory(props) {
         currentBranch,
 
         showCreateModal,
-        showAdjustModal,
-        selectedProduct,
-        liveSelectedProduct,
+        showEntryModal,
+        showExitModal,
+        showMovementsModal,
+        showConfigModal,
+
+        selectedMovementProduct,
+        selectedMovementsProduct,
+        selectedConfigProduct,
+
+        liveSelectedMovementProduct,
+        liveSelectedMovementsProduct,
+        liveSelectedConfigProduct,
 
         search,
         categoryFilter,
@@ -354,8 +478,10 @@ export function useBranchInventory(props) {
 
         paginationLinks,
         hasPagination,
+
         visualProducts,
         filteredProducts,
+
         stats,
         alerts,
 
@@ -366,18 +492,54 @@ export function useBranchInventory(props) {
 
         openCreateModal,
         closeCreateModal,
+
         openAlertModal,
         closeAlertModal,
 
-        adjustStock,
-        closeAdjustModal,
+        openEntryModal,
+        closeEntryModal,
+
+        openExitModal,
+        closeExitModal,
+
+        openMovementsModal,
+        closeMovementsModal,
+
+        editProduct,
+        closeConfigModal,
+
+        exportExcel,
+        viewProduct,
+        deleteProduct,
 
         reloadInventory,
         goToPage,
 
-        exportExcel,
-        viewProduct,
-        editProduct,
-        deleteProduct,
+        showProductBatchesModal,
+        liveSelectedBatchesProduct,
+        openProductBatchesModal,
+        closeProductBatchesModal,
+        openBatchAdjustmentFromList,
+
+        showBatchAdjustmentModal,
+        liveSelectedBatch,
+
+        adjustBatch,
+        closeBatchAdjustmentModal,
+
+        batchAdjustmentProcessing,
+        batchAdjustmentUsesLot,
+        batchAdjustmentForm,
+        batchAdjustmentErrors,
+        batchAdjustmentTotalErrors,
+        batchAdjustmentIsSeasonal,
+        batchAdjustmentCalculatedQuantity,
+        batchAdjustmentText,
+        batchAdjustmentQuantityResultColor,
+
+        toggleBatchAdjustmentLot,
+        setBatchAdjustmentType,
+        validateBatchAdjustmentField,
+        saveEditedBatch,
     };
 }
