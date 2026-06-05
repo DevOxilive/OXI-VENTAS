@@ -14,7 +14,8 @@ class InventoryStockUpdated implements ShouldBroadcastNow
 
     public function __construct(
         public BranchProduct $branchProduct
-    ) {}
+    ) {
+    }
 
     public function broadcastOn(): Channel
     {
@@ -32,13 +33,31 @@ class InventoryStockUpdated implements ShouldBroadcastNow
     {
         $this->branchProduct->load([
             'batches' => fn($query) => $query
+                ->select([
+                    'id',
+                    'branch_product_id',
+                    'lot_number',
+                    'expiration_date',
+                    'initial_quantity',
+                    'quantity',
+                    'supplier',
+                    'received_at',
+                    'status',
+                    'season_start_date',
+                    'season_end_date',
+                ])
                 ->where('quantity', '>', 0)
-                ->orderBy('expiration_date'),
+                ->orderByRaw('expiration_date IS NULL')
+                ->orderBy('expiration_date')
+                ->orderBy('id'),
 
             'movements' => fn($query) => $query
-                ->with('user')
+                ->with([
+                    'user:id,name',
+                    'batches.productBatch:id,lot_number',
+                ])
                 ->latest()
-                ->limit(5),
+                ->limit(10),
         ]);
 
         return [

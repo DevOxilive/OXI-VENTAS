@@ -22,7 +22,6 @@ const {
     frontendErrors,
     currentStock,
     errorSummary,
-    validateField,
     saveAdjustment,
     addBatch,
 } = useAdjustStockForm(props, emit)
@@ -44,9 +43,12 @@ const today = computed(() => {
 const totalErrors = computed(() => {
     return errorSummary.value.length
 })
+
 function ensureEntryReady() {
     form.type = 'IN'
     form.reason = 'PURCHASE'
+    form.batch_allocation_method = 'MANUAL'
+    form.manual_batches = []
 
     if (!form.batches?.length) {
         addBatch()
@@ -56,6 +58,8 @@ function ensureEntryReady() {
         entry.value.received_at = entry.value.received_at || today.value
         entry.value.lot_number = usesLot.value ? entry.value.lot_number || '' : null
     }
+
+    syncQuantity()
 }
 
 function syncQuantity() {
@@ -73,6 +77,8 @@ function toggleLot() {
 }
 
 function validateEntry() {
+    syncQuantity()
+
     frontendErrors.quantity = ''
     frontendErrors.received_at = ''
     frontendErrors.expiration_date = ''
@@ -103,6 +109,8 @@ function validateEntry() {
 }
 
 function saveEntry() {
+    syncQuantity()
+
     if (!validateEntry()) return
 
     saveAdjustment()
@@ -119,6 +127,11 @@ function handleEsc(e) {
 }
 
 watch(
+    () => entry.value?.quantity,
+    () => syncQuantity()
+)
+
+watch(
     entry,
     () => ensureEntryReady(),
     { immediate: true }
@@ -133,7 +146,6 @@ onBeforeUnmount(() => {
     window.removeEventListener('keydown', handleEsc)
 })
 </script>
-
 <template>
     <div class="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" role="dialog"
         aria-modal="true">
@@ -161,7 +173,8 @@ onBeforeUnmount(() => {
                         <div class="grid grid-cols-1 gap-5">
                             <div class="space-y-4">
                                 <InputField v-model="entry.quantity" :label="`Cantidad (${unit})`" type="number"
-                                    field="quantity" :readonly="form.processing" @blur="validateField('quantity')" />
+                                    field="quantity" :readonly="form.processing" @input="syncQuantity"
+                                    @blur="validateEntry" />
 
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                                     <div class="flex items-center justify-between gap-4">

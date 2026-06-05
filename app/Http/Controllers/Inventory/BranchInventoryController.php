@@ -114,8 +114,9 @@ class BranchInventoryController extends Controller
                         'supplier',
                         'received_at',
                         'status',
+                        'season_start_date',
+                        'season_end_date',
                     ])
-                    ->where('status', ProductBatch::STATUS_ACTIVE)
                     ->where('quantity', '>', 0)
                     ->orderByRaw('expiration_date IS NULL')
                     ->orderBy('expiration_date')

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Events\InventoryStockUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\ProductBatch;
+use App\Models\BranchProduct;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use Illuminate\Http\Request;
@@ -76,13 +77,7 @@ class ProductBatchController extends Controller
                 ->all();
 
             if (empty($changedFields)) {
-                return $branchProduct->fresh([
-                    'product.category',
-                    'product.barcodes',
-                    'batches',
-                    'movements.user',
-                    'movements.batches.productBatch',
-                ]);
+                return $this->freshBranchProductForInventory($branchProduct);
             }
 
             $previousQuantity = $previousData['quantity'];
@@ -134,18 +129,50 @@ class ProductBatchController extends Controller
                 'allocation_method' => StockMovementBatch::ALLOCATION_MANUAL,
             ]);
 
-            return $branchProduct->fresh([
-                'product.category',
-                'product.barcodes',
-                'batches',
-                'movements.user',
-                'movements.batches.productBatch',
-            ]);
+            return $this->freshBranchProductForInventory($branchProduct);
         });
 
         event(new InventoryStockUpdated($branchProduct));
 
         return back()->with('success', 'Lote actualizado correctamente.');
+    }
+
+    private function freshBranchProductForInventory(BranchProduct $branchProduct): BranchProduct
+    {
+        return $branchProduct->fresh([
+            'branch:id,name',
+            'product:id,name,category_id,subcategory_id,sale_price,cost,unit',
+            'product.category:id,name',
+            'product.subcategory:id,name,category_id',
+            'product.barcodes:id,product_id,code',
+
+            'batches' => fn($query) => $query
+                ->select([
+                    'id',
+                    'branch_product_id',
+                    'lot_number',
+                    'expiration_date',
+                    'initial_quantity',
+                    'quantity',
+                    'supplier',
+                    'received_at',
+                    'status',
+                    'season_start_date',
+                    'season_end_date',
+                ])
+                ->where('quantity', '>', 0)
+                ->orderByRaw('expiration_date IS NULL')
+                ->orderBy('expiration_date')
+                ->orderBy('id'),
+
+            'movements' => fn($query) => $query
+                ->with([
+                    'user:id,name',
+                    'batches.productBatch:id,lot_number',
+                ])
+                ->latest()
+                ->limit(10),
+        ]);
     }
 
     private function buildMovementNotes(array $changedFields, ?string $userNotes = null): string

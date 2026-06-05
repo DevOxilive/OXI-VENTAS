@@ -1,12 +1,13 @@
 <script setup>
-import { computed, reactive, watch } from 'vue'
-import { useForm } from '@inertiajs/vue3'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 
 import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
 import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
 import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
+
+import { useEditBranchProductConfig } from '@/Composables/Inventory/useEditBranchProductConfig'
 
 const emit = defineEmits(['close'])
 
@@ -17,103 +18,22 @@ const props = defineProps({
     },
 })
 
-const frontendErrors = reactive({})
+const productRef = computed(() => props.product)
 
-const form = useForm({
-    min_stock: props.product.minStock ?? 0,
-    status: props.product.administrativeStatus ?? 'active',
-    season_start_date: props.product.seasonStartDate ?? '',
-    season_end_date: props.product.seasonEndDate ?? '',
-})
-
-const statusOptions = [
-    { label: 'Activo', value: 'active' },
-    { label: 'Inactivo', value: 'inactive' },
-    { label: 'Temporada', value: 'seasonal' },
-]
-
-const totalErrors = computed(() => {
-    return Object.values(frontendErrors).filter(Boolean).length +
-        Object.values(form.errors || {}).filter(Boolean).length
-})
-
-const saveButtonText = computed(() => {
-    return form.processing
-        ? 'Guardando...'
-        : 'Guardar configuración'
-})
-
-const productName = computed(() => {
-    return props.product?.name ?? props.product?.product?.name ?? 'Producto'
-})
-
-const unit = computed(() => {
-    return props.product?.unit ?? 'pieza'
-})
-
-const stockLabel = computed(() => {
-    return props.product?.stockLabel ?? `${props.product?.stock ?? 0} ${unit.value}`
-})
-
-const isSeasonal = computed(() => {
-    return form.status === 'seasonal'
-})
-
-const statusHelpText = computed(() => {
-    if (form.status === 'active') {
-        return 'El producto estará disponible para operación normal en esta sucursal.'
-    }
-
-    if (form.status === 'inactive') {
-        return 'El producto quedará inactivo a nivel general en esta sucursal.'
-    }
-
-    if (form.status === 'seasonal') {
-        return 'El producto tendrá una temporada general sugerida para la sucursal.'
-    }
-
-    return 'Selecciona cómo debe comportarse el producto en esta sucursal.'
-})
-
-watch(
-    () => props.product,
-    (product) => {
-        form.min_stock = product.minStock ?? 0
-        form.status = product.administrativeStatus ?? 'active'
-        form.season_start_date = product.seasonStartDate ?? ''
-        form.season_end_date = product.seasonEndDate ?? ''
-    },
-    { immediate: true }
-)
-
-function validateField(field) {
-    frontendErrors[field] = ''
-
-    if (field === 'min_stock' && Number(form.min_stock) < 0) {
-        frontendErrors.min_stock = 'El stock mínimo no puede ser menor a cero.'
-    }
-
-    if (field === 'status' && !form.status) {
-        frontendErrors.status = 'Selecciona un estado operativo.'
-    }
-
-    if (
-        field === 'season_end_date' &&
-        form.season_start_date &&
-        form.season_end_date &&
-        form.season_end_date < form.season_start_date
-    ) {
-        frontendErrors.season_end_date = 'La fecha final no puede ser menor a la fecha inicial.'
-    }
-}
-
-function validateForm() {
-    validateField('min_stock')
-    validateField('status')
-    validateField('season_end_date')
-
-    return !Object.values(frontendErrors).some(Boolean)
-}
+const {
+    form,
+    frontendErrors,
+    statusOptions,
+    totalErrors,
+    saveButtonText,
+    productName,
+    unit,
+    stockLabel,
+    isSeasonal,
+    statusHelpText,
+    validateField,
+    saveConfig,
+} = useEditBranchProductConfig(productRef)
 
 function closeModal() {
     if (form.processing) return
@@ -121,14 +41,25 @@ function closeModal() {
     emit('close')
 }
 
-function saveConfig() {
-    if (!validateForm()) return
-
-    form.patch(route('inventario.branch-inventory.update-config', props.product.id), {
-        preserveScroll: true,
-        onSuccess: () => closeModal(),
+function submitConfig() {
+    saveConfig(props.product.id, () => {
+        closeModal()
     })
 }
+
+function handleEscape(event) {
+    if (event.key === 'Escape') {
+        closeModal()
+    }
+}
+
+onMounted(() => {
+    document.addEventListener('keydown', handleEscape)
+})
+
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', handleEscape)
+})
 </script>
 
 <template>
@@ -228,7 +159,7 @@ function saveConfig() {
 
                                             <p class="text-lg font-black text-slate-900">
                                                 {{statusOptions.find(option => option.value === form.status)?.label ??
-                                                'Sin estado' }}
+                                                    'Sin estado'}}
                                             </p>
 
                                             <p class="text-sm text-slate-500 mt-1">
@@ -262,7 +193,7 @@ function saveConfig() {
             </GeneralModalContent>
 
             <GeneralModalFooter :processing="form.processing" :save-button-text="saveButtonText"
-                close-button-text="Cancelar" mode="edit" @save="saveConfig" @close="closeModal" />
+                close-button-text="Cancelar" mode="edit" @save="submitConfig" @close="closeModal" />
         </div>
     </div>
 </template>

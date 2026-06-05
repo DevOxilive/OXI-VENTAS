@@ -90,12 +90,9 @@ function statusClass(status) {
 
                                 <ActionIconButton icon="remove" title="Salida" variant="red"
                                     @click="$emit('exit', product)" />
-                                    
+
                                 <ActionIconButton icon="edit" title="Lotes" variant="blue"
                                     :disabled="!product.batches?.length" @click="$emit('batches', product)" />
-
-                                <ActionIconButton icon="settings" title="Configurar" variant="amber"
-                                    @click="$emit('edit', product)" />
 
                                 <ActionIconButton icon="history" title="Historial" variant="slate"
                                     @click="$emit('movements', product)" />

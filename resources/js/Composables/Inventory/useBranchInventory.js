@@ -394,14 +394,45 @@ export function useBranchInventory(props) {
         window.Echo.channel(
             `inventory.branch.${currentBranch.value.id}`,
         ).listen(".stock.updated", (event) => {
+            const branchProductId =
+                event.branch_product_id ??
+                event.branchProduct?.id ??
+                event.branch_product?.id;
+
+            if (!branchProductId) return;
+
+            const currentProduct = visualProducts.value.find((product) => {
+                return product.id === branchProductId;
+            });
+
             realtimeUpdates.value = {
                 ...realtimeUpdates.value,
 
-                [event.branch_product_id]: {
-                    stock: Number(event.stock),
-                    updated_at: event.updated_at,
-                    batches: event.batches ?? [],
-                    movements: event.recent_movements ?? [],
+                [branchProductId]: {
+                    stock: Number(
+                        event.stock ??
+                            event.branchProduct?.stock ??
+                            event.branch_product?.stock ??
+                            currentProduct?.stock ??
+                            0,
+                    ),
+
+                    updated_at: event.updated_at ?? new Date().toISOString(),
+
+                    batches:
+                        event.batches ??
+                        event.branchProduct?.batches ??
+                        event.branch_product?.batches ??
+                        currentProduct?.batches ??
+                        [],
+
+                    movements:
+                        event.recent_movements ??
+                        event.movements ??
+                        event.branchProduct?.movements ??
+                        event.branch_product?.movements ??
+                        currentProduct?.recentMovements ??
+                        [],
                 },
             };
         });

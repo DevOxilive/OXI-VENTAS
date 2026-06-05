@@ -41,30 +41,15 @@ export function useStockExitModal(props, emit) {
         });
     });
 
-    const hasBatches = computed(() => activeBatches.value.length > 0);
-
     const availableSources = computed(() => {
-        if (hasBatches.value) {
-            return activeBatches.value.map((batch) => ({
-                key: `batch-${batch.id}`,
-                id: batch.id,
-                lot_number: batch.lot_number,
-                expiration_date: normalizeDate(batch.expiration_date),
-                quantity: Number(batch.quantity || 0),
-                type: "batch",
-            }));
-        }
-
-        return [
-            {
-                key: "general-stock",
-                id: null,
-                lot_number: null,
-                expiration_date: null,
-                quantity: currentStock.value,
-                type: "general",
-            },
-        ];
+        return activeBatches.value.map((batch) => ({
+            key: `batch-${batch.id}`,
+            id: batch.id,
+            lot_number: batch.lot_number,
+            expiration_date: normalizeDate(batch.expiration_date),
+            quantity: Number(batch.quantity || 0),
+            type: "batch",
+        }));
     });
 
     const selectedSource = computed(() => {
@@ -144,13 +129,14 @@ export function useStockExitModal(props, emit) {
     function sourceLabel(source) {
         return source.lot_number
             ? `Lote ${source.lot_number}`
-            : "Existencia general";
+            : "Entrada sin número de lote";
     }
 
     function ensureExitReady() {
         form.type = "OUT";
         form.reason = "";
         form.batches = [];
+        form.manual_batches = [];
         form.batch_allocation_method = "MANUAL";
 
         nextTick(() => {
@@ -166,6 +152,8 @@ export function useStockExitModal(props, emit) {
         if (form.processing || Number(source.quantity || 0) <= 0) return;
 
         selectedSourceKey.value = source.key;
+        form.batch_allocation_method = "MANUAL";
+
         syncManualBatch();
     }
 
@@ -182,7 +170,6 @@ export function useStockExitModal(props, emit) {
                 expiration_date: selectedSource.value.expiration_date,
                 available_quantity: selectedSource.value.quantity,
                 quantity: form.quantity || "",
-                source_type: selectedSource.value.type,
             },
         ];
     }
@@ -196,13 +183,14 @@ export function useStockExitModal(props, emit) {
 
     function validateExit() {
         clearExitErrors();
+        syncManualBatch();
 
         if (
             !selectedSource.value ||
             Number(selectedSource.value.quantity) <= 0
         ) {
             frontendErrors.manual_batches =
-                "Selecciona una existencia disponible.";
+                "Selecciona una entrada disponible.";
         }
 
         if (!form.quantity || Number(form.quantity) <= 0) {
@@ -237,6 +225,9 @@ export function useStockExitModal(props, emit) {
     }
 
     function submitExit() {
+        form.batch_allocation_method = "MANUAL";
+        syncManualBatch();
+
         if (!validateExit()) return;
 
         saveAdjustment();

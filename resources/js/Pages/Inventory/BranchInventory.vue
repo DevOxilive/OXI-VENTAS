@@ -9,9 +9,9 @@ import StockEntryModal from '@/Components/Inventory/BranchProducts/StockEntryMod
 import StockExitModal from '@/Components/Inventory/BranchProducts/StockExitModal.vue'
 import ProductMovementsModal from '@/Components/Inventory/BranchProducts/ProductMovementsModal.vue'
 import EditBranchProductConfigModal from '@/Components/Inventory/BranchProducts/EditBranchProductConfigModal.vue'
-import BatchAdjustmentModal from '@/Components/Inventory/BranchProducts/BatchAdjustmentModal.vue'
-import { useBranchInventory } from '@/Composables/Inventory/useBranchInventory'
 import ProductBatchesModal from '@/Components/Inventory/BranchProducts/ProductBatchesModal.vue'
+import { useBranchInventory } from '@/Composables/Inventory/useBranchInventory'
+
 
 defineOptions({ layout: AdminLayout })
 
@@ -217,13 +217,15 @@ const {
             :product="liveSelectedBatchesProduct" @close="closeProductBatchesModal"
             @adjust-batch="openBatchAdjustmentFromList" />
 
-        <BatchAdjustmentModal v-if="showBatchAdjustmentModal && liveSelectedBatch" :form="batchAdjustmentForm"
+        <ProductBatchesModal v-if="showProductBatchesModal && liveSelectedBatchesProduct"
+            :product="liveSelectedBatchesProduct" :selected-batch="liveSelectedBatch" :form="batchAdjustmentForm"
             :frontend-errors="batchAdjustmentErrors" :total-errors="batchAdjustmentTotalErrors"
             :processing="batchAdjustmentProcessing" :uses-lot="batchAdjustmentUsesLot"
             :is-seasonal="batchAdjustmentIsSeasonal" :calculated-quantity="batchAdjustmentCalculatedQuantity"
             :adjustment-text="batchAdjustmentText" :quantity-result-color="batchAdjustmentQuantityResultColor"
             :toggle-lot="toggleBatchAdjustmentLot" :set-adjustment-type="setBatchAdjustmentType"
-            :validate-field="validateBatchAdjustmentField" @save="saveEditedBatch" @close="closeBatchAdjustmentModal" />
+            :validate-field="validateBatchAdjustmentField" @select-batch="adjustBatch" @save="saveEditedBatch"
+            @close="closeProductBatchesModal" />
 
         <InventoryAlertsModal v-if="showAlertModal" :title="selectedAlertTitle" :type="selectedAlertType"
             :batches="selectedAlertBatches" @close="closeAlertModal" />
