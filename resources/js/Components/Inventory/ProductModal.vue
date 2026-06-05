@@ -3,6 +3,10 @@ import { useForm } from "@inertiajs/vue3";
 import { watch, computed } from "vue";
 import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
+import {
+    ToastAlert,
+    ErrorAlert
+} from '@/Components/Modales/UniversalActionModal'
 
 const props = defineProps({
   mode: String,
@@ -13,12 +17,17 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  branchesDB: {
+  type: Array,
+  default: () => [],
+},
 });
 
 const emit = defineEmits(["close"]);
 
 const form = useForm({
   barcodes: [""],
+  branch_ids: [],
   unit: "",
   name: "",
   stock: 0,
@@ -48,6 +57,11 @@ watch(
 
     form.unit = product.unit ?? "";
     form.name = product.name ?? "";
+  form.branch_ids = product?.branch_ids?.length
+  ? [...product.branch_ids]
+  : []
+
+ensureCurrentBranchSelected()
     form.stock = product.stock ?? 0;
     form.category_id = product.category_id ?? "";
     form.cost = product.cost ?? "";
@@ -91,10 +105,26 @@ const invalidPrice = computed(() => {
 function addBarcode() {
   form.barcodes.push("");
 }
+function isCurrentBranch(branchId) {
+  return Number(branchId) === Number(props.branch?.id);
+}
 
 function removeBarcode(index) {
   if (form.barcodes.length === 1) return;
   form.barcodes.splice(index, 1);
+} 
+function ensureCurrentBranchSelected() {
+  const currentBranchId = props.branch?.id
+
+  if (!currentBranchId) return
+
+  const exists = form.branch_ids.some(
+    branchId => Number(branchId) === Number(currentBranchId)
+  )
+
+  if (!exists) {
+    form.branch_ids.push(currentBranchId)
+  }
 }
 function submit() {
   const branchSlug = props.branch?.slug;
@@ -105,10 +135,14 @@ function submit() {
   }
 
   if (invalidPrice.value) {
-    alert("El precio de venta no puede ser menor al precio inicial.");
-    return;
-  }
+    ErrorAlert({
+    title: "Precio inválido",
+    message: "El precio de venta no puede ser menor al precio inicial.",
+});
 
+return;
+  }
+ensureCurrentBranchSelected()
   if (props.mode === "create") {
     form.post(
       route("inventory.branches.products.store", {
@@ -117,10 +151,32 @@ function submit() {
       {
         forceFormData: true,
         preserveScroll: true,
-        onSuccess: () => emit("close"),
-        onError: (errors) => {
-          console.log("ERRORES CREAR PRODUCTO:", errors);
-        },
+     onSuccess: () => {
+
+    ToastAlert({
+        title: "Producto creado correctamente",
+    });
+
+    emit("close");
+},
+onError: () => {
+
+    const barcodeError = form.errors['barcodes.0']
+
+    if (barcodeError) {
+
+        ErrorAlert({
+    title: "Código ya registrado",
+    message: `
+        <div style="text-align:left;line-height:1.7;">
+            ${barcodeError}
+        </div>
+    `
+})
+
+        form.clearErrors('barcodes.0')
+    }
+},
       }
     );
 
@@ -142,10 +198,44 @@ function submit() {
       {
         forceFormData: true,
         preserveScroll: true,
-        onSuccess: () => emit("close"),
-        onError: (errors) => {
-          console.log("ERRORES PRODUCTO:", errors);
-        },
+      onSuccess: () => {
+
+    ToastAlert({
+        title: "Producto actualizado correctamente",
+    });
+
+    emit("close");
+},
+onError: (errors) => {
+    const barcodeError =
+        errors['barcodes.0'] ||
+        errors.barcodes ||
+        form.errors['barcodes.0']
+
+    if (barcodeError) {
+        ErrorAlert({
+            title: "Código ya registrado",
+            message: barcodeError,
+        }).then(() => {
+            form.clearErrors('barcodes.0')
+            form.clearErrors('barcodes')
+        })
+
+        return
+    }
+
+    ErrorAlert({
+        title: "Error al crear producto",
+        message:
+            errors.name ||
+            errors.category_id ||
+            errors.unit ||
+            errors.cost ||
+            errors.sale_price ||
+            errors.branch_ids ||
+            "Revisa los datos capturados",
+    })
+},
       }
     );
 }
@@ -181,14 +271,14 @@ function submit() {
               class="flex items-start gap-2"
             >
               <div class="flex-1">
-                <InputField
-                  label=""
-                  field="barcode"
-                  v-model="form.barcodes[index]"
-                  icon="barcode_scanner"
-                  :error="form.errors[`barcodes.${index}`]"
-                  :readonly="mode === 'view'"
-                />
+            <InputField
+  label=""
+  field="barcode"
+  v-model="form.barcodes[index]"
+  icon="barcode_scanner"
+  :error="null"
+  :readonly="mode === 'view'"
+/>
               </div>
 
               <button
@@ -200,6 +290,7 @@ function submit() {
                 −
               </button>
             </div>
+            
           </div>
 
           <button
@@ -261,7 +352,59 @@ function submit() {
             </div>
           </div>
         </div>
+<!-- SUCURSALES -->
+<div v-if="mode !== 'view'" class="md:col-span-2">
+<div class="flex items-center justify-between mb-2">
+    <label class="block text-sm font-semibold text-slate-600">
+      Sucursales donde se agregará
+    </label>
 
+    <button
+      type="button"
+      class="text-sm font-semibold text-slate-700 hover:text-black"
+    @click="
+  form.branch_ids.length === branchesDB.length
+    ? form.branch_ids = [props.branch?.id].filter(Boolean)
+    : form.branch_ids = branchesDB.map(branch => branch.id)
+"
+    >
+      {{ form.branch_ids.length === branchesDB.length ? 'Quitar todas' : 'Seleccionar todas' }}
+    </button>
+  </div>
+
+  <div class="max-h-[130px] overflow-y-auto border border-slate-200 rounded-2xl p-3 bg-slate-50">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <label
+        v-for="branchItem in branchesDB"
+        :key="branchItem.id"
+        class="flex items-center gap-3 border rounded-xl px-4 py-3 bg-white cursor-pointer hover:bg-slate-100"
+      >
+  <input
+  type="checkbox"
+  :value="branchItem.id"
+  v-model="form.branch_ids"
+  :disabled="isCurrentBranch(branchItem.id)"
+  class="rounded border-slate-300 disabled:opacity-60"
+/>
+
+     {{ branchItem.name }}
+<span
+  v-if="isCurrentBranch(branchItem.id)"
+  class="text-xs text-slate-400 ml-1"
+>
+  actual
+</span>
+      </label>
+    </div>
+  </div>
+
+  <p
+    v-if="form.errors.branch_ids"
+    class="text-red-500 text-xs mt-2"
+  >
+    {{ form.errors.branch_ids }}
+  </p>
+</div>
         <SelectField
           label="Categoría"
           field="category_id"

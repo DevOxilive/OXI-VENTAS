@@ -100,7 +100,7 @@ class UserController extends Controller
         $user->load(['role', 'permissions']);
 
         broadcast(new UserChanged($user, 'created'))->toOthers();
-        return redirect()->route('sistemas.empleados')
+        return redirect()->route('systems.employees')
             ->with('success', 'Usuario creado correctamente');
     }
 
@@ -155,7 +155,7 @@ class UserController extends Controller
         }
         $user->load(['role', 'permissions']);
         broadcast(new UserChanged($user, 'updated'))->toOthers();
-        return redirect()->route('sistemas.empleados')
+        return redirect()->route('systems.employees')
             ->with('success', 'Usuario actualizado');
     }
 
@@ -174,7 +174,7 @@ class UserController extends Controller
 
         $user->delete();
 
-        return redirect()->route('sistemas.empleados')
+        return redirect()->route('systems.employees')
             ->with('success', 'Usuario eliminado');
     }
 }

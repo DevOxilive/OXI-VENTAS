@@ -293,7 +293,7 @@ function deleteProduct(selectedProduct) {
 }
 </script>
 
-</script>
+
 <template>
   <section class="max-w-[1030px] mx-auto py-8 px-6 bg-white min-h-[calc(100vh-90px)]">
 
@@ -306,7 +306,7 @@ function deleteProduct(selectedProduct) {
       />
 
       <ProductTable
-        :products="paginatedProducts"
+      :products="products"
         @view="openViewModal"
         @edit="openEditModal"
         @delete="deleteProduct"

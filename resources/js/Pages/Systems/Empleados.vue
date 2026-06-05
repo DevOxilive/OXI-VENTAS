@@ -304,7 +304,7 @@ function guardarEmpleado() {
   form.permissions = form.permissions.filter(p => p)
 
   if (editando.value) {
-    form.put(route('sistemas.empleados.update', userId.value), {
+    form.put(route('systems.employees.update', userId.value), {
       preserveScroll: true,
 
       onSuccess: () => {
@@ -326,7 +326,7 @@ function guardarEmpleado() {
       }
     })
   } else {
-    form.post(route('sistemas.empleados.store'), {
+    form.post(route('systems.employees.store'), {
       preserveScroll: true,
 
       onSuccess: () => {
@@ -337,7 +337,7 @@ function guardarEmpleado() {
           title: 'Usuario registrado correctamente',
         })
 
-        router.visit(route('sistemas.empleados'), {
+        router.visit(route('systems.employees'), {
           preserveScroll: true,
           preserveState: false,
           replace: true
@@ -366,7 +366,7 @@ function eliminarUsuario(id) {
   }).then((result) => {
     if (!result.isConfirmed) return
 
-    form.delete(route('sistemas.empleados.destroy', id), {
+    form.delete(route('systems.employees.destroy', id), {
       preserveScroll: true,
 
       onSuccess: () => {
@@ -375,7 +375,7 @@ function eliminarUsuario(id) {
           title: 'Usuario eliminado correctamente',
         })
 
-        router.visit(route('sistemas.empleados'), {
+        router.visit(route('systems.employees'), {
           preserveScroll: true,
           preserveState: false,
           replace: true

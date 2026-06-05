@@ -5,11 +5,10 @@ import ProductFilters from '@/Components/Inventory/ProductFilters.vue'
 import ProductTable from '@/Components/Inventory/ProductTable.vue'
 import ProductMobileCards from '@/Components/Inventory/ProductMobileCards.vue'
 
-import { useProductFilters } from '@/Composables/Inventory/useProductFilters'
 import { useProductActions } from '@/Composables/Inventory/useProductActions'
 import { usePermissions } from '@/Composables/usePermissions'
-
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { router } from '@inertiajs/vue3'
 
 defineOptions({ layout: AdminLayout })
 
@@ -36,29 +35,58 @@ const props = defineProps({
         type: Object,
         default: () => ({}),
     },
+    filters: {
+        type: Object,
+        default: () => ({}),
+    },
 })
 
 const branch = computed(() => props.branch ?? {})
-
-// IMPORTANTE:
-// No usar props.productsDB.data aquí.
-// El composable ya se encarga de sacar .data si viene paginado.
-const productsDB = computed(() => props.productsDB ?? { data: [] })
-
 const categoriesDB = computed(() => props.categoriesDB ?? [])
 const subcategoriesDB = computed(() => props.subcategoriesDB ?? [])
 const branchesDB = computed(() => props.branchesDB ?? [])
 
-const {
-    search,
-    categoryFilter,
-    subcategoryFilter,
-    filteredProducts,
-    paginatedProducts,
-    recordsToShow,
-    currentPage,
-    totalPages,
-} = useProductFilters(productsDB)
+const search = ref(props.filters.search ?? '')
+const categoryFilter = ref(props.filters.category_id ?? 'Todas')
+const recordsToShow = ref(props.filters.per_page ?? 50)
+
+const products = computed(() => props.productsDB?.data ?? [])
+const currentPage = computed(() => props.productsDB?.current_page ?? 1)
+const totalPages = computed(() => props.productsDB?.last_page ?? 1)
+
+function reloadProducts(page = 1) {
+    router.get(
+        route('inventory.branches.products.index', {
+            branch: branch.value.slug,
+        }),
+        {
+            search: search.value,
+            category_id: categoryFilter.value === 'Todas' ? null : categoryFilter.value,
+            per_page: recordsToShow.value,
+            page,
+        },
+        {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+            only: ['productsDB', 'filters'],
+        }
+    )
+}
+
+let searchTimer = null
+
+watch(search, () => {
+    clearTimeout(searchTimer)
+
+    searchTimer = setTimeout(() => {
+        reloadProducts(1)
+    }, 400)
+})
+
+watch([categoryFilter, recordsToShow], () => {
+    reloadProducts(1)
+})
 
 const {
     showModal,
@@ -71,12 +99,12 @@ const {
     deleteProduct,
 } = useProductActions()
 </script>
-
 <template>
   <div class="relative px-8 py-6">
     <div class="bg-[#f8f5f9] rounded-3xl p-6 min-h-[calc(100vh-180px)]">
-
+  
       <ProductFilters
+      :branch="branch"
         v-model:records-to-show="recordsToShow"
         :search="search"
         :categoryFilter="categoryFilter"
@@ -89,27 +117,26 @@ const {
       <!-- TABLA CON SCROLL -->
       <div class="mt-5 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="max-h-[520px] overflow-y-auto">
-           <ProductTable
-  :products="paginatedProducts"
-  @view="openViewModal"
-  @edit="openEditModal"
-  @delete="deleteProduct"
+<ProductTable
+    :products="products"
+    @view="openViewModal"
+    @edit="openEditModal"
+    @delete="deleteProduct"
 />
         </div>
       </div>
 
       <!-- MOBILE -->
-      <InventoryMobileCards
-        :products="paginatedProducts"
-        @view="openViewModal"
-        @edit="openEditModal"
-        @delete="deleteProduct"
-      />
-
+   <ProductMobileCards
+    :products="products"
+    @view="openViewModal"
+    @edit="openEditModal"
+    @delete="deleteProduct"
+/>
       <!-- PAGINACIÓN -->
       <div class="flex items-center justify-between mt-6 px-2">
         <button
-          @click="currentPage--"
+          @click="reloadProducts(currentPage - 1)"
           :disabled="currentPage === 1"
           class="px-4 py-2 rounded-xl border border-slate-300 bg-white text-sm disabled:opacity-40"
         >
@@ -121,8 +148,8 @@ const {
         </div>
 
         <button
-          @click="currentPage++"
-          :disabled="currentPage === totalPages"
+@click="reloadProducts(currentPage + 1)"   
+       :disabled="currentPage === totalPages"
           class="px-4 py-2 rounded-xl border border-slate-300 bg-white text-sm disabled:opacity-40"
         >
           Siguiente

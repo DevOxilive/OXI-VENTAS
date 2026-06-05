@@ -2,13 +2,14 @@
     import SidebarItem from '@/Components/SidebarItem.vue'
     import { Link, usePage } from '@inertiajs/vue3'
     import { generateMenu } from '@/config/menuConfig'
-    import { ref } from 'vue'
+    import { ref, computed } from 'vue'
 
     const page = usePage()
-    const menuItems = generateMenu(
-        page.props.auth.user?.role?.name,
-        page.props.auth.permissions,
-        page.props.branches ?? [])
+   const menuItems = computed(() => generateMenu(
+    page.props.auth.user?.role?.name,
+    page.props.auth.permissions ?? [],
+    page.props.branches ?? []
+))
 
     const role = page.props.auth.user?.role?.name
     const permissions = page.props.auth.permissions || []
@@ -23,7 +24,7 @@
     function toggleDesktopSidebar() {
         desktopSidebarCollapsed.value = !desktopSidebarCollapsed.value
     }
-    console.table(JSON.parse(JSON.stringify(page.props.branches ?? [])))
+ 
 
 </script>
 

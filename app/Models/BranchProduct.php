@@ -19,6 +19,7 @@ class BranchProduct extends Model
         'barcode',
         'category_id',
         'tracks_batches',
+        'unit',
         'tracks_expiration',
     ];
 

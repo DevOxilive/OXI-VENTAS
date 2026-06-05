@@ -12,7 +12,8 @@ use App\Http\Controllers\Inventory\ProductBatchController;
 use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\Inventory\PurchaseReportController;
 use App\Http\Controllers\Inventory\BranchInventoryController;
-
+use App\Http\Controllers\BranchController;
+use App\Http\Controllers\Audits\PhysicalCountController;
 
 
 /*
@@ -60,47 +61,109 @@ Route::middleware([
         return Inertia::render('Dashboard');
     })->name('dashboard');
 
-    /*
+/*
+|--------------------------------------------------------------------------
+| SYSTEMS
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('systems')->name('systems.')->group(function () {
+
+    Route::get('/employees', function () {
+        $user = \App\Models\User::find(Auth::id());
+
+        abort_unless(
+            Auth::check() && $user && $user->hasPermission('usuarios.ver'),
+            403
+        );
+
+        return Inertia::render('Systems/Empleados', [
+            'empleados' => \App\Models\Employee::doesntHave('user')->get(),
+
+            'usuarios' => \App\Models\User::with([
+                'role',
+                'permissions',
+                'branches',
+            ])
+                ->select(
+                    'id',
+                    'employee_id',
+                    'name',
+                    'email',
+                    'role_id'
+                )
+                ->get(),
+
+            'roles' => \App\Models\Role::all(),
+            'permissions' => \App\Models\Permission::all(),
+            'branches' => \App\Models\Branch::where('active', true)->get(),
+        ]);
+    })->name('employees');
+
+    Route::post('/employees', [UserController::class, 'store'])
+        ->name('employees.store');
+
+    Route::put('/employees/{id}', [UserController::class, 'update'])
+        ->name('employees.update');
+
+    Route::delete('/employees/{id}', [UserController::class, 'destroy'])
+        ->name('employees.destroy');
+
+
+    Route::get('/users', function () {
+        return Inertia::render('Systems/Empleados');
+    })->name('users');
+
+
+    Route::get('/branches', [BranchController::class, 'index'])
+        ->name('branches');
+
+    Route::post('/branches', [BranchController::class, 'store'])
+        ->name('branches.store');
+
+    Route::put('/branches/{branch}', [BranchController::class, 'update'])
+        ->name('branches.update');
+
+    Route::delete('/branches/{branch}', [BranchController::class, 'destroy'])
+        ->name('branches.destroy');
+
+
+
+    });
+ /*
     |--------------------------------------------------------------------------
-    | SISTEMAS
+    | audits
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('sistemas')->group(function () {
+    //inventariotiempo real 
+Route::prefix('audits')->group(function () {
+    Route::get('/physical-counts', [PhysicalCountController::class, 'index'])
+        ->name('audits.physical-counts.index');
 
-        Route::get('/Empleados', function () {
-            $user = \App\Models\User::find(Auth::id());
+    Route::get('/physical-counts/{physicalCount}', [PhysicalCountController::class, 'show'])
+        ->name('audits.physical-counts.show');
 
-            abort_unless(
-                Auth::check() && $user && $user->hasPermission('usuarios.ver'),
-                403
-            );
+        Route::post('/physical-counts', [PhysicalCountController::class, 'store'])
+    ->name('audits.physical-counts.store');
 
-            return Inertia::render('Sistemas/Empleados', [
-                'empleados' => \App\Models\Employee::doesntHave('user')->get(),
-                'usuarios' => \App\Models\User::with(['role',    'permissions',    'branches',])->select('id',        'employee_id',        'name',        'email',        'role_id')->get(),
-                'roles' => \App\Models\Role::all(),
-                'permissions' => \App\Models\Permission::all(),
-                'branches' => \App\Models\Branch::where('active', true)->get(),
-            ]);
-        })->name('sistemas.empleados');
+    Route::post('/physical-counts/{physicalCount}/scan', [PhysicalCountController::class, 'scan'])
+    ->name('audits.physical-counts.scan');
 
-        Route::post('/Empleados', [UserController::class, 'store'])
-            ->name('sistemas.empleados.store');
-
-        Route::put('/Empleados/{id}', [UserController::class, 'update'])
-            ->name('sistemas.empleados.update');
-
-        Route::delete('/Empleados/{id}', [UserController::class, 'destroy'])
-            ->name('sistemas.empleados.destroy');
-
-        Route::get(
-            '/usuarios',
-            fn() =>
-            Inertia::render('Sistemas/Usuarios')
-        )->name('sistemas.usuarios');
-    });
-
+    Route::post('/physical-counts/{physicalCount}/entries', [PhysicalCountController::class, 'storeEntry'])
+    ->name('audits.physical-counts.entries.store');
+    
+    Route::patch('/physical-counts/{physicalCount}/close', [PhysicalCountController::class, 'close'])
+    ->name('audits.physical-counts.close');
+    Route::get('/physical-counts/{physicalCount}/export-excel', [PhysicalCountController::class, 'exportExcel'])
+    ->name('audits.physical-counts.export-excel');
+    Route::patch('/physical-counts/{physicalCount}/reopen', [PhysicalCountController::class, 'reopen'])
+    ->name('audits.physical-counts.reopen');
+    Route::patch('/physical-counts/{physicalCount}/apply-adjustments', [PhysicalCountController::class, 'applyAdjustments'])
+    ->name('audits.physical-counts.apply-adjustments');
+    Route::get('/physical-counts/{physicalCount}/export-pdf', [PhysicalCountController::class, 'exportPdf'])
+    ->name('audits.physical-counts.export-pdf');
+});
     /*
     |--------------------------------------------------------------------------
     | CAPITAL HUMANO

@@ -1,5 +1,10 @@
 import { ref } from "vue";
 import { router } from "@inertiajs/vue3";
+import {
+    UniversalActionModal,
+    ToastAlert,
+    ErrorAlert
+} from '@/Components/Modales/UniversalActionModal'
 
 export function useProductActions() {
     const showModal = ref(false);
@@ -29,8 +34,16 @@ export function useProductActions() {
         selectedProduct.value = null;
     }
 
-   function deleteProduct(product) {
-    if (!confirm(`¿Eliminar el producto "${product.name}"?`)) return;
+  async function deleteProduct(product) {
+    const result = await UniversalActionModal({
+        title: "Eliminar producto",
+        message: "¿Deseas eliminar",
+        itemName: product.name,
+        confirmText: "Sí, eliminar",
+        icon: "warning",
+    });
+
+    if (!result.isConfirmed) return;
 
     router.delete(
         route("inventory.branches.products.destroy", {
@@ -39,8 +52,18 @@ export function useProductActions() {
         }),
         {
             preserveScroll: true,
+
             onSuccess: () => {
-                console.log("Producto eliminado");
+                ToastAlert({
+                    title: "Producto eliminado correctamente",
+                });
+            },
+
+            onError: () => {
+                ErrorAlert({
+                    title: "Error al eliminar",
+                    message: "No fue posible eliminar el producto.",
+                });
             },
         }
     );
