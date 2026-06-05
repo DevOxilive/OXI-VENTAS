@@ -20,6 +20,7 @@ class BranchProduct extends Model
         'last_restocked_at',
         'inactive_candidate_after_days',
         'tracks_batches',
+        'unit',
         'tracks_expiration',
         'season_start_date',
         'season_end_date',

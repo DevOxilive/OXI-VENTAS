@@ -32,10 +32,18 @@ export function generateMenu(role, permissions = [], branches = []) {
                     ? [
                           {
                               text: "Registro de Usuarios",
-                              key: "sistemas.empleados",
+                              key: "systems.employees",
                               icon: "security",
-                              url: route("sistemas.empleados"),
+                              url: route('systems.employees'),
                           },
+
+                          {
+   text: "Registro de Sucursales",
+    key: "systems.branches",
+    icon: "store",
+     url: "/systems/branches",
+
+}
                       ]
                     : []),
             ],
@@ -56,7 +64,28 @@ export function generateMenu(role, permissions = [], branches = []) {
             url: route("rh.empleados"),
         });
     }
+/*
+|--------------------------------------------------------------------------
+| AUDITORÍAS
+|--------------------------------------------------------------------------
+*/
 
+if (isAdmin || isSistemas || isInventario || can("auditorias.conteo-fisico.ver")) {
+    menu.push({
+        text: "Auditorías",
+        key: "audits",
+        icon: "fact_check",
+        isOpen: false,
+        children: [
+            {
+                text: "Conteo físico",
+                key: "audits.physical-counts",
+                icon: "inventory_2",
+                url: route("audits.physical-counts.index"),
+            },
+        ],
+    });
+}
     /*
     |--------------------------------------------------------------------------
     | INVENTARIO
@@ -87,9 +116,9 @@ export function generateMenu(role, permissions = [], branches = []) {
                       text: "Productos",
                       key: `inventario.${branch.slug}.products`,
                       icon: "inventory",
-                      url: route("inventory.branches.products.index", {
-                          branch: branch.slug,
-                      }),
+                   url: route("inventory.branches.products.index", {
+    branch: branch.slug,
+}),
                   },
               ]
             : []),
@@ -219,13 +248,19 @@ export function generateMenu(role, permissions = [], branches = []) {
             key: "sucursales",
             icon: "inventory_2",
             isOpen: false,
-            children: branches.map((branch) => ({
-                text: branch.name,
-                key: `branch.${branch.slug}`,
-                icon: "store",
-                isOpen: false,
-                children: inventoryOptions(branch),
-            })),
+           children: branches
+    .filter((branch) => branch.slug)
+    .map((branch) => ({
+    text: branch.name,
+    key: branch.slug,
+    slug: branch.slug,
+    color: branch.color,
+    bgColor: branch.color,    // para hover
+    icon: "store",
+    isBranch: true,
+    isOpen: false,
+    children: inventoryOptions(branch),
+})),
         });
     }
 

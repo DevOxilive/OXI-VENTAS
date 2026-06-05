@@ -54,6 +54,9 @@ export function SuccessAlert({
 /* ===========================
    ALERTA DE ERROR
 =========================== */
+/* ===========================
+   ALERTA INFORMATIVA
+=========================== */
 export function ErrorAlert({
     title = "Ocurrió un error",
     message = "No fue posible completar la operación",
@@ -61,34 +64,21 @@ export function ErrorAlert({
     return Swal.fire({
         icon: "error",
         title: title,
-        text: message,
+        html: message,
         confirmButtonColor: "#ef4444",
         customClass: {
             popup: "rounded-2xl",
             confirmButton: "px-5 py-2 rounded-full",
         },
-    });
-}
+        didOpen: () => {
+            const container = document.querySelector(".swal2-container")
 
-/* ===========================
-   ALERTA INFORMATIVA
-=========================== */
-export function InfoAlert({
-    title = "Información",
-    message = "Proceso ejecutado",
-} = {}) {
-    return Swal.fire({
-        icon: "info",
-        title: title,
-        text: message,
-        confirmButtonColor: "#3b82f6",
-        customClass: {
-            popup: "rounded-2xl",
-            confirmButton: "px-5 py-2 rounded-full",
+            if (container) {
+                container.style.zIndex = "999999"
+            }
         },
     });
 }
-
 /* ===========================
    ALERTA WARNING SIMPLE
 =========================== */

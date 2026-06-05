@@ -1,11 +1,11 @@
 <script setup>
 const props = defineProps({
-  search: String,
+    search: String,
   categoryFilter: [String, Number],
 
-  categoriesDB: {
-    type: Array,
-    default: () => [],
+  branch: {
+    type: Object,
+    default: () => ({})
   },
 
   recordsToShow: {
@@ -21,15 +21,22 @@ defineEmits([
   'create',
   'export',
 ])
+
 </script><template>
   <section class="bg-transparent">
 
     <!-- ENCABEZADO -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
 
-      <h2 class="text-3xl font-bold text-slate-800">
-        Productos
-      </h2>
+     <div>
+  <h2 class="text-3xl font-bold text-slate-800">
+    Productos - {{ branch?.name }}
+  </h2>
+
+  <p class="text-sm text-slate-500">
+    Administración de productos de la sucursal {{ branch?.name }}
+  </p>
+</div>
 
       <div class="flex items-center gap-3">
 
