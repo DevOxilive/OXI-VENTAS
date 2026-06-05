@@ -155,82 +155,125 @@ public function index(Request $request, Branch $branch)
             'per_page' => $perPage,
         ],
     ]);
-}
-        public function store(Request $request, Branch $branch)
-        {
-            $data = $request->validate([
-                'barcodes' => ['nullable', 'array'],
-                'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct', 'unique:barcodes,code'],
+}public function store(Request $request, Branch $branch)
+{
+    $data = $request->validate([
+        'barcodes' => ['nullable', 'array'],
+        'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct'],
 
-                'unit' => ['required', 'string', 'max:20'],
-                'name' => ['required', 'string', 'max:255'],
-                'image' => ['nullable', 'image', 'max:2048'],
-                'stock' => ['nullable', 'numeric', 'min:0'],
-                'category_id' => ['required', 'exists:categories,id'],
-                'cost' => ['required', 'numeric', 'min:0'],
-            'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
-                'entry_date' => ['required', 'date'],
-                'active' => ['boolean'],
-                'branch_ids' => ['required', 'array', 'min:1'],
-'branch_ids.*' => ['exists:branches,id'],
+        'unit' => ['required', 'string', 'max:20'],
+        'name' => ['required', 'string', 'max:255'],
+        'image' => ['nullable', 'image', 'max:2048'],
+        'stock' => ['nullable', 'numeric', 'min:0'],
+        'category_id' => ['required', 'exists:categories,id'],
+        'cost' => ['required', 'numeric', 'min:0'],
+        'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
+        'entry_date' => ['required', 'date'],
+        'active' => ['boolean'],
+        'branch_ids' => ['required', 'array', 'min:1'],
+        'branch_ids.*' => ['exists:branches,id'],
+    ]);
+
+    $barcodes = collect($data['barcodes'] ?? [])
+        ->filter(fn ($code) => filled($code))
+        ->values();
+
+    $duplicatedBarcode = DB::table('barcodes')
+        ->whereIn('code', $barcodes)
+        ->first();
+
+    if ($duplicatedBarcode) {
+        $existingProduct = Product::find($duplicatedBarcode->product_id);
+
+        $branches = BranchProduct::with('branch:id,name')
+            ->where('product_id', $duplicatedBarcode->product_id)
+            ->where('active', true)
+            ->get()
+            ->pluck('branch.name')
+            ->filter()
+            ->values()
+            ->implode(', ');
+
+      return back()->withErrors([
+    'barcodes.0' => '
+        <div style="text-align:left; line-height:1.6;">
+            <p style="margin:0 0 10px;">
+                <strong>Código:</strong><br>
+                ' . e($duplicatedBarcode->code) . '
+            </p>
+
+            <p style="margin:0 0 10px;">
+                <strong>Producto:</strong><br>
+                ' . e($existingProduct?->name ?? 'Sin nombre') . '
+            </p>
+
+            <p style="margin:0 0 10px;">
+                <strong>Sucursales donde existe:</strong><br>
+                ' . e($branches ?: 'Sin sucursal activa') . '
+            </p>
+
+            <hr style="margin:12px 0;">
+
+            <p style="margin:0; color:#6b7280; font-size:14px;">
+                Si deseas agregarlo a otra sucursal, busca el producto existente,
+                entra a editar y selecciona la sucursal correspondiente.
+            </p>
+        </div>
+    ',
+])->withInput();
+    }
+
+    $imagePath = null;
+
+    if ($request->hasFile('image')) {
+        $imagePath = $request->file('image')->store('products', 'public');
+    }
+
+    DB::transaction(function () use ($data, $branch, $imagePath, $barcodes) {
+        $product = Product::create([
+            'name' => $data['name'],
+            'description' => null,
+            'image' => $imagePath,
+            'cost' => $data['cost'],
+            'sale_price' => $data['sale_price'],
+            'category_id' => $data['category_id'],
+            'active' => true,
+        ]);
+
+        foreach ($barcodes as $index => $code) {
+            DB::table('barcodes')->insert([
+                'product_id' => $product->id,
+                'code' => $code,
+                'type' => $index === 0 ? 'PRINCIPAL' : 'ALTERNO',
+                'base_quantity' => 1,
+                'active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
-
-        $barcodes = collect($data['barcodes'] ?? [])
-            ->filter(fn($code) => filled($code))
-            ->values();
-
-        $imagePath = null;
-
-        if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('products', 'public');
         }
 
-        DB::transaction(function () use ($data, $branch, $imagePath, $barcodes) {
-            $product = Product::create([
+        foreach ($data['branch_ids'] as $branchId) {
+            BranchProduct::create([
+                'branch_id' => $branchId,
+                'product_id' => $product->id,
+                'barcode' => $barcodes->first(),
                 'name' => $data['name'],
-                'description' => null,
-                'image' => $imagePath,
-                'cost' => $data['cost'],
-                'sale_price' => $data['sale_price'],
                 'category_id' => $data['category_id'],
+                'unit' => $data['unit'],
+                'stock' => $branchId == $branch->id
+                    ? ($data['stock'] ?? 0)
+                    : 0,
+                'cost' => $data['cost'],
+                'price' => $data['sale_price'],
+                'min_stock' => 0,
+                'entry_date' => $data['entry_date'],
                 'active' => true,
             ]);
+        }
+    });
 
-            foreach ($barcodes as $index => $code) {
-                DB::table('barcodes')->insert([
-                    'product_id' => $product->id,
-                    'code' => $code,
-                    'type' => $index === 0 ? 'PRINCIPAL' : 'ALTERNO',
-                    'base_quantity' => 1,
-                    'active' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-
-        foreach ($data['branch_ids'] as $branchId) {
-
-    BranchProduct::create([
-        'branch_id' => $branchId,
-        'product_id' => $product->id,
-        'barcode' => $barcodes->first(),
-        'name' => $data['name'],
-        'category_id' => $data['category_id'],
-        'unit' => $data['unit'],
-        'stock' => $branchId == $branch->id
-            ? ($data['stock'] ?? 0)
-            : 0,
-        'cost' => $data['cost'],
-        'price' => $data['sale_price'],
-        'min_stock' => 0,
-        'entry_date' => $data['entry_date'],
-        'active' => true,
-    ]);
+    return back()->with('success', 'Producto creado correctamente');
 }
-        });
-
-        return back()->with('success', 'Producto creado correctamente');
-    }
     public function update(Request $request, Branch $branch, Product $product)
     {
        $data = $request->validate([

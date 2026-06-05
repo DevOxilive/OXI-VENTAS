@@ -159,14 +159,23 @@ ensureCurrentBranchSelected()
 
     emit("close");
 },
-
 onError: () => {
 
-    ErrorAlert({
-        title: "Error al crear producto",
-        message: "Revisa los datos capturados",
-    });
+    const barcodeError = form.errors['barcodes.0']
 
+    if (barcodeError) {
+
+        ErrorAlert({
+    title: "Código ya registrado",
+    message: `
+        <div style="text-align:left;line-height:1.7;">
+            ${barcodeError}
+        </div>
+    `
+})
+
+        form.clearErrors('barcodes.0')
+    }
 },
       }
     );
@@ -197,14 +206,35 @@ onError: () => {
 
     emit("close");
 },
+onError: (errors) => {
+    const barcodeError =
+        errors['barcodes.0'] ||
+        errors.barcodes ||
+        form.errors['barcodes.0']
 
-onError: () => {
+    if (barcodeError) {
+        ErrorAlert({
+            title: "Código ya registrado",
+            message: barcodeError,
+        }).then(() => {
+            form.clearErrors('barcodes.0')
+            form.clearErrors('barcodes')
+        })
+
+        return
+    }
 
     ErrorAlert({
-        title: "Error al actualizar producto",
-        message: "No fue posible actualizar el producto",
-    });
-
+        title: "Error al crear producto",
+        message:
+            errors.name ||
+            errors.category_id ||
+            errors.unit ||
+            errors.cost ||
+            errors.sale_price ||
+            errors.branch_ids ||
+            "Revisa los datos capturados",
+    })
 },
       }
     );
@@ -241,14 +271,14 @@ onError: () => {
               class="flex items-start gap-2"
             >
               <div class="flex-1">
-                <InputField
-                  label=""
-                  field="barcode"
-                  v-model="form.barcodes[index]"
-                  icon="barcode_scanner"
-                  :error="form.errors[`barcodes.${index}`]"
-                  :readonly="mode === 'view'"
-                />
+            <InputField
+  label=""
+  field="barcode"
+  v-model="form.barcodes[index]"
+  icon="barcode_scanner"
+  :error="null"
+  :readonly="mode === 'view'"
+/>
               </div>
 
               <button
