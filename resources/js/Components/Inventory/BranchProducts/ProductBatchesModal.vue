@@ -20,15 +20,27 @@ const props = defineProps({
     },
     form: {
         type: Object,
-        required: true,
+        default: () => ({
+            lot_number: '',
+            supplier: '',
+            received_at: '',
+            expiration_date: '',
+            notes: '',
+            status: 'ACTIVE',
+            season_start_date: '',
+            season_end_date: '',
+            adjustment_type: 'ADD',
+            adjustment_amount: 0,
+            original_quantity: 0,
+        }),
     },
     frontendErrors: {
         type: Object,
-        required: true,
+        default: () => ({}),
     },
     totalErrors: {
         type: Number,
-        required: true,
+        default: 0,
     },
     processing: {
         type: Boolean,
@@ -44,27 +56,27 @@ const props = defineProps({
     },
     calculatedQuantity: {
         type: Number,
-        required: true,
+        default: 0,
     },
     adjustmentText: {
         type: String,
-        required: true,
+        default: 'Selecciona un lote para ajustar su cantidad.',
     },
     quantityResultColor: {
         type: String,
-        required: true,
+        default: 'text-slate-900',
     },
     toggleLot: {
         type: Function,
-        required: true,
+        default: () => { },
     },
     setAdjustmentType: {
         type: Function,
-        required: true,
+        default: () => { },
     },
     validateField: {
         type: Function,
-        required: true,
+        default: () => { },
     },
 })
 
