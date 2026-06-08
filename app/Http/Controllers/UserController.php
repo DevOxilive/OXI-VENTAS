@@ -2,22 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Models\Role;
-use Inertia\Inertia;
+use App\Events\UserChanged;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Permission;
-use App\Events\UserChanged;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Inertia\Inertia;
 
 class UserController extends Controller
 {
-    private function checkPermission($permiso)
+    private function checkPermission(string $permission): void
     {
-        /** @var \App\Models\User $user */
+        /** @var \App\Models\User|null $user */
         $user = Auth::user();
 
         if (!$user) {
@@ -26,29 +26,40 @@ class UserController extends Controller
 
         $user->load(['permissions', 'role.permissions']);
 
-        if (!$user->hasPermission($permiso)) {
+        if (!$user->hasPermission($permission)) {
             abort(403, 'No tienes permiso');
         }
     }
 
     public function index()
     {
-        return Inertia::render('Sistemas/Empleados', [
-            'empleados' => Employee::with('user.role')
+        $this->checkPermission('users.view');
+
+        return Inertia::render('Systems/Users', [
+            'employees' => Employee::doesntHave('user')
                 ->orderBy('id', 'desc')
                 ->get(),
 
-            'usuarios' => User::with([
+            'users' => User::with([
                 'role.permissions',
                 'permissions',
                 'branches',
             ])
+                ->select([
+                    'id',
+                    'employee_id',
+                    'name',
+                    'email',
+                    'role_id',
+                ])
                 ->orderBy('id', 'desc')
                 ->get(),
 
-            'roles' => Role::with('permissions')->get(),
+            'roles' => Role::with('permissions')
+                ->orderBy('name')
+                ->get(),
 
-            'permissions' => Permission::all(),
+            'permissions' => Permission::orderBy('name')->get(),
 
             'branches' => Branch::where('active', true)
                 ->orderBy('name')
@@ -58,123 +69,117 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-        $this->checkPermission('usuarios.crear');
+        $this->checkPermission('users.create');
 
-        $request->validate([
-            'employee_id' => 'nullable|exists:employees,id',
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|confirmed|min:6',
-            'role_id' => 'required|exists:roles,id',
-
-            'branch_ids' => 'nullable|array',
-            'branch_ids.*' => 'exists:branches,id',
-
-            'permissions' => 'nullable|array',
-            'permissions.*' => 'exists:permissions,id',
+        $validated = $request->validate([
+            'employee_id' => ['nullable', 'exists:employees,id'],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'unique:users,email'],
+            'password' => ['required', 'confirmed', 'min:6'],
+            'role_id' => ['required', 'exists:roles,id'],
+            'branch_ids' => ['nullable', 'array'],
+            'branch_ids.*' => ['exists:branches,id'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['exists:permissions,id'],
         ]);
 
-        $role = Role::findOrFail($request->role_id);
+        $role = Role::findOrFail($validated['role_id']);
 
-        if ($role->name === 'Ventas' && empty($request->branch_ids)) {
+        if ($role->name === 'Ventas' && empty($validated['branch_ids'])) {
             return back()->withErrors([
                 'branch_ids' => 'Debes seleccionar al menos una sucursal para el vendedor.',
             ])->withInput();
         }
 
         $user = User::create([
-            'employee_id' => $request->employee_id,
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role_id' => $request->role_id,
+            'employee_id' => $validated['employee_id'] ?? null,
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'role_id' => $validated['role_id'],
         ]);
 
-        $user->permissions()->sync($request->permissions ?? []);
+        $user->permissions()->sync($validated['permissions'] ?? []);
+        $user->branches()->sync(
+            $role->name === 'Ventas'
+            ? ($validated['branch_ids'] ?? [])
+            : []
+        );
 
-        if ($role->name === 'Ventas') {
-            $user->branches()->sync($request->branch_ids ?? []);
-        } else {
-            $user->branches()->sync([]);
-        }
-        $user->load(['role', 'permissions']);
+        $user->load(['role', 'permissions', 'branches']);
 
         broadcast(new UserChanged($user, 'created'))->toOthers();
-        return redirect()->route('systems.employees')
+
+        return redirect()
+            ->route('systems.users.index')
             ->with('success', 'Usuario creado correctamente');
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, User $user)
     {
-        $this->checkPermission('usuarios.editar');
+        $this->checkPermission('users.update');
 
-        $user = User::findOrFail($id);
-
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $id,
-            'role_id' => 'required|exists:roles,id',
-
-            'branch_ids' => 'nullable|array',
-            'branch_ids.*' => 'exists:branches,id',
-
-            'permissions' => 'nullable|array',
-            'permissions.*' => 'exists:permissions,id',
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'unique:users,email,' . $user->id],
+            'role_id' => ['required', 'exists:roles,id'],
+            'password' => ['nullable', 'confirmed', 'min:6'],
+            'branch_ids' => ['nullable', 'array'],
+            'branch_ids.*' => ['exists:branches,id'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['exists:permissions,id'],
         ]);
 
-        if ($request->password) {
-            $request->validate([
-                'password' => 'confirmed|min:6',
-            ]);
-        }
+        $role = Role::findOrFail($validated['role_id']);
 
-        $role = Role::findOrFail($request->role_id);
-
-        if ($role->name === 'Ventas' && empty($request->branch_ids)) {
+        if ($role->name === 'Ventas' && empty($validated['branch_ids'])) {
             return back()->withErrors([
                 'branch_ids' => 'Debes seleccionar al menos una sucursal para el vendedor.',
             ])->withInput();
         }
 
-        $user->update([
-            'name' => $request->name,
-            'email' => $request->email,
-            'role_id' => $request->role_id,
+        $userData = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'role_id' => $validated['role_id'],
+        ];
 
-            'password' => $request->password
-                ? Hash::make($request->password)
-                : $user->password,
-        ]);
-
-        $user->permissions()->sync($request->permissions ?? []);
-
-        if ($role->name === 'Ventas') {
-            $user->branches()->sync($request->branch_ids ?? []);
-        } else {
-            $user->branches()->sync([]);
+        if (!empty($validated['password'])) {
+            $userData['password'] = Hash::make($validated['password']);
         }
-        $user->load(['role', 'permissions']);
+
+        $user->update($userData);
+
+        $user->permissions()->sync($validated['permissions'] ?? []);
+        $user->branches()->sync(
+            $role->name === 'Ventas'
+            ? ($validated['branch_ids'] ?? [])
+            : []
+        );
+
+        $user->load(['role', 'permissions', 'branches']);
+
         broadcast(new UserChanged($user, 'updated'))->toOthers();
-        return redirect()->route('systems.employees')
-            ->with('success', 'Usuario actualizado');
+
+        return redirect()
+            ->route('systems.users.index')
+            ->with('success', 'Usuario actualizado correctamente');
     }
 
-    public function destroy($id)
+    public function destroy(User $user)
     {
-        $this->checkPermission('usuarios.eliminar');
+        $this->checkPermission('users.delete');
 
-        $user = User::findOrFail($id);
-
-        $user->load(['role', 'permissions']);
+        $user->load(['role', 'permissions', 'branches']);
 
         broadcast(new UserChanged($user, 'deleted'))->toOthers();
 
         $user->permissions()->detach();
         $user->branches()->detach();
-
         $user->delete();
 
-        return redirect()->route('systems.employees')
-            ->with('success', 'Usuario eliminado');
+        return redirect()
+            ->route('systems.users.index')
+            ->with('success', 'Usuario eliminado correctamente');
     }
 }

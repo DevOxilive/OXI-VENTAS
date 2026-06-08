@@ -9,41 +9,68 @@ class PermissionSeeder extends Seeder
 {
     public function run(): void
     {
-
         $permissions = [
 
-            // EMPLEADOS
+            /*
+            |--------------------------------------------------------------------------
+            | EMPLOYEES (CAPITAL HUMANO)
+            |--------------------------------------------------------------------------
+            */
+
             'empleados.ver',
             'empleados.crear',
             'empleados.editar',
             'empleados.eliminar',
 
-            // EXPORTAR
+            /*
+            |--------------------------------------------------------------------------
+            | FILE EXPORTS
+            |--------------------------------------------------------------------------
+            */
+
             'exportar.archivos',
 
-            // ROLES
+            /*
+            |--------------------------------------------------------------------------
+            | ROLES
+            |--------------------------------------------------------------------------
+            */
+
             'roles.ver',
             'roles.crear',
             'roles.editar',
             'roles.eliminar',
 
-            // USUARIOS
-            'usuarios.ver',
-            'usuarios.crear',
-            'usuarios.editar',
-            'usuarios.eliminar',
+            /*
+            |--------------------------------------------------------------------------
+            | USERS (SYSTEMS)
+            |--------------------------------------------------------------------------
+            */
 
-            // INVENTARIO
-'inventario.ver',
-'inventario.crear',
-'inventario.editar',
-'inventario.eliminar',
+            'users.view',
+            'users.create',
+            'users.update',
+            'users.delete',
+
+            /*
+            |--------------------------------------------------------------------------
+            | INVENTORY
+            |--------------------------------------------------------------------------
+            */
+
+            'inventario.ver',
+            'inventario.crear',
+            'inventario.editar',
+            'inventario.eliminar',
         ];
 
         foreach ($permissions as $permission) {
             DB::table('permissions')->updateOrInsert(
                 ['name' => $permission],
-                ['created_at' => now(), 'updated_at' => now()]
+                [
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
             );
         }
     }

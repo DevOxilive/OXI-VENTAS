@@ -2,18 +2,17 @@
 
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\BranchController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\Audits\PhysicalCountController;
 use App\Http\Controllers\Inventory\ReportController;
 use App\Http\Controllers\Inventory\ProductController;
 use App\Http\Controllers\Inventory\ProductBatchController;
 use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\Inventory\PurchaseReportController;
 use App\Http\Controllers\Inventory\BranchInventoryController;
-use App\Http\Controllers\BranchController;
-use App\Http\Controllers\Audits\PhysicalCountController;
 
 /*
 |--------------------------------------------------------------------------
@@ -66,61 +65,45 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('systems')->name('systems.')->group(function () {
-        Route::get('/employees', function () {
-            $user = \App\Models\User::find(Auth::id());
+    Route::middleware(['role:Sistemas,Administrador'])
+        ->prefix('systems')
+        ->name('systems.')
+        ->group(function () {
+            Route::get('/users', [UserController::class, 'index'])
+                ->name('users.index');
 
-            abort_unless(
-                Auth::check() && $user && $user->hasPermission('usuarios.ver'),
-                403
-            );
+            Route::post('/users', [UserController::class, 'store'])
+                ->name('users.store');
 
-            return Inertia::render('Systems/Empleados', [
-                'empleados' => \App\Models\Employee::doesntHave('user')->get(),
-                'usuarios' => \App\Models\User::with([
-                    'role',
-                    'permissions',
-                    'branches',
-                ])
-                    ->select(
-                        'id',
-                        'employee_id',
-                        'name',
-                        'email',
-                        'role_id'
-                    )
-                    ->get(),
-                'roles' => \App\Models\Role::all(),
-                'permissions' => \App\Models\Permission::all(),
-                'branches' => \App\Models\Branch::where('active', true)->get(),
-            ]);
-        })->name('employees');
+            Route::put('/users/{user}', [UserController::class, 'update'])
+                ->name('users.update');
 
-        Route::post('/employees', [UserController::class, 'store'])
-            ->name('employees.store');
+            Route::delete('/users/{user}', [UserController::class, 'destroy'])
+                ->name('users.destroy');
+        });
 
-        Route::put('/employees/{id}', [UserController::class, 'update'])
-            ->name('employees.update');
+    /*
+    |--------------------------------------------------------------------------
+    | BRANCHES
+    |--------------------------------------------------------------------------
+    */
 
-        Route::delete('/employees/{id}', [UserController::class, 'destroy'])
-            ->name('employees.destroy');
-    });
+    Route::middleware(['role:Sistemas,Administrador'])
+        ->prefix('branches')
+        ->name('branches.')
+        ->group(function () {
+            Route::get('/', [BranchController::class, 'index'])
+                ->name('index');
 
-    Route::get('/users', function () {
-        return Inertia::render('Systems/Empleados');
-    })->name('users');
+            Route::post('/', [BranchController::class, 'store'])
+                ->name('store');
 
-    Route::get('/branches', [BranchController::class, 'index'])
-        ->name('branches');
+            Route::put('/{branch}', [BranchController::class, 'update'])
+                ->name('update');
 
-    Route::post('/branches', [BranchController::class, 'store'])
-        ->name('branches.store');
-
-    Route::put('/branches/{branch}', [BranchController::class, 'update'])
-        ->name('branches.update');
-
-    Route::delete('/branches/{branch}', [BranchController::class, 'destroy'])
-        ->name('branches.destroy');
+            Route::delete('/{branch}', [BranchController::class, 'destroy'])
+                ->name('destroy');
+        });
 });
 
 /*
