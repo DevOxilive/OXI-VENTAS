@@ -128,7 +128,6 @@ class BranchInventoryController extends Controller
                         'batches.productBatch:id,lot_number',
                     ])
                     ->latest()
-                    ->limit(10),
             ])
 
             ->join('products', 'products.id', '=', 'branch_products.product_id')

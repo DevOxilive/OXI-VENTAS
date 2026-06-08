@@ -159,7 +159,6 @@ class StockMovementService
                         'batches.productBatch:id,lot_number',
                     ])
                     ->latest()
-                    ->limit(10),
             ]);
 
             event(new InventoryStockUpdated($branchProduct));
