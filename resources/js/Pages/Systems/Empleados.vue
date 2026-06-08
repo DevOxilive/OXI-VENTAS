@@ -304,7 +304,7 @@ function guardarEmpleado() {
   form.permissions = form.permissions.filter(p => p)
 
   if (editando.value) {
-    form.put(route('systems.employees.update', userId.value), {
+    form.put(route("systems.employees.update", userId.value), {
       preserveScroll: true,
 
       onSuccess: () => {
@@ -326,7 +326,7 @@ function guardarEmpleado() {
       }
     })
   } else {
-    form.post(route('systems.employees.store'), {
+    form.post(route("systems.employees.store"), {
       preserveScroll: true,
 
       onSuccess: () => {
@@ -366,7 +366,7 @@ function eliminarUsuario(id) {
   }).then((result) => {
     if (!result.isConfirmed) return
 
-    form.delete(route('systems.employees.destroy', id), {
+    form.delete(route("systems.employees.destroy", id), {
       preserveScroll: true,
 
       onSuccess: () => {
@@ -410,33 +410,19 @@ onMounted(() => {
 
   window.Echo.channel('systems')
 
-    .listen('.EmployeeChanged', (event) => {
-      console.log('Empleado actualizado en tiempo real', event)
-
+    .listen('.EmployeeChanged', () => {
       recargarSistema()
     })
 
     .listen('.UserChanged', (event) => {
-      console.log('Usuario actualizado en tiempo real', event)
 
-      /*
-      |--------------------------------------------------------------------------
-      | ACTUALIZAR PERMISOS DEL USUARIO LOGUEADO
-      |--------------------------------------------------------------------------
-      */
       if (page.props.auth.user.id === event.userId) {
-
         updateLivePermissions({
           permissions: event.permissions,
           role: event.role
         })
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | REFRESCAR MODAL ABIERTO
-      |--------------------------------------------------------------------------
-      */
       if (
         showModal.value &&
         userId.value === event.userId
@@ -450,11 +436,6 @@ onMounted(() => {
         form.permissions = permisosActualizados
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | RECARGAR TABLAS
-      |--------------------------------------------------------------------------
-      */
       recargarSistema()
     })
 })

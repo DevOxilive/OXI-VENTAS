@@ -95,13 +95,16 @@ Route::middleware([
                 'branches' => \App\Models\Branch::where('active', true)->get(),
             ]);
         })->name('employees');
+
+        Route::post('/employees', [UserController::class, 'store'])
+            ->name('employees.store');
+
+        Route::put('/employees/{id}', [UserController::class, 'update'])
+            ->name('employees.update');
+
+        Route::delete('/employees/{id}', [UserController::class, 'destroy'])
+            ->name('employees.destroy');
     });
-
-    Route::put('/employees/{id}', [UserController::class, 'update'])
-        ->name('employees.update');
-
-    Route::delete('/employees/{id}', [UserController::class, 'destroy'])
-        ->name('employees.destroy');
 
     Route::get('/users', function () {
         return Inertia::render('Systems/Empleados');
