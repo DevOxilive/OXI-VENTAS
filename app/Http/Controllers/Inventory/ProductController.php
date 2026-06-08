@@ -36,8 +36,14 @@ class ProductController extends Controller
         }
 
         if ($request->filled('search')) {
-            $query->whereHas('product', function ($productQuery) use ($request) {
-                $productQuery->where('name', 'like', "%{$request->search}%");
+            $search = $request->search;
+
+            $query->whereHas('product', function ($productQuery) use ($search) {
+                $productQuery
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhereHas('barcodes', function ($barcodeQuery) use ($search) {
+                        $barcodeQuery->where('code', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -50,6 +56,13 @@ class ProductController extends Controller
                 'id' => $product?->id,
                 'branch_product_id' => $item->id,
                 'branch_id' => $item->branch_id,
+                'branch_slug' => $item->branch?->slug,
+
+                'branch_ids' => BranchProduct::where('product_id', $product?->id)
+                    ->where('status', BranchProduct::STATUS_ACTIVE)
+                    ->pluck('branch_id')
+                    ->map(fn($id) => (int) $id)
+                    ->values(),
                 'barcodes' => $product?->barcodes?->pluck('code')->values() ?? [],
                 'barcode' => $product?->barcodes?->first()?->code ?? 'Sin código',
                 'unit' => $product?->unit ?? '',
@@ -151,7 +164,11 @@ class ProductController extends Controller
                 ]);
             }
 
-            $branchIds = $data['branch_ids'] ?? [$branch->id];
+            $branchIds = collect($data['branch_ids'] ?? [])
+                ->push($branch->id)
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->values();
 
             foreach ($branchIds as $branchId) {
                 BranchProduct::create([
@@ -184,6 +201,8 @@ class ProductController extends Controller
             'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
             'entry_date' => ['required', 'date'],
             'active' => ['boolean'],
+            'branch_ids' => ['nullable', 'array'],
+            'branch_ids.*' => ['exists:branches,id'],
         ]);
 
         $barcodes = collect($data['barcodes'] ?? [])
@@ -238,20 +257,34 @@ class ProductController extends Controller
                 ]);
             }
 
-            BranchProduct::updateOrCreate(
-                [
-                    'branch_id' => $branch->id,
-                    'product_id' => $product->id,
-                ],
-                [
-                    'stock' => $data['stock'] ?? 0,
-                    'min_stock' => 0,
-                    'status' => ($data['active'] ?? true)
-                        ? BranchProduct::STATUS_ACTIVE
-                        : BranchProduct::STATUS_INACTIVE,
-                    'entry_date' => $data['entry_date'],
-                ]
-            );
+            $branchIds = collect($data['branch_ids'] ?? [])
+                ->push($branch->id)
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            foreach ($branchIds as $branchId) {
+                BranchProduct::updateOrCreate(
+                    [
+                        'branch_id' => $branchId,
+                        'product_id' => $product->id,
+                    ],
+                    [
+                        'stock' => $data['stock'] ?? 0,
+                        'min_stock' => 0,
+                        'status' => BranchProduct::STATUS_ACTIVE,
+                        'tracks_batches' => false,
+                        'tracks_expiration' => false,
+                        'entry_date' => $data['entry_date'],
+                    ]
+                );
+            }
+
+            BranchProduct::where('product_id', $product->id)
+                ->whereNotIn('branch_id', $branchIds)
+                ->update([
+                    'status' => BranchProduct::STATUS_INACTIVE,
+                ]);
         });
 
         return back()->with('success', 'Producto actualizado correctamente');
