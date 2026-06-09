@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Product;
 use App\Models\BranchProduct;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -54,13 +55,14 @@ class BranchController extends Controller
                     }
                 });
         });
+        Cache::forget('active_branches');
 
         return redirect()->back();
     }
     public function destroy(Branch $branch)
     {
         $branch->delete();
-
+Cache::forget('active_branches');
         return back()->with('success', 'Sucursal eliminada correctamente');
     }
     public function update(Request $request, Branch $branch)
@@ -77,7 +79,7 @@ class BranchController extends Controller
             'color' => $data['color'] ?? null,
             'active' => $data['active'] ?? true,
         ]);
-
+Cache::forget('active_branches');
         return redirect()->back();
     }
 }

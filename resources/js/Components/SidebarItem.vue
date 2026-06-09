@@ -2,7 +2,7 @@
 import { Link } from '@inertiajs/vue3'
 import { reactive, ref } from 'vue'
 
-defineProps({
+const props = defineProps({
     items: {
         type: Array,
         default: () => []
@@ -10,6 +10,10 @@ defineProps({
     extended: {
         type: Boolean,
         default: true
+    },
+    parentColor: {
+        type: String,
+        default: null
     }
 })
 
@@ -25,23 +29,59 @@ function saveOpenItems() {
 function normalizeUrl(url) {
     return url?.replace(/\/$/, '')
 }
+function getBranchKey(item) {
+    if (item.isBranch) {
+        return item.slug || item.key
+    }
 
-function toggleItem(item) {
-    openItems[item.key] = !isOpen(item)
+    const parts = item.key?.split('.') || []
 
-    // Guardar sucursal activa
-    if (
-        item.key?.includes('ajusco') ||
-        item.key?.includes('cecilia') ||
-        item.key?.includes('diana') ||
-        item.key?.includes('lago')
-    ) {
-        localStorage.setItem('activeBranch', item.key)
+    if ((parts[0] === 'inventario' || parts[0] === 'inventory') && parts[1]) {
+        return parts[1]
+    }
+
+    return null
+}function toggleItem(item) {
+    const nextValue = !isOpen(item)
+    const branchKey = getBranchKey(item)
+
+    const isTopLevelSection =
+        item.children?.length &&
+        !item.isBranch &&
+        item.key !== localStorage.getItem('activeBranch')
+
+    if (isTopLevelSection) {
+        Object.keys(openItems).forEach((key) => {
+            openItems[key] = false
+        })
+    }
+
+ if (item.isBranch) {
+    props.items.forEach((sibling) => {
+        if (sibling.isBranch && sibling.key !== item.key) {
+            openItems[sibling.key] = false
+        }
+    })
+
+    localStorage.setItem('activeBranch', branchKey)
+    openItems.branches = true
+    openItems[item.key] = nextValue
+    openItems[`${item.key}:manual`] = true
+
+    saveOpenItems()
+    return
+}
+
+    openItems[item.key] = nextValue
+
+    if (branchKey) {
+        localStorage.setItem('activeBranch', branchKey)
+        openItems.branches = true
+        openItems[branchKey] = true
     }
 
     saveOpenItems()
 }
-
 function isActiveItem(item) {
     if (!item.url) return false
 
@@ -73,18 +113,57 @@ function hasActiveChild(item) {
         isActiveItem(child) || hasActiveChild(child)
     )
 }
-
 function isOpen(item) {
-    return hasActiveChild(item) || !!openItems[item.key]
-}
+    const activeBranch = localStorage.getItem('activeBranch')
 
+    if (item.isBranch) {
+        const wasManuallyTouched = !!openItems[`${item.key}:manual`]
+
+        if (wasManuallyTouched) {
+            return !!openItems[item.key]
+        }
+
+        return (
+            item.key === activeBranch ||
+            item.slug === activeBranch ||
+            !!openItems[item.key]
+        )
+    }
+
+    if (item.key === 'branches' || item.key === 'sucursales') {
+        return hasActiveChild(item) || !!openItems[item.key]
+    }
+
+    if (hasActiveChild(item)) {
+        return true
+    }
+
+    return !!openItems[item.key]
+}
 function itemStyle(item) {
     const active = isActiveItem(item)
+    const activeBranch = localStorage.getItem('activeBranch')
+
+    const isActiveBranch =
+        item.isBranch &&
+        activeBranch &&
+        (
+            item.key === activeBranch ||
+            item.slug === activeBranch
+        )
 
     if (active) {
         return {
             backgroundColor: '#eff6ff',
             color: '#2563eb',
+            fontWeight: '700'
+        }
+    }
+
+    if (isActiveBranch && item.color) {
+        return {
+            backgroundColor: `${item.color}20`,
+            color: item.color,
             fontWeight: '700'
         }
     }
@@ -98,11 +177,26 @@ function itemStyle(item) {
 
     return {}
 }
-
 function iconStyle(item) {
+    const activeBranch = localStorage.getItem('activeBranch')
+
+    const isActiveBranch =
+        item.isBranch &&
+        activeBranch &&
+        (
+            item.key === activeBranch ||
+            item.slug === activeBranch
+        )
+
     if (isActiveItem(item)) {
         return {
             color: '#2563eb'
+        }
+    }
+
+    if (isActiveBranch && item.color) {
+        return {
+            color: item.color
         }
     }
 
@@ -115,11 +209,17 @@ function iconStyle(item) {
     return {}
 }
 function saveCurrentBranch(item) {
-    if (item.key?.includes('.dashboard')) {
-        const branch = item.key.split('.')[1]
+    const branchKey = getBranchKey(item)
 
-        localStorage.setItem('activeBranch', branch)
-    }
+    if (!branchKey) return
+
+    localStorage.setItem('activeBranch', branchKey)
+
+    openItems.branches = true
+    openItems[branchKey] = true
+    openItems[`${branchKey}:manual`] = false
+
+    saveOpenItems()
 }
 </script>
 
@@ -130,7 +230,7 @@ function saveCurrentBranch(item) {
                 <Link
                     v-if="item.url"
                     :href="item.url"
-                    @click="saveCurrentBranch(item)"
+                  @click="saveCurrentBranch(item)"
                     @mouseenter="hoveredItem = item.key"
                     @mouseleave="hoveredItem = null"
                     
@@ -184,7 +284,7 @@ function saveCurrentBranch(item) {
                 v-if="item.children && item.children.length && isOpen(item) && extended"
                 class="ml-6 mt-1 space-y-1 border-l border-slate-200 pl-3"
             >
-                <SidebarItem :items="item.children" :extended="extended" />
+    <SidebarItem :items="item.children" :extended="extended" />
             </div>
         </li>
     </ul>

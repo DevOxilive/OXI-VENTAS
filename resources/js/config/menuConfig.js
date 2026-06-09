@@ -73,20 +73,20 @@ export function generateMenu(role, permissions = [], branches = []) {
         });
     }
 
-    const inventoryOptions = (branch) => [
-        ...(isAdmin ||
-        isInventory ||
-        can("inventory.dashboard.view") ||
-        can("inventory.view")
-            ? [
-                  {
-                      text: "Dashboard",
-                      key: `inventory.${branch.slug}.dashboard`,
-                      icon: "dashboard",
-                      url: route("inventory.dashboard"),
-                  },
-              ]
-            : []),
+ const inventoryOptions = (branch) => [
+    //  //   ...(isAdmin ||
+    //     isInventory ||
+    //     can("inventory.dashboard.view") ||
+    //     can("inventory.view")
+    //         ? [
+    //               {
+    //                   text: "Dashboard",
+    //                   key: `inventory.${branch.slug}.dashboard`,
+    //                   icon: "dashboard",
+    //                   url: route("inventory.dashboard"),
+    //               },
+    //           ]
+    //         : []),
 
         ...(isAdmin ||
         isInventory ||
@@ -136,21 +136,21 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        ...(isAdmin ||
-        isInventory ||
-        can("inventory.reports.view") ||
-        can("inventory.view")
-            ? [
-                  {
-                      text: "Reportes",
-                      key: `inventory.${branch.slug}.reports`,
-                      icon: "bar_chart",
-                      url: route("inventario.branches.reports", {
-                          branch: branch.id,
-                      }),
-                  },
-              ]
-            : []),
+        // ...(isAdmin ||
+        // isInventory ||
+        // can("inventory.reports.view") ||
+        // can("inventory.view")
+        //     ? [
+        //           {
+        //               text: "Reportes",
+        //               key: `inventory.${branch.slug}.reports`,
+        //               icon: "bar_chart",
+        //               url: route("inventario.branches.reports", {
+        //                   branch: branch.id,
+        //               }),
+        //           },
+        //       ]
+        //     : []),
     ];
 
     if (isAdmin || isInventory || can("inventory.view")) {
