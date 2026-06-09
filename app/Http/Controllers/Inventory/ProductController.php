@@ -70,7 +70,7 @@ class ProductController extends Controller
                 'image' => $product?->image,
                 'category_id' => $product?->category_id,
                 'category' => $product?->category?->name ?? 'Sin categoría',
-                'stock' => $item->stock ?? 0,
+
                 'min_stock' => $item->min_stock ?? 0,
                 'cost' => $product?->cost ?? 0,
                 'price' => $product?->sale_price ?? 0,
@@ -120,7 +120,8 @@ class ProductController extends Controller
             'unit' => ['required', 'string', 'max:20'],
             'name' => ['required', 'string', 'max:255'],
             'image' => ['nullable', 'image', 'max:2048'],
-            'stock' => ['nullable', 'numeric', 'min:0'],
+
+            'min_stock' => ['nullable', 'numeric', 'min:0'],
             'category_id' => ['required', 'exists:categories,id'],
             'cost' => ['required', 'numeric', 'min:0'],
             'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
@@ -174,8 +175,7 @@ class ProductController extends Controller
                 BranchProduct::create([
                     'branch_id' => $branchId,
                     'product_id' => $product->id,
-                    'stock' => $data['stock'] ?? 0,
-                    'min_stock' => 0,
+                    'min_stock' => $data['min_stock'] ?? 0,
                     'status' => BranchProduct::STATUS_ACTIVE,
                     'tracks_batches' => false,
                     'tracks_expiration' => false,
@@ -195,7 +195,7 @@ class ProductController extends Controller
             'unit' => ['required', 'string', 'max:20'],
             'name' => ['required', 'string', 'max:255'],
             'image' => ['nullable', 'image', 'max:2048'],
-            'stock' => ['nullable', 'numeric', 'min:0'],
+            'min_stock' => ['nullable', 'numeric', 'min:0'],
             'category_id' => ['required', 'exists:categories,id'],
             'cost' => ['required', 'numeric', 'min:0'],
             'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
@@ -271,7 +271,7 @@ class ProductController extends Controller
                     ],
                     [
                         'stock' => $data['stock'] ?? 0,
-                        'min_stock' => 0,
+                        'min_stock' => $data['min_stock'] ?? 0,
                         'status' => BranchProduct::STATUS_ACTIVE,
                         'tracks_batches' => false,
                         'tracks_expiration' => false,
