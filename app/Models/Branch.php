@@ -20,8 +20,9 @@ class Branch extends Model
     {
         return $this->belongsToMany(User::class, 'branch_user');
     }
+
     public function inventories()
-{
-    return $this->hasMany(BranchInventory::class);
-}
+    {
+        return $this->hasMany(BranchInventory::class);
+    }
 }

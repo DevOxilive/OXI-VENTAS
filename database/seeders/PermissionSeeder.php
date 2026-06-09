@@ -10,58 +10,27 @@ class PermissionSeeder extends Seeder
     public function run(): void
     {
         $permissions = [
+            'employees.view',
+            'employees.create',
+            'employees.update',
+            'employees.delete',
 
-            /*
-            |--------------------------------------------------------------------------
-            | EMPLOYEES (CAPITAL HUMANO)
-            |--------------------------------------------------------------------------
-            */
+            'files.export',
 
-            'empleados.ver',
-            'empleados.crear',
-            'empleados.editar',
-            'empleados.eliminar',
-
-            /*
-            |--------------------------------------------------------------------------
-            | FILE EXPORTS
-            |--------------------------------------------------------------------------
-            */
-
-            'exportar.archivos',
-
-            /*
-            |--------------------------------------------------------------------------
-            | ROLES
-            |--------------------------------------------------------------------------
-            */
-
-            'roles.ver',
-            'roles.crear',
-            'roles.editar',
-            'roles.eliminar',
-
-            /*
-            |--------------------------------------------------------------------------
-            | USERS (SYSTEMS)
-            |--------------------------------------------------------------------------
-            */
+            'roles.view',
+            'roles.create',
+            'roles.update',
+            'roles.delete',
 
             'users.view',
             'users.create',
             'users.update',
             'users.delete',
 
-            /*
-            |--------------------------------------------------------------------------
-            | INVENTORY
-            |--------------------------------------------------------------------------
-            */
-
-            'inventario.ver',
-            'inventario.crear',
-            'inventario.editar',
-            'inventario.eliminar',
+            'inventory.view',
+            'inventory.create',
+            'inventory.update',
+            'inventory.delete',
         ];
 
         foreach ($permissions as $permission) {

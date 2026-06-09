@@ -2,15 +2,14 @@
 
 namespace Database\Seeders;
 
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use App\Models\User;
 
 class RoleSeeder extends Seeder
 {
     public function run(): void
     {
-        // 🔹 Crear roles
         $roles = [
             'Administrador',
             'Sistemas',
@@ -24,74 +23,65 @@ class RoleSeeder extends Seeder
                 ['name' => $role],
                 [
                     'created_at' => now(),
-                    'updated_at' => now()
+                    'updated_at' => now(),
                 ]
             );
         }
 
-        // 🔹 Obtener roles
         $adminRole = DB::table('roles')->where('name', 'Administrador')->first();
-        $sistemasRole = DB::table('roles')->where('name', 'Sistemas')->first();
-        $rhRole = DB::table('roles')->where('name', 'Recursos Humanos')->first();
-        $ventasRole = DB::table('roles')->where('name', 'Ventas')->first();
-        $inventarioRole = DB::table('roles')->where('name', 'Inventario')->first();
+        $systemsRole = DB::table('roles')->where('name', 'Sistemas')->first();
+        $humanResourcesRole = DB::table('roles')->where('name', 'Recursos Humanos')->first();
+        $salesRole = DB::table('roles')->where('name', 'Ventas')->first();
+        $inventoryRole = DB::table('roles')->where('name', 'Inventario')->first();
 
-        // 🔹 Obtener permisos
         $permissions = DB::table('permissions')->get();
 
-        // 🔹 ADMIN → todos los permisos
         foreach ($permissions as $permission) {
             DB::table('role_permission')->updateOrInsert([
                 'role_id' => $adminRole->id,
-                'permission_id' => $permission->id
+                'permission_id' => $permission->id,
             ]);
         }
 
-        // 🔹 SISTEMAS → todo lo técnico (usuarios + roles)
-// SISTEMAS → users + roles
         foreach ($permissions as $permission) {
             if (
                 str_starts_with($permission->name, 'users.') ||
                 str_starts_with($permission->name, 'roles.')
             ) {
                 DB::table('role_permission')->updateOrInsert([
-                    'role_id' => $sistemasRole->id,
-                    'permission_id' => $permission->id
+                    'role_id' => $systemsRole->id,
+                    'permission_id' => $permission->id,
                 ]);
             }
         }
 
-        // 🔹 RH → empleados
         foreach ($permissions as $permission) {
-            if (str_starts_with($permission->name, 'empleados.')) {
+            if (str_starts_with($permission->name, 'employees.')) {
                 DB::table('role_permission')->updateOrInsert([
-                    'role_id' => $rhRole->id,
-                    'permission_id' => $permission->id
+                    'role_id' => $humanResourcesRole->id,
+                    'permission_id' => $permission->id,
                 ]);
             }
         }
 
-        // 🔹 VENTAS → (cuando agregues permisos ventas.*)
         foreach ($permissions as $permission) {
-            if (str_starts_with($permission->name, 'ventas.')) {
+            if (str_starts_with($permission->name, 'sales.')) {
                 DB::table('role_permission')->updateOrInsert([
-                    'role_id' => $ventasRole->id,
-                    'permission_id' => $permission->id
+                    'role_id' => $salesRole->id,
+                    'permission_id' => $permission->id,
                 ]);
             }
         }
 
-        // 🔹 INVENTARIO → (cuando agregues permisos inventario.*)
         foreach ($permissions as $permission) {
-            if (str_starts_with($permission->name, 'inventario.')) {
+            if (str_starts_with($permission->name, 'inventory.')) {
                 DB::table('role_permission')->updateOrInsert([
-                    'role_id' => $inventarioRole->id,
-                    'permission_id' => $permission->id
+                    'role_id' => $inventoryRole->id,
+                    'permission_id' => $permission->id,
                 ]);
             }
         }
 
-        // 🔹 Asignar rol Administrador al usuario admin
         $adminUser = User::where('email', 'admin@oxilive.com.mx')->first();
 
         if ($adminUser && $adminRole) {

@@ -8,19 +8,18 @@ class Permission extends Model
 {
     protected $fillable = ['name'];
 
- public function roles()
-{
-    return $this->belongsToMany(
-        \App\Models\Role::class,
-        'role_permission', // 👈 MISMA TABLA
-        'permission_id',
-        'role_id'
-    );
-}
+    public function roles()
+    {
+        return $this->belongsToMany(
+            Role::class,
+            'role_permission',
+            'permission_id',
+            'role_id'
+        );
+    }
+
     public function users()
     {
-        return $this->belongsToMany(\App\Models\User::class);
+        return $this->belongsToMany(User::class);
     }
 }
-
-    //
