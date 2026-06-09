@@ -27,9 +27,10 @@ class PhysicalCountController extends Controller
                 ->latest()
                 ->get(),
 
-            'branches' => Branch::where('active', true)
-                ->orderBy('name')
-                ->get(['id', 'name']),
+        'branches' => Branch::where('active', true)
+    ->select('id', 'name', 'slug', 'color')
+    ->orderBy('name')
+    ->get(),
         ]);
     }
     public function storeEntry(Request $request, PhysicalCount $physicalCount)
