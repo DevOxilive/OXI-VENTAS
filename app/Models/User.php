@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Branch;
+use App\Models\Employee;
+use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use App\Models\Employee;
 
 class User extends Authenticatable
 {
@@ -37,12 +40,12 @@ class User extends Authenticatable
 
     public function permissions()
     {
-        return $this->belongsToMany(\App\Models\Permission::class);
+        return $this->belongsToMany(Permission::class);
     }
 
     public function role()
     {
-        return $this->belongsTo(\App\Models\Role::class);
+        return $this->belongsTo(Role::class);
     }
 
     public function employee()
@@ -66,7 +69,7 @@ class User extends Authenticatable
 
     public function branches()
     {
-        return $this->belongsToMany(\App\Models\Branch::class, 'branch_user');
+        return $this->belongsToMany(Branch::class, 'branch_user');
     }
 
     public function hasPermission($permission)

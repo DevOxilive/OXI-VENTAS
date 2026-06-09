@@ -3,16 +3,27 @@ import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { ref } from "vue";
 import { useForm, router } from "@inertiajs/vue3";
 import ActionIconButton from "@/Components/Forms/ActionIconButton.vue";
-import { usePermissions } from "@/Composables/usePermissions";
 import {
   UniversalActionModal,
   ToastAlert,
   ErrorAlert,
 } from "@/Components/Modales/UniversalActionModal";
-const { can } = usePermissions();
+
+defineProps({
+  branches: {
+    type: Array,
+    default: () => [],
+  },
+});
 
 const selectedBranch = ref(null);
 const modalMode = ref("create");
+const showCreateModal = ref(false);
+
+const form = useForm({
+  name: "",
+  color: "#facc15",
+});
 
 function viewBranch(branch) {
   selectedBranch.value = branch;
@@ -58,30 +69,20 @@ async function deleteBranch(branch) {
   });
 }
 
-const props = defineProps({
-  branches: {
-    type: Array,
-    default: () => [],
-  },
-});
-
-const form = useForm({
-  name: "",
-  color: "#facc15",
-});
-const showCreateModal = ref(false);
-
 function openCreateModal() {
   selectedBranch.value = null;
   modalMode.value = "create";
+
   form.reset();
   form.color = "#facc15";
+
   showCreateModal.value = true;
 }
 
 function closeCreateModal() {
   showCreateModal.value = false;
 }
+
 function submit() {
   if (modalMode.value === "edit") {
     form.put(route("branches.update", selectedBranch.value.id), {
@@ -141,10 +142,10 @@ function updateColor(branch, color) {
   });
 }
 </script>
+
 <template>
   <AdminLayout>
     <div class="space-y-6">
-      <!-- Header -->
       <div class="bg-white p-5 md:p-8 rounded-2xl shadow-sm border flex items-center justify-between">
         <div>
           <h1 class="text-xl md:text-3xl font-bold text-slate-700">
@@ -161,7 +162,7 @@ function updateColor(branch, color) {
           + Agregar sucursal
         </button>
       </div>
-      <!-- Tabla -->
+
       <div class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border">
         <h2 class="text-lg font-semibold text-slate-700 mb-4">
           Sucursales registradas
@@ -184,7 +185,6 @@ function updateColor(branch, color) {
               </div>
             </div>
 
-            <!-- ACCIONES -->
             <div class="flex items-center justify-end gap-2">
               <ActionIconButton icon="visibility" title="Ver sucursal" variant="blue"
                 @click.stop="viewBranch(branch)" />
@@ -202,34 +202,6 @@ function updateColor(branch, color) {
         </div>
       </div>
 
-      <!-- Acciones -->
-      <!--  <div class="flex items-center justify-center gap-2">
-
-                <ActionIconButton
-                    v-if="can('sucursales.ver')"
-                    icon="visibility"
-                    title="Ver sucursal"
-                    variant="blue"
-                    @click.stop="viewBranch(branch)"
-                />
-
-                <ActionIconButton
-                    v-if="can('sucursales.editar')"
-                    icon="edit"
-                    title="Editar sucursal"
-                    variant="amber"
-                    @click.stop="editBranch(branch)"
-                />
-
-                <ActionIconButton
-                    v-if="can('sucursales.eliminar')"
-                    icon="delete"
-                    title="Eliminar sucursal"
-                    variant="red"
-                    @click.stop="deleteBranch(branch)"
-                />-->
-
-      <!-- Modal crear sucursal -->
       <div v-if="showCreateModal" class="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
           <div class="flex items-center justify-between px-6 py-5 border-b">
