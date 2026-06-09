@@ -24,7 +24,9 @@ export function useEmployeeExport(
         }
 
         const url =
-            route("rh.empleados.exportarExcel") + "?" + params.toString();
+            route("human-resources.employees.export-excel") +
+            "?" +
+            params.toString();
 
         window.open(url, "_blank");
     }

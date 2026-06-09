@@ -15,7 +15,7 @@ export function useEmployeeActions() {
     const selectedEmployee = ref(null);
 
     function openCreateModal() {
-        if (!can("employees.create") && !can("empleados.crear")) return;
+        if (!can("employees.create")) return;
 
         modalMode.value = "create";
         selectedEmployee.value = null;
@@ -23,7 +23,7 @@ export function useEmployeeActions() {
     }
 
     function openEditModal(employee) {
-        if (!can("employees.update") && !can("empleados.editar")) return;
+        if (!can("employees.update")) return;
 
         modalMode.value = "edit";
         selectedEmployee.value = employee;
@@ -31,7 +31,7 @@ export function useEmployeeActions() {
     }
 
     function openViewModal(employee) {
-        if (!can("employees.view") && !can("empleados.ver")) return;
+        if (!can("employees.view")) return;
 
         modalMode.value = "view";
         selectedEmployee.value = employee;
@@ -43,7 +43,7 @@ export function useEmployeeActions() {
     }
 
     function deleteEmployee(employee) {
-        if (!can("employees.delete") && !can("empleados.eliminar")) return;
+        if (!can("employees.delete") && !can("employees.delete")) return;
 
         UniversalActionModal({
             title: "Confirmar eliminación",
@@ -53,21 +53,24 @@ export function useEmployeeActions() {
         }).then((result) => {
             if (!result.isConfirmed) return;
 
-            router.delete(route("rh.empleados.destroy", employee.id), {
-                onSuccess: () => {
-                    ToastAlert({
-                        icon: "success",
-                        title: "Empleado eliminado correctamente",
-                    });
-                },
+            router.delete(
+                route("human-resources.employees.destroy", employee.id),
+                {
+                    onSuccess: () => {
+                        ToastAlert({
+                            icon: "success",
+                            title: "Empleado eliminado correctamente",
+                        });
+                    },
 
-                onError: () => {
-                    ErrorAlert({
-                        title: "Error al eliminar",
-                        message: "No fue posible eliminar el empleado",
-                    });
+                    onError: () => {
+                        ErrorAlert({
+                            title: "Error al eliminar",
+                            message: "No fue posible eliminar el empleado",
+                        });
+                    },
                 },
-            });
+            );
         });
     }
 

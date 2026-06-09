@@ -1,11 +1,6 @@
 <script setup>
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
-
-import {
-  usePage,
-  useForm,
-  router
-} from '@inertiajs/vue3'
+import { usePage, useForm, router } from '@inertiajs/vue3'
 
 import {
   usePermissions,
@@ -26,30 +21,32 @@ import {
 
 defineOptions({ layout: AdminLayout })
 
-const cargandoEdicion = ref(false)
-
 const page = usePage()
 const { can } = usePermissions()
 
-const empleados = computed(() => page.props.employees || [])
-const usuarios = computed(() => page.props.users || [])
+const isLoadingEdit = ref(false)
+
+const employees = computed(() => page.props.employees || [])
+const users = computed(() => page.props.users || [])
 const roles = computed(() => page.props.roles || [])
 const branches = computed(() => page.props.branches || [])
 const permissions = computed(() => page.props.permissions || [])
 
-const vista = ref(can('users.view') ? 'usuarios' : 'empleados')
-const busqueda = ref('')
-const porPagina = ref(10)
-const pagina = ref(1)
+const viewMode = ref(can('users.view') ? 'users' : 'employees')
+const search = ref('')
+const perPage = ref(10)
+const currentPage = ref(1)
 
 const showModal = ref(false)
-const editando = ref(false)
-const userId = ref(null)
-const moduloActivo = ref(null)
+const isEditing = ref(false)
+const selectedUserId = ref(null)
+const activeModule = ref(null)
 
-const showDetalle = ref(false)
-const usuarioSeleccionado = ref(null)
-const showPermisosModal = ref(false)
+const showUserDetail = ref(false)
+const selectedUser = ref(null)
+const showPermissionsModal = ref(false)
+
+const errors = ref({})
 
 const form = useForm({
   employee_id: '',
@@ -59,240 +56,244 @@ const form = useForm({
   password_confirmation: '',
   role_id: '',
   branch_ids: [],
-  permissions: []
+  permissions: [],
 })
 
-const errores = ref({})
-
-function getEmployeeFullName(emp) {
-  return `${emp.first_name || emp.firstName || ''} ${emp.last_name || emp.lastName || ''}`.trim()
+function getEmployeeFullName(employee) {
+  return `${employee.first_name || employee.firstName || ''} ${employee.last_name || employee.lastName || ''}`.trim()
 }
 
-function getEmployeeEmail(emp) {
-  return emp.email || ''
+function getEmployeeEmail(employee) {
+  return employee.email || ''
 }
 
-const rolSeleccionado = computed(() => {
-  return roles.value.find(r => String(r.id) === String(form.role_id))
+const selectedRole = computed(() => {
+  return roles.value.find((role) => String(role.id) === String(form.role_id))
 })
 
-const esRolVentas = computed(() => {
-  return rolSeleccionado.value?.name === 'Ventas'
+const isSalesRole = computed(() => {
+  return selectedRole.value?.name === 'Ventas'
 })
 
-function permisosPorRol(roleId) {
-  const rol = roles.value.find(r => String(r.id) === String(roleId))
-  return rol?.permissions?.map(p => p.id) || []
+function getPermissionsByRole(roleId) {
+  const role = roles.value.find((role) => String(role.id) === String(roleId))
+
+  return role?.permissions?.map((permission) => permission.id) || []
 }
 
-function asignarPermisosPorRol() {
-  if (cargandoEdicion.value) return
+function assignPermissionsByRole() {
+  if (isLoadingEdit.value) return
 
-  form.permissions = permisosPorRol(form.role_id)
+  form.permissions = getPermissionsByRole(form.role_id)
 
-  if (!esRolVentas.value) {
+  if (!isSalesRole.value) {
     form.branch_ids = []
   }
 }
 
-function validar() {
-  errores.value = {}
+function validateForm() {
+  errors.value = {}
 
-  if (!form.name) errores.value.name = 'Nombre requerido'
+  if (!form.name) errors.value.name = 'Nombre requerido'
 
   if (!form.email) {
-    errores.value.email = 'Correo requerido'
+    errors.value.email = 'Correo requerido'
   } else if (!/^\S+@\S+\.\S+$/.test(form.email)) {
-    errores.value.email = 'Correo inválido'
+    errors.value.email = 'Correo inválido'
   }
 
   if (!form.role_id) {
-    errores.value.role_id = 'Debes seleccionar un rol'
+    errors.value.role_id = 'Debes seleccionar un rol'
   }
 
-  if (esRolVentas.value && form.branch_ids.length === 0) {
-    errores.value.branch_ids = 'Selecciona al menos una sucursal para el vendedor'
+  if (isSalesRole.value && form.branch_ids.length === 0) {
+    errors.value.branch_ids = 'Selecciona al menos una sucursal para el vendedor'
   }
 
-  if (!editando.value || form.password) {
+  if (!isEditing.value || form.password) {
     if (!form.password) {
-      errores.value.password = 'Contraseña requerida'
+      errors.value.password = 'Contraseña requerida'
     } else if (form.password.length < 7) {
-      errores.value.password = 'Mínimo 7 caracteres'
+      errors.value.password = 'Mínimo 7 caracteres'
     } else if (form.password.length > 15) {
-      errores.value.password = 'Máximo 15 caracteres'
+      errors.value.password = 'Máximo 15 caracteres'
     }
 
     if (form.password !== form.password_confirmation) {
-      errores.value.password_confirmation = 'No coincide'
+      errors.value.password_confirmation = 'No coincide'
     }
   }
 
-  return Object.keys(errores.value).length === 0
+  return Object.keys(errors.value).length === 0
 }
 
-const listaFiltrada = computed(() => {
-  let data = vista.value === 'usuarios' ? usuarios.value : empleados.value
+const filteredList = computed(() => {
+  let data = viewMode.value === 'users' ? users.value : employees.value
 
-  if (busqueda.value) {
-    const b = busqueda.value.toLowerCase()
+  if (search.value) {
+    const searchText = search.value.toLowerCase()
 
-    data = data.filter(emp => {
-      const nombre = vista.value === 'usuarios'
-        ? (emp.name || '')
-        : getEmployeeFullName(emp)
+    data = data.filter((item) => {
+      const name = viewMode.value === 'users'
+        ? (item.name || '')
+        : getEmployeeFullName(item)
 
-      const correo = vista.value === 'usuarios'
-        ? (emp.email || '')
-        : getEmployeeEmail(emp)
+      const email = viewMode.value === 'users'
+        ? (item.email || '')
+        : getEmployeeEmail(item)
 
-      return nombre.toLowerCase().includes(b) || correo.toLowerCase().includes(b)
+      return (
+        name.toLowerCase().includes(searchText) ||
+        email.toLowerCase().includes(searchText)
+      )
     })
   }
 
   return data
 })
 
-const listaActual = computed(() => {
-  const limite = Number(porPagina.value)
-  const inicio = (pagina.value - 1) * limite
-  return listaFiltrada.value.slice(inicio, inicio + limite)
+const currentList = computed(() => {
+  const limit = Number(perPage.value)
+  const start = (currentPage.value - 1) * limit
+
+  return filteredList.value.slice(start, start + limit)
 })
 
-const permisosAgrupados = computed(() => {
-  const grupos = {
-    empleados: [],
+const groupedPermissions = computed(() => {
+  const groups = {
+    employees: [],
     roles: [],
     users: [],
-    exportar: [],
-    ventas: [],
-    inventario: [],
+    files: [],
+    sales: [],
+    inventory: [],
+    audits: [],
   }
 
-  permissions.value.forEach(p => {
-    const modulo = (p.name || '').split('.')[0]?.toLowerCase() || 'otros'
+  permissions.value.forEach((permission) => {
+    const module = (permission.name || '').split('.')[0]?.toLowerCase() || 'others'
 
-    if (!grupos[modulo]) {
-      grupos[modulo] = []
-    }
+    if (!groups[module]) return
 
-    grupos[modulo].push(p)
+    groups[module].push(permission)
   })
 
-  return grupos
+  return groups
 })
 
-function abrirDetalleUsuario(user) {
-  if (vista.value !== 'usuarios') return
+function openUserDetail(user) {
+  if (viewMode.value !== 'users') return
 
-  usuarioSeleccionado.value = user
-  showDetalle.value = true
+  selectedUser.value = user
+  showUserDetail.value = true
 }
 
-function cerrarDetalleUsuario() {
-  showDetalle.value = false
-  usuarioSeleccionado.value = null
+function closeUserDetail() {
+  showUserDetail.value = false
+  selectedUser.value = null
 }
 
-function toggleModulo(modulo) {
-  moduloActivo.value = moduloActivo.value === modulo ? null : modulo
+function toggleModule(module) {
+  activeModule.value = activeModule.value === module ? null : module
 }
 
-function togglePermiso(id) {
+function togglePermission(id) {
   if (form.permissions.includes(id)) {
-    form.permissions = form.permissions.filter(p => p !== id)
-  } else {
-    form.permissions = [...form.permissions, id]
+    form.permissions = form.permissions.filter((permissionId) => permissionId !== id)
+    return
   }
+
+  form.permissions = [...form.permissions, id]
 }
 
-function activarModulo(modulo) {
-  const ids = permisosAgrupados.value[modulo].map(p => p.id)
+function enableModule(module) {
+  const ids = groupedPermissions.value[module].map((permission) => permission.id)
 
   form.permissions = [
     ...new Set([
       ...form.permissions,
-      ...ids
-    ])
+      ...ids,
+    ]),
   ]
 }
 
-function desactivarModulo(modulo) {
-  const ids = permisosAgrupados.value[modulo].map(p => p.id)
-  form.permissions = form.permissions.filter(id => !ids.includes(id))
+function disableModule(module) {
+  const ids = groupedPermissions.value[module].map((permission) => permission.id)
+
+  form.permissions = form.permissions.filter((id) => !ids.includes(id))
 }
 
-function abrirModal(emp = null) {
+function openModal(item = null) {
   form.reset()
   form.clearErrors()
-  errores.value = {}
+  errors.value = {}
   showModal.value = true
 
-  if (emp && vista.value === 'usuarios') {
-    cargandoEdicion.value = true
+  if (item && viewMode.value === 'users') {
+    isLoadingEdit.value = true
+    isEditing.value = true
+    selectedUserId.value = item.id
 
-    editando.value = true
-    userId.value = emp.id
+    form.employee_id = item.employee_id || ''
+    form.name = item.name || ''
+    form.email = item.email || ''
+    form.role_id = item.role_id || ''
 
-    form.employee_id = emp.employee_id || ''
-    form.name = emp.name || ''
-    form.email = emp.email || ''
-    form.role_id = emp.role_id || ''
+    form.permissions = Array.isArray(item.permissions)
+      ? item.permissions.map((permission) => permission.id)
+      : getPermissionsByRole(item.role_id)
 
-    form.permissions = Array.isArray(emp.permissions)
-      ? emp.permissions.map(p => p.id)
-      : permisosPorRol(emp.role_id)
-
-    form.branch_ids = emp.branches?.length
-      ? emp.branches.map(b => b.id)
+    form.branch_ids = item.branches?.length
+      ? item.branches.map((branch) => branch.id)
       : []
 
     setTimeout(() => {
-      cargandoEdicion.value = false
+      isLoadingEdit.value = false
     }, 0)
 
-  } else {
-    editando.value = false
-    userId.value = null
+    return
+  }
 
-    if (emp) {
-      form.employee_id = emp.id
-      form.name = getEmployeeFullName(emp)
-    }
+  isEditing.value = false
+  selectedUserId.value = null
+
+  if (item) {
+    form.employee_id = item.id
+    form.name = getEmployeeFullName(item)
   }
 }
 
-watch(() => form.name, (nuevoNombre) => {
-  if (!nuevoNombre) {
+watch(() => form.name, (newName) => {
+  if (!newName) {
     form.email = ''
     return
   }
 
-  const correo = nuevoNombre
+  const emailName = newName
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, '.')
     .replace(/[^a-z0-9.]/g, '')
 
-  form.email = `${correo}@oxilive.com.mx`
+  form.email = `${emailName}@oxilive.com.mx`
 })
 
 watch(() => form.role_id, () => {
-  asignarPermisosPorRol()
+  assignPermissionsByRole()
 })
 
-function cerrarModal() {
+function closeModal() {
   showModal.value = false
-  editando.value = false
-  userId.value = null
-  showPermisosModal.value = false
+  isEditing.value = false
+  selectedUserId.value = null
+  showPermissionsModal.value = false
   form.reset()
-  errores.value = {}
+  errors.value = {}
 }
 
-function guardarEmpleado() {
-  if (!validar()) {
+function saveUser() {
+  if (!validateForm()) {
     WarningAlert({
       title: 'Formulario incompleto',
       message: 'Revisa los campos marcados antes de continuar.',
@@ -301,14 +302,14 @@ function guardarEmpleado() {
     return
   }
 
-  form.permissions = form.permissions.filter(p => p)
+  form.permissions = form.permissions.filter((permission) => permission)
 
-  if (editando.value) {
-    form.put(route("systems.users.update", userId.value), {
+  if (isEditing.value) {
+    form.put(route('systems.users.update', selectedUserId.value), {
       preserveScroll: true,
 
       onSuccess: () => {
-        cerrarModal()
+        closeModal()
 
         ToastAlert({
           icon: 'success',
@@ -323,38 +324,40 @@ function guardarEmpleado() {
           title: 'Error al actualizar',
           message: 'No fue posible actualizar la información del usuario.',
         })
-      }
-    })
-  } else {
-    form.post(route("systems.users.store"), {
-      preserveScroll: true,
-
-      onSuccess: () => {
-        cerrarModal()
-
-        ToastAlert({
-          icon: 'success',
-          title: 'Usuario registrado correctamente',
-        })
-
-        router.visit(route('systems.users.index'), {
-          preserveScroll: true,
-          preserveState: false,
-          replace: true
-        })
       },
-
-      onError: () => {
-        ErrorAlert({
-          title: 'Error al registrar',
-          message: 'No fue posible registrar el usuario.',
-        })
-      }
     })
+
+    return
   }
+
+  form.post(route('systems.users.store'), {
+    preserveScroll: true,
+
+    onSuccess: () => {
+      closeModal()
+
+      ToastAlert({
+        icon: 'success',
+        title: 'Usuario registrado correctamente',
+      })
+
+      router.visit(route('systems.users.index'), {
+        preserveScroll: true,
+        preserveState: false,
+        replace: true,
+      })
+    },
+
+    onError: () => {
+      ErrorAlert({
+        title: 'Error al registrar',
+        message: 'No fue posible registrar el usuario.',
+      })
+    },
+  })
 }
 
-function eliminarUsuario(id) {
+function deleteUser(id) {
   UniversalActionModal({
     title: 'Confirmar eliminación',
     message: '¿Deseas eliminar permanentemente este usuario?',
@@ -366,7 +369,7 @@ function eliminarUsuario(id) {
   }).then((result) => {
     if (!result.isConfirmed) return
 
-    form.delete(route("systems.users.destroy", id), {
+    form.delete(route('systems.users.destroy', id), {
       preserveScroll: true,
 
       onSuccess: () => {
@@ -378,7 +381,7 @@ function eliminarUsuario(id) {
         router.visit(route('systems.users.index'), {
           preserveScroll: true,
           preserveState: false,
-          replace: true
+          replace: true,
         })
       },
 
@@ -387,56 +390,52 @@ function eliminarUsuario(id) {
           title: 'Error al eliminar',
           message: 'No fue posible eliminar el usuario.',
         })
-      }
+      },
     })
   })
 }
 
-function recargarSistema() {
+function reloadSystem() {
   router.reload({
     only: [
       'employees',
       'users',
       'roles',
       'permissions',
-      'branches'
+      'branches',
     ],
     preserveScroll: true,
     preserveState: true,
   })
 }
+
 onMounted(() => {
   if (!window.Echo) return
 
   window.Echo.channel('systems')
-
     .listen('.EmployeeChanged', () => {
-      recargarSistema()
+      reloadSystem()
     })
-
     .listen('.UserChanged', (event) => {
-
       if (page.props.auth.user.id === event.userId) {
         updateLivePermissions({
           permissions: event.permissions,
-          role: event.role
+          role: event.role,
         })
       }
 
       if (
         showModal.value &&
-        userId.value === event.userId
+        selectedUserId.value === event.userId
       ) {
-        const permisosActualizados = permissions.value
-          .filter(permission =>
-            event.permissions.includes(permission.name)
-          )
-          .map(permission => permission.id)
+        const updatedPermissions = permissions.value
+          .filter((permission) => event.permissions.includes(permission.name))
+          .map((permission) => permission.id)
 
-        form.permissions = permisosActualizados
+        form.permissions = updatedPermissions
       }
 
-      recargarSistema()
+      reloadSystem()
     })
 })
 
@@ -449,21 +448,19 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="bg-[#f6f3f7] min-h-screen rounded-3xl p-6">
-
     <h1 class="text-xl font-semibold text-slate-700 mb-6">
       Dashboard Registro de Usuarios
     </h1>
 
     <div class="flex items-center justify-between mb-5 gap-4 flex-wrap">
-
       <div class="flex gap-3">
-        <button v-if="can('users.create')" @click="vista = 'empleados'" class="px-5 py-2 rounded-xl border shadow-sm"
-          :class="vista === 'empleados' ? 'bg-black text-white' : 'bg-white'">
+        <button v-if="can('users.create')" @click="viewMode = 'employees'" class="px-5 py-2 rounded-xl border shadow-sm"
+          :class="viewMode === 'employees' ? 'bg-black text-white' : 'bg-white'">
           Empleados
         </button>
 
-        <button v-if="can('users.view')" @click="vista = 'usuarios'" class="px-5 py-2 rounded-xl border shadow-sm"
-          :class="vista === 'usuarios' ? 'bg-black text-white' : 'bg-white'">
+        <button v-if="can('users.view')" @click="viewMode = 'users'" class="px-5 py-2 rounded-xl border shadow-sm"
+          :class="viewMode === 'users' ? 'bg-black text-white' : 'bg-white'">
           Usuarios
         </button>
       </div>
@@ -472,11 +469,11 @@ onBeforeUnmount(() => {
         <div class="bg-white rounded-full px-5 py-2 border flex items-center gap-2">
           <span class="material-symbols-outlined">search</span>
 
-          <input v-model="busqueda" type="text" placeholder="Buscar empleado"
+          <input v-model="search" type="text" placeholder="Buscar empleado"
             class="outline-none bg-transparent text-sm" />
         </div>
 
-        <select v-model="porPagina" class="border rounded-full px-3 py-2 text-sm bg-white">
+        <select v-model="perPage" class="border rounded-full px-3 py-2 text-sm bg-white">
           <option :value="5">5</option>
           <option :value="10">10</option>
           <option :value="20">20</option>
@@ -497,50 +494,47 @@ onBeforeUnmount(() => {
         </thead>
 
         <tbody>
-          <tr v-for="emp in listaActual" :key="emp.id" @click="abrirDetalleUsuario(emp)"
-            class="border-t hover:bg-gray-50" :class="vista === 'usuarios' ? 'cursor-pointer' : ''">
-
+          <tr v-for="item in currentList" :key="item.id" @click="openUserDetail(item)" class="border-t hover:bg-gray-50"
+            :class="viewMode === 'users' ? 'cursor-pointer' : ''">
             <td class="px-4 py-3">
               {{
-                vista === 'usuarios'
-                  ? (emp.name || '—')
-                  : (getEmployeeFullName(emp) || 'Sin nombre registrado')
+                viewMode === 'users'
+                  ? (item.name || '—')
+                  : (getEmployeeFullName(item) || 'Sin nombre registrado')
               }}
             </td>
 
             <td class="px-4 py-3">
               {{
-                vista === 'usuarios'
-                  ? (emp.email || '—')
+                viewMode === 'users'
+                  ? (item.email || '—')
                   : 'Sin usuario registrado'
               }}
             </td>
 
             <td class="px-4 py-3 capitalize">
               {{
-                vista === 'usuarios'
-                  ? (emp.role?.name || 'Sin rol')
-                  : (emp.user?.role?.name || 'Sin usuario registrado')
+                viewMode === 'users'
+                  ? (item.role?.name || 'Sin rol')
+                  : (item.user?.role?.name || 'Sin usuario registrado')
               }}
             </td>
 
             <td class="px-4 py-3">
               <div class="flex items-center gap-2">
+                <ActionIconButton v-if="viewMode === 'employees' && can('users.create')" icon="person_add"
+                  title="Crear usuario" variant="blue" @click.stop="openModal(item)" />
 
-                <ActionIconButton v-if="vista === 'empleados' && can('users.create')" icon="person_add"
-                  title="Crear usuario" variant="blue" @click.stop="abrirModal(emp)" />
+                <ActionIconButton v-if="viewMode === 'users' && can('users.update')" icon="edit" title="Editar usuario"
+                  variant="amber" @click.stop="openModal(item)" />
 
-                <ActionIconButton v-if="vista === 'usuarios' && can('users.update')" icon="edit" title="Editar usuario"
-                  variant="amber" @click.stop="abrirModal(emp)" />
-
-                <ActionIconButton v-if="vista === 'usuarios' && can('users.delete')" icon="delete"
-                  title="Eliminar usuario" variant="red" @click.stop="eliminarUsuario(emp.id)" />
-
+                <ActionIconButton v-if="viewMode === 'users' && can('users.delete')" icon="delete"
+                  title="Eliminar usuario" variant="red" @click.stop="deleteUser(item.id)" />
               </div>
             </td>
           </tr>
 
-          <tr v-if="!listaActual.length">
+          <tr v-if="!currentList.length">
             <td colspan="4" class="px-4 py-10 text-center text-slate-500">
               No se encontraron registros.
             </td>
@@ -549,12 +543,11 @@ onBeforeUnmount(() => {
       </table>
     </div>
 
-    <UserDetailModal v-if="showDetalle" :usuario="usuarioSeleccionado" @close="cerrarDetalleUsuario" />
+    <UserDetailModal v-if="showUserDetail" :user="selectedUser" @close="closeUserDetail" />
 
-    <UserRegisterModal v-if="showModal" :form="form" :errores="errores" :roles="roles" :branches="branches"
-      :permisosAgrupados="permisosAgrupados" :editando="editando"
-      :canGuardar="editando ? can('users.update') : can('users.create')" :esRolVentas="esRolVentas" @close="cerrarModal"
-      @guardar="guardarEmpleado" @toggle-permiso="togglePermiso" @change-role="asignarPermisosPorRol">
-    </UserRegisterModal>
+    <UserRegisterModal v-if="showModal" :form="form" :errors="errors" :roles="roles" :branches="branches"
+      :groupedPermissions="groupedPermissions" :isEditing="isEditing"
+      :canSave="isEditing ? can('users.update') : can('users.create')" :isSalesRole="isSalesRole" @close="closeModal"
+      @save="saveUser" @toggle-permission="togglePermission" @change-role="assignPermissionsByRole" />
   </div>
 </template>

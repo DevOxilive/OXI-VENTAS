@@ -5,9 +5,9 @@ import { usePermissions } from '@/Composables/usePermissions'
 const { can } = usePermissions()
 
 const canViewActions = computed(() =>
-    can('empleados.ver') ||
-    can('empleados.editar') ||
-    can('empleados.eliminar')
+    can('employees.view') ||
+    can('employees.update') ||
+    can('employees.delete')
 )
 
 defineProps({
@@ -62,7 +62,7 @@ defineEmits(['view', 'edit', 'delete'])
 
             <div v-if="canViewActions" class="mt-4 flex justify-end gap-2">
 
-                <button v-if="can('empleados.ver')" type="button" title="Visualizar empleado"
+                <button v-if="can('employees.view')" type="button" title="Visualizar empleado"
                     @click="$emit('view', employee)"
                     class="group w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-200 transition-all duration-200">
                     <span
@@ -71,7 +71,7 @@ defineEmits(['view', 'edit', 'delete'])
                     </span>
                 </button>
 
-                <button v-if="can('empleados.editar')" type="button" title="Editar empleado"
+                <button v-if="can('employees.update')" type="button" title="Editar empleado"
                     @click="$emit('edit', employee)"
                     class="group w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-amber-50 hover:border-amber-200 transition-all duration-200">
                     <span
@@ -80,7 +80,7 @@ defineEmits(['view', 'edit', 'delete'])
                     </span>
                 </button>
 
-                <button v-if="can('empleados.eliminar')" type="button" title="Eliminar empleado"
+                <button v-if="can('employees.delete')" type="button" title="Eliminar empleado"
                     @click="$emit('delete', employee)"
                     class="group w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 transition-all duration-200">
                     <span

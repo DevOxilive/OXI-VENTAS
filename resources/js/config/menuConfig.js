@@ -47,7 +47,7 @@ export function generateMenu(role, permissions = [], branches = []) {
             text: "Capital Humano",
             key: "human-resources",
             icon: "badge",
-            url: route("rh.empleados"),
+            url: route("human-resources.employees.index"),
         });
     }
 

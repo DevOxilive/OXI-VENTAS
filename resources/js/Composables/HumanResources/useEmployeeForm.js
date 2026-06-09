@@ -1,4 +1,4 @@
-import { useForm } from "@inertiajs/vue3";
+import { useForm, router } from "@inertiajs/vue3";
 import { reactive, computed, watch } from "vue";
 import {
     WarningAlert,
@@ -212,6 +212,11 @@ export function useEmployeeForm(props, emit) {
                 emit("close");
                 employee.reset();
                 clearFrontendErrors();
+
+                router.reload({
+                    only: ["employeesDB"],
+                    preserveScroll: true,
+                });
             },
 
             onError: () => {
@@ -225,9 +230,9 @@ export function useEmployeeForm(props, emit) {
         };
 
         isCreating
-            ? employee.post(route("rh.empleados.store"), config)
+            ? employee.post(route("human-resources.employees.store"), config)
             : employee.put(
-                  route("rh.empleados.update", props.employeeToEdit.id),
+                  route("human-resources.employees.update", props.employeeToEdit.id),
                   config,
               );
     }
