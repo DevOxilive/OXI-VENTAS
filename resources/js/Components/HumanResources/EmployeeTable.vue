@@ -6,9 +6,9 @@ import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
 const { can } = usePermissions()
 
 const canViewActions = computed(() =>
-    can('empleados.ver') ||
-    can('empleados.editar') ||
-    can('empleados.eliminar')
+    can('employees.view') ||
+    can('employees.update') ||
+    can('employees.delete')
 )
 
 defineProps({
@@ -123,13 +123,13 @@ defineEmits([
 
                         <td v-if="canViewActions" class="px-4 py-4">
                             <div class="flex items-center justify-center gap-2">
-                                <ActionIconButton v-if="can('empleados.ver')" icon="visibility"
+                                <ActionIconButton v-if="can('employees.view')" icon="visibility"
                                     title="Visualizar empleado" variant="blue" @click="$emit('view', employee)" />
 
-                                <ActionIconButton v-if="can('empleados.editar')" icon="edit" title="Editar empleado"
+                                <ActionIconButton v-if="can('employees.update')" icon="edit" title="Editar empleado"
                                     variant="amber" @click="$emit('edit', employee)" />
 
-                                <ActionIconButton v-if="can('empleados.eliminar')" icon="delete"
+                                <ActionIconButton v-if="can('employees.delete')" icon="delete"
                                     title="Eliminar empleado" variant="red" @click="$emit('delete', employee)" />
                             </div>
                         </td>

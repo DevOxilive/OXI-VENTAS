@@ -10,11 +10,7 @@ export function initializePermissions() {
 
     if (initialized.value) return;
 
-    livePermissions.value =
-        page.props.auth?.user?.permissions?.map(
-            (permission) => permission.name,
-        ) || [];
-
+    livePermissions.value = page.props.auth?.permissions || [];
     liveRole.value = page.props.auth?.user?.role?.name || null;
 
     initialized.value = true;
@@ -29,7 +25,6 @@ export function usePermissions() {
     initializePermissions();
 
     const permissions = computed(() => livePermissions.value);
-
     const role = computed(() => liveRole.value);
 
     const can = (permission) => {
