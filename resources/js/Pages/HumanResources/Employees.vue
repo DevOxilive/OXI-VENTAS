@@ -97,11 +97,11 @@ onBeforeUnmount(() => {
         <EmployeeRegisterModal v-if="
             showModal &&
             (
-                (modalMode === 'create' && can('empleados.crear')) ||
-                (modalMode === 'edit' && can('empleados.editar')) ||
-                (modalMode === 'view' && can('empleados.ver'))
+                (modalMode === 'create' && (can('employees.create') || can('empleados.crear'))) ||
+                (modalMode === 'edit' && (can('employees.update') || can('empleados.editar'))) ||
+                (modalMode === 'view' && (can('employees.view') || can('empleados.ver')))
             )
-        " :modo="modalMode" :employeeToEdit="selectedEmployee" @close="closeModal" />
+        " :mode="modalMode" :employeeToEdit="selectedEmployee" @close="closeModal" />
 
     </div>
 </template>

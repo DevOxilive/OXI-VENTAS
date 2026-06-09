@@ -10,7 +10,7 @@ import EmployeeData from '@/Components/Forms/EmployeeData.vue'
 const emit = defineEmits(['close'])
 
 const props = defineProps({
-    modo: String,
+    mode: String,
     employeeToEdit: Object
 })
 
@@ -24,12 +24,12 @@ const {
     loadEditData
 } = useEmployeeForm(props, emit)
 
-const isReadOnly = computed(() => props.modo === 'view')
+const isReadOnly = computed(() => props.mode === 'view')
 
 const saveButtonText = computed(() => {
     if (employee.processing) return 'Procesando...'
 
-    return props.modo === 'create'
+    return props.mode === 'create'
         ? 'Guardar empleado'
         : 'Actualizar empleado'
 })
@@ -60,12 +60,12 @@ onBeforeUnmount(() => {
 
         <section
             class="relative flex h-[100dvh] w-full flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl md:h-[94vh] md:w-[98%] md:max-w-[1600px] md:rounded-3xl">
-            <GeneralModalHeader :title="props.modo === 'create'
+            <GeneralModalHeader :title="props.mode === 'create'
                 ? 'Registrar empleado'
-                : props.modo === 'edit'
+                : props.mode === 'edit'
                     ? 'Actualizar empleado'
                     : 'Detalle del empleado'" subtitle="Información general del empleado"
-                :total-errors="totalErrors" :mode="props.modo" @close="closeModal" />
+                :total-errors="totalErrors" :mode="props.mode" @close="closeModal" />
 
             <GeneralModalContent :columns="1">
                 <div class="min-w-0">
@@ -74,7 +74,7 @@ onBeforeUnmount(() => {
                 </div>
             </GeneralModalContent>
 
-            <GeneralModalFooter :processing="employee.processing" :save-button-text="saveButtonText" :mode="props.modo"
+            <GeneralModalFooter :processing="employee.processing" :save-button-text="saveButtonText" :mode="props.mode"
                 @save="saveEmployee" @close="closeModal" />
         </section>
     </div>

@@ -64,9 +64,7 @@ export function useEmployeeForm(props, emit) {
         specialty: "",
         contractType: "",
         seniority: "",
-
-        hasImss: false, // 👈 AGREGA ESTE
-
+        hasImss: false,
         nss: "",
         rfc: "",
     });
@@ -74,7 +72,7 @@ export function useEmployeeForm(props, emit) {
     const frontendErrors = reactive({});
 
     function loadEditData() {
-        const isEditing = ["edit", "view"].includes(props.modo);
+        const isEditing = ["edit", "view"].includes(props.mode);
 
         if (!isEditing || !props.employeeToEdit) return;
 
@@ -137,6 +135,7 @@ export function useEmployeeForm(props, emit) {
         () => employee.rfc,
         (newValue) => {
             if (!newValue) return;
+
             employee.rfc = newValue.toUpperCase();
         },
     );
@@ -171,7 +170,7 @@ export function useEmployeeForm(props, emit) {
     }
 
     function saveEmployee() {
-        const isCreating = props.modo === "create";
+        const isCreating = props.mode === "create";
 
         if (!employee.hasImss) {
             employee.nss = "";
@@ -197,6 +196,7 @@ export function useEmployeeForm(props, emit) {
                 message:
                     "Debes corregir los campos marcados antes de continuar",
             });
+
             return;
         }
 

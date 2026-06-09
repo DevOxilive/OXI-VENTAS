@@ -1,7 +1,6 @@
 import { ref } from "vue";
 import { router } from "@inertiajs/vue3";
 import { usePermissions } from "@/Composables/usePermissions";
-
 import {
     UniversalActionModal,
     ToastAlert,
@@ -16,7 +15,7 @@ export function useEmployeeActions() {
     const selectedEmployee = ref(null);
 
     function openCreateModal() {
-        if (!can("empleados.crear")) return;
+        if (!can("employees.create") && !can("empleados.crear")) return;
 
         modalMode.value = "create";
         selectedEmployee.value = null;
@@ -24,7 +23,7 @@ export function useEmployeeActions() {
     }
 
     function openEditModal(employee) {
-        if (!can("empleados.editar")) return;
+        if (!can("employees.update") && !can("empleados.editar")) return;
 
         modalMode.value = "edit";
         selectedEmployee.value = employee;
@@ -32,7 +31,7 @@ export function useEmployeeActions() {
     }
 
     function openViewModal(employee) {
-        if (!can("empleados.ver")) return;
+        if (!can("employees.view") && !can("empleados.ver")) return;
 
         modalMode.value = "view";
         selectedEmployee.value = employee;
@@ -44,7 +43,7 @@ export function useEmployeeActions() {
     }
 
     function deleteEmployee(employee) {
-        if (!can("empleados.eliminar")) return;
+        if (!can("employees.delete") && !can("empleados.eliminar")) return;
 
         UniversalActionModal({
             title: "Confirmar eliminación",
@@ -52,23 +51,23 @@ export function useEmployeeActions() {
             itemName: `${employee.firstName} ${employee.lastName}`,
             confirmText: "Sí, eliminar",
         }).then((result) => {
-            if (result.isConfirmed) {
-                router.delete(route("rh.empleados.destroy", employee.id), {
-                    onSuccess: () => {
-                        ToastAlert({
-                            icon: "success",
-                            title: "Empleado eliminado correctamente",
-                        });
-                    },
+            if (!result.isConfirmed) return;
 
-                    onError: () => {
-                        ErrorAlert({
-                            title: "Error al eliminar",
-                            message: "No fue posible eliminar el empleado",
-                        });
-                    },
-                });
-            }
+            router.delete(route("rh.empleados.destroy", employee.id), {
+                onSuccess: () => {
+                    ToastAlert({
+                        icon: "success",
+                        title: "Empleado eliminado correctamente",
+                    });
+                },
+
+                onError: () => {
+                    ErrorAlert({
+                        title: "Error al eliminar",
+                        message: "No fue posible eliminar el empleado",
+                    });
+                },
+            });
         });
     }
 
