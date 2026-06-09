@@ -230,9 +230,9 @@ export function useEmployeeForm(props, emit) {
         };
 
         isCreating
-            ? employee.post(route("rh.empleados.store"), config)
+            ? employee.post(route("human-resources.employees.store"), config)
             : employee.put(
-                  route("rh.empleados.update", props.employeeToEdit.id),
+                  route("human-resources.employees.update", props.employeeToEdit.id),
                   config,
               );
     }

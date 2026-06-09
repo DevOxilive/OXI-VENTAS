@@ -152,50 +152,29 @@ Route::middleware(['auth'])
 | CAPITAL HUMANO
 |--------------------------------------------------------------------------
 */
-
 Route::middleware(['auth', 'role:Recursos Humanos,Administrador'])
+    ->name('human-resources.')
     ->group(function () {
-        Route::get('/home', fn() => Inertia::render('Recursos-humanos/Home'))
-            ->name('rh.home');
-
-        Route::get('/roles', fn() => Inertia::render('Recursos-humanos/Roles'))
-            ->name('rh.roles');
-
-        Route::get('/usuarios', fn() => Inertia::render('Recursos-humanos/Usuarios'))
-            ->name('rh.usuarios');
-
         Route::get('/empleados', [EmployeeController::class, 'index'])
-            ->name('rh.empleados');
+            ->name('employees.index');
 
         Route::post('/empleados', [EmployeeController::class, 'store'])
-            ->name('rh.empleados.store');
-
-        Route::post('/empleados/store', [EmployeeController::class, 'store'])
-            ->name('rh.empleados.store.alt');
+            ->name('employees.store');
 
         Route::put('/empleados/{id}', [EmployeeController::class, 'update'])
-            ->name('rh.empleados.update');
+            ->name('employees.update');
 
         Route::delete('/empleados/{id}', [EmployeeController::class, 'destroy'])
-            ->name('rh.empleados.destroy');
+            ->name('employees.destroy');
 
         Route::get('/empleados/exportar-excel', [EmployeeController::class, 'exportExcel'])
-            ->name('rh.empleados.exportarExcel');
+            ->name('employees.export-excel');
     });
-
 /*
 |--------------------------------------------------------------------------
 | SALES / VENTAS
 |--------------------------------------------------------------------------
 */
-
-Route::middleware(['auth', 'role:Ventas,Administrador'])
-    ->prefix('sales')
-    ->name('sales.')
-    ->group(function () {
-        Route::get('/', fn() => Inertia::render('Ventas/Home'))
-            ->name('home');
-    });
 
 Route::middleware(['auth', 'role:Ventas,Administrador'])
     ->prefix('ventas')
@@ -250,8 +229,8 @@ Route::middleware(['auth', 'role:Inventario,Administrador'])
 
         Route::get('/movements', [StockMovementController::class, 'index'])
             ->name('movements');
-            Route::post('/categories', [CategoryController::class, 'store'])
-    ->name('categories.store');
+        Route::post('/categories', [CategoryController::class, 'store'])
+            ->name('categories.store');
     });
 
 /*

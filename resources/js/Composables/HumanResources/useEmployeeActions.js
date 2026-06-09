@@ -53,21 +53,24 @@ export function useEmployeeActions() {
         }).then((result) => {
             if (!result.isConfirmed) return;
 
-            router.delete(route("rh.empleados.destroy", employee.id), {
-                onSuccess: () => {
-                    ToastAlert({
-                        icon: "success",
-                        title: "Empleado eliminado correctamente",
-                    });
-                },
+            router.delete(
+                route("human-resources.employees.destroy", employee.id),
+                {
+                    onSuccess: () => {
+                        ToastAlert({
+                            icon: "success",
+                            title: "Empleado eliminado correctamente",
+                        });
+                    },
 
-                onError: () => {
-                    ErrorAlert({
-                        title: "Error al eliminar",
-                        message: "No fue posible eliminar el empleado",
-                    });
+                    onError: () => {
+                        ErrorAlert({
+                            title: "Error al eliminar",
+                            message: "No fue posible eliminar el empleado",
+                        });
+                    },
                 },
-            });
+            );
         });
     }
 
