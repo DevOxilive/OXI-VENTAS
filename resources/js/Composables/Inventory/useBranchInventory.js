@@ -109,8 +109,8 @@ export function useBranchInventory(props) {
                 inactiveCandidateAfterDays:
                     item.inactive_candidate_after_days ?? 90,
                 activeBatchesCount: item.active_batches_count ?? 0,
-                batches: realtime.batches ?? item.batches ?? [],
-                recentMovements: realtime.movements ?? item.movements ?? [],
+                batches: item.batches ?? realtime.batches ?? [],
+                recentMovements: item.movements ?? realtime.movements ?? [],
                 raw: item,
             };
         });
@@ -419,22 +419,32 @@ export function useBranchInventory(props) {
 
                     updated_at: event.updated_at ?? new Date().toISOString(),
 
-                    batches:
-                        event.batches ??
-                        event.branchProduct?.batches ??
-                        event.branch_product?.batches ??
-                        currentProduct?.batches ??
-                        [],
-
-                    movements:
-                        event.recent_movements ??
-                        event.movements ??
-                        event.branchProduct?.movements ??
-                        event.branch_product?.movements ??
-                        currentProduct?.recentMovements ??
-                        [],
+                    batches: currentProduct?.batches ?? [],
+                    movements: currentProduct?.recentMovements ?? [],
                 },
             };
+
+            router.reload({
+                only: ["branchProductsDB", "inventoryStats", "inventoryAlerts"],
+                preserveScroll: true,
+                preserveState: true,
+
+                onSuccess: () => {
+                    if (!selectedMovementsProduct.value) return;
+
+                    const updatedProduct = visualProducts.value.find(
+                        (product) => {
+                            return (
+                                product.id === selectedMovementsProduct.value.id
+                            );
+                        },
+                    );
+
+                    if (updatedProduct) {
+                        selectedMovementsProduct.value = updatedProduct;
+                    }
+                },
+            });
         });
     });
 

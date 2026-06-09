@@ -1,8 +1,8 @@
 export function generateMenu(role, permissions = [], branches = []) {
     const isAdmin = role === "Administrador";
-    const isSistemas = role === "Sistemas";
-    const isRH = role === "Recursos Humanos";
-    const isInventario = role === "Inventario";
+    const isSystems = role === "Sistemas";
+    const isHumanResources = role === "Recursos Humanos";
+    const isInventory = role === "Inventario";
 
     const can = (permission) => permissions.includes(permission);
 
@@ -10,97 +10,78 @@ export function generateMenu(role, permissions = [], branches = []) {
 
     menu.push({
         text: "Inicio",
-        key: "inicio",
+        key: "home",
         icon: "dashboard",
         url: route("dashboard"),
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | SISTEMAS
-    |--------------------------------------------------------------------------
-    */
-
-    if (isAdmin || isSistemas || can("usuarios.ver") || can("roles.ver")) {
+    if (isAdmin || isSystems || can("users.view") || can("roles.view")) {
         menu.push({
             text: "Sistemas",
-            key: "sistemas",
+            key: "systems",
             icon: "settings",
             isOpen: false,
             children: [
-                ...(isAdmin || isSistemas || can("usuarios.ver")
+                ...(isAdmin || isSystems || can("users.view")
                     ? [
                           {
                               text: "Registro de Usuarios",
-                              key: "systems.employees",
+                              key: "systems.users",
                               icon: "security",
-                              url: route('systems.employees'),
+                              url: route("systems.users.index"),
                           },
-
                           {
-   text: "Registro de Sucursales",
-    key: "systems.branches",
-    icon: "store",
-     url: "/systems/branches",
-
-}
+                              text: "Registro de Sucursales",
+                              key: "branches",
+                              icon: "store",
+                              url: route("branches.index"),
+                          },
                       ]
                     : []),
             ],
         });
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | RECURSOS HUMANOS
-    |--------------------------------------------------------------------------
-    */
-
-    if (isAdmin || isRH || can("empleados.ver")) {
+    if (isAdmin || isHumanResources || can("employees.view")) {
         menu.push({
             text: "Capital Humano",
-            key: "capital-humano",
+            key: "human-resources",
             icon: "badge",
             url: route("rh.empleados"),
         });
     }
-/*
-|--------------------------------------------------------------------------
-| AUDITORÍAS
-|--------------------------------------------------------------------------
-*/
 
-if (isAdmin || isSistemas || isInventario || can("auditorias.conteo-fisico.ver")) {
-    menu.push({
-        text: "Auditorías",
-        key: "audits",
-        icon: "fact_check",
-        isOpen: false,
-        children: [
-            {
-                text: "Conteo físico",
-                key: "audits.physical-counts",
-                icon: "inventory_2",
-                url: route("audits.physical-counts.index"),
-            },
-        ],
-    });
-}
-    /*
-    |--------------------------------------------------------------------------
-    | INVENTARIO
-    |--------------------------------------------------------------------------
-    */
+    if (
+        isAdmin ||
+        isSystems ||
+        isInventory ||
+        can("audits.physical-counts.view")
+    ) {
+        menu.push({
+            text: "Auditorías",
+            key: "audits",
+            icon: "fact_check",
+            isOpen: false,
+            children: [
+                {
+                    text: "Conteo físico",
+                    key: "audits.physical-counts",
+                    icon: "inventory_2",
+                    url: route("audits.physical-counts.index"),
+                },
+            ],
+        });
+    }
 
     const inventoryOptions = (branch) => [
         ...(isAdmin ||
-        isInventario ||
-        can("inventario.dashboard.ver") ||
-        can("inventario.ver")
+        isInventory ||
+        can("inventory.dashboard.view") ||
+        can("inventory.view")
             ? [
                   {
                       text: "Dashboard",
-                      key: `inventario.${branch.slug}.dashboard`,
+                      key: `inventory.${branch.slug}.dashboard`,
                       icon: "dashboard",
                       url: route("inventory.dashboard"),
                   },
@@ -108,29 +89,29 @@ if (isAdmin || isSistemas || isInventario || can("auditorias.conteo-fisico.ver")
             : []),
 
         ...(isAdmin ||
-        isInventario ||
-        can("inventario.productos.ver") ||
-        can("inventario.ver")
+        isInventory ||
+        can("inventory.products.view") ||
+        can("inventory.view")
             ? [
                   {
                       text: "Productos",
-                      key: `inventario.${branch.slug}.products`,
+                      key: `inventory.${branch.slug}.products`,
                       icon: "inventory",
-                   url: route("inventory.branches.products.index", {
-    branch: branch.slug,
-}),
+                      url: route("inventory.branches.products.index", {
+                          branch: branch.slug,
+                      }),
                   },
               ]
             : []),
 
         ...(isAdmin ||
-        isInventario ||
-        can("inventario.sucursales.ver") ||
-        can("inventario.ver")
+        isInventory ||
+        can("inventory.branches.view") ||
+        can("inventory.view")
             ? [
                   {
                       text: "Inventario",
-                      key: `inventario.${branch.slug}.inventory`,
+                      key: `inventory.${branch.slug}.inventory`,
                       icon: "inventory_2",
                       url: route("inventario.branches.inventory", {
                           branch: branch.id,
@@ -140,13 +121,13 @@ if (isAdmin || isSistemas || isInventario || can("auditorias.conteo-fisico.ver")
             : []),
 
         ...(isAdmin ||
-        isInventario ||
-        can("inventario.reportes-compra.ver") ||
-        can("inventario.ver")
+        isInventory ||
+        can("inventory.purchase-reports.view") ||
+        can("inventory.view")
             ? [
                   {
                       text: "Reporte de compra",
-                      key: `inventario.${branch.slug}.purchase-report`,
+                      key: `inventory.${branch.slug}.purchase-report`,
                       icon: "shopping_cart",
                       url: route("inventario.branches.purchase-reports.index", {
                           branch: branch.id,
@@ -156,13 +137,13 @@ if (isAdmin || isSistemas || isInventario || can("auditorias.conteo-fisico.ver")
             : []),
 
         ...(isAdmin ||
-        isInventario ||
-        can("inventario.reports.ver") ||
-        can("inventario.ver")
+        isInventory ||
+        can("inventory.reports.view") ||
+        can("inventory.view")
             ? [
                   {
                       text: "Reportes",
-                      key: `inventario.${branch.slug}.reports`,
+                      key: `inventory.${branch.slug}.reports`,
                       icon: "bar_chart",
                       url: route("inventario.branches.reports", {
                           branch: branch.id,
@@ -170,97 +151,27 @@ if (isAdmin || isSistemas || isInventario || can("auditorias.conteo-fisico.ver")
                   },
               ]
             : []),
-
-        /*
-        |--------------------------------------------------------------------------
-        | RUTAS COMENTADAS / PENDIENTES
-        |--------------------------------------------------------------------------
-        */
-
-        // ...(isAdmin ||
-        // isInventario ||
-        // can("inventario.movimientos.ver") ||
-        // can("inventario.ver")
-        //     ? [
-        //           {
-        //               text: "Movimientos",
-        //               key: `inventario.${branch.slug}.movements`,
-        //               icon: "sync_alt",
-        //               url: route("inventario.branches.movements", {
-        //                   branch: branch.id,
-        //               }),
-        //           },
-        //       ]
-        //     : []),
-
-        // ...(isAdmin ||
-        // isInventario ||
-        // can("inventario.caducidades.ver") ||
-        // can("inventario.ver")
-        //     ? [
-        //           {
-        //               text: "Caducidades",
-        //               key: `inventario.${branch.slug}.expirations`,
-        //               icon: "event_busy",
-        //               url: route("inventario.branches.expirations", {
-        //                   branch: branch.id,
-        //               }),
-        //           },
-        //       ]
-        //     : []),
-
-        // ...(isAdmin ||
-        // isInventario ||
-        // can("inventario.transferencias.ver") ||
-        // can("inventario.ver")
-        //     ? [
-        //           {
-        //               text: "Transferencias",
-        //               key: `inventario.${branch.slug}.transfers`,
-        //               icon: "compare_arrows",
-        //               url: route("inventario.branches.transfers", {
-        //                   branch: branch.id,
-        //               }),
-        //           },
-        //       ]
-        //     : []),
-
-        // ...(isAdmin ||
-        // isInventario ||
-        // can("inventario.ajustes.ver") ||
-        // can("inventario.ver")
-        //     ? [
-        //           {
-        //               text: "Ajustes",
-        //               key: `inventario.${branch.slug}.adjustments`,
-        //               icon: "tune",
-        //               url: route("inventario.branches.adjustments", {
-        //                   branch: branch.id,
-        //               }),
-        //           },
-        //       ]
-        //     : []),
     ];
 
-    if (isAdmin || isInventario || can("inventario.ver")) {
+    if (isAdmin || isInventory || can("inventory.view")) {
         menu.push({
             text: "Sucursales",
-            key: "sucursales",
+            key: "branches",
             icon: "inventory_2",
             isOpen: false,
-           children: branches
-    .filter((branch) => branch.slug)
-    .map((branch) => ({
-    text: branch.name,
-    key: branch.slug,
-    slug: branch.slug,
-    color: branch.color,
-    bgColor: branch.color,    // para hover
-    icon: "store",
-    isBranch: true,
-    isOpen: false,
-    children: inventoryOptions(branch),
-})),
+            children: branches
+                .filter((branch) => branch.slug)
+                .map((branch) => ({
+                    text: branch.name,
+                    key: branch.slug,
+                    slug: branch.slug,
+                    color: branch.color,
+                    bgColor: branch.color,
+                    icon: "store",
+                    isBranch: true,
+                    isOpen: false,
+                    children: inventoryOptions(branch),
+                })),
         });
     }
 

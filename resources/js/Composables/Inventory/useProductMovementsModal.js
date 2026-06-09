@@ -8,6 +8,15 @@ export function useProductMovementsModal(props, emit) {
     const movements = computed(() => props.product?.recentMovements ?? []);
     const totalMovements = computed(() => movements.value.length);
 
+    function isAdministrativeAdjustment(movement) {
+        return (
+            movement.type === "ADJUSTMENT" &&
+            Number(movement.quantity ?? 0) === 0 &&
+            Number(movement.previous_stock ?? 0) ===
+                Number(movement.new_stock ?? 0)
+        );
+    }
+
     const movementGroups = computed(() => [
         {
             key: "purchases",
@@ -70,6 +79,10 @@ export function useProductMovementsModal(props, emit) {
     }
 
     function quantityLabel(movement) {
+        if (isAdministrativeAdjustment(movement)) {
+            return "Cambio administrativo";
+        }
+
         const quantity = formatNumber(movement.quantity ?? 0);
 
         if (movement.type === "IN") return `+${quantity} ${unit.value}`;
@@ -85,13 +98,18 @@ export function useProductMovementsModal(props, emit) {
     }
 
     function quantityClass(movement) {
+        if (isAdministrativeAdjustment(movement)) return "text-indigo-700";
         if (movement.type === "IN") return "text-green-700";
         if (movement.type === "OUT") return "text-red-700";
 
         return "text-slate-700";
     }
 
-    function reasonLabel(reason) {
+    function reasonLabel(reason, movement = null) {
+        if (movement && isAdministrativeAdjustment(movement)) {
+            return "Actualización de datos del lote";
+        }
+
         return (
             {
                 PURCHASE: "Compra",
@@ -112,13 +130,19 @@ export function useProductMovementsModal(props, emit) {
     function formatDateTime(date) {
         if (!date) return "Sin fecha";
 
+        const parsedDate = new Date(date);
+
+        if (Number.isNaN(parsedDate.getTime())) {
+            return "Fecha inválida";
+        }
+
         return new Intl.DateTimeFormat("es-MX", {
             day: "2-digit",
             month: "2-digit",
             year: "numeric",
             hour: "2-digit",
             minute: "2-digit",
-        }).format(new Date(date));
+        }).format(parsedDate);
     }
 
     function userLabel(movement) {
@@ -134,6 +158,8 @@ export function useProductMovementsModal(props, emit) {
     }
 
     function movementBatches(movement) {
+        if (isAdministrativeAdjustment(movement)) return [];
+
         return movement.batches ?? [];
     }
 
@@ -146,6 +172,10 @@ export function useProductMovementsModal(props, emit) {
     }
 
     function batchQuantityLabel(batchMovement, movement) {
+        if (isAdministrativeAdjustment(movement)) {
+            return "Sin cambio de cantidad";
+        }
+
         const quantity = formatNumber(batchMovement.quantity ?? 0);
 
         if (movement.type === "IN") return `+${quantity} ${unit.value}`;
@@ -162,6 +192,10 @@ export function useProductMovementsModal(props, emit) {
             movement.new_stock === undefined
         ) {
             return null;
+        }
+
+        if (isAdministrativeAdjustment(movement)) {
+            return "Sin cambio de stock";
         }
 
         return `${formatNumber(movement.previous_stock)} → ${formatNumber(

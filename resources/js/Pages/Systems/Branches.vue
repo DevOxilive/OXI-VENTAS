@@ -40,7 +40,7 @@ async function deleteBranch(branch) {
 
   if (!result.isConfirmed) return;
 
-  router.delete(route("systems.branches.destroy", branch.id), {
+  router.delete(route("branches.destroy", branch.id), {
     preserveScroll: true,
 
     onSuccess: () => {
@@ -84,7 +84,7 @@ function closeCreateModal() {
 }
 function submit() {
   if (modalMode.value === "edit") {
-    form.put(route("systems.branches.update", selectedBranch.value.id), {
+    form.put(route("branches.update", selectedBranch.value.id), {
       preserveScroll: true,
 
       onSuccess: () => {
@@ -106,7 +106,7 @@ function submit() {
     return;
   }
 
-  form.post(route("systems.branches.store"), {
+  form.post(route("branches.store"), {
     preserveScroll: true,
 
     onSuccess: () => {
@@ -136,7 +136,7 @@ function updateColor(branch, color) {
     active: branch.active ?? true,
   });
 
-  updateForm.put(route("systems.branches.update", branch.id), {
+  updateForm.put(route("branches.update", branch.id), {
     preserveScroll: true,
   });
 }
@@ -145,9 +145,7 @@ function updateColor(branch, color) {
   <AdminLayout>
     <div class="space-y-6">
       <!-- Header -->
-      <div
-        class="bg-white p-5 md:p-8 rounded-2xl shadow-sm border flex items-center justify-between"
-      >
+      <div class="bg-white p-5 md:p-8 rounded-2xl shadow-sm border flex items-center justify-between">
         <div>
           <h1 class="text-xl md:text-3xl font-bold text-slate-700">
             Registro de Sucursales
@@ -158,11 +156,8 @@ function updateColor(branch, color) {
           </p>
         </div>
 
-        <button
-          type="button"
-          @click="openCreateModal"
-          class="px-5 py-3 rounded-2xl bg-black text-white font-semibold hover:bg-slate-800 transition"
-        >
+        <button type="button" @click="openCreateModal"
+          class="px-5 py-3 rounded-2xl bg-black text-white font-semibold hover:bg-slate-800 transition">
           + Agregar sucursal
         </button>
       </div>
@@ -173,16 +168,10 @@ function updateColor(branch, color) {
         </h2>
 
         <div class="space-y-3">
-          <div
-            v-for="branch in branches"
-            :key="branch.id"
-            class="grid grid-cols-[1fr_auto] items-center border rounded-xl p-4 gap-4"
-          >
+          <div v-for="branch in branches" :key="branch.id"
+            class="grid grid-cols-[1fr_auto] items-center border rounded-xl p-4 gap-4">
             <div class="flex items-center gap-3">
-              <div
-                class="w-5 h-5 rounded-full border"
-                :style="{ backgroundColor: branch.color || '#e5e7eb' }"
-              />
+              <div class="w-5 h-5 rounded-full border" :style="{ backgroundColor: branch.color || '#e5e7eb' }" />
 
               <div>
                 <p class="font-semibold text-slate-700">
@@ -197,26 +186,13 @@ function updateColor(branch, color) {
 
             <!-- ACCIONES -->
             <div class="flex items-center justify-end gap-2">
-              <ActionIconButton
-                icon="visibility"
-                title="Ver sucursal"
-                variant="blue"
-                @click.stop="viewBranch(branch)"
-              />
+              <ActionIconButton icon="visibility" title="Ver sucursal" variant="blue"
+                @click.stop="viewBranch(branch)" />
 
-              <ActionIconButton
-                icon="edit"
-                title="Editar sucursal"
-                variant="amber"
-                @click.stop="editBranch(branch)"
-              />
+              <ActionIconButton icon="edit" title="Editar sucursal" variant="amber" @click.stop="editBranch(branch)" />
 
-              <ActionIconButton
-                icon="delete"
-                title="Eliminar sucursal"
-                variant="red"
-                @click.stop="deleteBranch(branch)"
-              />
+              <ActionIconButton icon="delete" title="Eliminar sucursal" variant="red"
+                @click.stop="deleteBranch(branch)" />
             </div>
           </div>
 
@@ -254,27 +230,18 @@ function updateColor(branch, color) {
                 />-->
 
       <!-- Modal crear sucursal -->
-      <div
-        v-if="showCreateModal"
-        class="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4"
-      >
-        <div
-          class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
-        >
+      <div v-if="showCreateModal" class="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
           <div class="flex items-center justify-between px-6 py-5 border-b">
             {{
               modalMode === "create"
                 ? "Nueva sucursal"
                 : modalMode === "edit"
-                ? "Editar sucursal"
-                : "Ver sucursal"
+                  ? "Editar sucursal"
+                  : "Ver sucursal"
             }}
 
-            <button
-              type="button"
-              @click="closeCreateModal"
-              class="text-slate-400 hover:text-slate-700 text-2xl"
-            >
+            <button type="button" @click="closeCreateModal" class="text-slate-400 hover:text-slate-700 text-2xl">
               ×
             </button>
           </div>
@@ -285,13 +252,8 @@ function updateColor(branch, color) {
                 Nombre de sucursal
               </label>
 
-              <input
-                v-model="form.name"
-                :disabled="modalMode === 'view'"
-                type="text"
-                class="w-full rounded-xl border-slate-300"
-                placeholder="Ej. Ajusco"
-              />
+              <input v-model="form.name" :disabled="modalMode === 'view'" type="text"
+                class="w-full rounded-xl border-slate-300" placeholder="Ej. Ajusco" />
 
               <p v-if="form.errors.name" class="text-red-500 text-xs mt-1">
                 {{ form.errors.name }}
@@ -303,29 +265,18 @@ function updateColor(branch, color) {
                 Color
               </label>
 
-              <input
-                v-model="form.color"
-                :disabled="modalMode === 'view'"
-                type="color"
-                class="h-12 w-24 cursor-pointer rounded-lg border"
-              />
+              <input v-model="form.color" :disabled="modalMode === 'view'" type="color"
+                class="h-12 w-24 cursor-pointer rounded-lg border" />
             </div>
 
             <div class="flex justify-end gap-3 pt-4 border-t">
-              <button
-                type="button"
-                @click="closeCreateModal"
-                class="px-5 py-3 rounded-2xl bg-slate-200 text-slate-700 font-semibold"
-              >
+              <button type="button" @click="closeCreateModal"
+                class="px-5 py-3 rounded-2xl bg-slate-200 text-slate-700 font-semibold">
                 Cancelar
               </button>
 
-              <button
-                v-if="modalMode !== 'view'"
-                type="submit"
-                :disabled="form.processing"
-                class="px-5 py-3 rounded-2xl bg-slate-900 text-white font-semibold disabled:opacity-50"
-              >
+              <button v-if="modalMode !== 'view'" type="submit" :disabled="form.processing"
+                class="px-5 py-3 rounded-2xl bg-slate-900 text-white font-semibold disabled:opacity-50">
                 {{
                   modalMode === "edit"
                     ? "Actualizar sucursal"

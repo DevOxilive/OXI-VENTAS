@@ -216,7 +216,6 @@ class PurchaseReportController extends Controller
             ->withCount('items')
             ->where('branch_id', $branch->id)
             ->latest()
-            ->limit(10)
             ->get();
 
         return Inertia::render('Inventory/PurchaseReport', [

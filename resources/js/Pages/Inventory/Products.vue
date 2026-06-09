@@ -165,11 +165,11 @@ function normalizeProduct(selectedProduct) {
     ...selectedProduct,
 
     code: selectedProduct.code || "",
-barcode:
-  selectedProduct.barcode ||
-  selectedProduct.bar_code ||
-  selectedProduct.codigo_barras ||
-  "",
+    barcode:
+      selectedProduct.barcode ||
+      selectedProduct.bar_code ||
+      selectedProduct.codigo_barras ||
+      "",
 
     name: selectedProduct.name || "",
 
@@ -298,19 +298,12 @@ function deleteProduct(selectedProduct) {
   <section class="max-w-[1030px] mx-auto py-8 px-6 bg-white min-h-[calc(100vh-90px)]">
 
     <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden">
-      <ProductFilters
-        v-model:search="search"
-        v-model:category-filter="categoryFilter"
-        v-model:records-to-show="recordsToShow"
-        @create="openCreateModal"
-      />
+      <ProductFilters :branch="branch" :search="search" :category-filter="categoryFilter" :categories-d-b="categoriesDB"
+        :records-to-show="recordsToShow" @update:search="search = $event"
+        @update:category-filter="categoryFilter = $event" @update:records-to-show="recordsToShow = $event"
+        @create="openCreateModal" />
 
-      <ProductTable
-      :products="products"
-        @view="openViewModal"
-        @edit="openEditModal"
-        @delete="deleteProduct"
-      />
+      <ProductTable :products="products" @view="openViewModal" @edit="openEditModal" @delete="deleteProduct" />
     </div>
 
     <ProductToolbar :total="props.productsDB?.total ?? filteredProducts.length" v-model:records-to-show="recordsToShow"

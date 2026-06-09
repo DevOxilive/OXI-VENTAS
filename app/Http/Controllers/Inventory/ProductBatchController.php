@@ -120,14 +120,29 @@ class ProductBatchController extends Controller
                 'notes' => $movementNotes,
             ]);
 
-            StockMovementBatch::create([
-                'stock_movement_id' => $movement->id,
-                'product_batch_id' => $productBatch->id,
-                'quantity' => abs($difference),
-                'previous_batch_quantity' => $previousQuantity,
-                'new_batch_quantity' => $newQuantity,
-                'allocation_method' => StockMovementBatch::ALLOCATION_MANUAL,
-            ]);
+            $isQuantityAdjustment = abs($difference) > 0;
+
+            if ($isQuantityAdjustment) {
+                StockMovementBatch::create([
+                    'stock_movement_id' => $movement->id,
+                    'product_batch_id' => $productBatch->id,
+                    'quantity' => abs($difference),
+                    'previous_batch_quantity' => $previousQuantity,
+                    'new_batch_quantity' => $newQuantity,
+                    'allocation_method' => StockMovementBatch::ALLOCATION_MANUAL,
+                ]);
+            }
+
+            if (abs($difference) > 0) {
+                StockMovementBatch::create([
+                    'stock_movement_id' => $movement->id,
+                    'product_batch_id' => $productBatch->id,
+                    'quantity' => abs($difference),
+                    'previous_batch_quantity' => $previousQuantity,
+                    'new_batch_quantity' => $newQuantity,
+                    'allocation_method' => StockMovementBatch::ALLOCATION_MANUAL,
+                ]);
+            }
 
             return $this->freshBranchProductForInventory($branchProduct);
         });
@@ -170,8 +185,7 @@ class ProductBatchController extends Controller
                     'user:id,name',
                     'batches.productBatch:id,lot_number',
                 ])
-                ->latest()
-                ->limit(10),
+                ->latest(),
         ]);
     }
 

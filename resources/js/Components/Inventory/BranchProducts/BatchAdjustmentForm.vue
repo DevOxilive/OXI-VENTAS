@@ -2,17 +2,62 @@
 import InputField from '@/Components/Forms/InputField.vue'
 
 defineProps({
-    form: Object,
-    frontendErrors: Object,
-    processing: Boolean,
-    usesLot: Boolean,
-    isSeasonal: Boolean,
-    calculatedQuantity: Number,
-    adjustmentText: String,
-    quantityResultColor: String,
-    toggleLot: Function,
-    setAdjustmentType: Function,
-    validateField: Function,
+    form: {
+        type: Object,
+        default: () => ({
+            lot_number: '',
+            supplier: '',
+            received_at: '',
+            expiration_date: '',
+            notes: '',
+            status: 'ACTIVE',
+            season_start_date: '',
+            season_end_date: '',
+            adjustment_type: 'ADD',
+            adjustment_amount: 0,
+            original_quantity: 0,
+        }),
+    },
+    frontendErrors: {
+        type: Object,
+        default: () => ({}),
+    },
+    processing: {
+        type: Boolean,
+        default: false,
+    },
+    usesLot: {
+        type: Boolean,
+        default: false,
+    },
+    isSeasonal: {
+        type: Boolean,
+        default: false,
+    },
+    calculatedQuantity: {
+        type: Number,
+        default: 0,
+    },
+    adjustmentText: {
+        type: String,
+        default: '',
+    },
+    quantityResultColor: {
+        type: String,
+        default: 'text-slate-900',
+    },
+    toggleLot: {
+        type: Function,
+        default: () => { },
+    },
+    setAdjustmentType: {
+        type: Function,
+        default: () => { },
+    },
+    validateField: {
+        type: Function,
+        default: () => { },
+    },
 })
 </script>
 

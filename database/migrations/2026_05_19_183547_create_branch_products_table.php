@@ -30,6 +30,9 @@ return new class extends Migration {
                 'seasonal',
             ])->default('active');
 
+            $table->date('season_start_date')->nullable();
+            $table->date('season_end_date')->nullable();
+
             $table->timestamp('last_restocked_at')->nullable();
 
             $table->unsignedInteger('inactive_candidate_after_days')

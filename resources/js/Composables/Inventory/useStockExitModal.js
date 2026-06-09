@@ -134,16 +134,10 @@ export function useStockExitModal(props, emit) {
 
     function ensureExitReady() {
         form.type = "OUT";
-        form.reason = "";
+        form.reason = "DAMAGED";
         form.batches = [];
         form.manual_batches = [];
         form.batch_allocation_method = "MANUAL";
-
-        nextTick(() => {
-            if (!allowedReasons.includes(form.reason)) {
-                form.reason = "";
-            }
-        });
 
         syncManualBatch();
     }

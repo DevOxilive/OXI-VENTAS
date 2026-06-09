@@ -119,8 +119,7 @@ const {
                                                 </p>
 
                                                 <p class="mt-1 text-xs font-semibold text-slate-500">
-                                                    {{ reasonLabel(movement.reason) }}
-                                                </p>
+                                                    {{ reasonLabel(movement.reason, movement) }} </p>
                                             </div>
 
                                             <p class="text-right text-xs font-semibold text-slate-400">

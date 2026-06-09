@@ -31,13 +31,13 @@ const cargandoEdicion = ref(false)
 const page = usePage()
 const { can } = usePermissions()
 
-const empleados = computed(() => page.props.empleados || [])
-const usuarios = computed(() => page.props.usuarios || [])
+const empleados = computed(() => page.props.employees || [])
+const usuarios = computed(() => page.props.users || [])
 const roles = computed(() => page.props.roles || [])
 const branches = computed(() => page.props.branches || [])
 const permissions = computed(() => page.props.permissions || [])
 
-const vista = ref(can('usuarios.ver') ? 'usuarios' : 'empleados')
+const vista = ref(can('users.view') ? 'usuarios' : 'empleados')
 const busqueda = ref('')
 const porPagina = ref(10)
 const pagina = ref(1)
@@ -163,7 +163,7 @@ const permisosAgrupados = computed(() => {
   const grupos = {
     empleados: [],
     roles: [],
-    usuarios: [],
+    users: [],
     exportar: [],
     ventas: [],
     inventario: [],
@@ -304,7 +304,7 @@ function guardarEmpleado() {
   form.permissions = form.permissions.filter(p => p)
 
   if (editando.value) {
-    form.put(route('systems.employees.update', userId.value), {
+    form.put(route("systems.users.update", userId.value), {
       preserveScroll: true,
 
       onSuccess: () => {
@@ -315,7 +315,7 @@ function guardarEmpleado() {
           title: 'Usuario actualizado correctamente',
         })
 
-        router.reload({ only: ['empleados', 'usuarios', 'branches'] })
+        router.reload({ only: ['employees', 'users', 'branches'] })
       },
 
       onError: () => {
@@ -326,7 +326,7 @@ function guardarEmpleado() {
       }
     })
   } else {
-    form.post(route('systems.employees.store'), {
+    form.post(route("systems.users.store"), {
       preserveScroll: true,
 
       onSuccess: () => {
@@ -337,7 +337,7 @@ function guardarEmpleado() {
           title: 'Usuario registrado correctamente',
         })
 
-        router.visit(route('systems.employees'), {
+        router.visit(route('systems.users.index'), {
           preserveScroll: true,
           preserveState: false,
           replace: true
@@ -366,7 +366,7 @@ function eliminarUsuario(id) {
   }).then((result) => {
     if (!result.isConfirmed) return
 
-    form.delete(route('systems.employees.destroy', id), {
+    form.delete(route("systems.users.destroy", id), {
       preserveScroll: true,
 
       onSuccess: () => {
@@ -375,7 +375,7 @@ function eliminarUsuario(id) {
           title: 'Usuario eliminado correctamente',
         })
 
-        router.visit(route('systems.employees'), {
+        router.visit(route('systems.users.index'), {
           preserveScroll: true,
           preserveState: false,
           replace: true
@@ -395,8 +395,8 @@ function eliminarUsuario(id) {
 function recargarSistema() {
   router.reload({
     only: [
-      'empleados',
-      'usuarios',
+      'employees',
+      'users',
       'roles',
       'permissions',
       'branches'
@@ -410,33 +410,19 @@ onMounted(() => {
 
   window.Echo.channel('systems')
 
-    .listen('.EmployeeChanged', (event) => {
-      console.log('Empleado actualizado en tiempo real', event)
-
+    .listen('.EmployeeChanged', () => {
       recargarSistema()
     })
 
     .listen('.UserChanged', (event) => {
-      console.log('Usuario actualizado en tiempo real', event)
 
-      /*
-      |--------------------------------------------------------------------------
-      | ACTUALIZAR PERMISOS DEL USUARIO LOGUEADO
-      |--------------------------------------------------------------------------
-      */
       if (page.props.auth.user.id === event.userId) {
-
         updateLivePermissions({
           permissions: event.permissions,
           role: event.role
         })
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | REFRESCAR MODAL ABIERTO
-      |--------------------------------------------------------------------------
-      */
       if (
         showModal.value &&
         userId.value === event.userId
@@ -450,11 +436,6 @@ onMounted(() => {
         form.permissions = permisosActualizados
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | RECARGAR TABLAS
-      |--------------------------------------------------------------------------
-      */
       recargarSistema()
     })
 })
@@ -470,18 +451,18 @@ onBeforeUnmount(() => {
   <div class="bg-[#f6f3f7] min-h-screen rounded-3xl p-6">
 
     <h1 class="text-xl font-semibold text-slate-700 mb-6">
-      Dashboard Registro de Usuario
+      Dashboard Registro de Usuarios
     </h1>
 
     <div class="flex items-center justify-between mb-5 gap-4 flex-wrap">
 
       <div class="flex gap-3">
-        <button v-if="can('usuarios.crear')" @click="vista = 'empleados'" class="px-5 py-2 rounded-xl border shadow-sm"
+        <button v-if="can('users.create')" @click="vista = 'empleados'" class="px-5 py-2 rounded-xl border shadow-sm"
           :class="vista === 'empleados' ? 'bg-black text-white' : 'bg-white'">
           Empleados
         </button>
 
-        <button v-if="can('usuarios.ver')" @click="vista = 'usuarios'" class="px-5 py-2 rounded-xl border shadow-sm"
+        <button v-if="can('users.view')" @click="vista = 'usuarios'" class="px-5 py-2 rounded-xl border shadow-sm"
           :class="vista === 'usuarios' ? 'bg-black text-white' : 'bg-white'">
           Usuarios
         </button>
@@ -546,13 +527,13 @@ onBeforeUnmount(() => {
             <td class="px-4 py-3">
               <div class="flex items-center gap-2">
 
-                <ActionIconButton v-if="vista === 'empleados' && can('usuarios.crear')" icon="person_add"
+                <ActionIconButton v-if="vista === 'empleados' && can('users.create')" icon="person_add"
                   title="Crear usuario" variant="blue" @click.stop="abrirModal(emp)" />
 
-                <ActionIconButton v-if="vista === 'usuarios' && can('usuarios.editar')" icon="edit"
-                  title="Editar usuario" variant="amber" @click.stop="abrirModal(emp)" />
+                <ActionIconButton v-if="vista === 'usuarios' && can('users.update')" icon="edit" title="Editar usuario"
+                  variant="amber" @click.stop="abrirModal(emp)" />
 
-                <ActionIconButton v-if="vista === 'usuarios' && can('usuarios.eliminar')" icon="delete"
+                <ActionIconButton v-if="vista === 'usuarios' && can('users.delete')" icon="delete"
                   title="Eliminar usuario" variant="red" @click.stop="eliminarUsuario(emp.id)" />
 
               </div>
@@ -572,9 +553,8 @@ onBeforeUnmount(() => {
 
     <UserRegisterModal v-if="showModal" :form="form" :errores="errores" :roles="roles" :branches="branches"
       :permisosAgrupados="permisosAgrupados" :editando="editando"
-      :canGuardar="editando ? can('usuarios.editar') : can('usuarios.crear')" :esRolVentas="esRolVentas"
-      @close="cerrarModal" @guardar="guardarEmpleado" @toggle-permiso="togglePermiso"
-      @change-role="asignarPermisosPorRol">
+      :canGuardar="editando ? can('users.update') : can('users.create')" :esRolVentas="esRolVentas" @close="cerrarModal"
+      @guardar="guardarEmpleado" @toggle-permiso="togglePermiso" @change-role="asignarPermisosPorRol">
     </UserRegisterModal>
   </div>
 </template>

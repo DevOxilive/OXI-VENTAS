@@ -314,7 +314,7 @@ export function useAdjustStockForm(props, emit) {
 
             return;
         }
-
+        console.log("PAYLOAD FINAL:", form.data());
         form.post(route("inventario.stock-movements.store"), {
             preserveScroll: true,
 
@@ -328,10 +328,14 @@ export function useAdjustStockForm(props, emit) {
                 resetForm();
             },
 
-            onError: () => {
+            onError: (errors) => {
+                console.log("ERRORES BACKEND:", errors);
+
                 ErrorAlert({
                     title: "Error en la operación",
-                    message: "No fue posible registrar el movimiento de stock",
+                    message:
+                        Object.values(errors)[0] ??
+                        "No fue posible registrar el movimiento de stock",
                 });
             },
         });

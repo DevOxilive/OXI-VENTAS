@@ -24,9 +24,7 @@ const {
     loadEditData
 } = useEmployeeForm(props, emit)
 
-function closeModal() {
-    emit('close')
-}
+const isReadOnly = computed(() => props.modo === 'view')
 
 const saveButtonText = computed(() => {
     if (employee.processing) return 'Procesando...'
@@ -37,6 +35,10 @@ const saveButtonText = computed(() => {
 })
 
 const totalErrors = computed(() => errorSummary.value.length)
+
+function closeModal() {
+    emit('close')
+}
 
 function handleEsc(e) {
     if (e.key === 'Escape') closeModal()
@@ -50,27 +52,30 @@ onMounted(() => {
 onBeforeUnmount(() => {
     window.removeEventListener('keydown', handleEsc)
 })
-
-const isReadOnly = computed(() => props.modo === 'view')
 </script>
 
 <template>
-    <div class="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center">
+    <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center">
         <div class="absolute inset-0" @click="closeModal"></div>
 
-        <div
-            class="relative bg-white w-full h-[100dvh] sm:h-[100dvh] md:h-[94vh] md:w-[96%] md:max-w-6xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-            <GeneralModalHeader
-                :title="props.modo === 'create' ? 'Registrar empleado' : props.modo === 'edit' ? 'Actualizar empleado' : 'Detalle del empleado'"
-                subtitle="Información general del empleado" :total-errors="totalErrors" :mode="props.modo"
-                @close="closeModal" />
+        <section
+            class="relative flex h-[100dvh] w-full flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl md:h-[94vh] md:w-[98%] md:max-w-[1600px] md:rounded-3xl">
+            <GeneralModalHeader :title="props.modo === 'create'
+                ? 'Registrar empleado'
+                : props.modo === 'edit'
+                    ? 'Actualizar empleado'
+                    : 'Detalle del empleado'" subtitle="Información general del empleado"
+                :total-errors="totalErrors" :mode="props.modo" @close="closeModal" />
+
             <GeneralModalContent :columns="1">
-                <EmployeeData :employee="employee" :frontendErrors="frontendErrors" :departments="departments"
-                    :readonly="isReadOnly" @validate="validateField" />
+                <div class="min-w-0">
+                    <EmployeeData :employee="employee" :frontend-errors="frontendErrors" :departments="departments"
+                        :readonly="isReadOnly" @validate="validateField" />
+                </div>
             </GeneralModalContent>
 
             <GeneralModalFooter :processing="employee.processing" :save-button-text="saveButtonText" :mode="props.modo"
                 @save="saveEmployee" @close="closeModal" />
-        </div>
+        </section>
     </div>
 </template>

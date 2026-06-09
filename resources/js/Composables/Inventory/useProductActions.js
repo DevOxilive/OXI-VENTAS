@@ -3,8 +3,8 @@ import { router } from "@inertiajs/vue3";
 import {
     UniversalActionModal,
     ToastAlert,
-    ErrorAlert
-} from '@/Components/Modales/UniversalActionModal'
+    ErrorAlert,
+} from "@/Components/Modales/UniversalActionModal";
 
 export function useProductActions() {
     const showModal = ref(false);
@@ -34,40 +34,40 @@ export function useProductActions() {
         selectedProduct.value = null;
     }
 
-  async function deleteProduct(product) {
-    const result = await UniversalActionModal({
-        title: "Eliminar producto",
-        message: "¿Deseas eliminar",
-        itemName: product.name,
-        confirmText: "Sí, eliminar",
-        icon: "warning",
-    });
+    async function deleteProduct(product) {
+        const result = await UniversalActionModal({
+            title: "Eliminar producto",
+            message: "¿Deseas eliminar",
+            itemName: product.name,
+            confirmText: "Sí, eliminar",
+            icon: "warning",
+        });
 
-    if (!result.isConfirmed) return;
+        if (!result.isConfirmed) return;
 
-    router.delete(
-        route("inventory.branches.products.destroy", {
-            branch: product.branch_slug,
-            product: product.id,
-        }),
-        {
-            preserveScroll: true,
+        router.delete(
+            route("inventory.branches.products.destroy", {
+                branch: product.branch_slug ?? product.branch_id,
+                product: product.id,
+            }),
+            {
+                preserveScroll: true,
 
-            onSuccess: () => {
-                ToastAlert({
-                    title: "Producto eliminado correctamente",
-                });
+                onSuccess: () => {
+                    ToastAlert({
+                        title: "Producto eliminado correctamente",
+                    });
+                },
+
+                onError: () => {
+                    ErrorAlert({
+                        title: "Error al eliminar",
+                        message: "No fue posible eliminar el producto.",
+                    });
+                },
             },
-
-            onError: () => {
-                ErrorAlert({
-                    title: "Error al eliminar",
-                    message: "No fue posible eliminar el producto.",
-                });
-            },
-        }
-    );
-}
+        );
+    }
 
     return {
         showModal,
