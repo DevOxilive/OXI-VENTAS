@@ -13,7 +13,7 @@ use App\Http\Controllers\Inventory\ProductBatchController;
 use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\Inventory\PurchaseReportController;
 use App\Http\Controllers\Inventory\BranchInventoryController;
-
+use App\Http\Controllers\Inventory\CategoryController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC
@@ -250,6 +250,8 @@ Route::middleware(['auth', 'role:Inventario,Administrador'])
 
         Route::get('/movements', [StockMovementController::class, 'index'])
             ->name('movements');
+            Route::post('/categories', [CategoryController::class, 'store'])
+    ->name('categories.store');
     });
 
 /*
