@@ -451,7 +451,7 @@ onBeforeUnmount(() => {
   <div class="bg-[#f6f3f7] min-h-screen rounded-3xl p-6">
 
     <h1 class="text-xl font-semibold text-slate-700 mb-6">
-      Dashboard Registro de Usuario
+      Dashboard Registro de Usuarios
     </h1>
 
     <div class="flex items-center justify-between mb-5 gap-4 flex-wrap">
