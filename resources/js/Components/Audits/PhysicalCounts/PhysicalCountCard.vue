@@ -1,5 +1,6 @@
 <script setup>
 import { Link } from '@inertiajs/vue3'
+import { usePermissions } from '@/Composables/usePermissions'
 
 defineProps({
     physicalCount: {
@@ -7,6 +8,7 @@ defineProps({
         required: true
     }
 })
+const { can } = usePermissions()
 </script>
 
 <template>
@@ -28,12 +30,13 @@ defineProps({
                 </p>
             </div>
 
-            <Link
-                :href="route('audits.physical-counts.show', physicalCount.id)"
-                class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-                Abrir
-            </Link>
+         <Link
+    v-if="can('audits.physical-counts.view')"
+    :href="route('audits.physical-counts.show', physicalCount.id)"
+    class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+>
+    Abrir
+</Link>
         </div>
     </div>
 </template> 

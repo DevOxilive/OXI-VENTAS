@@ -1,29 +1,31 @@
 <script setup>
-import { usePermissions } from "@/Composables/usePermissions";
+import { computed } from "vue";
 import ActionIconButton from "@/Components/Forms/ActionIconButton.vue";
 
-const { can } = usePermissions();
-
-defineProps({
+const props = defineProps({
   products: {
     type: Array,
     default: () => [],
+  },
+  canView: {
+    type: Boolean,
+    default: false,
+  },
+  canEdit: {
+    type: Boolean,
+    default: false,
+  },
+  canDelete: {
+    type: Boolean,
+    default: false,
   },
 });
 
 defineEmits(["view", "edit", "delete"]);
 
-function stockColor(product) {
-  if (product.stock <= product.minimum_stock) {
-    return "bg-red-500";
-  }
-
-  if (product.stock >= product.maximum_stock) {
-    return "bg-blue-500";
-  }
-
-  return "bg-green-600";
-}
+const canSeeActions = computed(() =>
+  props.canView || props.canEdit || props.canDelete
+);
 </script>
 <template>
   <div class="hidden md:block w-full bg-white overflow-hidden">
@@ -59,7 +61,7 @@ function stockColor(product) {
               Precio venta
             </th>
 
-            <th class="text-center px-5 py-4 font-semibold">
+<th v-if="canSeeActions" class="text-center px-5 py-4 font-semibold">
               Acciones
             </th>
           </tr>
@@ -131,10 +133,10 @@ function stockColor(product) {
             </td>
 
             <!-- ACCIONES -->
-            <td class="px-5 py-4">
+           <td v-if="canSeeActions" class="px-5 py-4">
               <div class="flex items-center justify-center gap-2">
                 <ActionIconButton
-                  v-if="can('inventario.ver')"
+              v-if="canView"
                   icon="visibility"
                   title="Ver producto"
                   variant="blue"
@@ -142,7 +144,7 @@ function stockColor(product) {
                 />
 
                 <ActionIconButton
-                  v-if="can('inventario.editar')"
+              v-if="canEdit"
                   icon="edit"
                   title="Editar producto"
                   variant="amber"
@@ -150,7 +152,7 @@ function stockColor(product) {
                 />
 
                 <ActionIconButton
-                  v-if="can('inventario.eliminar')"
+               v-if="canDelete"
                   icon="delete"
                   title="Eliminar producto"
                   variant="red"
@@ -161,9 +163,9 @@ function stockColor(product) {
           </tr>
 
           <tr v-if="products.length === 0">
-            <td colspan="8" class="text-center py-16 text-slate-400">
-              No se encontraron productos
-            </td>
+       <td :colspan="canSeeActions ? 8 : 7" class="text-center py-16 text-slate-400">
+  No se encontraron productos
+</td>
           </tr>
         </tbody>
       </table>

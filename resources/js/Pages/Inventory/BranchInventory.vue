@@ -10,10 +10,12 @@ import StockExitModal from '@/Components/Inventory/BranchProducts/StockExitModal
 import ProductMovementsModal from '@/Components/Inventory/BranchProducts/ProductMovementsModal.vue'
 import EditBranchProductConfigModal from '@/Components/Inventory/BranchProducts/EditBranchProductConfigModal.vue'
 import ProductBatchesModal from '@/Components/Inventory/BranchProducts/ProductBatchesModal.vue'
+import { usePermissions } from '@/Composables/usePermissions'
 import { useBranchInventory } from '@/Composables/Inventory/useBranchInventory'
 
 
 defineOptions({ layout: AdminLayout })
+
 
 const props = defineProps({
     branchProductsDB: {
@@ -79,6 +81,7 @@ const props = defineProps({
         }),
     },
 })
+const { can } = usePermissions()
 
 const {
     categories,
@@ -188,12 +191,38 @@ const {
             @update:expirationStatusFilter="expirationStatusFilter = $event"
             @update:inactiveCandidateFilter="inactiveCandidateFilter = $event" />
 
-        <InventoryTable :filtered-products="filteredProducts" @view="viewProduct" @edit="editProduct"
-            @entry="openEntryModal" @exit="openExitModal" @movements="openMovementsModal"
-            @batches="openProductBatchesModal" @delete="deleteProduct" />
-
-        <InventoryMobileCards :filtered-products="filteredProducts" @view="viewProduct" @edit="editProduct"
-            @entry="openEntryModal" @exit="openExitModal" @movements="openMovementsModal" @delete="deleteProduct" />
+<InventoryTable
+    :filtered-products="filteredProducts"
+    :can-view="can('inventory.branches.view')"
+    :can-entry="can('inventory.branches.create')"
+    :can-exit="can('inventory.branches.update')"
+    :can-movements="can('inventory.branches.view')"
+    :can-batches="can('inventory.branches.update')"
+    :can-edit="can('inventory.branches.update')"
+    :can-delete="can('inventory.branches.delete')"
+    @view="viewProduct"
+    @edit="editProduct"
+    @entry="openEntryModal"
+    @exit="openExitModal"
+    @movements="openMovementsModal"
+    @batches="openProductBatchesModal"
+    @delete="deleteProduct"
+/>
+<InventoryMobileCards
+    :filtered-products="filteredProducts"
+    :can-view="can('inventory.branches.view')"
+    :can-entry="can('inventory.branches.create')"
+    :can-exit="can('inventory.branches.update')"
+    :can-movements="can('inventory.branches.view')"
+    :can-edit="can('inventory.branches.update')"
+    :can-delete="can('inventory.branches.delete')"
+    @view="viewProduct"
+    @edit="editProduct"
+    @entry="openEntryModal"
+    @exit="openExitModal"
+    @movements="openMovementsModal"
+    @delete="deleteProduct"
+/>
 
         <nav v-if="hasPagination" class="flex flex-wrap items-center justify-center gap-2 pt-1">
             <button v-for="link in paginationLinks" :key="link.label" type="button" :disabled="!link.url"
@@ -204,16 +233,22 @@ const {
                     " @click="goToPage(link.url)" v-html="link.label" />
         </nav>
 
-        <StockEntryModal v-if="showEntryModal && liveSelectedMovementProduct" :product="liveSelectedMovementProduct"
-            @close="closeEntryModal" />
+      <StockEntryModal
+    v-if="showEntryModal && liveSelectedMovementProduct && can('inventory.branches.create')"
+    :product="liveSelectedMovementProduct"
+    @close="closeEntryModal"
+/>
 
-        <StockExitModal v-if="showExitModal && liveSelectedMovementProduct" :product="liveSelectedMovementProduct"
-            @close="closeExitModal" />
+<StockExitModal
+    v-if="showExitModal && liveSelectedMovementProduct && can('inventory.branches.update')"
+    :product="liveSelectedMovementProduct"
+    @close="closeExitModal"
+/>
 
-        <ProductMovementsModal v-if="showMovementsModal && liveSelectedMovementsProduct"
+   <ProductMovementsModal v-if="showMovementsModal && liveSelectedMovementsProduct && can('inventory.branches.view')"
             :product="liveSelectedMovementsProduct" @close="closeMovementsModal" />
 
-        <ProductBatchesModal v-if="showProductBatchesModal && liveSelectedBatchesProduct"
+<ProductBatchesModal v-if="showProductBatchesModal && liveSelectedBatchesProduct && can('inventory.branches.update')"
             :product="liveSelectedBatchesProduct" @close="closeProductBatchesModal"
             @adjust-batch="openBatchAdjustmentFromList" />
 
@@ -230,7 +265,7 @@ const {
         <InventoryAlertsModal v-if="showAlertModal" :title="selectedAlertTitle" :type="selectedAlertType"
             :batches="selectedAlertBatches" @close="closeAlertModal" />
 
-        <EditBranchProductConfigModal v-if="showConfigModal && liveSelectedConfigProduct"
+       <EditBranchProductConfigModal v-if="showConfigModal && liveSelectedConfigProduct && can('inventory.branches.update')"
             :product="liveSelectedConfigProduct" @close="closeConfigModal" />
     </div>
 </template>

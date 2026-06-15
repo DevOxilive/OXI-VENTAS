@@ -6,6 +6,34 @@ defineProps({
         type: Array,
         default: () => [],
     },
+    canView: {
+        type: Boolean,
+        default: false,
+    },
+    canEdit: {
+        type: Boolean,
+        default: false,
+    },
+    canEntry: {
+        type: Boolean,
+        default: false,
+    },
+    canExit: {
+        type: Boolean,
+        default: false,
+    },
+    canMovements: {
+        type: Boolean,
+        default: false,
+    },
+    canBatches: {
+        type: Boolean,
+        default: false,
+    },
+    canDelete: {
+        type: Boolean,
+        default: false,
+    },
 })
 
 defineEmits([
@@ -40,8 +68,12 @@ function statusClass(status) {
                         <th class="w-[18%] text-left px-4 py-3 font-semibold">Categoría</th>
                         <th class="w-[15%] text-left px-4 py-3 font-semibold">Stock</th>
                         <th class="w-[13%] text-left px-4 py-3 font-semibold">Estado</th>
-                        <th class="w-[13%] text-center px-4 py-3 font-semibold">Acciones</th>
-                    </tr>
+<th
+    v-if="canView || canEdit || canEntry || canExit || canMovements || canBatches || canDelete"
+    class="w-[13%] text-center px-4 py-3 font-semibold"
+>
+    Acciones
+</th>                    </tr>
                 </thead>
 
                 <tbody class="divide-y divide-slate-100">
@@ -83,25 +115,46 @@ function statusClass(status) {
                             </span>
                         </td>
 
-                        <td class="px-4 py-4">
+                        <td   v-if="canView || canEdit || canEntry || canExit || canMovements || canBatches || canDelete"  class="px-4 py-4">
                             <div class="flex items-center justify-center gap-2">
-                                <ActionIconButton icon="add" title="Entrada" variant="green"
-                                    @click="$emit('entry', product)" />
+                             <ActionIconButton
+    v-if="canEntry"
+    icon="add"
+    title="Entrada"
+    variant="green"
+    @click="$emit('entry', product)"
+/>
 
-                                <ActionIconButton icon="remove" title="Salida" variant="red"
-                                    @click="$emit('exit', product)" />
+<ActionIconButton
+    v-if="canExit"
+    icon="remove"
+    title="Salida"
+    variant="red"
+    @click="$emit('exit', product)"
+/>
 
-                                <ActionIconButton icon="edit" title="Lotes" variant="blue"
-                                    :disabled="!product.batches?.length" @click="$emit('batches', product)" />
+<ActionIconButton
+    v-if="canBatches"
+    icon="edit"
+    title="Lotes"
+    variant="blue"
+    :disabled="!product.batches?.length"
+    @click="$emit('batches', product)"
+/>
 
-                                <ActionIconButton icon="history" title="Historial" variant="slate"
-                                    @click="$emit('movements', product)" />
+<ActionIconButton
+    v-if="canMovements"
+    icon="history"
+    title="Historial"
+    variant="slate"
+    @click="$emit('movements', product)"
+/>
                             </div>
                         </td>
                     </tr>
 
                     <tr v-if="!filteredProducts.length">
-                        <td colspan="6" class="px-4 py-10 text-center text-slate-500">
+                        <td :colspan="canView || canEdit || canEntry || canExit || canMovements || canBatches || canDelete ? 6 : 5" class="px-4 py-10 text-center text-slate-500">
                             No se encontraron productos.
                         </td>
                     </tr>

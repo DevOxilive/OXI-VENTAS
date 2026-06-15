@@ -60,11 +60,7 @@ onMounted(() => {
     if (!window.Echo) return
 
     window.Echo.channel('systems')
-        .listen('.employee.changed', (event) => {
-            console.log('Empleado actualizado en tiempo real desde RH', event)
-
-            reloadEmployees()
-        })
+      
 })
 
 onBeforeUnmount(() => {
@@ -80,19 +76,28 @@ onBeforeUnmount(() => {
         <h1 class="text-lg md:text-xl font-semibold text-slate-700 mb-5">
             Empleados
         </h1>
+<EmployeeToolbar :filteredEmployees="filteredEmployees" :employeesDB="employeesDB" :recordsToShow="recordsToShow" :can-create="can('employees.create')" 
+   :can-export="can('files.export')"
+  @create="openCreateModal"
+  @excel="exportExcel"
+  @update:recordsToShow="recordsToShow = $event"
+/>
 
-        <EmployeeToolbar :filteredEmployees="filteredEmployees" :employeesDB="employeesDB"
-            :recordsToShow="recordsToShow" @create="openCreateModal" @excel="exportExcel"
-            @update:recordsToShow="recordsToShow = $event" />
-
-        <EmployeeTable :filteredEmployees="filteredEmployees" :search="search" :positionFilter="positionFilter"
-            :departmentFilter="departmentFilter" :statusFilter="statusFilter" @update:search="search = $event"
-            @update:positionFilter="positionFilter = $event" @update:departmentFilter="departmentFilter = $event"
-            @update:statusFilter="statusFilter = $event" @view="openViewModal" @edit="openEditModal"
-            @delete="deleteEmployee" />
-
-        <EmployeeMobileCards :filteredEmployees="filteredEmployees" @view="openViewModal" @edit="openEditModal"
-            @delete="deleteEmployee" />
+<EmployeeTable :filteredEmployees="filteredEmployees" :search="search" :positionFilter="positionFilter" :departmentFilter="departmentFilter"
+  :statusFilter="statusFilter" :can-view="can('employees.view')" :can-edit="can('employees.update')" :can-delete="can('employees.delete')"
+  @update:search="search = $event"
+  @update:positionFilter="positionFilter = $event"
+  @update:departmentFilter="departmentFilter = $event"
+  @update:statusFilter="statusFilter = $event"
+  @view="openViewModal"
+  @edit="openEditModal"
+  @delete="deleteEmployee"
+/>
+    <EmployeeMobileCards :filteredEmployees="filteredEmployees" :can-view="can('employees.view')"  :can-edit="can('employees.update')" :can-delete="can('employees.delete')"
+  @view="openViewModal"
+  @edit="openEditModal"
+  @delete="deleteEmployee"
+/>   
 
         <EmployeeRegisterModal v-if="
             showModal &&

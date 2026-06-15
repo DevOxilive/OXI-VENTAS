@@ -1,17 +1,11 @@
 <script setup>
 import { computed } from 'vue'
-import { usePermissions } from '@/Composables/usePermissions'
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
 
-const { can } = usePermissions()
 
-const canViewActions = computed(() =>
-    can('employees.view') ||
-    can('employees.update') ||
-    can('employees.delete')
-)
 
-defineProps({
+
+const props = defineProps({
     filteredEmployees: {
         type: Array,
         default: () => []
@@ -19,8 +13,24 @@ defineProps({
     search: String,
     positionFilter: String,
     departmentFilter: String,
-    statusFilter: String
+    statusFilter: String,
+    canView: {
+        type: Boolean,
+        default: false
+    },
+    canEdit: {
+        type: Boolean,
+        default: false
+    },
+    canDelete: {
+        type: Boolean,
+        default: false
+    }
 })
+
+const canViewActions = computed(() =>
+    props.canView || props.canEdit || props.canDelete
+)
 
 defineEmits([
     'update:search',
@@ -123,13 +133,13 @@ defineEmits([
 
                         <td v-if="canViewActions" class="px-4 py-4">
                             <div class="flex items-center justify-center gap-2">
-                                <ActionIconButton v-if="can('employees.view')" icon="visibility"
+                                <ActionIconButton v-if="canView" icon="visibility"
                                     title="Visualizar empleado" variant="blue" @click="$emit('view', employee)" />
 
-                                <ActionIconButton v-if="can('employees.update')" icon="edit" title="Editar empleado"
+                                <ActionIconButton v-if="canEdit" icon="edit" title="Editar empleado"
                                     variant="amber" @click="$emit('edit', employee)" />
 
-                                <ActionIconButton v-if="can('employees.delete')" icon="delete"
+                                <ActionIconButton v-if="canDelete" icon="delete"
                                     title="Eliminar empleado" variant="red" @click="$emit('delete', employee)" />
                             </div>
                         </td>

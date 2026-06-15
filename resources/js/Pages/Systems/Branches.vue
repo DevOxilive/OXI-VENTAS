@@ -3,6 +3,7 @@ import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { ref } from "vue";
 import { useForm, router } from "@inertiajs/vue3";
 import ActionIconButton from "@/Components/Forms/ActionIconButton.vue";
+import { usePermissions } from "@/Composables/usePermissions";
 import {
   UniversalActionModal,
   ToastAlert,
@@ -15,6 +16,7 @@ defineProps({
     default: () => [],
   },
 });
+const { can } = usePermissions();
 
 const selectedBranch = ref(null);
 const modalMode = ref("create");
@@ -131,15 +133,17 @@ function submit() {
 }
 
 function updateColor(branch, color) {
+  if (!can('branches.update')) return
+
   const updateForm = useForm({
     name: branch.name,
     color,
     active: branch.active ?? true,
-  });
+  })
 
   updateForm.put(route("branches.update", branch.id), {
     preserveScroll: true,
-  });
+  })
 }
 </script>
 
@@ -157,7 +161,7 @@ function updateColor(branch, color) {
           </p>
         </div>
 
-        <button type="button" @click="openCreateModal"
+      <button v-if="can('branches.create')" type="button" @click="openCreateModal"
           class="px-5 py-3 rounded-2xl bg-black text-white font-semibold hover:bg-slate-800 transition">
           + Agregar sucursal
         </button>
@@ -186,13 +190,19 @@ function updateColor(branch, color) {
             </div>
 
             <div class="flex items-center justify-end gap-2">
-              <ActionIconButton icon="visibility" title="Ver sucursal" variant="blue"
-                @click.stop="viewBranch(branch)" />
+  <ActionIconButton
+  v-if="can('branches.view')"  icon="visibility" title="Ver sucursal" variant="blue"
+  @click.stop="viewBranch(branch)"
+/>
 
-              <ActionIconButton icon="edit" title="Editar sucursal" variant="amber" @click.stop="editBranch(branch)" />
+<ActionIconButton
+  v-if="can('branches.update')"  icon="edit"  title="Editar sucursal"  variant="amber"
+  @click.stop="editBranch(branch)"
+/>
 
-              <ActionIconButton icon="delete" title="Eliminar sucursal" variant="red"
-                @click.stop="deleteBranch(branch)" />
+<ActionIconButton  v-if="can('branches.delete')"  icon="delete"  title="Eliminar sucursal" variant="red"
+  @click.stop="deleteBranch(branch)"
+/>
             </div>
           </div>
 
@@ -224,7 +234,7 @@ function updateColor(branch, color) {
                 Nombre de sucursal
               </label>
 
-              <input v-model="form.name" :disabled="modalMode === 'view'" type="text"
+              <input v-model="form.name" :disabled="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))" type="text"
                 class="w-full rounded-xl border-slate-300" placeholder="Ej. Ajusco" />
 
               <p v-if="form.errors.name" class="text-red-500 text-xs mt-1">
@@ -237,7 +247,7 @@ function updateColor(branch, color) {
                 Color
               </label>
 
-              <input v-model="form.color" :disabled="modalMode === 'view'" type="color"
+              <input v-model="form.color" :disabled="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))" type="color"
                 class="h-12 w-24 cursor-pointer rounded-lg border" />
             </div>
 
@@ -247,7 +257,8 @@ function updateColor(branch, color) {
                 Cancelar
               </button>
 
-              <button v-if="modalMode !== 'view'" type="submit" :disabled="form.processing"
+           <button
+  v-if="modalMode !== 'view' && (modalMode === 'edit' ? can('branches.update') : can('branches.create'))" type="submit" :disabled="form.processing"
                 class="px-5 py-3 rounded-2xl bg-slate-900 text-white font-semibold disabled:opacity-50">
                 {{
                   modalMode === "edit"

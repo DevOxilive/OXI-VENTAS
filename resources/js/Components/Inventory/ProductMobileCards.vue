@@ -1,16 +1,30 @@
 <script setup>
-import { usePermissions } from '@/Composables/usePermissions'
+import { computed } from 'vue'
 
-const { can } = usePermissions()
-
-defineProps({
+const props = defineProps({
     products: {
         type: Array,
         default: () => []
+    },
+    canView: {
+        type: Boolean,
+        default: false
+    },
+    canEdit: {
+        type: Boolean,
+        default: false
+    },
+    canDelete: {
+        type: Boolean,
+        default: false
     }
 })
 
 defineEmits(['view', 'edit', 'delete'])
+
+const canSeeActions = computed(() =>
+    props.canView || props.canEdit || props.canDelete
+)
 </script>
 
 <template>
@@ -58,18 +72,18 @@ defineEmits(['view', 'edit', 'delete'])
 </div>
             </div>
 
-            <div class="flex justify-end gap-2 mt-4">
-                <button v-if="can('inventario.ver')" @click="$emit('view', product)"
+  <div v-if="canSeeActions" class="flex justify-end gap-2 mt-4">
+                <button v-if="canView" @click="$emit('view', product)"
                     class="px-3 py-2 rounded-xl bg-sky-100 text-sky-600 text-sm">
                     Ver
                 </button>
 
-                <button v-if="can('inventario.editar')" @click="$emit('edit', product)"
+                <button v-if="canEdit" @click="$emit('edit', product)"
                     class="px-3 py-2 rounded-xl bg-amber-100 text-amber-600 text-sm">
                     Editar
                 </button>
 
-                <button v-if="can('inventario.eliminar')" @click="$emit('delete', product)"
+                <button v-if="canDelete" @click="$emit('delete', product)"
                     class="px-3 py-2 rounded-xl bg-red-100 text-red-600 text-sm">
                     Eliminar
                 </button>

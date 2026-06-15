@@ -4,6 +4,30 @@ defineProps({
         type: Array,
         default: () => [],
     },
+    canView: {
+        type: Boolean,
+        default: false,
+    },
+    canEdit: {
+        type: Boolean,
+        default: false,
+    },
+    canEntry: {
+        type: Boolean,
+        default: false,
+    },
+    canExit: {
+        type: Boolean,
+        default: false,
+    },
+    canMovements: {
+        type: Boolean,
+        default: false,
+    },
+    canDelete: {
+        type: Boolean,
+        default: false,
+    },
 })
 
 defineEmits([
@@ -73,8 +97,11 @@ function statusClass(status) {
                 </div>
             </div>
 
-            <div class="mt-4 flex justify-end gap-2">
-                <button type="button" title="Entrada"
+          <div
+    v-if="canView || canEdit || canEntry || canExit || canMovements || canDelete"
+    class="mt-4 flex justify-end gap-2"
+>
+<button v-if="canEntry" type="button" title="Entrada"
                     class="group w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-green-50 hover:border-green-200 transition-all duration-200"
                     @click="$emit('entry', product)">
                     <span
@@ -83,7 +110,7 @@ function statusClass(status) {
                     </span>
                 </button>
 
-                <button type="button" title="Salida"
+         <button v-if="canExit" type="button" title="Salida"
                     class="group w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-red-50 hover:border-red-200 transition-all duration-200"
                     @click="$emit('exit', product)">
                     <span
@@ -91,8 +118,8 @@ function statusClass(status) {
                         remove
                     </span>
                 </button>
-
-                <button type="button" title="Historial"
+                
+<button v-if="canMovements" type="button" title="Historial"
                     class="group w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
                     @click="$emit('movements', product)">
                     <span

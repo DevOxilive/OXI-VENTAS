@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { usePage, useForm, router } from '@inertiajs/vue3'
+import { usePermissionLabels } from '@/Composables/usePermissionLabels'
 
 import {
   usePermissions,
@@ -31,8 +32,29 @@ const users = computed(() => page.props.users || [])
 const roles = computed(() => page.props.roles || [])
 const branches = computed(() => page.props.branches || [])
 const permissions = computed(() => page.props.permissions || [])
+const {
+  groupedPermissions,
+  permissionLabel,
+  moduleLabel,
+} = usePermissionLabels(permissions)
 
-const viewMode = ref(can('users.view') ? 'users' : 'employees')
+const canSeeUsersTab = computed(() =>
+  can('users.view') ||
+  can('users.update') ||
+  can('users.delete')
+)
+
+const canSeeEmployeesTab = computed(() =>
+  can('users.create')
+)
+
+const viewMode = ref(
+  canSeeUsersTab.value
+    ? 'users'
+    : canSeeEmployeesTab.value
+      ? 'employees'
+      : 'users'
+)
 const search = ref('')
 const perPage = ref(10)
 const currentPage = ref(1)
@@ -45,7 +67,15 @@ const activeModule = ref(null)
 const showUserDetail = ref(false)
 const selectedUser = ref(null)
 const showPermissionsModal = ref(false)
-
+const canSeeActions = computed(() =>
+  viewMode.value === 'employees'
+    ? can('users.create')
+    : (
+        can('users.view') ||
+        can('users.update') ||
+        can('users.delete')
+      )
+)
 const errors = ref({})
 
 const form = useForm({
@@ -158,29 +188,6 @@ const currentList = computed(() => {
 
   return filteredList.value.slice(start, start + limit)
 })
-
-const groupedPermissions = computed(() => {
-  const groups = {
-    employees: [],
-    roles: [],
-    users: [],
-    files: [],
-    sales: [],
-    inventory: [],
-    audits: [],
-  }
-
-  permissions.value.forEach((permission) => {
-    const module = (permission.name || '').split('.')[0]?.toLowerCase() || 'others'
-
-    if (!groups[module]) return
-
-    groups[module].push(permission)
-  })
-
-  return groups
-})
-
 function openUserDetail(user) {
   if (viewMode.value !== 'users') return
 
@@ -280,6 +287,8 @@ watch(() => form.name, (newName) => {
 })
 
 watch(() => form.role_id, () => {
+  if (isEditing.value) return
+
   assignPermissionsByRole()
 })
 
@@ -453,13 +462,15 @@ onBeforeUnmount(() => {
     </h1>
 
     <div class="flex items-center justify-between mb-5 gap-4 flex-wrap">
-      <div class="flex gap-3">
-        <button v-if="can('users.create')" @click="viewMode = 'employees'" class="px-5 py-2 rounded-xl border shadow-sm"
+      <div class="flex gap-3"><button v-if="canSeeEmployeesTab" @click="viewMode = 'employees'" class="px-5 py-2 rounded-xl border shadow-sm"
           :class="viewMode === 'employees' ? 'bg-black text-white' : 'bg-white'">
           Empleados
         </button>
 
-        <button v-if="can('users.view')" @click="viewMode = 'users'" class="px-5 py-2 rounded-xl border shadow-sm"
+<button
+  v-if="can('users.view') || can('users.update') || can('users.delete')"
+  @click="viewMode = 'users'"
+        class="px-5 py-2 rounded-xl border shadow-sm"
           :class="viewMode === 'users' ? 'bg-black text-white' : 'bg-white'">
           Usuarios
         </button>
@@ -489,22 +500,24 @@ onBeforeUnmount(() => {
             <th class="px-4 py-3 text-left">Nombre</th>
             <th class="px-4 py-3 text-left">Correo</th>
             <th class="px-4 py-3 text-left">Rol</th>
-            <th class="px-4 py-3 text-left">Acciones</th>
+            <th v-if="canSeeActions" class="px-4 py-3 text-left">
+  Acciones
+</th>
+         
           </tr>
         </thead>
 
         <tbody>
-          <tr v-for="item in currentList" :key="item.id" @click="openUserDetail(item)" class="border-t hover:bg-gray-50"
+          <tr v-for="item in currentList" :key="item.id" @click="viewMode === 'users' && can('users.view') && openUserDetail(item)" class="border-t hover:bg-gray-50"
             :class="viewMode === 'users' ? 'cursor-pointer' : ''">
-            <td class="px-4 py-3">
+     <td class="px-4 py-3">
               {{
                 viewMode === 'users'
                   ? (item.name || '—')
                   : (getEmployeeFullName(item) || 'Sin nombre registrado')
               }}
             </td>
-
-            <td class="px-4 py-3">
+<td class="px-4 py-3">
               {{
                 viewMode === 'users'
                   ? (item.email || '—')
@@ -520,8 +533,8 @@ onBeforeUnmount(() => {
               }}
             </td>
 
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-2">
+     <td v-if="canSeeActions" class="px-4 py-3">
+    <div class="flex items-center gap-2">
                 <ActionIconButton v-if="viewMode === 'employees' && can('users.create')" icon="person_add"
                   title="Crear usuario" variant="blue" @click.stop="openModal(item)" />
 
@@ -534,20 +547,27 @@ onBeforeUnmount(() => {
             </td>
           </tr>
 
-          <tr v-if="!currentList.length">
-            <td colspan="4" class="px-4 py-10 text-center text-slate-500">
-              No se encontraron registros.
-            </td>
-          </tr>
+        <tr v-if="!currentList.length">
+    <td
+        :colspan="canSeeActions ? 4 : 3"
+        class="px-4 py-10 text-center text-slate-500"
+    >
+        No se encontraron registros.
+    </td>
+</tr>
         </tbody>
       </table>
     </div>
 
-    <UserDetailModal v-if="showUserDetail" :user="selectedUser" @close="closeUserDetail" />
+   <UserDetailModal v-if="showUserDetail && can('users.view')" :user="selectedUser"
+    @close="closeUserDetail"
+/>
 
     <UserRegisterModal v-if="showModal" :form="form" :errors="errors" :roles="roles" :branches="branches"
       :groupedPermissions="groupedPermissions" :isEditing="isEditing"
       :canSave="isEditing ? can('users.update') : can('users.create')" :isSalesRole="isSalesRole" @close="closeModal"
+        :module-label="moduleLabel"
+  :permission-label="permissionLabel"
       @save="saveUser" @toggle-permission="togglePermission" @change-role="assignPermissionsByRole" />
   </div>
 </template>
