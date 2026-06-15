@@ -46,10 +46,10 @@ export function useProductActions() {
         if (!result.isConfirmed) return;
 
         router.delete(
-            route("inventory.branches.products.destroy", {
-                branch: product.branch_slug ?? product.branch_id,
-                product: product.id,
-            }),
+         route("inventory.branches.products.destroy", {
+    branch: product.branch_slug ?? product.branch?.slug,
+    product: product.id,
+}),
             {
                 preserveScroll: true,
 

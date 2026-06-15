@@ -12,6 +12,7 @@ use App\Models\Subcategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
+
 class BranchInventoryController extends Controller
 {
     public function index(Request $request)

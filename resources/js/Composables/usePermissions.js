@@ -3,17 +3,12 @@ import { usePage } from "@inertiajs/vue3";
 
 const livePermissions = ref([]);
 const liveRole = ref(null);
-const initialized = ref(false);
 
 export function initializePermissions() {
     const page = usePage();
 
-    if (initialized.value) return;
-
     livePermissions.value = page.props.auth?.permissions || [];
     liveRole.value = page.props.auth?.user?.role?.name || null;
-
-    initialized.value = true;
 }
 
 export function updateLivePermissions({ permissions = [], role = null }) {
@@ -28,12 +23,16 @@ export function usePermissions() {
     const role = computed(() => liveRole.value);
 
     const can = (permission) => {
+        if (role.value === "Administrador") return true;
+
         return permissions.value.includes(permission);
     };
 
     const canAny = (permissionList = []) => {
+        if (role.value === "Administrador") return true;
+
         return permissionList.some((permission) =>
-            permissions.value.includes(permission),
+            permissions.value.includes(permission)
         );
     };
 

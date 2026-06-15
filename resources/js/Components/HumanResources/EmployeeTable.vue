@@ -1,7 +1,8 @@
 <script setup>
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 
-defineProps({
+
+const props = defineProps({
     filteredEmployees: {
         type: Array,
         default: () => []

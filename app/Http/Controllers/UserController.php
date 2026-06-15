@@ -24,16 +24,41 @@ class UserController extends Controller
             abort(401);
         }
 
-        $user->load(['permissions', 'role.permissions']);
+        $user->load(['permissions']);
 
         if (!$user->hasPermission($permission)) {
             abort(403, 'No tienes permiso');
         }
     }
 
+    private function checkAnyPermission(array $permissions): void
+    {
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        if (!$user) {
+            abort(401);
+        }
+
+        $user->load(['permissions']);
+
+        foreach ($permissions as $permission) {
+            if ($user->hasPermission($permission)) {
+                return;
+            }
+        }
+
+        abort(403, 'No tienes permiso');
+    }
+
     public function index()
     {
-        $this->checkPermission('users.view');
+        $this->checkAnyPermission([
+            'users.view',
+            'users.create',
+            'users.update',
+            'users.delete',
+        ]);
 
         return Inertia::render('Systems/Users', [
             'employees' => Employee::doesntHave('user')
@@ -100,10 +125,11 @@ class UserController extends Controller
         ]);
 
         $user->permissions()->sync($validated['permissions'] ?? []);
+
         $user->branches()->sync(
             $role->name === 'Ventas'
-            ? ($validated['branch_ids'] ?? [])
-            : []
+                ? ($validated['branch_ids'] ?? [])
+                : []
         );
 
         $user->load(['role', 'permissions', 'branches']);
@@ -151,15 +177,20 @@ class UserController extends Controller
         $user->update($userData);
 
         $user->permissions()->sync($validated['permissions'] ?? []);
+
         $user->branches()->sync(
             $role->name === 'Ventas'
-            ? ($validated['branch_ids'] ?? [])
-            : []
+                ? ($validated['branch_ids'] ?? [])
+                : []
         );
 
         $user->load(['role', 'permissions', 'branches']);
 
-        broadcast(new UserChanged($user, 'updated'))->toOthers();
+       try {
+    broadcast(new UserChanged($user, 'updated'))->toOthers();
+} catch (\Throwable $e) {
+    report($e);
+}
 
         return redirect()
             ->route('systems.users.index')
@@ -172,7 +203,11 @@ class UserController extends Controller
 
         $user->load(['role', 'permissions', 'branches']);
 
-        broadcast(new UserChanged($user, 'deleted'))->toOthers();
+     try {
+    broadcast(new UserChanged($user, 'updated'))->toOthers();
+} catch (\Throwable $e) {
+    report($e);
+}
 
         $user->permissions()->detach();
         $user->branches()->detach();

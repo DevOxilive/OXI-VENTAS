@@ -4,9 +4,16 @@ import ExportButton from '@/Components/ExportButton.vue'
 defineProps({
     filteredEmployees: Array,
     employeesDB: Array,
-    recordsToShow: Number
+    recordsToShow: Number,
+    canCreate: {
+        type: Boolean,
+        default: false
+    },
+    canExport: {
+        type: Boolean,
+        default: false
+    }
 })
-
 defineEmits([
     'create',
     'excel',
@@ -18,7 +25,7 @@ defineEmits([
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
 
         <div class="flex items-center gap-3">
-            <button @click="$emit('create')"
+        <button v-if="canCreate" @click="$emit('create')"
                 class="bg-[#1f1d2b] text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px]">
                     add_circle
@@ -26,7 +33,7 @@ defineEmits([
 
                 Nuevo empleado
             </button>
-            <ExportButton @click="$emit('excel')" />
+   <ExportButton v-if="canExport" @click="$emit('excel')" />
         </div>
 
 

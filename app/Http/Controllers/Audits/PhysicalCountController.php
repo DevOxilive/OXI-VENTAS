@@ -17,6 +17,8 @@ use App\Exports\PhysicalCountExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\StockMovement;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Events\PhysicalCountChanged;
+
 
 class PhysicalCountController extends Controller
 {
@@ -77,7 +79,7 @@ class PhysicalCountController extends Controller
 
 $folio = 'AUD-' . now()->format('Ymd') . '-' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
 
-PhysicalCount::create([
+$physicalCount = PhysicalCount::create([
     'folio' => $folio,
     'branch_id' => $data['branch_id'],
     'created_by' => Auth::id(),
@@ -85,7 +87,8 @@ PhysicalCount::create([
     'status' => 'open',
     'started_at' => now(),
 ]);
-
+broadcast(new PhysicalCountChanged($physicalCount, 'created')
+)->toOthers();
         return redirect()
             ->route('audits.physical-counts.index')
             ->with('success', 'Conteo físico creado correctamente.');
@@ -313,53 +316,74 @@ $summary['matched_products'] = $comparison
         ->route('audits.physical-counts.show', $physicalCount)
         ->with('success', 'Auditoría finalizada correctamente.');
 }
-
 public function scan(Request $request, PhysicalCount $physicalCount)
-    {
-        $data = $request->validate([
-            'code' => ['required', 'string', 'max:255'],
-        ]);
-
-        $code = trim($data['code']);
-
-        $branchProduct = BranchProduct::where('branch_id', $physicalCount->branch_id)
-            ->where('barcode', $code)
-            ->first();
-
-        if (!$branchProduct) {
-    $alternativeCode = ProductAlternativeCode::where('code', $code)->first();
-
-    if ($alternativeCode) {
-        $branchProduct = BranchProduct::where('branch_id', $physicalCount->branch_id)
-            ->where('product_id', $alternativeCode->product_id)
-            ->first();
-    }
-}
-
-        if (!$branchProduct) {
-            return back()->withErrors([
-                'code' => 'No se encontró un producto con ese código en la sucursal auditada.',
-            ]);
-        }
-$batches = ProductBatch::where('branch_product_id', $branchProduct->id)
-    ->orderBy('expiration_date')
-    ->get([
-        'id',
-        'lot_number',
-        'quantity',
-        'expiration_date',
+{
+    $data = $request->validate([
+        'code' => ['required', 'string', 'max:255'],
     ]);
 
-return back()->with([
-    'scannedProduct' => [
-        'branch_product_id' => $branchProduct->id,
-        'product_id' => $branchProduct->product_id,
-        'name' => $branchProduct->name,
-        'barcode' => $branchProduct->barcode,
-        'stock' => $branchProduct->stock,
-        'scanned_code' => $code,
-        'batches' => $batches,
-    ],
-]);
+    $code = trim($data['code']);
+
+    $branchProduct = null;
+
+    // 1. Buscar primero en la tabla barcodes
+    $barcode = DB::table('barcodes')
+        ->where('code', $code)
+        ->where('active', 1)
+        ->first();
+
+    if ($barcode) {
+        $branchProduct = BranchProduct::with('product')
+            ->where('branch_id', $physicalCount->branch_id)
+            ->where('product_id', $barcode->product_id)
+            ->first();
     }
-}
+
+    // 2. Si no se encontró, buscar en códigos alternativos
+    if (!$branchProduct) {
+        $alternativeCode = ProductAlternativeCode::where('code', $code)->first();
+
+        if ($alternativeCode) {
+            $branchProduct = BranchProduct::with('product')
+                ->where('branch_id', $physicalCount->branch_id)
+                ->where('product_id', $alternativeCode->product_id)
+                ->first();
+        }
+    }
+
+    // 3. Si no existe en esa sucursal, regresar error
+    if (!$branchProduct) {
+        return back()->withErrors([
+            'code' => 'No se encontró un producto con ese código en la sucursal auditada.',
+        ]);
+    }
+
+    // 4. Traer lotes
+    $batches = ProductBatch::where('branch_product_id', $branchProduct->id)
+        ->orderBy('expiration_date')
+        ->get([
+            'id',
+            'lot_number',
+            'quantity',
+            'expiration_date',
+        ]);
+
+        // 4. Trae EL STOCK
+        $currentStock = DB::table('branch_inventory')
+    ->where('branch_id', $physicalCount->branch_id)
+    ->where('product_id', $branchProduct->product_id)
+    ->value('current_stock');
+
+    // 5. Regresar producto encontrado
+    return back()->with([
+        'scannedProduct' => [
+            'branch_product_id' => $branchProduct->id,
+            'product_id' => $branchProduct->product_id,
+            'name' => $branchProduct->product->name ?? 'Sin producto',
+            'barcode' => $code,
+      'stock' => $currentStock ?? $branchProduct->stock,
+            'scanned_code' => $code,
+            'batches' => $batches,
+        ],
+    ]);
+}}

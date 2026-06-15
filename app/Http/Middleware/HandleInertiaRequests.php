@@ -46,9 +46,9 @@ class HandleInertiaRequests extends Middleware
                     ? $user->load('role.permissions', 'permissions')
                     : null,
 
-                'permissions' => $user
-                    ? $user->all_permissions->pluck('name')->values()
-                    : [],
+               'permissions' => $user
+    ? $user->permissions->pluck('name')->values()
+    : [],
             ],
 
             'branches' => fn () => Cache::remember(

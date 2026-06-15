@@ -14,6 +14,16 @@ const props = defineProps({
     isEditing: Boolean,
     canSave: Boolean,
     isSalesRole: Boolean,
+
+    moduleLabel: {
+  type: Function,
+  required: true,
+},
+permissionLabel: {
+  type: Function,
+  required: true,
+},
+    
 })
 
 const emit = defineEmits([
@@ -63,8 +73,8 @@ onBeforeUnmount(() => {
             <GeneralModalHeader :title="isEditing ? 'Actualizar usuario' : 'Registrar usuario'"
                 subtitle="Configuración de acceso y permisos" :total-errors="totalErrors" :mode="mode"
                 @close="closeModal" />
-
-            <GeneralModalContent :columns="2">
+<div class="flex-1 overflow-hidden p-4 sm:p-5 md:p-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-full overflow-hidden">
                 <section class="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 md:p-6 shadow-sm">
                     <h3 class="font-bold text-base border-b pb-3 mb-4">
                         Datos de usuario
@@ -126,7 +136,7 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
-                <section class="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 md:p-6 shadow-sm">
+                <section class="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 md:p-6 shadow-sm h-full overflow-y-auto pr-3">
                     <h3 class="font-bold text-base border-b pb-3 mb-4">
                         Accesos
                     </h3>
@@ -170,7 +180,7 @@ onBeforeUnmount(() => {
                                 class="border rounded-2xl p-4 bg-gray-50">
                                 <div class="flex items-center justify-between mb-3">
                                     <h4 class="font-semibold capitalize text-slate-700">
-                                        {{ module }}
+                                     {{ moduleLabel(module) }}
                                     </h4>
 
                                     <span class="text-xs text-gray-500">
@@ -185,7 +195,7 @@ onBeforeUnmount(() => {
                                     <div v-for="permission in group" :key="permission.id"
                                         class="flex items-center justify-between bg-white px-3 py-2 rounded-xl border">
                                         <span class="text-sm">
-                                            {{ permission.name }}
+                                        {{ permissionLabel(permission.name) }}
                                         </span>
 
                                         <div @click="$emit('toggle-permission', permission.id)"
@@ -208,10 +218,29 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
                 </section>
-            </GeneralModalContent>
+            </div>
+</div>
 
-            <GeneralModalFooter :processing="form.processing" :save-button-text="saveButtonText" :mode="mode"
-                @save="$emit('save')" @close="closeModal" />
+         <GeneralModalFooter
+    v-if="canSave"
+    :processing="form.processing"
+    :save-button-text="saveButtonText"
+    :mode="mode"
+    @save="$emit('save')"
+    @close="closeModal"
+/>
+<div
+    v-else
+    class="flex justify-end gap-3 px-6 py-4 border-t bg-white"
+>
+    <button
+        type="button"
+        @click="closeModal"
+        class="px-5 py-3 rounded-2xl bg-slate-200 text-slate-700 font-semibold"
+    >
+        Cerrar
+    </button>
+</div>
         </div>
     </div>
 </template>

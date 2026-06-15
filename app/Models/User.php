@@ -72,16 +72,14 @@ class User extends Authenticatable
         return $this->belongsToMany(Branch::class, 'branch_user');
     }
 
-    public function hasPermission($permission)
-    {
-        if ($this->permissions()->where('name', $permission)->exists()) {
-            return true;
-        }
-
-        if ($this->role && $this->role->permissions()->where('name', $permission)->exists()) {
-            return true;
-        }
-
-        return false;
+  public function hasPermission($permission)
+{
+    if ($this->role?->name === 'Administrador') {
+        return true;
     }
+
+    return $this->permissions()
+        ->where('name', $permission)
+        ->exists();
+}
 }

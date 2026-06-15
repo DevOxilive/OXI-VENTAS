@@ -102,15 +102,26 @@ const {
   <div class="relative px-8 py-6">
     <div class="bg-[#f8f5f9] rounded-3xl p-6 min-h-[calc(100vh-180px)]">
 
-      <ProductFilters :branch="branch" :search="search" :category-filter="categoryFilter" :categories-d-b="categoriesDB"
-        :records-to-show="recordsToShow" @update:search="search = $event"
-        @update:category-filter="categoryFilter = $event" @update:records-to-show="recordsToShow = $event"
-        @create="openCreateModal" />
-
+    <ProductFilters
+  :branch="branch"
+  :search="search"
+  :category-filter="categoryFilter"
+  :categoriesDB="categoriesDB"
+  :records-to-show="recordsToShow"
+  :can-create="can('inventory.products.create')"
+  @update:search="search = $event"
+  @update:category-filter="categoryFilter = $event"
+  @update:records-to-show="recordsToShow = $event"
+  @create="can('inventory.products.create') && openCreateModal()"
+/>
       <!-- TABLA CON SCROLL -->
       <div class="mt-5 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="max-h-[520px] overflow-y-auto">
-          <ProductTable :products="products" @view="openViewModal" @edit="openEditModal" @delete="deleteProduct" />
+      <ProductTable :products="products" :can-view="can('inventory.products.view')" :can-edit="can('inventory.products.update')" :can-delete="can('inventory.products.delete')"
+ @view="can('inventory.products.view') && openViewModal($event)"
+  @edit="can('inventory.products.update') && openEditModal($event)"
+  @delete="can('inventory.products.delete') && deleteProduct($event)"
+/>
         </div>
       </div>
 
