@@ -2,7 +2,6 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { router } from '@inertiajs/vue3'
-import EmployeeMobileCards from '@/Components/HumanResources/EmployeeMobileCards.vue'
 import { useEmployeeActions } from '@/Composables/HumanResources/useEmployeeActions'
 import { useEmployeeFilters } from '@/Composables/HumanResources/useEmployeeFilters'
 import { useEmployeeExport } from '@/Composables/HumanResources/useEmployeeExport'
@@ -85,13 +84,7 @@ onBeforeUnmount(() => {
             :recordsToShow="recordsToShow" @create="openCreateModal" @excel="exportExcel"
             @update:recordsToShow="recordsToShow = $event" />
 
-        <EmployeeTable :filteredEmployees="filteredEmployees" :search="search" :positionFilter="positionFilter"
-            :departmentFilter="departmentFilter" :statusFilter="statusFilter" @update:search="search = $event"
-            @update:positionFilter="positionFilter = $event" @update:departmentFilter="departmentFilter = $event"
-            @update:statusFilter="statusFilter = $event" @view="openViewModal" @edit="openEditModal"
-            @delete="deleteEmployee" />
-
-        <EmployeeMobileCards :filteredEmployees="filteredEmployees" @view="openViewModal" @edit="openEditModal"
+        <EmployeeTable :filteredEmployees="filteredEmployees" @view="openViewModal" @edit="openEditModal"
             @delete="deleteEmployee" />
 
         <EmployeeRegisterModal v-if="
