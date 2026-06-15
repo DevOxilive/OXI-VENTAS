@@ -8,10 +8,6 @@ defineProps({
         type: Array,
         default: () => [],
     },
-    recordsToShow: {
-        type: Number,
-        default: 10,
-    },
     categories: {
         type: Array,
         default: () => [],
@@ -47,21 +43,6 @@ defineEmits([
             <input :value="search" type="text" placeholder="Buscar producto o código"
                 class="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                 @input="$emit('update:search', $event.target.value)" />
-
-            <div class="flex items-center gap-2">
-                <span class="text-sm text-slate-500 whitespace-nowrap">
-                    Mostrar
-                </span>
-
-                <select :value="recordsToShow"
-                    class="border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-                    @change="$emit('update:recordsToShow', Number($event.target.value))">
-                    <option :value="10">10</option>
-                    <option :value="25">25</option>
-                    <option :value="50">50</option>
-                    <option :value="100">100</option>
-                </select>
-            </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">

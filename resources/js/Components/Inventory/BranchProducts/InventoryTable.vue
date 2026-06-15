@@ -1,14 +1,23 @@
 <script setup>
-import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
+import GlobalTable from '@/Components/Tables/GlobalTable.vue'
+import { inventoryTableConfig } from '@/Config/TableConfigs/inventoryTableConfig'
 
 defineProps({
     filteredProducts: {
         type: Array,
         default: () => [],
     },
+    pagination: {
+        type: [Object, Array],
+        default: null,
+    },
+    recordsPerPage: {
+        type: Number,
+        default: 50,
+    },
 })
 
-defineEmits([
+const emit = defineEmits([
     'view',
     'edit',
     'entry',
@@ -16,97 +25,23 @@ defineEmits([
     'movements',
     'batches',
     'delete',
+    'update:recordsPerPage',
+    'page-change',
 ])
 
-function statusClass(status) {
-    const classes = {
-        Disponible: 'bg-green-100 text-green-700',
-        'Stock bajo': 'bg-amber-100 text-amber-700',
-        Agotado: 'bg-red-100 text-red-700',
-    }
-
-    return classes[status] || 'bg-slate-100 text-slate-700'
+function handleTableAction({ action, row }) {
+    if (action === 'entry') emit('entry', row)
+    else if (action === 'exit') emit('exit', row)
+    else if (action === 'movements') emit('movements', row)
+    else if (action === 'batches') emit('batches', row)
+    else if (action === 'view') emit('view', row)
+    else if (action === 'edit') emit('edit', row)
+    else if (action === 'delete') emit('delete', row)
 }
 </script>
 
 <template>
-    <div class="hidden md:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full table-fixed text-sm">
-                <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
-                    <tr>
-                        <th class="w-[13%] text-left px-4 py-3 font-semibold">Código</th>
-                        <th class="w-[28%] text-left px-4 py-3 font-semibold">Producto</th>
-                        <th class="w-[18%] text-left px-4 py-3 font-semibold">Categoría</th>
-                        <th class="w-[15%] text-left px-4 py-3 font-semibold">Stock</th>
-                        <th class="w-[13%] text-left px-4 py-3 font-semibold">Estado</th>
-                        <th class="w-[13%] text-center px-4 py-3 font-semibold">Acciones</th>
-                    </tr>
-                </thead>
-
-                <tbody class="divide-y divide-slate-100">
-                    <tr v-for="product in filteredProducts" :key="product.id"
-                        class="hover:bg-slate-50 transition-colors">
-                        <td class="px-4 py-4 text-slate-500 font-mono text-xs truncate">
-                            {{ product.code }}
-                        </td>
-
-                        <td class="px-4 py-4">
-                            <div class="font-semibold text-slate-800 truncate">
-                                {{ product.name }}
-                            </div>
-                        </td>
-
-                        <td class="px-4 py-4 text-slate-600 truncate">
-                            {{ product.category_name ?? product.category ?? 'Sin categoría' }}
-                        </td>
-
-                        <td class="px-4 py-4">
-                            <div class="font-semibold text-slate-800 truncate">
-                                {{ product.stockLabel ?? product.stock }}
-                            </div>
-
-                            <div class="text-xs text-slate-400 truncate">
-                                Mínimo: {{ product.minStockLabel ?? product.minStock }}
-                            </div>
-
-                            <div v-if="product.batches?.length" class="text-xs text-blue-500 font-semibold truncate">
-                                {{ product.batches.length }} lote(s)
-                            </div>
-                        </td>
-
-                        <td class="px-4 py-4">
-                            <span
-                                class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap"
-                                :class="statusClass(product.status)">
-                                {{ product.status }}
-                            </span>
-                        </td>
-
-                        <td class="px-4 py-4">
-                            <div class="flex items-center justify-center gap-2">
-                                <ActionIconButton icon="add" title="Entrada" variant="green"
-                                    @click="$emit('entry', product)" />
-
-                                <ActionIconButton icon="remove" title="Salida" variant="red"
-                                    @click="$emit('exit', product)" />
-
-                                <ActionIconButton icon="edit" title="Lotes" variant="blue"
-                                    :disabled="!product.batches?.length" @click="$emit('batches', product)" />
-
-                                <ActionIconButton icon="history" title="Historial" variant="slate"
-                                    @click="$emit('movements', product)" />
-                            </div>
-                        </td>
-                    </tr>
-
-                    <tr v-if="!filteredProducts.length">
-                        <td colspan="6" class="px-4 py-10 text-center text-slate-500">
-                            No se encontraron productos.
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <GlobalTable :items="filteredProducts" v-bind="inventoryTableConfig" :pagination="pagination"
+        :records-per-page="recordsPerPage" @action="handleTableAction"
+        @update:records-per-page="$emit('update:recordsPerPage', $event)" @page-change="$emit('page-change', $event)" />
 </template>

@@ -3,11 +3,10 @@ import { computed, ref, watch } from "vue";
 import { router } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
-
-import ProductToolbar from "@/Components/Inventory/BranchProducts/ProductToolbar.vue";
-import ProductTable from "@/Components/Inventory/BranchProducts/ProductTable.vue";
-import ProductMobileCards from "@/Components/Inventory/BranchProducts/ProductMobileCards.vue";
-import ProductRegisterModal from "@/Components/Inventory/BranchProducts/ProductRegisterModal.vue";
+import ProductTable from "@/Components/Inventory/ProductTable.vue";
+import TablePageLayout from '@/Components/Tables/TablePageLayout.vue'
+import ProductFilters from "@/Components/Inventory/ProductFilters.vue";
+import ProductRegisterModal from "@/Components/Inventory/ProductRegisterModal.vue";
 
 defineOptions({
   layout: AdminLayout,
@@ -67,16 +66,6 @@ const products = computed(() => {
   return props.productsDB?.data ?? [];
 });
 
-const paginationLinks = computed(() => {
-  return Array.isArray(props.productsDB?.links)
-    ? props.productsDB.links
-    : [];
-});
-
-const hasPagination = computed(() => {
-  return !Array.isArray(props.productsDB) && paginationLinks.value.length > 0;
-});
-
 const filteredProducts = computed(() => {
   return products.value.filter((product) => {
     const matchesBranch =
@@ -121,14 +110,21 @@ function reloadProducts() {
   );
 }
 
-function goToPage(url) {
-  if (!url) return;
+function reloadProducts(pageUrl = null) {
+  const request = pageUrl ?? window.location.pathname
 
-  router.visit(url, {
-    preserveState: true,
-    preserveScroll: true,
-    replace: true,
-  });
+  router.get(
+    request,
+    {
+      search: search.value || undefined,
+      per_page: recordsToShow.value,
+    },
+    {
+      preserveState: true,
+      preserveScroll: true,
+      replace: true,
+    }
+  );
 }
 
 function resetProduct() {
@@ -287,45 +283,20 @@ function exportExcel() {
 function adjustStock(selectedProduct) {
   console.log("Ajustar stock", selectedProduct);
 }
-
-function deleteProduct(selectedProduct) {
-  console.log("Eliminar producto", selectedProduct);
-}
 </script>
-
-
 <template>
-  <section class="max-w-[1030px] mx-auto py-8 px-6 bg-white min-h-[calc(100vh-90px)]">
+  <TablePageLayout>
+    <template #toolbar>
+      <ProductFilters :search="search" :category-filter="categoryFilter" :records-to-show="recordsToShow"
+        @update:search="search = $event" @update:category-filter="categoryFilter = $event"
+        @update:records-to-show="recordsToShow = $event" @create="openCreateModal" />
+    </template>
 
-    <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden">
-      <ProductFilters :branch="branch" :search="search" :category-filter="categoryFilter" :categories-d-b="categoriesDB"
-        :records-to-show="recordsToShow" @update:search="search = $event"
-        @update:category-filter="categoryFilter = $event" @update:records-to-show="recordsToShow = $event"
-        @create="openCreateModal" />
+    <ProductTable :products="filteredProducts" :pagination="productsDB" :records-per-page="recordsToShow"
+      @update:records-per-page="recordsToShow = $event" @page-change="reloadProducts" @view="openViewModal"
+      @edit="openEditModal" @delete="deleteProduct" />
+  </TablePageLayout>
 
-      <ProductTable :products="products" @view="openViewModal" @edit="openEditModal" @delete="deleteProduct" />
-    </div>
-
-    <ProductToolbar :total="props.productsDB?.total ?? filteredProducts.length" v-model:records-to-show="recordsToShow"
-      @create="openCreateModal" />
-
-    <ProductTable :filtered-products="filteredProducts" v-model:search="search" v-model:branch-filter="branchFilter"
-      v-model:category-filter="categoryFilter" v-model:stock-filter="stockFilter" @view="openViewModal"
-      @edit="openEditModal" @adjust="adjustStock" @delete="deleteProduct" />
-
-
-    <ProductMobileCards :filtered-products="filteredProducts" @view="openViewModal" @edit="openEditModal"
-      @adjust="adjustStock" @delete="deleteProduct" />
-
-    <div v-if="hasPagination" class="flex flex-wrap items-center justify-center gap-2 mt-6">
-      <button v-for="link in paginationLinks" :key="link.label" type="button" :disabled="!link.url"
-        class="px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 disabled:cursor-not-allowed" :class="link.active
-          ? 'bg-slate-900 text-white border-slate-900'
-          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'" @click="goToPage(link.url)"
-        v-html="link.label" />
-    </div>
-
-    <ProductRegisterModal v-if="showModal" :modo="modalMode" :product="product" :frontend-errors="frontendErrors"
-      @close="closeModal" @save="submitProduct" @validate="validateField" />
-  </section>
+  <ProductRegisterModal v-if="showModal" :modo="modalMode" :product="product" :frontend-errors="frontendErrors"
+    @close="closeModal" @save="submitProduct" @validate="validateField" />
 </template>

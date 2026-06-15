@@ -3,7 +3,6 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ProductModal from '@/Components/Inventory/ProductModal.vue'
 import ProductFilters from '@/Components/Inventory/ProductFilters.vue'
 import ProductTable from '@/Components/Inventory/ProductTable.vue'
-import ProductMobileCards from '@/Components/Inventory/ProductMobileCards.vue'
 
 import { useProductActions } from '@/Composables/Inventory/useProductActions'
 import { usePermissions } from '@/Composables/usePermissions'
@@ -115,8 +114,6 @@ const {
         </div>
       </div>
 
-      <!-- MOBILE -->
-      <ProductMobileCards :products="products" @view="openViewModal" @edit="openEditModal" @delete="deleteProduct" />
       <!-- PAGINACIÓN -->
       <div class="flex items-center justify-between mt-6 px-2">
         <button @click="reloadProducts(currentPage - 1)" :disabled="currentPage === 1"
@@ -138,9 +135,9 @@ const {
     <ProductModal v-if="
       showModal &&
       (
-        (modalMode === 'create' && can('inventario.crear')) ||
-        (modalMode === 'edit' && can('inventario.editar')) ||
-        (modalMode === 'view' && can('inventario.ver'))
+        (modalMode === 'create' && can('inventory.create')) ||
+        (modalMode === 'edit' && can('inventory.update')) ||
+        (modalMode === 'view' && can('inventory.view'))
       )
     " :mode="modalMode" :product="selectedProduct" :categoriesDB="categoriesDB" :subcategoriesDB="subcategoriesDB"
       :branchesDB="branchesDB" :branch="branch" @close="closeModal" />
