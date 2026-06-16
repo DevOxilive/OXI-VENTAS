@@ -4,9 +4,14 @@
  */
 
 // Componentes
-export { default as GlobalTable } from "./GlobalTable.vue";
-export { default as TableDesktop } from "./TableDesktop.vue";
-export { default as TableMobile } from "./TableMobile.vue";
+export { default as GlobalToolbar } from "./GlobalToolbar.vue";
+export { default as ToolbarDesktop } from "./ToolbarDesktop.vue";
+export { default as ToolbarMobile } from "./ToolbarMobile.vue";
+export { useToolbarConfig } from "./useToolbarConfig";
+export {
+    getToolbarActionClasses,
+    toolbarActionVariants,
+} from "./toolbarClasses";
 
 export {
     formatCellValue,

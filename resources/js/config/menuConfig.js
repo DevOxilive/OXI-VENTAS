@@ -18,19 +18,19 @@ export function generateMenu(role, permissions = [], branches = []) {
     |--------------------------------------------------------------------------
     */
     if (
-    isAdmin ||
-    can("employees.view") ||
-    can("employees.create") ||
-    can("employees.update") ||
-    can("employees.delete")
-) {
-    menu.push({
-        text: "Capital Humano",
-        key: "human-resources",
-        icon: "badge",
-        url: route("human-resources.employees.index"),
-    });
-}
+        isAdmin ||
+        can("employees.view") ||
+        can("employees.create") ||
+        can("employees.update") ||
+        can("employees.delete")
+    ) {
+        menu.push({
+            text: "Capital Humano",
+            key: "human-resources",
+            icon: "badge",
+            url: route("human-resources.employees.index"),
+        });
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -124,7 +124,7 @@ export function generateMenu(role, permissions = [], branches = []) {
                       text: "Inventario",
                       key: `inventory.${branch.slug}.inventory`,
                       icon: "inventory_2",
-                      url: route("inventario.branches.inventory", {
+                      url: route("inventory.branches.inventory", {
                           branch: branch.id,
                       }),
                   },
@@ -141,7 +141,7 @@ export function generateMenu(role, permissions = [], branches = []) {
                       text: "Reporte de compra",
                       key: `inventory.${branch.slug}.purchase-report`,
                       icon: "shopping_cart",
-                      url: route("inventario.branches.purchase-reports.index", {
+                      url: route("inventory.branches.purchase-reports.index", {
                           branch: branch.id,
                       }),
                   },
@@ -165,20 +165,18 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        // ...(isAdmin ||
-        // can("inventory.reports.view") ||
-        // can("inventory.view")
-        //     ? [
-        //           {
-        //               text: "Reportes",
-        //               key: `inventory.${branch.slug}.reports`,
-        //               icon: "bar_chart",
-        //               url: route("inventario.branches.reports", {
-        //                   branch: branch.id,
-        //               }),
-        //           },
-        //       ]
-        //     : []),
+        ...(isAdmin || can("inventory.view") || can("inventory.branches.view")
+            ? [
+                  {
+                      text: "Reportes",
+                      key: `inventory.${branch.slug}.reports`,
+                      icon: "bar_chart",
+                      url: route("inventory.branches.reports", {
+                          branch: branch.id,
+                      }),
+                  },
+              ]
+            : []),
     ];
 
     const canSeeBranchesSection =
@@ -198,7 +196,9 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("audits.physical-counts.view") ||
         can("audits.physical-counts.create") ||
         can("audits.physical-counts.update") ||
-        can("audits.physical-counts.delete");
+        can("audits.physical-counts.delete") ||
+        can("inventory.view") ||
+        can("inventory.branches.view");
 
     if (canSeeBranchesSection) {
         menu.push({

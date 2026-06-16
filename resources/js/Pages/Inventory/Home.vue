@@ -2,8 +2,7 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ProductModal from '@/Components/Inventory/ProductModal.vue'
 import ProductFilters from '@/Components/Inventory/ProductFilters.vue'
-import ProductTable from '@/Components/Inventory/ProductTable.vue'
-
+import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import { useProductActions } from '@/Composables/Inventory/useProductActions'
 import { usePermissions } from '@/Composables/usePermissions'
 import { computed, ref, watch } from 'vue'
@@ -52,6 +51,98 @@ const recordsToShow = ref(props.filters.per_page ?? 50)
 const products = computed(() => props.productsDB?.data ?? [])
 const currentPage = computed(() => props.productsDB?.current_page ?? 1)
 const totalPages = computed(() => props.productsDB?.last_page ?? 1)
+
+const productColumns = [
+  {
+    key: 'barcode',
+    label: 'Código barras',
+    format: 'text',
+    fallback: 'Sin código',
+    mobileLabel: 'Código',
+  },
+  {
+    key: 'name',
+    label: 'Producto',
+    format: 'text',
+    subKey: 'presentation',
+    mobileSecondary: true,
+  },
+  {
+    key: 'category_name',
+    label: 'Categoría',
+    format: 'badge',
+    fallback: 'Sin categoría',
+    mobileBadge: true,
+  },
+  {
+    key: 'unit',
+    label: 'Unidad',
+    format: 'text',
+    fallback: 'Sin unidad',
+    mobileDisplay: false,
+  },
+  {
+    key: 'cost',
+    label: 'Precio inicial',
+    format: 'currency',
+    formatOptions: {
+      decimals: 2,
+      fallback: '$0.00',
+    },
+    mobileDisplay: false,
+  },
+  {
+    key: 'price',
+    label: 'Precio venta',
+    format: 'currency',
+    formatOptions: {
+      decimals: 2,
+      fallback: '$0.00',
+    },
+    mobileLabel: 'Precio',
+  },
+]
+
+const productActions = computed(() => [
+  {
+    id: 'view',
+    label: 'Ver',
+    icon: 'visibility',
+    variant: 'blue',
+    hidden: () => !can('inventory.products.view'),
+    mobile: 'button',
+  },
+  {
+    id: 'edit',
+    label: 'Editar',
+    icon: 'edit',
+    variant: 'amber',
+    hidden: () => !can('inventory.products.update'),
+    mobile: 'button',
+  },
+  {
+    id: 'delete',
+    label: 'Eliminar',
+    icon: 'delete',
+    variant: 'red',
+    hidden: () => !can('inventory.products.delete'),
+    mobile: 'button',
+  },
+])
+
+function handleProductAction({ action, row }) {
+  if (action === 'view' && can('inventory.products.view')) {
+    openViewModal(row)
+  }
+
+  if (action === 'edit' && can('inventory.products.update')) {
+    openEditModal(row)
+  }
+
+  if (action === 'delete' && can('inventory.products.delete')) {
+    deleteProduct(row)
+  }
+}
 
 function reloadProducts(page = 1) {
   router.get(
@@ -102,26 +193,16 @@ const {
   <div class="relative px-8 py-6">
     <div class="bg-[#f8f5f9] rounded-3xl p-6 min-h-[calc(100vh-180px)]">
 
-    <ProductFilters
-  :branch="branch"
-  :search="search"
-  :category-filter="categoryFilter"
-  :categoriesDB="categoriesDB"
-  :records-to-show="recordsToShow"
-  :can-create="can('inventory.products.create')"
-  @update:search="search = $event"
-  @update:category-filter="categoryFilter = $event"
-  @update:records-to-show="recordsToShow = $event"
-  @create="can('inventory.products.create') && openCreateModal()"
-/>
+      <ProductFilters :branch="branch" :search="search" :category-filter="categoryFilter" :categoriesDB="categoriesDB"
+        :records-to-show="recordsToShow" :can-create="can('inventory.products.create')" @update:search="search = $event"
+        @update:category-filter="categoryFilter = $event" @update:records-to-show="recordsToShow = $event"
+        @create="can('inventory.products.create') && openCreateModal()" />
       <!-- TABLA CON SCROLL -->
       <div class="mt-5 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="max-h-[520px] overflow-y-auto">
-      <ProductTable :products="products" :can-view="can('inventory.products.view')" :can-edit="can('inventory.products.update')" :can-delete="can('inventory.products.delete')"
- @view="can('inventory.products.view') && openViewModal($event)"
-  @edit="can('inventory.products.update') && openEditModal($event)"
-  @delete="can('inventory.products.delete') && deleteProduct($event)"
-/>
+          <GlobalTable :items="products" :columns="productColumns" :actions="productActions" row-key="id"
+            mobile-card-header-field="name" no-data-message="No se encontraron productos"
+            @action="handleProductAction" />
         </div>
       </div>
 
@@ -146,9 +227,9 @@ const {
     <ProductModal v-if="
       showModal &&
       (
-        (modalMode === 'create' && can('inventory.create')) ||
-        (modalMode === 'edit' && can('inventory.update')) ||
-        (modalMode === 'view' && can('inventory.view'))
+        (modalMode === 'create' && can('inventory.products.create')) ||
+        (modalMode === 'edit' && can('inventory.products.update')) ||
+        (modalMode === 'view' && can('inventory.products.view'))
       )
     " :mode="modalMode" :product="selectedProduct" :categoriesDB="categoriesDB" :subcategoriesDB="subcategoriesDB"
       :branchesDB="branchesDB" :branch="branch" @close="closeModal" />

@@ -4,46 +4,74 @@ namespace App\Http\Controllers\Inventory;
 
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
-use App\Models\BranchProduct;
+use App\Services\InventoryReportService;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ReportController extends Controller
 {
-    public function index(Branch $branch)
+    public function index(Request $request, Branch $branch, InventoryReportService $reportService)
     {
-        $branchProducts = BranchProduct::with(['branch', 'product'])
-            ->where('branch_id', $branch->id)
-            ->where('status', BranchProduct::STATUS_ACTIVE)
-            ->get();
+        $filters = $this->resolveFilters($request);
+        $activeReport = $request->input('report', 'dashboard');
 
-        $inventoryValue = $branchProducts->sum(function ($item) {
-            return (float) $item->stock * (float) ($item->product?->sale_price ?? 0);
-        });
+        $reports = [
+            'movements' => [],
+            'expirations' => [],
+            'rotation' => [],
+            'attentionProducts' => [],
+        ];
+
+        if ($activeReport === 'movements') {
+            $reports['movements'] = $reportService->movements($branch, $filters);
+        }
+
+        if ($activeReport === 'expirations') {
+            $reports['expirations'] = $reportService->expirations($branch, $filters);
+        }
+
+        if ($activeReport === 'rotation') {
+            $reports['rotation'] = $reportService->rotation($branch, $filters);
+        }
+
+        if ($activeReport === 'attention') {
+            $reports['attentionProducts'] = $reportService->attentionProducts($branch);
+        }
 
         return Inertia::render('Inventory/Reports', [
             'currentBranch' => $branch,
-
-            'branches' => Branch::where('active', true)->get(),
-
-            'summary' => [
-                'total_products' => $branchProducts->count(),
-                'total_stock' => $branchProducts->sum('stock'),
-                'inventory_value' => $inventoryValue,
-                'low_stock' => $branchProducts->filter(fn($item) => $item->stock <= $item->min_stock)->count(),
-                'out_of_stock' => $branchProducts->where('stock', 0)->count(),
+            'activeReport' => $activeReport,
+            'filters' => $filters,
+            'catalogs' => [
+                'movementTypes' => [
+                    'IN',
+                    'OUT',
+                    'ADJUSTMENT',
+                ],
+                'movementReasons' => [
+                    'PURCHASE',
+                    'SALE',
+                    'DAMAGED',
+                    'EXPIRED',
+                    'INVENTORY_DIFFERENCE',
+                ],
             ],
-
-            'branchReports' => [
-                [
-                    'branch_id' => $branch->id,
-                    'branch_name' => $branch->name,
-                    'products_count' => $branchProducts->count(),
-                    'total_stock' => $branchProducts->sum('stock'),
-                    'inventory_value' => $inventoryValue,
-                    'low_stock' => $branchProducts->filter(fn($item) => $item->stock <= $item->min_stock)->count(),
-                    'out_of_stock' => $branchProducts->where('stock', 0)->count(),
-                ]
-            ],
+            'summary' => $reportService->summary($branch),
+            'reports' => $reports,
         ]);
+    }
+
+    private function resolveFilters(Request $request): array
+    {
+        return [
+            'period' => $request->input('period', '30_days'),
+            'date_from' => $request->input('date_from'),
+            'date_to' => $request->input('date_to'),
+            'product_id' => $request->input('product_id'),
+            'category_id' => $request->input('category_id'),
+            'user_id' => $request->input('user_id'),
+            'movement_type' => $request->input('movement_type'),
+            'movement_reason' => $request->input('movement_reason'),
+        ];
     }
 }

@@ -1,181 +1,197 @@
 <script setup>
+import { Head, router } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
-defineOptions({ layout: AdminLayout })
+import ReportsTabs from '@/Components/Inventory/Reports/ReportsTabs.vue'
+import ReportsSummaryCards from '@/Components/Inventory/Reports/ReportsSummaryCards.vue'
+import MovementsReportTable from '@/Components/Inventory/Reports/MovementsReportTable.vue'
+import ExpirationsReportTable from '@/Components/Inventory/Reports/ExpirationsReportTable.vue'
+import RotationReportTable from '@/Components/Inventory/Reports/RotationReportTable.vue'
+import AttentionProductsReportTable from '@/Components/Inventory/Reports/AttentionProductsReportTable.vue'
 
 const props = defineProps({
-    branches: Array,
-    summary: Object,
-    branchReports: Array,
-    currentBranch: Object,
+    currentBranch: {
+        type: Object,
+        required: true,
+    },
+    filters: {
+        type: Object,
+        default: () => ({}),
+    },
+    catalogs: {
+        type: Object,
+        default: () => ({}),
+    },
+    summary: {
+        type: Object,
+        default: () => ({}),
+    },
+    reports: {
+        type: Object,
+        default: () => ({}),
+    },
 })
 
-const branchFilter = ref('Todas')
-const currentBranch = computed(() => props.currentBranch ?? null)
-const reports = computed(() => props.branchReports ?? [])
+const activeTab = ref(props.activeReport ?? 'dashboard')
+const tabs = [
+    {
+        key: 'dashboard',
+        label: 'Dashboard',
+        icon: 'dashboard',
+        description: 'Resumen general',
+    },
+    {
+        key: 'movements',
+        label: 'Movimientos',
+        icon: 'sync_alt',
+        description: 'Entradas, salidas y ajustes',
+    },
+    {
+        key: 'expirations',
+        label: 'Caducidades',
+        icon: 'event_busy',
+        description: 'Lotes vencidos o por vencer',
+    },
+    {
+        key: 'rotation',
+        label: 'Rotación',
+        icon: 'trending_up',
+        description: 'Consumo y movimiento',
+    },
+    {
+        key: 'attention',
+        label: 'Atención',
+        icon: 'priority_high',
+        description: 'Productos con alertas',
+    },
+]
 
-const filteredReports = computed(() => {
-    if (branchFilter.value === 'Todas') return reports.value
+function changeReport(tab) {
+    activeTab.value = tab
 
-    return reports.value.filter(item => item.branch_id === Number(branchFilter.value))
-})
-
-const totalSummary = computed(() => props.summary ?? {
-    total_products: 0,
-    total_stock: 0,
-    inventory_value: 0,
-    low_stock: 0,
-    out_of_stock: 0,
-})
-
-const money = (value) => {
-    return new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: 'MXN',
-    }).format(value ?? 0)
+    router.get(
+        route('inventory.branches.reports', {
+            branch: props.currentBranch.id,
+        }),
+        {
+            ...props.filters,
+            report: tab,
+        },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        },
+    )
 }
+const pageTitle = computed(() => {
+    return `Reportes de inventario - ${props.currentBranch?.name ?? 'Sucursal'}`
+})
+
+const activeReportTitle = computed(() => {
+    return tabs.find((tab) => tab.key === activeTab.value)?.label ?? 'Dashboard'
+})
+
+const activeReportDescription = computed(() => {
+    return tabs.find((tab) => tab.key === activeTab.value)?.description ?? ''
+})
 </script>
 
 <template>
-    <section class="space-y-5">
-        <div>
-            <h1 class="text-xl font-bold text-slate-800">
-                Reportes de inventario - {{ currentBranch?.name ?? 'Sucursal' }}
-            </h1>
-            <p class="text-sm text-slate-500 mt-1">
-                Resumen general del inventario por sucursal.
-            </p>
-        </div>
 
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h2 class="text-base font-bold text-slate-800">
-                        Filtros
+    <Head :title="pageTitle" />
+
+    <AdminLayout>
+        <div class="space-y-6">
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-[0.22em] text-slate-400">
+                            Inventario por sucursal
+                        </p>
+
+                        <h1 class="mt-1 text-2xl font-black text-slate-900">
+                            Reportes de inventario
+                        </h1>
+
+                        <p class="mt-1 text-sm text-slate-500">
+                            Consulta movimientos, caducidades, rotación y productos que requieren atención.
+                        </p>
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p class="text-xs font-bold uppercase tracking-wide text-slate-400">
+                            Sucursal actual
+                        </p>
+                        <p class="text-sm font-black text-slate-800">
+                            {{ currentBranch?.name ?? 'Sin sucursal' }}
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <ReportsSummaryCards :summary="summary" />
+
+            <ReportsTabs :model-value="activeTab" :tabs="tabs" @update:model-value="changeReport" />
+            
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="mb-5 flex flex-col gap-1">
+                    <h2 class="text-lg font-black text-slate-900">
+                        {{ activeReportTitle }}
                     </h2>
                     <p class="text-sm text-slate-500">
-                        Consulta información general o por sucursal.
+                        {{ activeReportDescription }}
                     </p>
                 </div>
 
-                <select v-model="branchFilter" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-                    <option value="Todas">Todas las sucursales</option>
+                <div v-if="activeTab === 'dashboard'" class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <p class="text-xs font-black uppercase tracking-wide text-slate-400">
+                            Inventario
+                        </p>
+                        <p class="mt-2 text-3xl font-black text-slate-900">
+                            {{ summary?.total_products ?? 0 }}
+                        </p>
+                        <p class="mt-1 text-sm text-slate-500">
+                            Productos registrados en esta sucursal.
+                        </p>
+                    </article>
 
-                    <option v-for="branch in branches" :key="branch.id" :value="branch.id">
-                        {{ branch.name }}
-                    </option>
-                </select>
-            </div>
-        </div>
+                    <article class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                        <p class="text-xs font-black uppercase tracking-wide text-amber-600">
+                            Atención
+                        </p>
+                        <p class="mt-2 text-3xl font-black text-amber-700">
+                            {{ summary?.attention_products ?? 0 }}
+                        </p>
+                        <p class="mt-1 text-sm text-amber-700/80">
+                            Productos con stock bajo, sin movimiento o riesgo de caducidad.
+                        </p>
+                    </article>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Productos</p>
-                <h3 class="text-2xl font-bold text-slate-800 mt-2">
-                    {{ totalSummary.total_products }}
-                </h3>
-            </div>
-
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Stock total</p>
-                <h3 class="text-2xl font-bold text-slate-800 mt-2">
-                    {{ totalSummary.total_stock }}
-                </h3>
-            </div>
-
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Valor inventario</p>
-                <h3 class="text-2xl font-bold text-slate-800 mt-2">
-                    {{ money(totalSummary.inventory_value) }}
-                </h3>
-            </div>
-
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Stock bajo</p>
-                <h3 class="text-2xl font-bold text-orange-600 mt-2">
-                    {{ totalSummary.low_stock }}
-                </h3>
-            </div>
-
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Agotados</p>
-                <h3 class="text-2xl font-bold text-red-600 mt-2">
-                    {{ totalSummary.out_of_stock }}
-                </h3>
-            </div>
-        </div>
-
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div class="p-4 border-b border-slate-100">
-                <h2 class="text-base font-bold text-slate-800">
-                    Resumen por sucursal
-                </h2>
-            </div>
-
-            <div class="hidden md:block overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-semibold">Sucursal</th>
-                            <th class="px-4 py-3 text-left font-semibold">Productos</th>
-                            <th class="px-4 py-3 text-left font-semibold">Stock total</th>
-                            <th class="px-4 py-3 text-left font-semibold">Valor inventario</th>
-                            <th class="px-4 py-3 text-left font-semibold">Stock bajo</th>
-                            <th class="px-4 py-3 text-left font-semibold">Agotados</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        <tr v-for="item in filteredReports" :key="item.branch_id"
-                            class="border-b border-slate-100 hover:bg-slate-50">
-                            <td class="px-4 py-4 font-semibold text-slate-800">
-                                {{ item.branch_name }}
-                            </td>
-                            <td class="px-4 py-4 text-slate-600">
-                                {{ item.products_count }}
-                            </td>
-                            <td class="px-4 py-4 text-slate-600">
-                                {{ item.total_stock }}
-                            </td>
-                            <td class="px-4 py-4 text-slate-600">
-                                {{ money(item.inventory_value) }}
-                            </td>
-                            <td class="px-4 py-4 text-orange-600 font-semibold">
-                                {{ item.low_stock }}
-                            </td>
-                            <td class="px-4 py-4 text-red-600 font-semibold">
-                                {{ item.out_of_stock }}
-                            </td>
-                        </tr>
-
-                        <tr v-if="filteredReports.length === 0">
-                            <td colspan="6" class="text-center py-10 text-slate-400">
-                                No hay información para mostrar.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="md:hidden p-4 space-y-4">
-                <div v-for="item in filteredReports" :key="item.branch_id"
-                    class="border border-slate-200 rounded-2xl p-4">
-                    <p class="font-bold text-slate-800">{{ item.branch_name }}</p>
-                    <p class="text-sm text-slate-500 mt-1">
-                        Productos: {{ item.products_count }} · Stock: {{ item.total_stock }}
-                    </p>
-                    <p class="text-sm text-slate-500 mt-1">
-                        Valor: {{ money(item.inventory_value) }}
-                    </p>
-                    <p class="text-xs text-orange-600 mt-2">
-                        Stock bajo: {{ item.low_stock }}
-                    </p>
-                    <p class="text-xs text-red-600 mt-1">
-                        Agotados: {{ item.out_of_stock }}
-                    </p>
+                    <article class="rounded-2xl border border-red-200 bg-red-50 p-5">
+                        <p class="text-xs font-black uppercase tracking-wide text-red-600">
+                            Caducidades
+                        </p>
+                        <p class="mt-2 text-3xl font-black text-red-700">
+                            {{ summary?.expired_batches ?? 0 }}
+                        </p>
+                        <p class="mt-1 text-sm text-red-700/80">
+                            Lotes caducados detectados en esta sucursal.
+                        </p>
+                    </article>
                 </div>
-            </div>
+
+                <MovementsReportTable v-if="activeTab === 'movements'" :rows="reports?.movements ?? []" />
+
+                <ExpirationsReportTable v-if="activeTab === 'expirations'" :rows="reports?.expirations ?? []" />
+
+                <RotationReportTable v-if="activeTab === 'rotation'" :rows="reports?.rotation ?? []" />
+
+                <AttentionProductsReportTable v-if="activeTab === 'attention'"
+                    :rows="reports?.attentionProducts ?? []" />
+            </section>
         </div>
-    </section>
+    </AdminLayout>
 </template>

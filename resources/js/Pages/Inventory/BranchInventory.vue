@@ -1,17 +1,17 @@
 <script setup>
+import { computed } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import InventoryStatsCards from '@/Components/Inventory/BranchProducts/InventoryStatsCards.vue'
-import InventoryToolbar from '@/Components/Inventory/BranchProducts/InventoryToolbar.vue'
-import InventoryTable from '@/Components/Inventory/BranchProducts/InventoryTable.vue'
-import InventoryMobileCards from '@/Components/Inventory/BranchProducts/InventoryMobileCards.vue'
-import InventoryAlertsModal from '@/Components/Inventory/BranchProducts/InventoryAlertsModal.vue'
-import StockEntryModal from '@/Components/Inventory/BranchProducts/StockEntryModal.vue'
-import StockExitModal from '@/Components/Inventory/BranchProducts/StockExitModal.vue'
-import ProductMovementsModal from '@/Components/Inventory/BranchProducts/ProductMovementsModal.vue'
-import EditBranchProductConfigModal from '@/Components/Inventory/BranchProducts/EditBranchProductConfigModal.vue'
-import ProductBatchesModal from '@/Components/Inventory/BranchProducts/ProductBatchesModal.vue'
+import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import { usePermissions } from '@/Composables/usePermissions'
 import { useBranchInventory } from '@/Composables/Inventory/useBranchInventory'
+import StockExitModal from '@/Components/Inventory/BranchProducts/StockExitModal.vue'
+import StockEntryModal from '@/Components/Inventory/BranchProducts/StockEntryModal.vue'
+import InventoryToolbar from '@/Components/Inventory/BranchProducts/InventoryToolbar.vue'
+import ProductBatchesModal from '@/Components/Inventory/BranchProducts/ProductBatchesModal.vue'
+import InventoryStatsCards from '@/Components/Inventory/BranchProducts/InventoryStatsCards.vue'
+import InventoryAlertsModal from '@/Components/Inventory/BranchProducts/InventoryAlertsModal.vue'
+import ProductMovementsModal from '@/Components/Inventory/BranchProducts/ProductMovementsModal.vue'
+import EditBranchProductConfigModal from '@/Components/Inventory/BranchProducts/EditBranchProductConfigModal.vue'
 
 
 defineOptions({ layout: AdminLayout })
@@ -81,6 +81,105 @@ const props = defineProps({
         }),
     },
 })
+
+const inventoryColumns = [
+    {
+        key: 'code',
+        label: 'Código',
+        format: 'text',
+        fallback: 'Sin código',
+        mobileLabel: 'Código',
+    },
+    {
+        key: 'name',
+        label: 'Producto',
+        format: 'text',
+        mobileSecondary: true,
+    },
+    {
+        key: 'category_name',
+        label: 'Categoría',
+        format: 'text',
+        fallback: 'Sin categoría',
+        mobileLabel: 'Categoría',
+    },
+    {
+        key: 'stockLabel',
+        label: 'Stock',
+        format: 'text',
+        fallback: '0',
+        mobileLabel: 'Stock',
+        subKey: 'minStockLabel',
+    },
+    {
+        key: 'status',
+        label: 'Estado',
+        format: 'badge',
+        formatOptions: {
+            statusMap: {
+                Disponible: 'green',
+                'Stock bajo': 'amber',
+                Agotado: 'red',
+            },
+        },
+        mobileBadge: true,
+    },
+]
+
+const inventoryActions = computed(() => [
+    {
+        id: 'entry',
+        label: 'Entrada',
+        icon: 'add',
+        variant: 'green',
+        hidden: () => !can('inventory.branches.create'),
+        mobile: 'button',
+    },
+    {
+        id: 'exit',
+        label: 'Salida',
+        icon: 'remove',
+        variant: 'red',
+        hidden: () => !can('inventory.branches.update'),
+        mobile: 'button',
+    },
+    {
+        id: 'batches',
+        label: 'Lotes',
+        icon: 'edit',
+        variant: 'blue',
+        hidden: (product) =>
+            !can('inventory.branches.update') || !product.batches?.length,
+        mobile: 'button',
+    },
+    {
+        id: 'movements',
+        label: 'Historial',
+        icon: 'history',
+        variant: 'slate',
+        hidden: () => !can('inventory.branches.view'),
+        mobile: 'button',
+    },
+])
+
+function handleInventoryAction({ action, row }) {
+    if (action === 'entry' && can('inventory.branches.create')) {
+        openEntryModal(row)
+    }
+
+    if (action === 'exit' && can('inventory.branches.update')) {
+        openExitModal(row)
+    }
+
+    if (action === 'batches' && can('inventory.branches.update')) {
+        openProductBatchesModal(row)
+    }
+
+    if (action === 'movements' && can('inventory.branches.view')) {
+        openMovementsModal(row)
+    }
+}
+
 const { can } = usePermissions()
 
 const {
@@ -191,38 +290,9 @@ const {
             @update:expirationStatusFilter="expirationStatusFilter = $event"
             @update:inactiveCandidateFilter="inactiveCandidateFilter = $event" />
 
-<InventoryTable
-    :filtered-products="filteredProducts"
-    :can-view="can('inventory.branches.view')"
-    :can-entry="can('inventory.branches.create')"
-    :can-exit="can('inventory.branches.update')"
-    :can-movements="can('inventory.branches.view')"
-    :can-batches="can('inventory.branches.update')"
-    :can-edit="can('inventory.branches.update')"
-    :can-delete="can('inventory.branches.delete')"
-    @view="viewProduct"
-    @edit="editProduct"
-    @entry="openEntryModal"
-    @exit="openExitModal"
-    @movements="openMovementsModal"
-    @batches="openProductBatchesModal"
-    @delete="deleteProduct"
-/>
-<InventoryMobileCards
-    :filtered-products="filteredProducts"
-    :can-view="can('inventory.branches.view')"
-    :can-entry="can('inventory.branches.create')"
-    :can-exit="can('inventory.branches.update')"
-    :can-movements="can('inventory.branches.view')"
-    :can-edit="can('inventory.branches.update')"
-    :can-delete="can('inventory.branches.delete')"
-    @view="viewProduct"
-    @edit="editProduct"
-    @entry="openEntryModal"
-    @exit="openExitModal"
-    @movements="openMovementsModal"
-    @delete="deleteProduct"
-/>
+        <GlobalTable :items="filteredProducts" :columns="inventoryColumns" :actions="inventoryActions" row-key="id"
+            mobile-card-header-field="name" no-data-message="No se encontraron productos."
+            @action="handleInventoryAction" />
 
         <nav v-if="hasPagination" class="flex flex-wrap items-center justify-center gap-2 pt-1">
             <button v-for="link in paginationLinks" :key="link.label" type="button" :disabled="!link.url"
@@ -233,22 +303,18 @@ const {
                     " @click="goToPage(link.url)" v-html="link.label" />
         </nav>
 
-      <StockEntryModal
-    v-if="showEntryModal && liveSelectedMovementProduct && can('inventory.branches.create')"
-    :product="liveSelectedMovementProduct"
-    @close="closeEntryModal"
-/>
+        <StockEntryModal v-if="showEntryModal && liveSelectedMovementProduct && can('inventory.branches.create')"
+            :product="liveSelectedMovementProduct" @close="closeEntryModal" />
 
-<StockExitModal
-    v-if="showExitModal && liveSelectedMovementProduct && can('inventory.branches.update')"
-    :product="liveSelectedMovementProduct"
-    @close="closeExitModal"
-/>
+        <StockExitModal v-if="showExitModal && liveSelectedMovementProduct && can('inventory.branches.update')"
+            :product="liveSelectedMovementProduct" @close="closeExitModal" />
 
-   <ProductMovementsModal v-if="showMovementsModal && liveSelectedMovementsProduct && can('inventory.branches.view')"
+        <ProductMovementsModal
+            v-if="showMovementsModal && liveSelectedMovementsProduct && can('inventory.branches.view')"
             :product="liveSelectedMovementsProduct" @close="closeMovementsModal" />
 
-<ProductBatchesModal v-if="showProductBatchesModal && liveSelectedBatchesProduct && can('inventory.branches.update')"
+        <ProductBatchesModal
+            v-if="showProductBatchesModal && liveSelectedBatchesProduct && can('inventory.branches.update')"
             :product="liveSelectedBatchesProduct" @close="closeProductBatchesModal"
             @adjust-batch="openBatchAdjustmentFromList" />
 
@@ -265,7 +331,8 @@ const {
         <InventoryAlertsModal v-if="showAlertModal" :title="selectedAlertTitle" :type="selectedAlertType"
             :batches="selectedAlertBatches" @close="closeAlertModal" />
 
-       <EditBranchProductConfigModal v-if="showConfigModal && liveSelectedConfigProduct && can('inventory.branches.update')"
+        <EditBranchProductConfigModal
+            v-if="showConfigModal && liveSelectedConfigProduct && can('inventory.branches.update')"
             :product="liveSelectedConfigProduct" @close="closeConfigModal" />
     </div>
 </template>

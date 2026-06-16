@@ -113,7 +113,7 @@ export function useEditBranchProductConfig(product) {
         if (!validateForm()) return;
 
         form.patch(
-            route("inventario.branch-inventory.update-config", productId),
+            route("inventory.branch-inventory.update-config", productId),
             {
                 preserveScroll: true,
                 onSuccess,

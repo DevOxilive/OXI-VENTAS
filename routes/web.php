@@ -159,11 +159,11 @@ Route::middleware([
             ->middleware('permission:inventory.view,inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete,inventory.branches.view,inventory.branches.create,inventory.branches.update,inventory.branches.delete,inventory.purchase-reports.view,inventory.purchase-reports.create,inventory.purchase-reports.update,inventory.purchase-reports.delete')
             ->name('dashboard');
 
- Route::get('/branches/{branch:slug}/products', [ProductController::class, 'index'])
-    ->middleware(
-        'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete'
-    )
-    ->name('branches.products.index');
+        Route::get('/branches/{branch:slug}/products', [ProductController::class, 'index'])
+            ->middleware(
+                'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete'
+            )
+            ->name('branches.products.index');
 
         Route::post('/branches/{branch:slug}/products', [ProductController::class, 'store'])
             ->middleware('permission:inventory.products.create')
@@ -180,6 +180,28 @@ Route::middleware([
         Route::post('/categories', [CategoryController::class, 'store'])
             ->middleware('permission:inventory.products.create')
             ->name('categories.store');
+
+        /*
+        |--------------------------------------------------------------------------
+        | INVENTARIO - INVENTARIO POR SUCURSAL
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/branches/{branch}/inventory', [BranchInventoryController::class, 'show'])
+            ->middleware('permission:inventory.branches.view,inventory.branches.create,inventory.branches.update,inventory.branches.delete')
+            ->name('branches.inventory');
+
+        Route::post('/branch-inventory', [BranchInventoryController::class, 'store'])
+            ->middleware('permission:inventory.branches.create')
+            ->name('branch-inventory.store');
+
+        Route::patch('/branch-inventory/{branchProduct}/config', [BranchInventoryController::class, 'updateConfig'])
+            ->middleware('permission:inventory.branches.update')
+            ->name('branch-inventory.update-config');
+
+        Route::put('/product-batches/{productBatch}', [ProductBatchController::class, 'update'])
+            ->middleware('permission:inventory.branches.update')
+            ->name('product-batches.update');
 
         Route::get('/stock-movements', [StockMovementController::class, 'index'])
             ->middleware('permission:inventory.branches.view,inventory.branches.update')
@@ -204,50 +226,6 @@ Route::middleware([
         Route::get('/adjustments', fn() => Inertia::render('Inventory/Adjustments'))
             ->middleware('permission:inventory.update,inventory.branches.update')
             ->name('adjustments');
-
-        Route::get('/reports', fn() => Inertia::render('Inventory/Reports'))
-            ->middleware('permission:inventory.view')
-            ->name('reports');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | INVENTARIO - INVENTARIO POR SUCURSAL
-    |--------------------------------------------------------------------------
-    */
-
-    Route::prefix('inventario')->name('inventario.')->group(function () {
-        Route::get('/dashboard', fn() => Inertia::render('Inventory/Dashboard'))
-            ->middleware('permission:inventory.view,inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete,inventory.branches.view,inventory.branches.create,inventory.branches.update,inventory.branches.delete,inventory.purchase-reports.view,inventory.purchase-reports.create,inventory.purchase-reports.update,inventory.purchase-reports.delete')
-            ->name('dashboard');
-
-        Route::get('/branches/{branch}/inventory', [BranchInventoryController::class, 'show'])
-            ->middleware('permission:inventory.branches.view,inventory.branches.create,inventory.branches.update,inventory.branches.delete')
-            ->name('branches.inventory');
-
-        Route::post('/inventario-sucursales', [BranchInventoryController::class, 'store'])
-            ->middleware('permission:inventory.branches.create')
-            ->name('branch-inventory.store');
-
-        Route::patch('/inventario-sucursales/{branchProduct}/config', [BranchInventoryController::class, 'updateConfig'])
-            ->middleware('permission:inventory.branches.update')
-            ->name('branch-inventory.update-config');
-
-        Route::get('/stock-movements', [StockMovementController::class, 'index'])
-            ->middleware('permission:inventory.branches.view,inventory.branches.update')
-            ->name('stock-movements.index');
-
-        Route::post('/stock-movements', [StockMovementController::class, 'store'])
-            ->middleware('permission:inventory.branches.update')
-            ->name('stock-movements.store');
-
-        Route::put('/product-batches/{productBatch}', [ProductBatchController::class, 'update'])
-            ->middleware('permission:inventory.branches.update')
-            ->name('product-batches.update');
-
-        Route::get('/movimientos', [StockMovementController::class, 'index'])
-            ->middleware('permission:inventory.branches.view,inventory.branches.update')
-            ->name('movimientos');
 
         /*
         |--------------------------------------------------------------------------
@@ -289,18 +267,23 @@ Route::middleware([
             ->middleware('permission:inventory.view,inventory.branches.view')
             ->name('branches.reports');
 
-        Route::get('/caducidades', fn() => Inertia::render('Inventory/Expirations'))
-            ->middleware('permission:inventory.view,inventory.branches.view')
-            ->name('caducidades');
-
-        Route::get('/transferencias', fn() => Inertia::render('Inventory/Transfers'))
-            ->middleware('permission:inventory.update,inventory.branches.update')
-            ->name('transferencias');
-
-        Route::get('/ajustes', fn() => Inertia::render('Inventory/Adjustments'))
-            ->middleware('permission:inventory.update,inventory.branches.update')
-            ->name('ajustes');
+        Route::get('/reports', fn() => Inertia::render('Inventory/Reports'))
+            ->middleware('permission:inventory.view')
+            ->name('reports');
     });
+
+    /*
+    |--------------------------------------------------------------------------
+    | INVENTARIO - INVENTARIO POR SUCURSAL
+    |--------------------------------------------------------------------------
+    */
+
+    /*
+    Route::prefix('inventario')->name('inventario.')->group(function () {
+        // Bloque anterior conservado como referencia.
+        // Las rutas activas ya fueron movidas a Route::prefix('inventory')->name('inventory.').
+    });
+    */
 
     /*
     |--------------------------------------------------------------------------
