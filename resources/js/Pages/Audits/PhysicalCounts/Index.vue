@@ -7,7 +7,7 @@ import PhysicalCountList from '@/Components/Audits/PhysicalCounts/PhysicalCountL
 import { usePermissions } from '@/Composables/usePermissions'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
-defineProps({
+const props = defineProps({
     physicalCounts: {
         type: Array,
         default: () => []
@@ -15,11 +15,14 @@ defineProps({
     branches: {
         type: Array,
         default: () => []
+    },
+    branch: {
+        type: Object,
+        default: null
     }
 })
 
 const { can } = usePermissions()
-
 const showCreateModal = ref(false)
 
 function reloadPhysicalCounts() {
@@ -32,12 +35,12 @@ function reloadPhysicalCounts() {
 
 onMounted(() => {
     if (!window.Echo) return
-window.Echo.channel('audits')
-    .listen('.PhysicalCountChanged', (event) => {
-        console.log('AUDITORIA RECIBIDA', event)
 
-        reloadPhysicalCounts()
-    })
+    window.Echo.channel('audits')
+        .listen('.PhysicalCountChanged', (event) => {
+            console.log('AUDITORIA RECIBIDA', event)
+            reloadPhysicalCounts()
+        })
 })
 
 onBeforeUnmount(() => {
@@ -53,12 +56,12 @@ onBeforeUnmount(() => {
             <div class="mb-6 flex items-start justify-between gap-4">
                 <PhysicalCountHeader
                     title="Conteo físico"
-                    subtitle="Administra las sesiones de conteo físico"
+                    :subtitle="`Sucursal: ${props.branch?.name ?? 'No seleccionada'}`"
                 />
 
-              <button
-    v-if="can('audits.physical-counts.create')"
-    type="button"
+                <button
+                    v-if="can('audits.physical-counts.create')"
+                    type="button"
                     class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                     @click="showCreateModal = true"
                 >
@@ -68,12 +71,12 @@ onBeforeUnmount(() => {
 
             <PhysicalCountList :physical-counts="physicalCounts" />
 
-         <CreatePhysicalCountModal
-    v-if="can('audits.physical-counts.create')"
-    :show="showCreateModal"
-    :branches="branches"
-    @close="showCreateModal = false"
-/>
+            <CreatePhysicalCountModal
+                v-if="can('audits.physical-counts.create')"
+                :show="showCreateModal"
+                :branch="props.branch"
+                @close="showCreateModal = false"
+            />
         </div>
     </AdminLayout>
 </template>

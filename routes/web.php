@@ -313,6 +313,17 @@ Route::middleware([
             ->middleware('permission:audits.physical-counts.view,audits.physical-counts.create,audits.physical-counts.update,audits.physical-counts.delete')
             ->name('physical-counts.index');
 
+
+           Route::get('/physical-count-entries/{entry}', [PhysicalCountController::class, 'showEntry'])
+    ->name('physical-count-entries.show');
+
+Route::patch('/physical-count-entries/{entry}', [PhysicalCountController::class, 'updateEntry'])
+    ->name('physical-count-entries.update');
+
+Route::delete('/physical-count-entries/{entry}', [PhysicalCountController::class, 'destroyEntry'])
+    ->name('physical-count-entries.destroy');
+
+    
         Route::get('/physical-counts/{physicalCount}', [PhysicalCountController::class, 'show'])
             ->middleware('permission:audits.physical-counts.view,audits.physical-counts.update')
             ->name('physical-counts.show');

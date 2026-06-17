@@ -1,13 +1,17 @@
 <script setup>
-import PhysicalCountHeader from "@/Components/Audits/PhysicalCounts/PhysicalCountHeader.vue";
-import ProductScanForm from "@/Components/Audits/PhysicalCounts/ProductScanForm.vue";
-import ProductFoundCard from "@/Components/Audits/PhysicalCounts/ProductFoundCard.vue";
-import CountEntryForm from "@/Components/Audits/PhysicalCounts/CountEntryForm.vue";
-import CountEntriesTable from "@/Components/Audits/PhysicalCounts/CountEntriesTable.vue";
-import PhysicalCountSummary from "@/Components/Audits/PhysicalCounts/PhysicalCountSummary.vue";
-import InventoryComparisonTable from "@/Components/Audits/PhysicalCounts/InventoryComparisonTable.vue";
-import { router } from "@inertiajs/vue3";
+
+import { onMounted, onBeforeUnmount } from 'vue'
+import PhysicalCountHeader from "@/Components/Audits/PhysicalCounts/PhysicalCountHeader.vue"
+import ProductScanForm from "@/Components/Audits/PhysicalCounts/ProductScanForm.vue"
+import ProductFoundCard from "@/Components/Audits/PhysicalCounts/ProductFoundCard.vue"
+import CountEntryForm from "@/Components/Audits/PhysicalCounts/CountEntryForm.vue"
+import CountEntriesTable from "@/Components/Audits/PhysicalCounts/CountEntriesTable.vue"
+import PhysicalCountSummary from "@/Components/Audits/PhysicalCounts/PhysicalCountSummary.vue"
+import InventoryComparisonTable from "@/Components/Audits/PhysicalCounts/InventoryComparisonTable.vue"
+import PhysicalCountEntryModal from "@/Components/Audits/PhysicalCounts/PhysicalCountEntryModal.vue"
+import { router, Link } from "@inertiajs/vue3"
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { usePhysicalCountEntryActions } from '@/Composables/Audits/usePhysicalCountEntryActions'
 
 const props = defineProps({
   physicalCount: Object,
@@ -15,105 +19,75 @@ const props = defineProps({
   summary: Array,
   scannedProduct: Object,
   comparison: Array,
-});
-const closePhysicalCount = () => {
-  if (
-    !confirm(
-      "¿Seguro que quieres finalizar esta auditoría? Ya no se podrán registrar más conteos."
-    )
-  ) {
-    return;
-  }
+})
 
-  router.patch(
-    route("audits.physical-counts.close", props.physicalCount.id),
-    {},
-    {
-      preserveScroll: true,
-    }
-  );
-};
-const applyAdjustments = () => {
-  if (
-    !confirm(
-      "¿Seguro que quieres aplicar estos ajustes al inventario? Esta acción actualizará el stock del sistema y ya no se podrá modificar la auditoría."
-    )
-  ) {
-    return;
-  }
 
-  router.patch(
-    route("audits.physical-counts.apply-adjustments", props.physicalCount.id),
-    {},
-    {
-      preserveScroll: true,
-    }
-  );
-};
-const reopenPhysicalCount = () => {
-  if (
-    !confirm(
-      "¿Seguro que quieres reabrir esta auditoría? Se podrán registrar nuevos conteos."
-    )
-  ) {
-    return;
-  }
 
-  router.patch(
-    route("audits.physical-counts.reopen", props.physicalCount.id),
-    {},
-    {
-      preserveScroll: true,
-    }
-  );
-};
+const {
+    showModal,
+    modalMode,
+    selectedEntry,
+    openViewModal,
+    openEditModal,
+    openDeleteModal,
+    closeModal,
+} = usePhysicalCountEntryActions()
+function reloadAuditDetail() {
+  router.reload({
+    only: ['entries', 'summary', 'comparison'],
+    preserveScroll: true,
+    preserveState: true,
+  })
+}
+
+onMounted(() => {
+  if (!window.Echo) return
+
+  window.Echo.channel('audits')
+    .listen('.PhysicalCountChanged', (event) => {
+      if (event.physicalCount?.id !== props.physicalCount.id) return
+
+      reloadAuditDetail()
+    })
+})
+
+onBeforeUnmount(() => {
+  if (!window.Echo) return
+
+  window.Echo.leave('audits')
+})
+
+
+
 </script>
 <template>
         <AdminLayout>
   <div class="p-6 space-y-6">
-    <div class="flex items-start justify-between gap-4">
-      <PhysicalCountHeader
-        :title="physicalCount?.name ?? 'Conteo físico'"
-       :subtitle="`Folio: ${physicalCount?.folio ?? 'Sin folio'} | Sucursal: ${physicalCount?.branch?.name ?? 'Sin sucursal seleccionada'}`"
-      />
-      <a
+    <Link
+    :href="route('audits.physical-counts.index', { branch: physicalCount.branch.slug })"
+    class="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+>
+    ← Volver a auditorías
+</Link>
+
+  <div
+  v-if="physicalCount.status === 'closed' || physicalCount.status === 'applied'"
+  class="flex items-center gap-3"
+>
+  <a
     :href="route('audits.physical-counts.export-pdf', physicalCount.id)"
     class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
->
+  >
     Exportar PDF
-</a>
-      <a
-        :href="route('audits.physical-counts.export-excel', physicalCount.id)"
-        class="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-      >
-        Exportar Excel
-      </a>
-      
-      <button
-        v-if="physicalCount.status === 'open'"
-        type="button"
-        class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
-        @click="closePhysicalCount"
-      >
-        Finalizar auditoría
-      </button>
-      <button
-        v-if="physicalCount.status === 'closed'"
-        type="button"
-        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-        @click="reopenPhysicalCount"
-      >
-        Reabrir auditoría
-      </button>
-      <button
-        v-if="physicalCount.status === 'closed'"
-        type="button"
-        class="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700"
-        @click="applyAdjustments"
-      >
-        Aplicar ajustes
-      </button>
-    </div>
+  </a>
+
+  <a
+    :href="route('audits.physical-counts.export-excel', physicalCount.id)"
+    class="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+  >
+    Exportar Excel
+  </a>
+</div>
 <div
     v-if="physicalCount.status === 'closed'"
     class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-600"
@@ -149,8 +123,13 @@ const reopenPhysicalCount = () => {
           consultarse la información.
         </div>
 
-        <CountEntriesTable :entries="entries" />
-
+<CountEntriesTable
+    :entries="entries"
+    :status="physicalCount.status"
+    @view="openViewModal"
+    @edit="openEditModal"
+    @delete="openDeleteModal"
+/>
         <InventoryComparisonTable :comparison="comparison" />
       </div>
 
@@ -159,5 +138,11 @@ const reopenPhysicalCount = () => {
       </div>
     </div>
   </div>
+<PhysicalCountEntryModal
+    v-if="showModal && selectedEntry"
+    :mode="modalMode"
+    :entry="selectedEntry"
+    @close="closeModal"
+/>
   </AdminLayout>
 </template>

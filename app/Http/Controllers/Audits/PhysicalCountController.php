@@ -20,23 +20,49 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use App\Events\PhysicalCountChanged;
 
 
-class PhysicalCountController extends Controller
-{
-    public function index()
-    {
-        return Inertia::render('Audits/PhysicalCounts/Index', [
-            'physicalCounts' => PhysicalCount::with(['branch', 'creator'])
-                ->latest()
-                ->get(),
 
-        'branches' => Branch::where('active', true)
-    ->select('id', 'name', 'slug', 'color')
-    ->orderBy('name')
-    ->get(),
+class PhysicalCountController extends Controller
+{public function index(Request $request)
+{
+    $branchSlug = $request->query('branch');
+
+    if (!$branchSlug) {
+        $firstBranch = Branch::where('active', true)
+            ->orderBy('name')
+            ->firstOrFail();
+
+        return redirect()->route('audits.physical-counts.index', [
+            'branch' => $firstBranch->slug,
         ]);
     }
-    public function storeEntry(Request $request, PhysicalCount $physicalCount)
+
+    $branch = Branch::where('active', true)
+        ->where('slug', $branchSlug)
+        ->select('id', 'name', 'slug', 'color')
+        ->firstOrFail();
+
+    return Inertia::render('Audits/PhysicalCounts/Index', [
+        'branch' => $branch,
+
+        'physicalCounts' => PhysicalCount::with(['branch', 'creator'])
+            ->where('branch_id', $branch->id)
+            ->latest()
+            ->get(),
+
+        'branches' => Branch::where('active', true)
+            ->select('id', 'name', 'slug', 'color')
+            ->orderBy('name')
+            ->get(),
+    ]);
+}
+  public function storeEntry(Request $request, PhysicalCount $physicalCount)
 {
+    if ($physicalCount->status !== 'open') {
+        return back()->withErrors([
+            'status' => 'Esta auditoría no está abierta. No se pueden registrar conteos.',
+        ]);
+    }
+
     $data = $request->validate([
         'branch_product_id' => ['required', 'exists:branch_products,id'],
         'product_batch_id' => ['nullable', 'exists:product_batches,id'],
@@ -49,51 +75,79 @@ class PhysicalCountController extends Controller
         'notes' => ['nullable', 'string'],
     ]);
 
-    PhysicalCountEntry::create([
+    $counted = (float) $data['counted_quantity'];
+    $damaged = (float) ($data['damaged_quantity'] ?? 0);
+    $expired = (float) ($data['expired_quantity'] ?? 0);
+
+    if (($damaged + $expired) > $counted) {
+        return back()->withErrors([
+            'damaged_quantity' => 'La suma de dañados y caducados no puede ser mayor a la cantidad contada.',
+            'expired_quantity' => 'La suma de dañados y caducados no puede ser mayor a la cantidad contada.',
+        ]);
+    }
+
+    $branchProduct = BranchProduct::findOrFail($data['branch_product_id']);
+
+    if ($branchProduct->branch_id !== $physicalCount->branch_id) {
+        return back()->withErrors([
+            'branch_product_id' => 'El producto no pertenece a la sucursal de esta auditoría.',
+        ]);
+    }
+
+$entry = PhysicalCountEntry::updateOrCreate(
+    [
         'physical_count_id' => $physicalCount->id,
         'branch_product_id' => $data['branch_product_id'],
         'product_batch_id' => $data['product_batch_id'] ?? null,
+    ],
+    [
         'product_id' => $data['product_id'],
         'user_id' => Auth::id(),
         'scanned_code' => $data['scanned_code'] ?? null,
-        'counted_quantity' => $data['counted_quantity'],
-        'damaged_quantity' => $data['damaged_quantity'] ?? 0,
-        'expired_quantity' => $data['expired_quantity'] ?? 0,
+        'counted_quantity' => $counted,
+        'damaged_quantity' => $damaged,
+        'expired_quantity' => $expired,
         'expiration_date' => $data['expiration_date'] ?? null,
         'notes' => $data['notes'] ?? null,
+    ]
+);
+
+broadcast(new PhysicalCountChanged($physicalCount, 'entry_created'))->toOthers();
+
+return redirect()
+    ->route('audits.physical-counts.show', $physicalCount)
+    ->with('success', 'Conteo guardado correctamente.');
+}
+public function store(Request $request)
+{
+    $data = $request->validate([
+        'branch_id' => ['required', 'exists:branches,id'],
+        'name' => ['required', 'string', 'max:255'],
     ]);
 
+    $branch = Branch::findOrFail($data['branch_id']);
+
+    $nextId = (PhysicalCount::max('id') ?? 0) + 1;
+
+    $folio = 'AUD-' . now()->format('Ymd') . '-' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
+
+    $physicalCount = PhysicalCount::create([
+        'folio' => $folio,
+        'branch_id' => $branch->id,
+        'created_by' => Auth::id(),
+        'name' => $data['name'],
+        'status' => 'open',
+        'started_at' => now(),
+    ]);
+
+    broadcast(new PhysicalCountChanged($physicalCount, 'created'))->toOthers();
+
     return redirect()
-        ->route('audits.physical-counts.show', $physicalCount)
-        ->with('success', 'Conteo guardado correctamente.');
-}
-
-    public function store(Request $request)
-    {
-        $data = $request->validate([
-            'branch_id' => ['required', 'exists:branches,id'],
-            'name' => ['required', 'string', 'max:255'],
-            
-        ]);
-      $nextId = (PhysicalCount::max('id') ?? 0) + 1;
-
-$folio = 'AUD-' . now()->format('Ymd') . '-' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
-
-$physicalCount = PhysicalCount::create([
-    'folio' => $folio,
-    'branch_id' => $data['branch_id'],
-    'created_by' => Auth::id(),
-    'name' => $data['name'],
-    'status' => 'open',
-    'started_at' => now(),
-]);
-broadcast(new PhysicalCountChanged($physicalCount, 'created')
-)->toOthers();
-        return redirect()
-            ->route('audits.physical-counts.index')
-            ->with('success', 'Conteo físico creado correctamente.');
-    }
-    public function exportPdf(PhysicalCount $physicalCount)
+        ->route('audits.physical-counts.index', [
+            'branch' => $branch->slug,
+        ])
+        ->with('success', 'Conteo físico creado correctamente.');
+}    public function exportPdf(PhysicalCount $physicalCount)
 {
     $physicalCount->load(['branch', 'creator']);
 
@@ -105,34 +159,38 @@ broadcast(new PhysicalCountChanged($physicalCount, 'created')
         'participants' => $physicalCount->entries()->distinct('user_id')->count('user_id'),
     ];
 
-    $comparison = $physicalCount->entries()
-        ->select(
-            'branch_product_id',
-            DB::raw('SUM(counted_quantity) as counted_stock'),
-            DB::raw('SUM(damaged_quantity) as damaged_stock'),
-            DB::raw('SUM(expired_quantity) as expired_stock')
-        )
-        ->with('branchProduct')
-        ->groupBy('branch_product_id')
-        ->get()
-        ->map(function ($item) {
-            $systemStock = (float) ($item->branchProduct->stock ?? 0);
-            $countedStock = (float) $item->counted_stock;
-            $difference = $countedStock - $systemStock;
+  $comparison = $physicalCount->entries()
+    ->select(
+        'branch_product_id',
+        DB::raw('SUM(counted_quantity) as counted_stock'),
+        DB::raw('SUM(damaged_quantity) as damaged_stock'),
+        DB::raw('SUM(expired_quantity) as expired_stock')
+    )
+    ->with('branchProduct.product')
+    ->groupBy('branch_product_id')
+    ->get()
+    ->map(function ($item) {
+        $systemStock = (float) ($item->branchProduct->stock ?? 0);
+        $countedStock = (float) $item->counted_stock;
+        $difference = $countedStock - $systemStock;
 
-            return [
-                'product_name' => $item->branchProduct->name ?? 'Sin producto',
-                'system_stock' => $systemStock,
-                'counted_stock' => $countedStock,
-                'damaged_stock' => (float) $item->damaged_stock,
-                'expired_stock' => (float) $item->expired_stock,
-                'difference' => $difference,
-                'status_label' => $difference < 0
-                    ? 'Faltante'
-                    : ($difference > 0 ? 'Sobrante' : 'Correcto'),
-            ];
-        })
-        ->values();
+        return [
+            'branch_product_id' => $item->branch_product_id,
+
+            'product_name' => $item->branchProduct?->product?->name
+                ?? 'Sin producto',
+
+            'system_stock' => $systemStock,
+            'counted_stock' => $countedStock,
+            'damaged_stock' => (float) $item->damaged_stock,
+            'expired_stock' => (float) $item->expired_stock,
+            'difference' => $difference,
+            'status' => $difference < 0
+                ? 'missing'
+                : ($difference > 0 ? 'surplus' : 'matched'),
+        ];
+    })
+    ->values();
 
     $summary['audited_products'] = $comparison->count();
 
@@ -141,14 +199,15 @@ broadcast(new PhysicalCountChanged($physicalCount, 'created')
         'summary' => $summary,
         'comparison' => $comparison,
     ])->setPaper('letter', 'portrait');
+   
 
     return $pdf->download('conteo-fisico-' . $physicalCount->id . '.pdf');
 }
-    public function reopen(PhysicalCount $physicalCount)
+ public function reopen(PhysicalCount $physicalCount)
 {
-    if ($physicalCount->status === 'applied') {
+    if ($physicalCount->status !== 'closed') {
         return back()->withErrors([
-            'status' => 'No se puede reabrir una auditoría que ya fue aplicada al inventario.',
+            'status' => 'Solo auditorías cerradas pueden reabrirse.',
         ]);
     }
 
@@ -157,9 +216,7 @@ broadcast(new PhysicalCountChanged($physicalCount, 'created')
         'closed_at' => null,
     ]);
 
-    return redirect()
-        ->route('audits.physical-counts.show', $physicalCount)
-        ->with('success', 'Auditoría reabierta correctamente.');
+    return back()->with('success', 'Auditoría reabierta correctamente.');
 }
     public function exportExcel(PhysicalCount $physicalCount)
 {
@@ -178,13 +235,15 @@ public function applyAdjustments(PhysicalCount $physicalCount)
         ]);
     }
 
-    $comparison = $physicalCount->entries()
-        ->select(
-            'branch_product_id',
-            DB::raw('SUM(counted_quantity) as counted_stock')
-        )
-        ->groupBy('branch_product_id')
-        ->get();
+ $comparison = $physicalCount->entries()
+    ->select(
+        'branch_product_id',
+        DB::raw('SUM(counted_quantity) as counted_stock'),
+        DB::raw('SUM(damaged_quantity) as damaged_stock'),
+        DB::raw('SUM(expired_quantity) as expired_stock')
+    )
+    ->groupBy('branch_product_id')
+    ->get();
 
     foreach ($comparison as $item) {
         $branchProduct = BranchProduct::find($item->branch_product_id);
@@ -193,9 +252,15 @@ public function applyAdjustments(PhysicalCount $physicalCount)
             continue;
         }
 
-        $previousStock = (int) $branchProduct->stock;
-        $newStock = (int) $item->counted_stock;
-        $difference = $newStock - $previousStock;
+      $previousStock = (float) $branchProduct->stock;
+
+$countedStock = (float) $item->counted_stock;
+$damagedStock = (float) $item->damaged_stock;
+$expiredStock = (float) $item->expired_stock;
+
+$newStock = max(0, $countedStock - $damagedStock - $expiredStock);
+
+$difference = $newStock - $previousStock;
 
         if ($difference === 0) {
             continue;
@@ -204,17 +269,34 @@ public function applyAdjustments(PhysicalCount $physicalCount)
         $branchProduct->update([
             'stock' => $newStock,
         ]);
+        DB::table('branch_inventory')
+    ->updateOrInsert(
+        [
+            'branch_id' => $physicalCount->branch_id,
+            'product_id' => $branchProduct->product_id,
+        ],
+        [
+            'current_stock' => $newStock,
+            'updated_at' => now(),
+        ]
+    );
 
-        StockMovement::create([
-            'branch_product_id' => $branchProduct->id,
-            'type' => $difference > 0 ? 'in' : 'out',
-          'reason' => 'MANUAL',
-            'quantity' => abs($difference),
-            'previous_stock' => $previousStock,
-            'new_stock' => $newStock,
-            'user_id' => Auth::id(),
-            'notes' => 'Ajuste aplicado desde conteo físico #' . $physicalCount->id,
-        ]);
+StockMovement::create([
+    'branch_product_id' => $branchProduct->id,
+    'type' => 'ADJUSTMENT',
+    'reason' => 'INVENTORY_DIFFERENCE',
+    'quantity' => abs($difference),
+    'previous_stock' => $previousStock,
+    'new_stock' => $newStock,
+    'user_id' => Auth::id(),
+    'notes' => sprintf(
+        'Ajuste aplicado desde auditoría %s | Contado: %s | Dañado: %s | Caducado: %s',
+        $physicalCount->folio,
+        $countedStock,
+        $damagedStock,
+        $expiredStock
+    ),
+]);
     }
 
     $physicalCount->update([
@@ -230,7 +312,7 @@ public function show(PhysicalCount $physicalCount)
     $physicalCount->load(['branch', 'creator']);
 
     $entries = $physicalCount->entries()
-        ->with(['branchProduct', 'productBatch', 'user'])
+      ->with(['branchProduct.product', 'productBatch', 'user'])
         ->latest()
         ->take(20)
         ->get();
@@ -244,39 +326,48 @@ public function show(PhysicalCount $physicalCount)
         
         
     ];
+    $summary['participant_names'] = $physicalCount->entries()
+    ->with('user:id,name')
+    ->get()
+    ->pluck('user.name')
+    ->filter()
+    ->unique()
+    ->values();
 
-    $comparison = $physicalCount->entries()
-        ->select(
-            'branch_product_id',
-            DB::raw('SUM(counted_quantity) as counted_stock'),
-            DB::raw('SUM(damaged_quantity) as damaged_stock'),
-            DB::raw('SUM(expired_quantity) as expired_stock')
+   $comparison = $physicalCount->entries()
+    ->select(
+        'branch_product_id',
+        DB::raw('SUM(counted_quantity) as counted_stock'),
+        DB::raw('SUM(damaged_quantity) as damaged_stock'),
+        DB::raw('SUM(expired_quantity) as expired_stock')
+    )
+    ->with('branchProduct.product')
+    ->groupBy('branch_product_id')
+    ->get()
+    ->map(function ($item) {
+        $systemStock = (float) ($item->branchProduct->stock ?? 0);
+        $countedStock = (float) $item->counted_stock;
+        $damagedStock = (float) $item->damaged_stock;
+        $expiredStock = (float) $item->expired_stock;
 
+        $sellableStock = max(0, $countedStock - $damagedStock - $expiredStock);
+        $difference = $sellableStock - $systemStock;
 
-            
-        )
-        ->with('branchProduct')
-        ->groupBy('branch_product_id')
-        ->get()
-        ->map(function ($item) {
-            $systemStock = (float) ($item->branchProduct->stock ?? 0);
-            $countedStock = (float) $item->counted_stock;
-            $difference = $countedStock - $systemStock;
-
-            return [
-                'branch_product_id' => $item->branch_product_id,
-                'product_name' => $item->branchProduct->name ?? 'Sin producto',
-                'system_stock' => $systemStock,
-                'counted_stock' => $countedStock,
-                'damaged_stock' => (float) $item->damaged_stock,
-                'expired_stock' => (float) $item->expired_stock,
-                'difference' => $difference,
-                'status' => $difference < 0
-                    ? 'missing'
-                    : ($difference > 0 ? 'surplus' : 'matched'),
-            ];
-        })
-        ->values();
+        return [
+            'branch_product_id' => $item->branch_product_id,
+            'product_name' => $item->branchProduct?->product?->name ?? 'Sin producto',
+            'system_stock' => $systemStock,
+            'counted_stock' => $countedStock,
+            'damaged_stock' => $damagedStock,
+            'expired_stock' => $expiredStock,
+            'sellable_stock' => $sellableStock,
+            'difference' => $difference,
+            'status' => $difference < 0
+                ? 'missing'
+                : ($difference > 0 ? 'surplus' : 'matched'),
+        ];
+    })
+    ->values();
     $summary['audited_products'] = $comparison->count();
 
 $summary['missing_products'] = $comparison
@@ -290,6 +381,23 @@ $summary['surplus_products'] = $comparison
 $summary['matched_products'] = $comparison
     ->filter(fn ($item) => $item['status'] === 'matched')
     ->count();
+ $totalProductsInBranch = BranchProduct::where(
+    'branch_id',
+    $physicalCount->branch_id
+)->count();
+$summary['total_products_in_branch'] = $totalProductsInBranch;
+
+$summary['pending_products'] = max(
+    0,
+    $totalProductsInBranch - $summary['audited_products']
+);
+
+$summary['progress_percentage'] = $totalProductsInBranch > 0
+    ? round(
+        ($summary['audited_products'] / $totalProductsInBranch) * 100,
+        2
+    )
+    : 0;
 
     return Inertia::render('Audits/PhysicalCounts/Show', [
         'physicalCount' => $physicalCount,
@@ -305,19 +413,82 @@ $summary['matched_products'] = $comparison
         
         
     ]);
-}   public function close(PhysicalCount $physicalCount)
+}  public function close(PhysicalCount $physicalCount)
 {
+    if ($physicalCount->status !== 'open') {
+        return back()->withErrors([
+            'status' => 'Solo auditorías abiertas pueden cerrarse.'
+        ]);
+    }
+
     $physicalCount->update([
         'status' => 'closed',
         'closed_at' => now(),
     ]);
 
-    return redirect()
-        ->route('audits.physical-counts.show', $physicalCount)
-        ->with('success', 'Auditoría finalizada correctamente.');
+    return back()->with('success', 'Auditoría cerrada correctamente.');
 }
+public function destroyEntry(PhysicalCountEntry $entry)
+{
+    $entry->load('physicalCount');
+
+    if ($entry->physicalCount->status !== 'open') {
+        return back()->withErrors([
+            'status' => 'Esta auditoría no está abierta. No se pueden eliminar conteos.',
+        ]);
+    }
+
+    $physicalCount = $entry->physicalCount;
+
+    $entry->delete();
+
+    broadcast(new PhysicalCountChanged($physicalCount, 'entry_deleted'))->toOthers();
+
+    return back()->with('success', 'Registro eliminado correctamente.');
+}
+public function updateEntry(Request $request, PhysicalCountEntry $entry)
+{
+    $entry->load('physicalCount');
+
+    if ($entry->physicalCount->status !== 'open') {
+        return back()->withErrors([
+            'status' => 'Esta auditoría no está abierta. No se pueden editar conteos.',
+        ]);
+    }
+
+    $data = $request->validate([
+        'counted_quantity' => ['required', 'numeric', 'min:0'],
+        'damaged_quantity' => ['required', 'numeric', 'min:0'],
+        'expired_quantity' => ['required', 'numeric', 'min:0'],
+        'expiration_date' => ['nullable', 'date'],
+        'notes' => ['nullable', 'string', 'max:1000'],
+    ]);
+
+    $counted = (float) $data['counted_quantity'];
+    $damaged = (float) $data['damaged_quantity'];
+    $expired = (float) $data['expired_quantity'];
+
+    if (($damaged + $expired) > $counted) {
+        return back()->withErrors([
+            'damaged_quantity' => 'La suma de dañados y caducados no puede ser mayor a la cantidad contada.',
+            'expired_quantity' => 'La suma de dañados y caducados no puede ser mayor a la cantidad contada.',
+        ]);
+    }
+
+    $entry->update($data);
+ broadcast(new PhysicalCountChanged($entry->physicalCount, 'entry_updated'))->toOthers();
+
+    return back()->with('success', 'Registro actualizado correctamente.');
+}
+
 public function scan(Request $request, PhysicalCount $physicalCount)
 {
+if ($physicalCount->status !== 'open') {
+    return back()->withErrors([
+        'status' => 'Esta auditoría no está abierta. No se pueden escanear productos.',
+    ]);
+}
+
     $data = $request->validate([
         'code' => ['required', 'string', 'max:255'],
     ]);
@@ -369,10 +540,7 @@ public function scan(Request $request, PhysicalCount $physicalCount)
         ]);
 
         // 4. Trae EL STOCK
-        $currentStock = DB::table('branch_inventory')
-    ->where('branch_id', $physicalCount->branch_id)
-    ->where('product_id', $branchProduct->product_id)
-    ->value('current_stock');
+       
 
     // 5. Regresar producto encontrado
     return back()->with([
