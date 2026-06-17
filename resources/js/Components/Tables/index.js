@@ -4,26 +4,21 @@
  */
 
 // Componentes
-export { default as GlobalToolbar } from "../Toolbars/GlobalToolbar.vue/index.js";
-export { default as ToolbarDesktop } from "../Toolbars/ToolbarDesktop.vue/index.js";
-export { default as ToolbarMobile } from "../Toolbars/ToolbarMobile.vue/index.js";
-export {
-    getToolbarActionClasses,
-    toolbarActionVariants,
-} from "../Toolbars/toolbarClasses.js";
+export { default as GlobalTable } from "./GlobalTable.vue";
+export { default as TableDesktop } from "./TableDesktop.vue";
+export { default as TableMobile } from "./TableMobile.vue";
 
 export {
     formatCellValue,
     getNestedValue,
     truncateText,
     formatters,
-} from "./tableFormatters";
+} from "./tableFormatters.js";
 
 export {
     getStatusClasses,
     getAvailableVariants,
     predefinedStatusMaps,
-} from "./tableStatusClasses";
+} from "./tableStatusClasses.js";
 
-export { useToolbarConfig } from "../Toolbars/useToolbarConfig.js";
-export { useTableConfig } from "./useTableConfig";
+export { useTableConfig } from "./useTableConfig.js";

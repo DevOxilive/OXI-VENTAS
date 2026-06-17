@@ -127,7 +127,7 @@ onBeforeUnmount(() => {
         <template #toolbar>
             <GlobalToolbar title="Empleados" subtitle="Administración del personal registrado"
                 v-bind="employeeToolbarConfig" :search="search" :records-per-page="recordsPerPage"
-                :records-per-page-options="[10, 25, 50, 100]" :filtered-records="normalizedEmployees.length"
+                :records-per-page-options="recordsToShow" :filtered-records="normalizedEmployees.length"
                 :total-records="employeePaginator?.total || 0" @action="handleEmployeeToolbarAction"
                 @update:search="search = $event" @update:records-per-page="recordsPerPage = $event" />
         </template>
