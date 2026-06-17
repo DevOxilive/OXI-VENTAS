@@ -1,0 +1,76 @@
+export const attentionProductsReportTableConfig = {
+    columns: [
+        {
+            key: "product",
+            label: "Producto",
+            format: "text",
+            width: "24%",
+            mobileSecondary: true,
+            fallback: "Sin producto",
+        },
+        {
+            key: "category",
+            label: "Categoría",
+            format: "text",
+            width: "14%",
+            mobileDisplay: false,
+            fallback: "Sin categoría",
+        },
+        {
+            key: "stock",
+            label: "Stock",
+            format: "text",
+            width: "10%",
+            mobileLabel: "Stock",
+            fallback: "0",
+            subKey: "min_stock_label",
+        },
+        {
+            key: "last_restocked_at",
+            label: "Último resurtido",
+            format: "text",
+            width: "13%",
+            mobileDisplay: false,
+            fallback: "Sin resurtido",
+        },
+        {
+            key: "last_out_at",
+            label: "Última salida",
+            format: "text",
+            width: "13%",
+            mobileLabel: "Última salida",
+            fallback: "Sin salida",
+        },
+        {
+            key: "days_without_movement",
+            label: "Días sin movimiento",
+            format: "text",
+            width: "12%",
+            mobileDisplay: false,
+            fallback: "-",
+        },
+        {
+            key: "main_action",
+            label: "Prioridad",
+            format: "badge",
+            width: "14%",
+            formatOptions: {
+                statusMap: {
+                    OUT_OF_STOCK: "red",
+                    LOW_STOCK: "amber",
+                    EXPIRED_BATCHES: "red",
+                    NEAR_EXPIRATION: "orange",
+                    NO_RECENT_MOVEMENT: "purple",
+                },
+            },
+            mobileBadge: true,
+            fallback: "Revisar",
+        },
+    ],
+
+    actions: [],
+
+    mobileCardHeaderField: "product",
+    noDataMessage: "No hay productos que requieran atención.",
+    rowKey: "branch_product_id",
+};

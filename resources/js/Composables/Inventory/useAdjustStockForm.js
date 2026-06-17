@@ -315,7 +315,7 @@ export function useAdjustStockForm(props, emit) {
             return;
         }
         console.log("PAYLOAD FINAL:", form.data());
-        form.post(route("inventario.stock-movements.store"), {
+        form.post(route("inventory.stock-movements.store"), {
             preserveScroll: true,
 
             onSuccess: () => {

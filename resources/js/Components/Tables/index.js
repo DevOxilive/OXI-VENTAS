@@ -13,12 +13,12 @@ export {
     getNestedValue,
     truncateText,
     formatters,
-} from "./tableFormatters";
+} from "./tableFormatters.js";
 
 export {
     getStatusClasses,
     getAvailableVariants,
     predefinedStatusMaps,
-} from "./tableStatusClasses";
+} from "./tableStatusClasses.js";
 
-export { useTableConfig } from "./useTableConfig";
+export { useTableConfig } from "./useTableConfig.js";

@@ -51,7 +51,7 @@ class UserController extends Controller
         abort(403, 'No tienes permiso');
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $this->checkAnyPermission([
             'users.view',
@@ -60,25 +60,53 @@ class UserController extends Controller
             'users.delete',
         ]);
 
-        return Inertia::render('Systems/Users', [
-            'employees' => Employee::doesntHave('user')
-                ->orderBy('id', 'desc')
-                ->get(),
+        $search = $request->input('search');
+        $perPage = (int) $request->input('per_page', 50);
 
-            'users' => User::with([
-                'role.permissions',
-                'permissions',
-                'branches',
+        if (!in_array($perPage, [10, 25, 50, 100])) {
+            $perPage = 50;
+        }
+        $view = $request->input('view', 'users');
+
+        $usersDB = User::with([
+            'role.permissions',
+            'permissions',
+            'branches',
+        ])
+            ->select([
+                'id',
+                'employee_id',
+                'name',
+                'email',
+                'role_id',
             ])
-                ->select([
-                    'id',
-                    'employee_id',
-                    'name',
-                    'email',
-                    'role_id',
-                ])
-                ->orderBy('id', 'desc')
-                ->get(),
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($subQuery) use ($search) {
+                    $subQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('id', 'desc')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $employeesDB = Employee::doesntHave('user')
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($subQuery) use ($search) {
+                    $subQuery->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('position', 'like', "%{$search}%")
+                        ->orWhere('department', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('id', 'desc')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('Systems/Users', [
+            'employeesDB' => $employeesDB,
+            'usersDB' => $usersDB,
 
             'roles' => Role::with('permissions')
                 ->orderBy('name')
@@ -89,9 +117,14 @@ class UserController extends Controller
             'branches' => Branch::where('active', true)
                 ->orderBy('name')
                 ->get(),
+
+            'filters' => [
+                'search' => $search,
+                'perPage' => $perPage,
+                'view' => $view,
+            ],
         ]);
     }
-
     public function store(Request $request)
     {
         $this->checkPermission('users.create');
@@ -128,8 +161,8 @@ class UserController extends Controller
 
         $user->branches()->sync(
             $role->name === 'Ventas'
-                ? ($validated['branch_ids'] ?? [])
-                : []
+            ? ($validated['branch_ids'] ?? [])
+            : []
         );
 
         $user->load(['role', 'permissions', 'branches']);
@@ -180,17 +213,17 @@ class UserController extends Controller
 
         $user->branches()->sync(
             $role->name === 'Ventas'
-                ? ($validated['branch_ids'] ?? [])
-                : []
+            ? ($validated['branch_ids'] ?? [])
+            : []
         );
 
         $user->load(['role', 'permissions', 'branches']);
 
-       try {
-    broadcast(new UserChanged($user, 'updated'))->toOthers();
-} catch (\Throwable $e) {
-    report($e);
-}
+        try {
+            broadcast(new UserChanged($user, 'updated'))->toOthers();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return redirect()
             ->route('systems.users.index')
@@ -203,11 +236,11 @@ class UserController extends Controller
 
         $user->load(['role', 'permissions', 'branches']);
 
-     try {
-    broadcast(new UserChanged($user, 'updated'))->toOthers();
-} catch (\Throwable $e) {
-    report($e);
-}
+        try {
+            broadcast(new UserChanged($user, 'deleted'))->toOthers();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $user->permissions()->detach();
         $user->branches()->detach();
