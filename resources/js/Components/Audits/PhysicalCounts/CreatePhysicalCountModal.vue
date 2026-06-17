@@ -1,14 +1,16 @@
 <script setup>
+import { watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
+
 
 const props = defineProps({
     show: {
         type: Boolean,
         default: false
     },
-    branches: {
-        type: Array,
-        default: () => []
+    branch: {
+        type: Object,
+        default: null
     }
 })
 
@@ -19,7 +21,19 @@ const form = useForm({
     branch_id: ''
 })
 
+watch(
+    () => props.branch,
+    (branch) => {
+        form.branch_id = branch?.id ?? ''
+    },
+    { immediate: true }
+)
+
 const submit = () => {
+    if (!props.branch) return
+
+    form.branch_id = props.branch.id
+
     form.post(route('audits.physical-counts.store'), {
         preserveScroll: true,
         onSuccess: () => {
@@ -27,6 +41,7 @@ const submit = () => {
             emit('close')
         }
     })
+
 }
 </script>
 
@@ -43,7 +58,7 @@ const submit = () => {
                     </h2>
 
                     <p class="mt-1 text-sm text-gray-500">
-                        Crea una nueva sesión para auditar una sucursal.
+                        Crea una nueva sesión para la sucursal {{ branch?.name }}.
                     </p>
                 </div>
 
@@ -66,35 +81,13 @@ const submit = () => {
                         v-model="form.name"
                         type="text"
                         class="w-full rounded-lg border-gray-300 text-sm"
-                        placeholder="Ej. Conteo físico Lago - Junio 2026"
+                        placeholder="Ej. Conteo ##/##/####"
+
                     >
 
                     <p v-if="form.errors.name" class="mt-1 text-sm text-red-600">
                         {{ form.errors.name }}
                     </p>
-                </div>
-
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">
-                        Sucursal a auditar
-                    </label>
-
-                    <select
-                        v-model="form.branch_id"
-                        class="w-full rounded-lg border-gray-300 text-sm"
-                    >
-                        <option value="">
-                            Selecciona una sucursal
-                        </option>
-
-                        <option
-                            v-for="branch in branches"
-                            :key="branch.id"
-                            :value="branch.id"
-                        >
-                            {{ branch.name }}
-                        </option>
-                    </select>
 
                     <p v-if="form.errors.branch_id" class="mt-1 text-sm text-red-600">
                         {{ form.errors.branch_id }}
@@ -113,7 +106,7 @@ const submit = () => {
                     <button
                         type="submit"
                         class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-                        :disabled="form.processing"
+                   :disabled="form.processing || !props.branch"
                     >
                         Crear conteo
                     </button>

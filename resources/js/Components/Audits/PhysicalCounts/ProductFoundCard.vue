@@ -9,40 +9,88 @@ defineProps({
 
 <template>
     <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 class="text-lg font-semibold text-gray-900">
-            Producto encontrado
-        </h2>
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">
+                    Producto actual escaneado
+                </h2>
+
+                <p class="mt-1 text-sm text-gray-500">
+                    Información del producto seleccionado para capturar conteo.
+                </p>
+            </div>
+
+            <span
+                v-if="product"
+                class="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700"
+            >
+                Listo para capturar
+            </span>
+        </div>
 
         <div
             v-if="product"
-            class="mt-4 space-y-2"
+            class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2"
         >
-            <p>
-                <strong>Producto:</strong>
-                {{ product.name }}
+            <div class="rounded-lg bg-slate-50 p-3">
+                <p class="text-xs font-medium text-slate-500">Producto</p>
+                <p class="mt-1 font-semibold text-slate-900">
+                    {{ product.name }}
+                </p>
+            </div>
+
+            <div class="rounded-lg bg-slate-50 p-3">
+                <p class="text-xs font-medium text-slate-500">Código escaneado</p>
+                <p class="mt-1 font-semibold text-slate-900">
+                    {{ product.scanned_code }}
+                </p>
+            </div>
+
+            <div class="rounded-lg bg-slate-50 p-3">
+                <p class="text-xs font-medium text-slate-500">Código principal</p>
+                <p class="mt-1 font-semibold text-slate-900">
+                    {{ product.barcode }}
+                </p>
+            </div>
+
+            <div class="rounded-lg bg-slate-50 p-3">
+                <p class="text-xs font-medium text-slate-500">Stock en sistema</p>
+                <p class="mt-1 text-2xl font-bold text-slate-900">
+                    {{ product.stock ?? 0 }}
+                </p>
+            </div>
+        </div>
+
+        <div
+            v-if="product?.batches?.length"
+            class="mt-4 rounded-lg border border-slate-200 p-3"
+        >
+            <p class="text-sm font-semibold text-slate-800">
+                Lotes disponibles
             </p>
 
-            <p>
-                <strong>Código:</strong>
-                {{ product.barcode }}
-            </p>
+            <div class="mt-3 space-y-2">
+                <div
+                    v-for="batch in product.batches"
+                    :key="batch.id"
+                    class="flex justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
+                >
+                    <span class="text-slate-600">
+                        Lote: {{ batch.lot_number ?? 'Sin lote' }}
+                    </span>
 
-            <p>
-                <strong>Stock actual:</strong>
-                {{ product.stock }}
-            </p>
-
-            <p>
-                <strong>Código escaneado:</strong>
-                {{ product.scanned_code }}
-            </p>
+                    <span class="font-semibold text-slate-900">
+                        {{ batch.quantity }} pzas
+                    </span>
+                </div>
+            </div>
         </div>
 
         <p
-            v-else
-            class="mt-2 text-sm text-gray-500"
+            v-else-if="!product"
+            class="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500"
         >
-            Los datos del producto aparecerán aquí después de escanear.
+            Escanea un código para visualizar aquí el producto que se va a capturar.
         </p>
     </div>
 </template>
