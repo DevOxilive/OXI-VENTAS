@@ -1,6 +1,6 @@
 <script setup>
-import ToolbarDesktop from './ToolbarDesktop.vue'
 import ToolbarMobile from './ToolbarMobile.vue'
+import ToolbarDesktop from './ToolbarDesktop.vue'
 
 defineProps({
     title: String,
@@ -26,6 +26,15 @@ defineProps({
     actions: {
         type: Array,
         default: () => [],
+    },
+
+    tabs: {
+        type: Array,
+        default: () => [],
+    },
+    activeTab: {
+        type: String,
+        default: '',
     },
 
     recordsPerPage: {
@@ -58,7 +67,8 @@ defineProps({
 defineEmits([
     'update:search',
     'update:filter',
-    'update:recordsPerPage',
+    'update:records-per-page',
+    'update:active-tab',
     'action',
 ])
 </script>
@@ -66,17 +76,21 @@ defineEmits([
 <template>
     <div>
         <ToolbarDesktop :title="title" :subtitle="subtitle" :search="search" :search-placeholder="searchPlaceholder"
-            :show-search="showSearch" :filters="filters" :actions="actions" :records-per-page="recordsPerPage"
-            :records-per-page-options="recordsPerPageOptions" :show-records-per-page="showRecordsPerPage"
-            :total-records="totalRecords" :filtered-records="filteredRecords" :show-counter="showCounter"
+            :show-search="showSearch" :filters="filters" :actions="actions" :tabs="tabs" :active-tab="activeTab"
+            :records-per-page="recordsPerPage" :records-per-page-options="recordsPerPageOptions"
+            :show-records-per-page="showRecordsPerPage" :total-records="totalRecords"
+            :filtered-records="filteredRecords" :show-counter="showCounter"
             @update:search="$emit('update:search', $event)" @update:filter="$emit('update:filter', $event)"
-            @update:records-per-page="$emit('update:recordsPerPage', $event)" @action="$emit('action', $event)" />
+            @update:records-per-page="$emit('update:records-per-page', $event)"
+            @update:active-tab="$emit('update:active-tab', $event)" @action="$emit('action', $event)" />
 
         <ToolbarMobile :title="title" :subtitle="subtitle" :search="search" :search-placeholder="searchPlaceholder"
-            :show-search="showSearch" :filters="filters" :actions="actions" :records-per-page="recordsPerPage"
-            :records-per-page-options="recordsPerPageOptions" :show-records-per-page="showRecordsPerPage"
-            :total-records="totalRecords" :filtered-records="filteredRecords" :show-counter="showCounter"
+            :show-search="showSearch" :filters="filters" :actions="actions" :tabs="tabs" :active-tab="activeTab"
+            :records-per-page="recordsPerPage" :records-per-page-options="recordsPerPageOptions"
+            :show-records-per-page="showRecordsPerPage" :total-records="totalRecords"
+            :filtered-records="filteredRecords" :show-counter="showCounter"
             @update:search="$emit('update:search', $event)" @update:filter="$emit('update:filter', $event)"
-            @update:records-per-page="$emit('update:recordsPerPage', $event)" @action="$emit('action', $event)" />
+            @update:records-per-page="$emit('update:records-per-page', $event)"
+            @update:active-tab="$emit('update:active-tab', $event)" @action="$emit('action', $event)" />
     </div>
 </template>

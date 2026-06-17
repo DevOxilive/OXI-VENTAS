@@ -55,21 +55,21 @@ export const inventoryTableConfig = {
             label: "Entrada",
             icon: "add",
             variant: "green",
-            permission: "inventory.update",
+            permission: "inventory.branches.create",
         },
         {
             id: "exit",
             label: "Salida",
             icon: "remove",
             variant: "red",
-            permission: "inventory.update",
+            permission: "inventory.branches.update",
         },
         {
             id: "batches",
             label: "Lotes",
             icon: "inventory_2",
             variant: "blue",
-            permission: "inventory.view",
+            permission: "inventory.branches.update",
             hidden: (row) => !row.batches?.length,
         },
         {
@@ -77,7 +77,7 @@ export const inventoryTableConfig = {
             label: "Historial",
             icon: "history",
             variant: "slate",
-            permission: "inventory.view",
+            permission: "inventory.branches.view",
         },
     ],
 

@@ -4,14 +4,13 @@
  */
 
 // Componentes
-export { default as GlobalToolbar } from "./GlobalToolbar.vue";
-export { default as ToolbarDesktop } from "./ToolbarDesktop.vue";
-export { default as ToolbarMobile } from "./ToolbarMobile.vue";
-export { useToolbarConfig } from "./useToolbarConfig";
+export { default as GlobalToolbar } from "../Toolbars/GlobalToolbar.vue/index.js";
+export { default as ToolbarDesktop } from "../Toolbars/ToolbarDesktop.vue/index.js";
+export { default as ToolbarMobile } from "../Toolbars/ToolbarMobile.vue/index.js";
 export {
     getToolbarActionClasses,
     toolbarActionVariants,
-} from "./toolbarClasses";
+} from "../Toolbars/toolbarClasses.js";
 
 export {
     formatCellValue,
@@ -26,4 +25,5 @@ export {
     predefinedStatusMaps,
 } from "./tableStatusClasses";
 
+export { useToolbarConfig } from "../Toolbars/useToolbarConfig.js";
 export { useTableConfig } from "./useTableConfig";

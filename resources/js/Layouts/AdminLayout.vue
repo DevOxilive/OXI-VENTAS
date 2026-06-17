@@ -58,7 +58,7 @@ onBeforeUnmount(() => {
 
 <template>
 
-<div class="flex h-dvh bg-white overflow-hidden">
+    <div class="flex h-dvh bg-white overflow-hidden">
         <div v-if="sidebarOpen" class="fixed inset-0 bg-black/40 z-40 md:hidden" @click="toggleSidebar" />
 
         <aside class="fixed md:static z-50 md:z-auto bg-white border-r shadow-sm flex flex-col
@@ -134,7 +134,7 @@ onBeforeUnmount(() => {
                 </div>
             </header>
 
-            <main class="flex-1 min-h-0 overflow-y-auto p-4 md:p-8">
+            <main class="flex-1 min-h-0 overflow-y-auto">
                 <slot />
             </main>
 

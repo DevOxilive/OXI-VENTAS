@@ -1,21 +1,26 @@
 <script setup>
 import { computed } from 'vue'
+
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
+import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
+import PageLayout from '@/Layouts/PageLayout.vue'
+
 import { usePermissions } from '@/Composables/usePermissions'
 import { useBranchInventory } from '@/Composables/Inventory/useBranchInventory'
-import StockExitModal from '@/Components/Inventory/BranchProducts/StockExitModal.vue'
-import StockEntryModal from '@/Components/Inventory/BranchProducts/StockEntryModal.vue'
-import InventoryToolbar from '@/Components/Inventory/BranchProducts/InventoryToolbar.vue'
-import ProductBatchesModal from '@/Components/Inventory/BranchProducts/ProductBatchesModal.vue'
+
+import { inventoryTableConfig } from '@/config/TableConfigs/inventoryTableConfig'
+import { getInventoryToolbarConfig } from '@/config/ToolbarConfigs/inventoryToolbarConfig'
+
 import InventoryStatsCards from '@/Components/Inventory/BranchProducts/InventoryStatsCards.vue'
 import InventoryAlertsModal from '@/Components/Inventory/BranchProducts/InventoryAlertsModal.vue'
+import StockEntryModal from '@/Components/Inventory/BranchProducts/StockEntryModal.vue'
+import StockExitModal from '@/Components/Inventory/BranchProducts/StockExitModal.vue'
 import ProductMovementsModal from '@/Components/Inventory/BranchProducts/ProductMovementsModal.vue'
+import ProductBatchesModal from '@/Components/Inventory/BranchProducts/ProductBatchesModal.vue'
 import EditBranchProductConfigModal from '@/Components/Inventory/BranchProducts/EditBranchProductConfigModal.vue'
 
-
 defineOptions({ layout: AdminLayout })
-
 
 const props = defineProps({
     branchProductsDB: {
@@ -82,104 +87,6 @@ const props = defineProps({
     },
 })
 
-const inventoryColumns = [
-    {
-        key: 'code',
-        label: 'Código',
-        format: 'text',
-        fallback: 'Sin código',
-        mobileLabel: 'Código',
-    },
-    {
-        key: 'name',
-        label: 'Producto',
-        format: 'text',
-        mobileSecondary: true,
-    },
-    {
-        key: 'category_name',
-        label: 'Categoría',
-        format: 'text',
-        fallback: 'Sin categoría',
-        mobileLabel: 'Categoría',
-    },
-    {
-        key: 'stockLabel',
-        label: 'Stock',
-        format: 'text',
-        fallback: '0',
-        mobileLabel: 'Stock',
-        subKey: 'minStockLabel',
-    },
-    {
-        key: 'status',
-        label: 'Estado',
-        format: 'badge',
-        formatOptions: {
-            statusMap: {
-                Disponible: 'green',
-                'Stock bajo': 'amber',
-                Agotado: 'red',
-            },
-        },
-        mobileBadge: true,
-    },
-]
-
-const inventoryActions = computed(() => [
-    {
-        id: 'entry',
-        label: 'Entrada',
-        icon: 'add',
-        variant: 'green',
-        hidden: () => !can('inventory.branches.create'),
-        mobile: 'button',
-    },
-    {
-        id: 'exit',
-        label: 'Salida',
-        icon: 'remove',
-        variant: 'red',
-        hidden: () => !can('inventory.branches.update'),
-        mobile: 'button',
-    },
-    {
-        id: 'batches',
-        label: 'Lotes',
-        icon: 'edit',
-        variant: 'blue',
-        hidden: (product) =>
-            !can('inventory.branches.update') || !product.batches?.length,
-        mobile: 'button',
-    },
-    {
-        id: 'movements',
-        label: 'Historial',
-        icon: 'history',
-        variant: 'slate',
-        hidden: () => !can('inventory.branches.view'),
-        mobile: 'button',
-    },
-])
-
-function handleInventoryAction({ action, row }) {
-    if (action === 'entry' && can('inventory.branches.create')) {
-        openEntryModal(row)
-    }
-
-    if (action === 'exit' && can('inventory.branches.update')) {
-        openExitModal(row)
-    }
-
-    if (action === 'batches' && can('inventory.branches.update')) {
-        openProductBatchesModal(row)
-    }
-
-    if (action === 'movements' && can('inventory.branches.view')) {
-        openMovementsModal(row)
-    }
-}
-
 const { can } = usePermissions()
 
 const {
@@ -191,7 +98,6 @@ const {
     showExitModal,
     showMovementsModal,
     showConfigModal,
-    showBatchAdjustmentModal,
 
     liveSelectedMovementProduct,
     liveSelectedMovementsProduct,
@@ -199,7 +105,6 @@ const {
     liveSelectedBatch,
 
     closeConfigModal,
-    closeBatchAdjustmentModal,
     adjustBatch,
 
     search,
@@ -235,10 +140,6 @@ const {
 
     goToPage,
 
-    viewProduct,
-    editProduct,
-    deleteProduct,
-
     showProductBatchesModal,
     liveSelectedBatchesProduct,
     openProductBatchesModal,
@@ -260,48 +161,60 @@ const {
     saveEditedBatch,
 } = useBranchInventory(props)
 
+const inventoryToolbarConfig = computed(() =>
+    getInventoryToolbarConfig({
+        branch: currentBranch.value,
+        categories: categories.value,
+        subcategories: subcategories.value,
+        categoryFilter: categoryFilter.value,
+        subcategoryFilter: subcategoryFilter.value,
+        stockFilter: stockFilter.value,
+        statusFilter: statusFilter.value,
+        expirationStatusFilter: expirationStatusFilter.value,
+        inactiveCandidateFilter: inactiveCandidateFilter.value,
+    })
+)
+
+function handleInventoryToolbarFilter({ key, value }) {
+    if (key === 'categoryFilter') categoryFilter.value = value
+    if (key === 'subcategoryFilter') subcategoryFilter.value = value
+    if (key === 'stockFilter') stockFilter.value = value
+    if (key === 'statusFilter') statusFilter.value = value
+    if (key === 'expirationStatusFilter') expirationStatusFilter.value = value
+    if (key === 'inactiveCandidateFilter') inactiveCandidateFilter.value = value
+}
+
+function handleInventoryAction({ action, row }) {
+    if (action === 'entry' && can('inventory.branches.create')) {
+        openEntryModal(row)
+    }
+
+    if (action === 'exit' && can('inventory.branches.update')) {
+        openExitModal(row)
+    }
+
+    if (action === 'batches' && can('inventory.branches.update')) {
+        openProductBatchesModal(row)
+    }
+
+    if (action === 'movements' && can('inventory.branches.view')) {
+        openMovementsModal(row)
+    }
+}
 </script>
-
 <template>
-    <div class="space-y-5">
-        <header class="flex flex-col gap-1">
-            <h1 class="text-2xl md:text-3xl font-black text-slate-800">
-                Inventario
-                <span v-if="currentBranch" class="text-slate-500">
-                    - {{ currentBranch.name }}
-                </span>
-            </h1>
+    <PageLayout>
+        <InventoryStatsCards :stats="stats" :alerts="alerts" class="mb-5" @open-alert="openAlertModal" />
 
-            <p class="text-sm text-slate-500">
-                Consulta y movimientos por sucursal
-            </p>
-        </header>
+        <template #toolbar>
+            <GlobalToolbar v-bind="inventoryToolbarConfig" :search="search" :records-per-page="recordsToShow"
+                :filtered-records="filteredProducts.length" :total-records="visualProducts.length"
+                @update:search="search = $event" @update:filter="handleInventoryToolbarFilter"
+                @update:records-per-page="recordsToShow = $event" />
+        </template>
 
-        <InventoryStatsCards :stats="stats" :alerts="alerts" @open-alert="openAlertModal" />
-
-        <InventoryToolbar :filtered-products="filteredProducts" :products-db="visualProducts"
-            :records-to-show="recordsToShow" :categories="categories" :subcategories="subcategories" :search="search"
-            :category-filter="categoryFilter" :subcategory-filter="subcategoryFilter" :stock-filter="stockFilter"
-            :status-filter="statusFilter" :expiration-status-filter="expirationStatusFilter"
-            :inactive-candidate-filter="inactiveCandidateFilter" @update:recordsToShow="recordsToShow = $event"
-            @update:search="search = $event" @update:categoryFilter="categoryFilter = $event"
-            @update:subcategoryFilter="subcategoryFilter = $event" @update:stockFilter="stockFilter = $event"
-            @update:statusFilter="statusFilter = $event"
-            @update:expirationStatusFilter="expirationStatusFilter = $event"
-            @update:inactiveCandidateFilter="inactiveCandidateFilter = $event" />
-
-        <GlobalTable :items="filteredProducts" :columns="inventoryColumns" :actions="inventoryActions" row-key="id"
-            mobile-card-header-field="name" no-data-message="No se encontraron productos."
-            @action="handleInventoryAction" />
-
-        <nav v-if="hasPagination" class="flex flex-wrap items-center justify-center gap-2 pt-1">
-            <button v-for="link in paginationLinks" :key="link.label" type="button" :disabled="!link.url"
-                class="px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 disabled:cursor-not-allowed"
-                :class="link.active
-                    ? 'bg-slate-900 text-white border-slate-900'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    " @click="goToPage(link.url)" v-html="link.label" />
-        </nav>
+        <GlobalTable :items="filteredProducts" v-bind="inventoryTableConfig" :pagination="branchProductsDB"
+            @page-change="goToPage" @action="handleInventoryAction" />
 
         <StockEntryModal v-if="showEntryModal && liveSelectedMovementProduct && can('inventory.branches.create')"
             :product="liveSelectedMovementProduct" @close="closeEntryModal" />
@@ -313,11 +226,6 @@ const {
             v-if="showMovementsModal && liveSelectedMovementsProduct && can('inventory.branches.view')"
             :product="liveSelectedMovementsProduct" @close="closeMovementsModal" />
 
-        <ProductBatchesModal
-            v-if="showProductBatchesModal && liveSelectedBatchesProduct && can('inventory.branches.update')"
-            :product="liveSelectedBatchesProduct" @close="closeProductBatchesModal"
-            @adjust-batch="openBatchAdjustmentFromList" />
-
         <ProductBatchesModal v-if="showProductBatchesModal && liveSelectedBatchesProduct"
             :product="liveSelectedBatchesProduct" :selected-batch="liveSelectedBatch" :form="batchAdjustmentForm"
             :frontend-errors="batchAdjustmentErrors" :total-errors="batchAdjustmentTotalErrors"
@@ -325,8 +233,8 @@ const {
             :is-seasonal="batchAdjustmentIsSeasonal" :calculated-quantity="batchAdjustmentCalculatedQuantity"
             :adjustment-text="batchAdjustmentText" :quantity-result-color="batchAdjustmentQuantityResultColor"
             :toggle-lot="toggleBatchAdjustmentLot" :set-adjustment-type="setBatchAdjustmentType"
-            :validate-field="validateBatchAdjustmentField" @select-batch="adjustBatch" @save="saveEditedBatch"
-            @close="closeProductBatchesModal" />
+            :validate-field="validateBatchAdjustmentField" @adjust-batch="openBatchAdjustmentFromList"
+            @select-batch="adjustBatch" @save="saveEditedBatch" @close="closeProductBatchesModal" />
 
         <InventoryAlertsModal v-if="showAlertModal" :title="selectedAlertTitle" :type="selectedAlertType"
             :batches="selectedAlertBatches" @close="closeAlertModal" />
@@ -334,5 +242,5 @@ const {
         <EditBranchProductConfigModal
             v-if="showConfigModal && liveSelectedConfigProduct && can('inventory.branches.update')"
             :product="liveSelectedConfigProduct" @close="closeConfigModal" />
-    </div>
+    </PageLayout>
 </template>

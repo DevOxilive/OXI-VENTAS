@@ -3,14 +3,18 @@ import { computed, ref, watch } from "vue";
 import { router } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
-import ProductTable from "@/Components/Inventory/ProductTable.vue";
-import TablePageLayout from '@/Components/Tables/TablePageLayout.vue'
-import ProductFilters from "@/Components/Inventory/ProductFilters.vue";
+import GlobalTable from '@/Components/Tables/GlobalTable.vue'
+import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
+import { usePermissions } from '@/Composables/usePermissions'
+import { getProductToolbarConfig } from "@/config/ToolbarConfigs/productToolbarConfig";
+import { productTableConfig } from '@/config/TableConfigs/productTableConfig'
 import ProductRegisterModal from "@/Components/Inventory/ProductRegisterModal.vue";
+import PageLayout from '@/Layouts/PageLayout.vue'
 
 defineOptions({
   layout: AdminLayout,
 });
+const { can } = usePermissions()
 
 const props = defineProps({
   productsDB: {
@@ -23,6 +27,14 @@ const props = defineProps({
       search: "",
       per_page: 50,
     }),
+  },
+  categoriesDB: {
+    type: Array,
+    default: () => [],
+  },
+  branch: {
+    type: Object,
+    default: () => ({}),
   },
 });
 
@@ -58,6 +70,39 @@ const product = ref({
   errors: {},
 });
 
+const productToolbarConfig = computed(() =>
+  getProductToolbarConfig({
+    branch: props.branch,
+    categories: props.categoriesDB ?? [],
+    categoryFilter: categoryFilter.value,
+    canCreate: can('inventory.products.create'),
+  })
+)
+
+function handleProductToolbarFilter({ key, value }) {
+  if (key === 'categoryFilter') {
+    categoryFilter.value = value
+  }
+}
+
+function handleProductToolbarAction(action) {
+  if (action === 'create' && can('inventory.products.create')) {
+    openCreateModal()
+  }
+}
+function handleProductTableAction({ action, row }) {
+  if (action === 'view' && can('inventory.products.view')) {
+    openViewModal(row)
+  }
+
+  if (action === 'edit' && can('inventory.products.update')) {
+    openEditModal(row)
+  }
+
+  if (action === 'delete' && can('inventory.products.delete')) {
+    deleteProduct(row)
+  }
+}
 const products = computed(() => {
   if (Array.isArray(props.productsDB)) {
     return props.productsDB;
@@ -94,21 +139,6 @@ watch(search, () => {
 watch(recordsToShow, () => {
   reloadProducts();
 });
-
-function reloadProducts() {
-  router.get(
-    window.location.pathname,
-    {
-      search: search.value || undefined,
-      per_page: recordsToShow.value,
-    },
-    {
-      preserveState: true,
-      preserveScroll: true,
-      replace: true,
-    }
-  );
-}
 
 function reloadProducts(pageUrl = null) {
   const request = pageUrl ?? window.location.pathname
@@ -276,27 +306,20 @@ function deleteProduct(selectedProduct) {
     p => p.id !== selectedProduct.id
   );
 }
-function exportExcel() {
-  console.log("Exportar excel");
-}
-
-function adjustStock(selectedProduct) {
-  console.log("Ajustar stock", selectedProduct);
-}
 </script>
 <template>
-  <TablePageLayout>
+  <PageLayout>
     <template #toolbar>
-      <ProductFilters :search="search" :category-filter="categoryFilter" :records-to-show="recordsToShow"
-        @update:search="search = $event" @update:category-filter="categoryFilter = $event"
-        @update:records-to-show="recordsToShow = $event" @create="openCreateModal" />
+      <GlobalToolbar v-bind="productToolbarConfig" :search="search" :records-per-page="recordsToShow"
+        :filtered-records="filteredProducts.length" :total-records="products.length" @update:search="search = $event"
+        @update:filter="handleProductToolbarFilter" @update:records-per-page="recordsToShow = $event"
+        @action="handleProductToolbarAction" />
     </template>
 
-    <ProductTable :products="filteredProducts" :pagination="productsDB" :records-per-page="recordsToShow"
-      @update:records-per-page="recordsToShow = $event" @page-change="reloadProducts" @view="openViewModal"
-      @edit="openEditModal" @delete="deleteProduct" />
-  </TablePageLayout>
+    <GlobalTable :items="filteredProducts" v-bind="productTableConfig" :pagination="productsDB"
+      @page-change="reloadProducts" @action="handleProductTableAction" />
 
-  <ProductRegisterModal v-if="showModal" :modo="modalMode" :product="product" :frontend-errors="frontendErrors"
-    @close="closeModal" @save="submitProduct" @validate="validateField" />
+    <ProductRegisterModal v-if="showModal" :modo="modalMode" :product="product" :frontend-errors="frontendErrors"
+      @close="closeModal" @save="submitProduct" @validate="validateField" />
+  </PageLayout>
 </template>
