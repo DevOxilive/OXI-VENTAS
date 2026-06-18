@@ -1,16 +1,17 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import PageLayout from '@/Layouts/PageLayout.vue'
+
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
+
 import { useEmployeeActions } from '@/Composables/HumanResources/useEmployeeActions'
 import { useEmployeeExport } from '@/Composables/HumanResources/useEmployeeExport'
-import { getEmployeeToolbarConfig } from '@/config/ToolbarConfigs/employeeToolbarConfig'
-import EmployeeRegisterModal from '@/Components/Forms/EmployeeRegisterModal.vue'
-import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
-import GlobalTable from '@/Components/Tables/GlobalTable.vue'
-import PageLayout from '@/Layouts/PageLayout.vue'
-import { employeeTableConfig } from '@/config/TableConfigs/employeeTableConfig'
 import { usePermissions } from '@/Composables/usePermissions'
+
+import EmployeeToolbar from '@/Components/HumanResourses/EmployeeToolbar.vue'
+import EmployeeTable from '@/Components/HumanResourses/EmployeeTable.vue'
+import EmployeeRegisterModal from '@/Components/HumanResourses/EmployeeRegisterModal.vue'
 
 defineOptions({ layout: AdminLayout })
 
@@ -62,13 +63,6 @@ const {
     deleteEmployee,
 } = useEmployeeActions()
 
-const employeeToolbarConfig = computed(() =>
-    getEmployeeToolbarConfig({
-        canCreate: can('employees.create'),
-        canExport: can('files.export'),
-    })
-)
-
 function reloadEmployees() {
     router.get(route('human-resources.employees.index'), {
         search: search.value,
@@ -106,8 +100,8 @@ function handleEmployeeTableAction({ action, row }) {
 }
 
 function handleEmployeeToolbarAction(action) {
-    if (action === 'create') openCreateModal()
-    if (action === 'export') exportExcel()
+    if (action === 'create' && can('employees.create')) openCreateModal()
+    if (action === 'export' && can('files.export')) exportExcel()
 }
 
 onMounted(() => {
@@ -122,18 +116,19 @@ onBeforeUnmount(() => {
     window.Echo.leave('systems')
 })
 </script>
+
 <template>
     <PageLayout>
         <template #toolbar>
-            <GlobalToolbar title="Empleados" subtitle="Administración del personal registrado"
-                v-bind="employeeToolbarConfig" :search="search" :records-per-page="recordsPerPage"
-                :records-per-page-options="recordsToShow" :filtered-records="normalizedEmployees.length"
-                :total-records="employeePaginator?.total || 0" @action="handleEmployeeToolbarAction"
-                @update:search="search = $event" @update:records-per-page="recordsPerPage = $event" />
+            <EmployeeToolbar :search="search" :records-per-page="recordsPerPage"
+                :filtered-records="normalizedEmployees.length" :total-records="employeePaginator?.total || 0"
+                :can-create="can('employees.create')" :can-export="can('files.export')"
+                @action="handleEmployeeToolbarAction" @update:search="search = $event"
+                @update:records-per-page="recordsPerPage = $event" />
         </template>
 
-        <GlobalTable :items="normalizedEmployees" v-bind="employeeTableConfig" :pagination="employeePaginator"
-            @page-change="handlePageChange" @action="handleEmployeeTableAction" />
+        <EmployeeTable :employees="normalizedEmployees" :pagination="employeePaginator" @page-change="handlePageChange"
+            @action="handleEmployeeTableAction" />
 
         <EmployeeRegisterModal v-if="
             showModal &&

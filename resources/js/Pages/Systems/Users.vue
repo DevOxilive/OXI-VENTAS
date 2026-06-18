@@ -2,10 +2,8 @@
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { usePage, useForm, router } from '@inertiajs/vue3'
 import { usePermissionLabels } from '@/Composables/usePermissionLabels'
-import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
-import { getUsersToolbarConfig } from '@/config/ToolbarConfigs/usersToolbarConfig'
-import GlobalTable from '@/Components/Tables/GlobalTable.vue'
-import { getUsersTableConfig } from '@/config/ToolbarConfigs/usersTableConfig'
+import UserToolbar from '@/Components/Systems/UserToolbar.vue'
+import UserTable from '@/Components/Systems/UserTable.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import {
   usePermissions,
@@ -13,8 +11,8 @@ import {
 } from '@/Composables/usePermissions'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import UserRegisterModal from '@/Components/Forms/UserRegisterModal.vue'
-import UserDetailModal from '@/Components/Forms/UserDetailModal.vue'
+import UserRegisterModal from '@/Components/Systems/UserRegisterModal.vue'
+import UserDetailModal from '@/Components/Systems/UserDetailModal.vue'
 
 import {
   UniversalActionModal,
@@ -69,12 +67,6 @@ const viewMode = ref(
         ? 'employees'
         : 'users'
   )
-)
-
-const usersToolbarConfig = computed(() =>
-  getUsersToolbarConfig({
-    viewMode: viewMode.value,
-  })
 )
 
 function changeViewMode(mode) {
@@ -198,13 +190,6 @@ const activePaginator = computed(() => {
     ? usersDB.value
     : employeesDB.value
 })
-
-const usersTableConfig = computed(() =>
-  getUsersTableConfig({
-    viewMode: viewMode.value,
-    can,
-  })
-)
 
 function reloadUsers() {
   router.get(route('systems.users.index'), {
@@ -521,17 +506,13 @@ onBeforeUnmount(() => {
 <template>
   <PageLayout>
     <template #toolbar>
-      <GlobalToolbar title="Registro de Usuarios" subtitle="Administra empleados disponibles y usuarios del sistema"
-        v-bind="usersToolbarConfig" :tabs="[
-          { key: 'employees', label: 'Empleados' },
-          { key: 'users', label: 'Usuarios' }
-        ]" :active-tab="viewMode" :search="search" :records-per-page="recordsPerPage"
-        :records-per-page-options="[10, 25, 50, 100]" :filtered-records="normalizedList.length"
-        :total-records="activePaginator?.total || 0" @update:active-tab="changeViewMode"
-        @update:search="search = $event" @update:records-per-page="recordsPerPage = $event" />
+      <UserToolbar :view-mode="viewMode" :search="search" :records-per-page="recordsPerPage"
+        :filtered-records="normalizedList.length" :total-records="activePaginator?.total || 0"
+        @update:active-tab="changeViewMode" @update:search="search = $event"
+        @update:records-per-page="recordsPerPage = $event" />
     </template>
 
-    <GlobalTable :items="normalizedList" v-bind="usersTableConfig" :pagination="activePaginator"
+    <UserTable :items="normalizedList" :pagination="activePaginator" :view-mode="viewMode" :can="can"
       @page-change="handlePageChange" @action="handleUsersTableAction" @row-click="handleUsersRowClick" />
 
     <UserDetailModal v-if="showUserDetail && can('users.view')" :user="selectedUser" @close="closeUserDetail" />
