@@ -5,7 +5,7 @@ import { useEmployeeForm } from '@/Composables/HumanResources/useEmployeeForm'
 import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
 import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
 import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
-import EmployeeData from '@/Components/Forms/EmployeeData.vue'
+import EmployeeData from './EmployeeData.vue'
 
 const emit = defineEmits(['close'])
 
@@ -64,8 +64,8 @@ onBeforeUnmount(() => {
                 ? 'Registrar empleado'
                 : props.mode === 'edit'
                     ? 'Actualizar empleado'
-                    : 'Detalle del empleado'" subtitle="Información general del empleado"
-                :total-errors="totalErrors" :mode="props.mode" @close="closeModal" />
+                    : 'Detalle del empleado'" subtitle="Información general del empleado" :total-errors="totalErrors"
+                :mode="props.mode" @close="closeModal" />
 
             <GeneralModalContent :columns="1">
                 <div class="min-w-0">

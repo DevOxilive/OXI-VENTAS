@@ -16,6 +16,7 @@ defineProps({
     },
     showSearch: {
         type: Boolean,
+        
         default: true,
     },
 

@@ -3,7 +3,7 @@ import { onMounted, onBeforeUnmount } from "vue";
 
 import GeneralModalHeader from "@/Components/Forms/GeneralModalHeader.vue";
 import GeneralModalContent from "@/Components/Forms/GeneralModalContent.vue";
-
+import GeneralModalFooter from "../Forms/GeneralModalFooter.vue";
 const props = defineProps({
     user: {
         type: Object,
