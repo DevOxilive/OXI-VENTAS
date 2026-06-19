@@ -160,6 +160,33 @@ class InventoryReportService
             $query->where('products.category_id', $filters['category_id']);
         }
 
+        if (!empty($filters['search'])) {
+            $query->where(function ($searchQuery) use ($filters) {
+                $searchQuery
+                    ->where('products.name', 'like', '%' . $filters['search'] . '%')
+                    ->orWhere('categories.name', 'like', '%' . $filters['search'] . '%')
+                    ->orWhere('product_batches.lot_number', 'like', '%' . $filters['search'] . '%');
+            });
+        }
+
+        if (!empty($filters['date_from'])) {
+            $query->whereDate('product_batches.expiration_date', '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $query->whereDate('product_batches.expiration_date', '<=', $filters['date_to']);
+        }
+
+        if (($filters['status'] ?? null) === 'expired') {
+            $query->whereDate('product_batches.expiration_date', '<', today());
+        }
+
+        if (($filters['status'] ?? null) === 'near_expiration') {
+            $query
+                ->whereDate('product_batches.expiration_date', '>=', today())
+                ->whereDate('product_batches.expiration_date', '<=', now()->addDays(30));
+        }
+
         return $query->limit(100)->get();
     }
 
@@ -221,10 +248,18 @@ class InventoryReportService
             $query->where('products.category_id', $filters['category_id']);
         }
 
+        if (!empty($filters['search'])) {
+            $query->where(function ($searchQuery) use ($filters) {
+                $searchQuery
+                    ->where('products.name', 'like', '%' . $filters['search'] . '%')
+                    ->orWhere('categories.name', 'like', '%' . $filters['search'] . '%');
+            });
+        }
+
         return $query->limit(300)->get();
     }
 
-    public function attentionProducts(Branch $branch)
+    public function attentionProducts(Branch $branch, array $filters = [])
     {
         $lastMovementSubquery = StockMovement::query()
             ->select(
@@ -274,6 +309,30 @@ class InventoryReportService
                     ->orWhereRaw('COALESCE(expired_batches.expired_batches, 0) > 0')
                     ->orWhereRaw('COALESCE(near_expiration_batches.near_expiration_batches, 0) > 0');
             })
+            ->when(!empty($filters['category_id']), function ($query) use ($filters) {
+                $query->where('products.category_id', $filters['category_id']);
+            })
+            ->when(!empty($filters['search']), function ($query) use ($filters) {
+                $query->where(function ($searchQuery) use ($filters) {
+                    $searchQuery
+                        ->where('products.name', 'like', '%' . $filters['search'] . '%')
+                        ->orWhere('categories.name', 'like', '%' . $filters['search'] . '%');
+                });
+            })
+            ->when(($filters['status'] ?? null) === 'out_of_stock', function ($query) {
+                $query->where('branch_products.stock', '<=', 0);
+            })
+            ->when(($filters['status'] ?? null) === 'low_stock', function ($query) {
+                $query
+                    ->where('branch_products.stock', '>', 0)
+                    ->whereColumn('branch_products.stock', '<=', 'branch_products.min_stock');
+            })
+            ->when(($filters['status'] ?? null) === 'expired', function ($query) {
+                $query->whereRaw('COALESCE(expired_batches.expired_batches, 0) > 0');
+            })
+            ->when(($filters['status'] ?? null) === 'near_expiration', function ($query) {
+                $query->whereRaw('COALESCE(near_expiration_batches.near_expiration_batches, 0) > 0');
+            })
             ->select([
                 'branch_products.id as branch_product_id',
                 'products.name as product',
@@ -301,6 +360,14 @@ class InventoryReportService
 
     private function applyCommonFilters($query, array $filters): void
     {
+        if (!empty($filters['search'])) {
+            $query->where(function ($searchQuery) use ($filters) {
+                $searchQuery
+                    ->where('products.name', 'like', '%' . $filters['search'] . '%')
+                    ->orWhere('categories.name', 'like', '%' . $filters['search'] . '%');
+            });
+        }
+
         if (!empty($filters['product_id'])) {
             $query->where('branch_products.id', $filters['product_id']);
         }

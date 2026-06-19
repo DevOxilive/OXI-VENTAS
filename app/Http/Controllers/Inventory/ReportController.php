@@ -4,13 +4,21 @@ namespace App\Http\Controllers\Inventory;
 
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
+use App\Models\Category;
 use App\Services\InventoryReportService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ReportController extends Controller
 {
-    public function index(Request $request, Branch $branch, InventoryReportService $reportService)
+    public function index(Branch $branch)
+    {
+        return Inertia::render('Inventory/Reports', [
+            'currentBranch' => $branch,
+        ]);
+    }
+
+    public function inventory(Request $request, Branch $branch, InventoryReportService $reportService)
     {
         $filters = $this->resolveFilters($request);
         $activeReport = $request->input('report', 'dashboard');
@@ -35,7 +43,7 @@ class ReportController extends Controller
         }
 
         if ($activeReport === 'attention') {
-            $reports['attentionProducts'] = $reportService->attentionProducts($branch);
+            $reports['attentionProducts'] = $reportService->attentionProducts($branch, $filters);
         }
 
         return Inertia::render('Inventory/Reports/InventoryReports', [
@@ -43,6 +51,11 @@ class ReportController extends Controller
             'activeReport' => $activeReport,
             'filters' => $filters,
             'catalogs' => [
+                'categories' => Category::query()
+                    ->select('id', 'name')
+                    ->where('active', true)
+                    ->orderBy('name')
+                    ->get(),
                 'movementTypes' => [
                     'IN',
                     'OUT',
@@ -62,11 +75,6 @@ class ReportController extends Controller
         ]);
     }
 
-    public function inventory(Request $request, Branch $branch, InventoryReportService $reportService)
-    {
-        return $this->index($request, $branch, $reportService);
-    }
-
     private function resolveFilters(Request $request): array
     {
         return [
@@ -75,6 +83,7 @@ class ReportController extends Controller
             'date_to' => $request->input('date_to'),
             'product_id' => $request->input('product_id'),
             'category_id' => $request->input('category_id'),
+            'status' => $request->input('status'),
             'user_id' => $request->input('user_id'),
             'movement_type' => $request->input('movement_type'),
             'movement_reason' => $request->input('movement_reason'),

@@ -38,7 +38,7 @@ const reportGroups = [
         description: 'Caducidades, stock bajo, rotación e inventario general.',
         icon: 'inventory_2',
         disabled: false,
-        routeName: 'inventory.branches.reports',
+        routeName: 'inventory.branches.reports.inventory',
     },
     {
         key: 'movements',
