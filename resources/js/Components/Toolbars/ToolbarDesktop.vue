@@ -3,6 +3,15 @@ import { useToolbarConfig } from './useToolbarConfig'
 import { getToolbarActionClasses } from './toolbarClasses'
 
 const props = defineProps({
+    backButton: {
+        type: Boolean,
+        default: false,
+    },
+
+    backLabel: {
+        type: String,
+        default: 'Volver',
+    },
     title: String,
     subtitle: String,
     search: String,
@@ -27,6 +36,7 @@ const props = defineProps({
 })
 
 defineEmits([
+    'back',
     'update:search',
     'update:filter',
     'update:records-per-page',
@@ -47,6 +57,19 @@ const {
 
 <template>
     <section class="hidden md:block bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
+        <div class="hidden md:block space-y-3">
+            <div v-if="backButton">
+                <button type="button"
+                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                    @click="$emit('back')">
+                    <span class="material-symbols-outlined text-[19px]">
+                        arrow_back
+                    </span>
+
+                    {{ backLabel }}
+                </button>
+            </div>
+        </div>
         <div class="flex items-start justify-between gap-6">
             <div class="min-w-0">
                 <h2 v-if="title" class="text-xl font-black text-slate-800">
@@ -119,18 +142,38 @@ const {
             'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5': visibleFilters.length === 5,
             'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6': visibleFilters.length >= 6,
         }">
-            <select v-for="filter in visibleFilters" :key="filter.key" :value="filter.value ?? ''"
-                class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-                @change="$emit('update:filter', { key: filter.key, value: $event.target.value })">
-                <option :value="filter.emptyValue ?? ''">
-                    {{ filter.placeholder || filter.label }}
-                </option>
+            <template v-for="filter in visibleFilters" :key="filter.key">
+                <input v-if="filter.type === 'date'" :value="filter.value ?? ''" type="date"
+                    class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                    @input="$emit('update:filter', {
+                        key: filter.key,
+                        value: $event.target.value
+                    })" />
 
-                <option v-for="option in filter.options || []" :key="getOptionValue(option, filter)"
-                    :value="getOptionValue(option, filter)">
-                    {{ getOptionLabel(option, filter) }}
-                </option>
-            </select>
+                <input v-else-if="filter.type === 'text'" :value="filter.value ?? ''" type="text"
+                    :placeholder="filter.placeholder || filter.label"
+                    class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                    @input="$emit('update:filter', {
+                        key: filter.key,
+                        value: $event.target.value
+                    })" />
+
+                <select v-else :value="filter.value ?? ''"
+                    class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                    @change="$emit('update:filter', {
+                        key: filter.key,
+                        value: $event.target.value
+                    })">
+                    <option :value="filter.emptyValue ?? ''">
+                        {{ filter.placeholder || filter.label }}
+                    </option>
+
+                    <option v-for="option in filter.options || []" :key="getOptionValue(option, filter)"
+                        :value="getOptionValue(option, filter)">
+                        {{ getOptionLabel(option, filter) }}
+                    </option>
+                </select>
+            </template>
         </div>
 
         <p v-if="showCounter" class="text-xs text-slate-400">

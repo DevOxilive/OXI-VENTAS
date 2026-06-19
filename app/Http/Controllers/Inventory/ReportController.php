@@ -38,7 +38,7 @@ class ReportController extends Controller
             $reports['attentionProducts'] = $reportService->attentionProducts($branch);
         }
 
-        return Inertia::render('Inventory/Reports', [
+        return Inertia::render('Inventory/Reports/InventoryReports', [
             'currentBranch' => $branch,
             'activeReport' => $activeReport,
             'filters' => $filters,
@@ -58,7 +58,13 @@ class ReportController extends Controller
             ],
             'summary' => $reportService->summary($branch),
             'reports' => $reports,
+            'reportHistory' => [],
         ]);
+    }
+
+    public function inventory(Request $request, Branch $branch, InventoryReportService $reportService)
+    {
+        return $this->index($request, $branch, $reportService);
     }
 
     private function resolveFilters(Request $request): array
@@ -72,6 +78,7 @@ class ReportController extends Controller
             'user_id' => $request->input('user_id'),
             'movement_type' => $request->input('movement_type'),
             'movement_reason' => $request->input('movement_reason'),
+            'search' => $request->input('search'),
         ];
     }
 }
