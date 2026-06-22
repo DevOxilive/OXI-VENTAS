@@ -274,6 +274,26 @@ Route::middleware([
         Route::get('/branches/{branch}/reports/inventory', [ReportController::class, 'inventory'])
             ->middleware('permission:inventory.view,inventory.branches.view')
             ->name('branches.reports.inventory');
+
+        Route::get('/branches/{branch}/reports/inventory/excel', [ReportController::class, 'exportExcel'])
+            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->name('branches.reports.inventory.excel');
+
+        Route::get('/branches/{branch}/reports/inventory/pdf', [ReportController::class, 'exportPdf'])
+            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->name('branches.reports.inventory.pdf');
+
+        Route::get('/branches/{branch}/reports/movements', [ReportController::class, 'movements'])
+            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->name('branches.reports.movements');
+
+        Route::get('/branches/{branch}/reports/movements/excel', [ReportController::class, 'exportMovementsExcel'])
+            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->name('branches.reports.movements.excel');
+
+        Route::get('/branches/{branch}/reports/movements/pdf', [ReportController::class, 'exportMovementsPdf'])
+            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->name('branches.reports.movements.pdf');
     });
 
     /*

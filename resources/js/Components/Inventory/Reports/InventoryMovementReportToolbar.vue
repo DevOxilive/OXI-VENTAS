@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
-import { getInventoryReportToolbarConfig } from '@/config/ToolbarConfigs/inventoryReportToolbarConfig'
+import { getInventoryMovementReportToolbarConfig } from '@/config/ToolbarConfigs/inventoryMovementReportToolbarConfig'
 
 const props = defineProps({
     branch: {
@@ -21,6 +21,18 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    users: {
+        type: Array,
+        default: () => [],
+    },
+    movementTypes: {
+        type: Array,
+        default: () => [],
+    },
+    movementReasons: {
+        type: Array,
+        default: () => [],
+    },
 })
 
 defineEmits([
@@ -31,11 +43,14 @@ defineEmits([
 ])
 
 const toolbarConfig = computed(() =>
-    getInventoryReportToolbarConfig({
+    getInventoryMovementReportToolbarConfig({
         branch: props.branch,
         filters: props.filters,
         categories: props.categories,
         products: props.products,
+        users: props.users,
+        movementTypes: props.movementTypes,
+        movementReasons: props.movementReasons,
     }),
 )
 </script>

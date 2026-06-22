@@ -20,8 +20,8 @@ const pageTitle = computed(() => {
 const reportGroups = [
     {
         key: 'audits',
-        title: 'Reportes de auditoría',
-        description: 'Conteos físicos, diferencias, incidencias y validaciones internas.',
+        title: 'Reportes de auditoria',
+        description: 'Conteos fisicos, diferencias, incidencias y validaciones internas.',
         icon: 'fact_check',
         disabled: true,
     },
@@ -35,7 +35,7 @@ const reportGroups = [
     {
         key: 'inventory',
         title: 'Reportes de inventario',
-        description: 'Caducidades, stock bajo, rotación e inventario general.',
+        description: 'Caducidades, stock bajo, rotacion e inventario general.',
         icon: 'inventory_2',
         disabled: false,
         routeName: 'inventory.branches.reports.inventory',
@@ -45,13 +45,14 @@ const reportGroups = [
         title: 'Reportes de movimientos',
         description: 'Entradas, salidas, ajustes y trazabilidad por lote.',
         icon: 'sync_alt',
-        disabled: true,
+        disabled: false,
+        routeName: 'inventory.branches.reports.movements',
     },
 ]
 
 const toolbarConfig = computed(() => ({
     title: 'Centro de reportes',
-    subtitle: 'Consulta información estratégica y operativa del sistema.',
+    subtitle: 'Consulta informacion estrategica y operativa del sistema.',
     showSearch: false,
     showRecordsPerPage: false,
     showCounter: false,
@@ -70,7 +71,6 @@ function openReportGroup(group) {
 </script>
 
 <template>
-
     <Head :title="pageTitle" />
 
     <PageLayout>
@@ -79,9 +79,17 @@ function openReportGroup(group) {
         </template>
 
         <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <GlobalCard v-for="group in reportGroups" :key="group.key" :title="group.title"
-                :description="group.description" :icon="group.icon" :disabled="group.disabled"
-                :badge="group.disabled ? 'Próximamente' : ''" badge-variant="neutral" @click="openReportGroup(group)" />
+            <GlobalCard
+                v-for="group in reportGroups"
+                :key="group.key"
+                :title="group.title"
+                :description="group.description"
+                :icon="group.icon"
+                :disabled="group.disabled"
+                :badge="group.disabled ? 'Proximamente' : ''"
+                badge-variant="neutral"
+                @click="openReportGroup(group)"
+            />
         </section>
     </PageLayout>
 </template>

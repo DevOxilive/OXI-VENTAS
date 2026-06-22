@@ -3,9 +3,9 @@ import { Head } from '@inertiajs/vue3'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
-import InventoryReportToolbar from '@/Components/Inventory/Reports/InventoryReportToolbar.vue'
-import ReportTable from '@/Components/Inventory/Reports/ReportTable.vue'
-import { useInventoryReport } from '@/Composables/Inventory/useInventoryReport'
+import InventoryMovementReportToolbar from '@/Components/Inventory/Reports/InventoryMovementReportToolbar.vue'
+import MovementReportTable from '@/Components/Inventory/Reports/MovementReportTable.vue'
+import { useInventoryMovementReport } from '@/Composables/Inventory/useInventoryMovementReport'
 
 defineOptions({ layout: AdminLayout })
 
@@ -22,17 +22,9 @@ const props = defineProps({
         type: Object,
         default: () => ({}),
     },
-    reports: {
-        type: Object,
-        default: () => ({}),
-    },
-    reportHistory: {
-        type: Array,
+    movements: {
+        type: [Array, Object],
         default: () => [],
-    },
-    activeReport: {
-        type: String,
-        default: 'dashboard',
     },
 })
 
@@ -41,6 +33,9 @@ const {
     pageTitle,
     categoryOptions,
     productOptions,
+    userOptions,
+    movementTypeOptions,
+    movementReasonOptions,
     tableRows,
     tablePagination,
     backToReportsCenter,
@@ -48,7 +43,7 @@ const {
     updateFilter,
     reloadReport,
     handleToolbarAction,
-} = useInventoryReport(props)
+} = useInventoryMovementReport(props)
 </script>
 
 <template>
@@ -56,11 +51,14 @@ const {
 
     <PageLayout>
         <template #toolbar>
-            <InventoryReportToolbar
+            <InventoryMovementReportToolbar
                 :branch="currentBranch"
                 :filters="filtersState"
                 :categories="categoryOptions"
                 :products="productOptions"
+                :users="userOptions"
+                :movement-types="movementTypeOptions"
+                :movement-reasons="movementReasonOptions"
                 @back="backToReportsCenter"
                 @update:search="updateSearch"
                 @update:filter="updateFilter"
@@ -68,13 +66,10 @@ const {
             />
         </template>
 
-        <section class="space-y-5">
-            <ReportTable
-                :rows="tableRows"
-                :report-type="filtersState.reportType"
-                :pagination="tablePagination"
-                @page-change="reloadReport"
-            />
-        </section>
+        <MovementReportTable
+            :rows="tableRows"
+            :pagination="tablePagination"
+            @page-change="reloadReport"
+        />
     </PageLayout>
 </template>

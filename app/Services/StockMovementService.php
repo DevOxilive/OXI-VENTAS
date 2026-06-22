@@ -206,6 +206,24 @@ class StockMovementService
         BranchProduct $branchProduct,
         array $batches
     ): void {
+        if (count($batches) === 0) {
+            throw new InvalidArgumentException('Debes registrar al menos un lote para la entrada.');
+        }
+
+        foreach ($batches as $batch) {
+            if (empty($batch['lot_number'])) {
+                throw new InvalidArgumentException('El numero de lote es obligatorio para la entrada.');
+            }
+
+            if (empty($batch['expiration_date'])) {
+                throw new InvalidArgumentException('La caducidad es obligatoria para la entrada.');
+            }
+
+            if (empty($batch['received_at'])) {
+                throw new InvalidArgumentException('La fecha de ingreso es obligatoria para la entrada.');
+            }
+        }
+
         $hasExpirationDate = collect($batches)
             ->contains(fn($batch) => !empty($batch['expiration_date']));
 
@@ -244,7 +262,7 @@ class StockMovementService
                 'initial_quantity' => $batchQuantity,
                 'quantity' => $batchQuantity,
                 'supplier' => $batch['supplier'] ?? null,
-                'received_at' => now()->toDateString(),
+                'received_at' => $batch['received_at'],
                 'status' => ProductBatch::STATUS_ACTIVE,
             ]);
 

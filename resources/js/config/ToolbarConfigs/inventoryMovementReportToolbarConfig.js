@@ -1,0 +1,108 @@
+export function getInventoryMovementReportToolbarConfig({
+    branch,
+    filters,
+    categories = [],
+    products = [],
+    users = [],
+    movementTypes = [],
+    movementReasons = [],
+} = {}) {
+    return {
+        title: 'Reportes de movimientos',
+        subtitle: branch?.name
+            ? `Sucursal ${branch.name}`
+            : 'Consulta entradas, salidas, ajustes y trazabilidad por lote.',
+        backButton: true,
+        backLabel: 'Centro de reportes',
+        showSearch: false,
+        showRecordsPerPage: false,
+        showCounter: false,
+        filters: [
+            {
+                key: 'categoryId',
+                label: 'Categoria',
+                placeholder: 'Todas las categorias',
+                value: filters?.categoryId ?? '',
+                options: categories,
+                optionLabel: 'name',
+                optionValue: 'id',
+            },
+            {
+                key: 'productId',
+                label: 'Producto',
+                placeholder: 'Todos los productos',
+                value: filters?.productId ?? '',
+                options: products,
+                optionLabel: 'label',
+                optionValue: 'id',
+            },
+            {
+                key: 'userId',
+                label: 'Usuario',
+                placeholder: 'Todos los usuarios',
+                value: filters?.userId ?? '',
+                options: users,
+                optionLabel: 'name',
+                optionValue: 'id',
+            },
+            {
+                key: 'movementType',
+                label: 'Tipo movimiento',
+                placeholder: 'Todos los tipos',
+                value: filters?.movementType ?? '',
+                options: movementTypes,
+                optionLabel: 'label',
+                optionValue: 'id',
+            },
+            {
+                key: 'movementReason',
+                label: 'Motivo',
+                placeholder: 'Todos los motivos',
+                value: filters?.movementReason ?? '',
+                options: movementReasons,
+                optionLabel: 'label',
+                optionValue: 'id',
+            },
+            {
+                key: 'dateFrom',
+                label: 'Movimiento inicio',
+                type: 'date',
+                value: filters?.dateFrom ?? '',
+            },
+            {
+                key: 'dateTo',
+                label: 'Movimiento fin',
+                type: 'date',
+                value: filters?.dateTo ?? '',
+            },
+            {
+                key: 'search',
+                label: 'Busqueda',
+                type: 'text',
+                placeholder: 'Producto, lote, usuario o nota',
+                value: filters?.search ?? '',
+            },
+        ],
+        actions: [
+            {
+                id: 'clear',
+                label: 'Limpiar',
+                icon: 'restart_alt',
+                variant: 'slate',
+            },
+            {
+                id: 'excel',
+                label: 'Excel',
+                icon: 'table_view',
+                variant: 'green',
+            },
+            {
+                id: 'pdf',
+                label: 'PDF',
+                icon: 'picture_as_pdf',
+                variant: 'red',
+            },
+        ],
+        tabs: [],
+    }
+}

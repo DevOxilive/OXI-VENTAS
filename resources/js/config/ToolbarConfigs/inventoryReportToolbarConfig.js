@@ -1,9 +1,9 @@
 export const INVENTORY_REPORT_TYPES = [
     {
         id: 'dashboard',
-        name: 'Resumen',
-        dataKey: null,
-        description: 'Vista general de salud del inventario.',
+        name: 'Inventario',
+        dataKey: 'inventory',
+        description: 'Lotes y existencias disponibles.',
     },
     {
         id: 'expirations',
@@ -86,6 +86,7 @@ export function getInventoryReportToolbarConfig({
     branch,
     filters,
     categories = [],
+    products = [],
 } = {}) {
     return {
         title: 'Reportes de inventario',
@@ -101,10 +102,9 @@ export function getInventoryReportToolbarConfig({
             {
                 key: 'status',
                 label: 'Estado del inventario',
-                type: 'button-group',
-                fullWidth: true,
+                placeholder: 'Todos los estados',
                 value: filters?.status ?? '',
-                options: INVENTORY_REPORT_STATUS_FILTERS,
+                options: INVENTORY_REPORT_STATUS_FILTERS.filter((status) => status.id),
                 optionLabel: 'label',
                 optionValue: 'id',
             },
@@ -118,14 +118,23 @@ export function getInventoryReportToolbarConfig({
                 optionValue: 'id',
             },
             {
+                key: 'productId',
+                label: 'Producto',
+                placeholder: 'Todos los productos',
+                value: filters?.productId ?? '',
+                options: products,
+                optionLabel: 'label',
+                optionValue: 'id',
+            },
+            {
                 key: 'dateFrom',
-                label: 'Fecha inicio',
+                label: 'Caducidad inicio',
                 type: 'date',
                 value: filters?.dateFrom ?? '',
             },
             {
                 key: 'dateTo',
-                label: 'Fecha fin',
+                label: 'Caducidad fin',
                 type: 'date',
                 value: filters?.dateTo ?? '',
             },
@@ -143,12 +152,6 @@ export function getInventoryReportToolbarConfig({
                 label: 'Limpiar',
                 icon: 'restart_alt',
                 variant: 'slate',
-            },
-            {
-                id: 'generate',
-                label: 'Consultar',
-                icon: 'search',
-                variant: 'primary',
             },
             {
                 id: 'excel',
