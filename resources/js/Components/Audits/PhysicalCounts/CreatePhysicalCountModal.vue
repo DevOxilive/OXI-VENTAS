@@ -1,117 +1,101 @@
 <script setup>
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 
+import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import { getModalRequestOptions } from '@/Components/Modales/useModalConfig'
+import { getCreatePhysicalCountModalConfig } from '@/config/ModalConfigs/createPhysicalCountModalConfig'
 
 const props = defineProps({
     show: {
         type: Boolean,
-        default: false
+        default: false,
     },
     branch: {
         type: Object,
-        default: null
-    }
+        default: null,
+    },
 })
 
 const emit = defineEmits(['close'])
 
 const form = useForm({
     name: '',
-    branch_id: ''
+    branch_id: '',
 })
+
+const totalErrors = computed(() => Object.keys(form.errors || {}).length)
+
+const modalConfig = computed(() => getCreatePhysicalCountModalConfig({
+    totalErrors: totalErrors.value,
+    processing: form.processing,
+}))
 
 watch(
     () => props.branch,
     (branch) => {
         form.branch_id = branch?.id ?? ''
     },
-    { immediate: true }
+    { immediate: true },
 )
 
-const submit = () => {
+function closeModal() {
+    if (form.processing) return
+
+    emit('close')
+}
+
+function submit() {
     if (!props.branch) return
 
     form.branch_id = props.branch.id
 
-    form.post(route('audits.physical-counts.store'), {
-        preserveScroll: true,
+    form.post(route('audits.physical-counts.store'), getModalRequestOptions({
+        mode: 'create',
+        entityName: modalConfig.value.alerts.entityName,
+        close: () => emit('close'),
+        successTitle: modalConfig.value.alerts.create.successTitle,
+        errorTitle: modalConfig.value.alerts.create.errorTitle,
+        errorMessage: modalConfig.value.alerts.create.errorMessage,
         onSuccess: () => {
             form.reset()
-            emit('close')
-        }
-    })
-
+        },
+    }))
 }
 </script>
 
 <template>
-    <div
+    <GlobalModal
         v-if="show"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        v-bind="modalConfig"
+        @save="submit"
+        @close="closeModal"
     >
-        <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-            <div class="mb-5 flex items-start justify-between gap-4">
-                <div>
-                    <h2 class="text-xl font-bold text-gray-900">
-                        Nuevo conteo físico
-                    </h2>
+        <form class="space-y-4" @submit.prevent="submit">
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">
+                    Nombre del conteo
+                </label>
 
-                    <p class="mt-1 text-sm text-gray-500">
-                        Crea una nueva sesión para la sucursal {{ branch?.name }}.
-                    </p>
-                </div>
-
-                <button
-                    type="button"
-                    class="text-gray-400 hover:text-gray-600"
-                    @click="emit('close')"
+                <input
+                    v-model="form.name"
+                    type="text"
+                    class="w-full rounded-lg border-gray-300 text-sm"
+                    placeholder="Ej. Conteo ##/##/####"
                 >
-                    ✕
-                </button>
+
+                <p v-if="form.errors.name" class="mt-1 text-sm text-red-600">
+                    {{ form.errors.name }}
+                </p>
+
+                <p v-if="form.errors.branch_id" class="mt-1 text-sm text-red-600">
+                    {{ form.errors.branch_id }}
+                </p>
             </div>
 
-            <form @submit.prevent="submit" class="space-y-4">
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">
-                        Nombre del conteo
-                    </label>
-
-                    <input
-                        v-model="form.name"
-                        type="text"
-                        class="w-full rounded-lg border-gray-300 text-sm"
-                        placeholder="Ej. Conteo ##/##/####"
-
-                    >
-
-                    <p v-if="form.errors.name" class="mt-1 text-sm text-red-600">
-                        {{ form.errors.name }}
-                    </p>
-
-                    <p v-if="form.errors.branch_id" class="mt-1 text-sm text-red-600">
-                        {{ form.errors.branch_id }}
-                    </p>
-                </div>
-
-                <div class="flex justify-end gap-3 pt-4">
-                    <button
-                        type="button"
-                        class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                        @click="emit('close')"
-                    >
-                        Cancelar
-                    </button>
-
-                    <button
-                        type="submit"
-                        class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-                   :disabled="form.processing || !props.branch"
-                    >
-                        Crear conteo
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
+            <p class="text-sm text-gray-500">
+                Sucursal: {{ branch?.name ?? 'Sin sucursal seleccionada' }}
+            </p>
+        </form>
+    </GlobalModal>
 </template>

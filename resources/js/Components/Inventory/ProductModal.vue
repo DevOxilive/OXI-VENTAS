@@ -1,8 +1,11 @@
-<script setup>
+﻿<script setup>
 import { useForm, router } from "@inertiajs/vue3";
 import { watch, computed, ref } from "vue";
+import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
+import { getProductModalConfig } from "@/config/ModalConfigs/productModalConfig";
+import { modalPresets } from "@/config/ModalConfigs/modalPresets";
 import {
   ToastAlert,
   ErrorAlert,
@@ -103,6 +106,25 @@ const showCategoryModal = ref(false);
 const categoryForm = useForm({
   name: "",
 });
+
+const modalConfig = computed(() =>
+  getProductModalConfig({
+    mode: props.mode,
+    totalErrors: Object.keys(form.errors || {}).length,
+    processing: form.processing,
+  })
+);
+
+const categoryModalConfig = computed(() => ({
+  ...modalPresets.compact,
+  mode: "create",
+  title: "Nueva categoría",
+  subtitle: "Registra una categoría para productos.",
+  totalErrors: Object.keys(categoryForm.errors || {}).length,
+  processing: categoryForm.processing,
+  saveButtonText: "Guardar",
+  closeButtonText: "Cancelar",
+}));
 
 function createCategory() {
   categoryForm.post(route("inventory.categories.store"), {
@@ -280,32 +302,13 @@ function submit() {
 </script>
 
 <template>
-  <div
-    class="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4"
+  <GlobalModal
+    v-bind="modalConfig"
+    @save="submit"
+    @close="$emit('close')"
   >
-    <div
-      class="bg-white rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden"
-    >
-      <div class="flex items-center justify-between px-6 py-5 border-b">
-        <h2 class="text-2xl font-bold text-slate-800">
-          {{
-            mode === "create"
-              ? "Nuevo producto"
-              : mode === "edit"
-              ? "Editar producto"
-              : "Ver producto"
-          }}
-        </h2>
-
-        <button
-          @click="$emit('close')"
-          class="text-slate-400 hover:text-slate-700 text-2xl"
-        >
-          ×
-        </button>
-      </div>
-
-      <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div>
+      <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
         <!-- CÓDIGOS -->
         <div>
           <label class="block text-sm font-semibold text-slate-600 mb-2">
@@ -335,7 +338,7 @@ function submit() {
                 @click="removeBarcode(index)"
                 class="mt-[2px] h-[42px] min-w-[42px] rounded-xl border border-slate-300 bg-white text-black hover:bg-slate-100 transition"
               >
-                −
+                âˆ’
               </button>
             </div>
           </div>
@@ -397,7 +400,7 @@ function submit() {
 
               <template v-else>
                 <p class="mt-3 text-xs text-green-600 font-medium">
-                  ✓ Imagen cargada
+                  âœ“ Imagen cargada
                 </p>
               </template>
             </div>
@@ -535,7 +538,7 @@ function submit() {
         />
 
         <InputField
-          label="Precio minimo"
+          label="Precio mínimo"
           field="cost"
           v-model="form.cost"
           prefix="$"
@@ -561,56 +564,19 @@ function submit() {
         />
       </div>
 
-      <div class="flex justify-end gap-3 px-6 py-5 border-t">
-        <button
-          @click="$emit('close')"
-          class="px-5 py-3 rounded-2xl bg-slate-200 text-slate-700 font-semibold"
-        >
-          Cancelar
-        </button>
-
-        <button
-          v-if="mode !== 'view'"
-          @click="submit"
-          class="px-5 py-3 rounded-2xl bg-slate-900 text-white font-semibold"
-        >
-          {{ mode === "create" ? "Crear producto" : "Actualizar producto" }}
-        </button>
-      </div>
     </div>
-    <div
+  </GlobalModal>
+    <GlobalModal
       v-if="showCategoryModal"
-      class="fixed inset-0 z-[10000] bg-black/40 flex items-center justify-center p-4"
+      v-bind="categoryModalConfig"
+      @save="createCategory"
+      @close="showCategoryModal = false"
     >
-      <div class="bg-white rounded-2xl p-6 w-full max-w-md">
-        <h3 class="text-lg font-bold mb-4">Nueva categoría</h3>
-
-        <InputField
-          label="Nombre de categoría"
-          field="category_name"
-          v-model="categoryForm.name"
-          :error="categoryForm.errors.name"
-        />
-
-        <div class="flex justify-end gap-3 mt-5">
-          <button
-            type="button"
-            @click="showCategoryModal = false"
-            class="px-4 py-2 rounded-xl bg-slate-200"
-          >
-            Cancelar
-          </button>
-
-          <button
-            type="button"
-            @click="createCategory"
-            :disabled="categoryForm.processing"
-            class="px-4 py-2 rounded-xl bg-black text-white disabled:opacity-50"
-          >
-            Guardar
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+      <InputField
+        label="Nombre de categoría"
+        field="category_name"
+        v-model="categoryForm.name"
+        :error="categoryForm.errors.name"
+      />
+    </GlobalModal>
 </template>

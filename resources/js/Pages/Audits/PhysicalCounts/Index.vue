@@ -8,6 +8,11 @@ import PageLayout from '@/Layouts/PageLayout.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import CreatePhysicalCountModal from '@/Components/Audits/PhysicalCounts/CreatePhysicalCountModal.vue'
+import {
+    ErrorAlert,
+    ToastAlert,
+    UniversalActionModal,
+} from '@/Components/Modales/UniversalActionModal'
 
 import { usePermissions } from '@/Composables/usePermissions'
 import { physicalCountTableConfig } from '@/config/TableConfigs/physicalCountTableConfig'
@@ -80,60 +85,91 @@ function reloadPhysicalCounts() {
     })
 }
 
-function handleTableAction({ action, row }) {
+function notifyError(title, message) {
+    ErrorAlert({ title, message })
+}
+
+async function handleTableAction({ action, row }) {
     if (action === 'open') {
         router.visit(route('audits.physical-counts.show', row.id))
         return
     }
 
     if (action === 'close') {
-        if (!confirm('¿Seguro que deseas cerrar esta auditoría? Ya no se podrá capturar hasta reabrirla.')) return
+        const result = await UniversalActionModal({
+            title: 'Cerrar auditoría',
+            message: '¿Deseas cerrar esta auditoría? Ya no se podrá capturar hasta reabrirla.',
+            confirmText: 'Sí, cerrar',
+            cancelText: 'Cancelar',
+            confirmButtonColor: '#f59e0b',
+        })
+
+        if (!result.isConfirmed) return
 
         router.patch(route('audits.physical-counts.close', row.id), {}, {
             preserveScroll: true,
+            onSuccess: () => ToastAlert({ title: 'Auditoría cerrada correctamente' }),
+            onError: () => notifyError('Error al cerrar auditoría', 'No fue posible cerrar la auditoría.'),
         })
 
         return
     }
 
     if (action === 'reopen') {
-        if (!confirm('¿Seguro que deseas reabrir esta auditoría? Se permitirá capturar nuevamente.')) return
+        const result = await UniversalActionModal({
+            title: 'Reabrir auditoría',
+            message: '¿Deseas reabrir esta auditoría? Se permitirá capturar nuevamente.',
+            confirmText: 'Sí, reabrir',
+            cancelText: 'Cancelar',
+            confirmButtonColor: '#2563eb',
+        })
+
+        if (!result.isConfirmed) return
 
         router.patch(route('audits.physical-counts.reopen', row.id), {}, {
             preserveScroll: true,
+            onSuccess: () => ToastAlert({ title: 'Auditoría reabierta correctamente' }),
+            onError: () => notifyError('Error al reabrir auditoría', 'No fue posible reabrir la auditoría.'),
         })
 
         return
     }
 
     if (action === 'apply') {
-        const confirmed = confirm(
-            `¿Seguro que deseas aplicar los ajustes de esta auditoría?
+        const result = await UniversalActionModal({
+            title: 'Aplicar ajustes',
+            message: '¿Deseas aplicar los ajustes de esta auditoría? El stock se actualizará con base en el conteo físico.',
+            confirmText: 'Sí, aplicar',
+            cancelText: 'Cancelar',
+            confirmButtonColor: '#16a34a',
+        })
 
-Esta acción actualizará el stock del sistema con base en el conteo físico.
-
-Importante:
-- Los productos dañados no se sumarán al stock vendible.
-- Los productos caducados no se sumarán al stock vendible.
-- La auditoría quedará como aplicada.
-
-Esta acción no debe revertirse manualmente.`
-        )
-
-        if (!confirmed) return
+        if (!result.isConfirmed) return
 
         router.patch(route('audits.physical-counts.apply-adjustments', row.id), {}, {
             preserveScroll: true,
+            onSuccess: () => ToastAlert({ title: 'Ajustes aplicados correctamente' }),
+            onError: () => notifyError('Error al aplicar ajustes', 'No fue posible aplicar los ajustes.'),
         })
 
         return
     }
 
     if (action === 'delete') {
-        if (!confirm('¿Seguro que deseas eliminar esta auditoría? Esta acción no se puede deshacer.')) return
+        const result = await UniversalActionModal({
+            title: 'Eliminar auditoría',
+            message: '¿Deseas eliminar esta auditoría? Esta acción no se puede deshacer.',
+            confirmText: 'Sí, eliminar',
+            cancelText: 'Cancelar',
+            confirmButtonColor: '#ef4444',
+        })
+
+        if (!result.isConfirmed) return
 
         router.delete(route('audits.physical-counts.destroy', row.id), {
             preserveScroll: true,
+            onSuccess: () => ToastAlert({ title: 'Auditoría eliminada correctamente' }),
+            onError: () => notifyError('Error al eliminar auditoría', 'No fue posible eliminar la auditoría.'),
         })
     }
 }

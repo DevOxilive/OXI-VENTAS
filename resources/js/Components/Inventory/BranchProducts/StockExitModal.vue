@@ -1,9 +1,9 @@
 <script setup>
 import { useStockExitModal } from '@/Composables/Inventory/useStockExitModal'
+import { computed } from 'vue'
+import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import { getStockExitModalConfig } from '@/config/ModalConfigs/stockExitModalConfig'
 
-import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
-import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
-import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
@@ -38,20 +38,20 @@ const {
     expirationClass,
     expirationBadgeClass,
 } = useStockExitModal(props, emit)
+
+const modalConfig = computed(() => getStockExitModalConfig({
+    totalErrors: totalErrors.value,
+    processing: form.processing,
+}))
 </script>
 
 <template>
-    <div class="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" role="dialog"
-        aria-modal="true">
-        <div class="absolute inset-0" @click="closeModal"></div>
-
-        <div class="relative bg-white w-full h-[100dvh] md:h-auto md:max-h-[92vh] md:w-[94%] md:max-w-6xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden"
-            @click.stop>
-            <GeneralModalHeader title="Salida" subtitle="Registra producto que sale del inventario."
-                :total-errors="totalErrors" mode="create" @close="closeModal" />
-
-            <GeneralModalContent :columns="1">
-                <section class="w-full max-w-5xl mx-auto rounded-3xl border border-slate-200 bg-white overflow-hidden">
+    <GlobalModal
+        v-bind="modalConfig"
+        @save="submitExit"
+        @close="closeModal"
+    >
+        <section class="w-full overflow-hidden">
                     <div class="border-b border-slate-200 px-5 py-4">
                         <h3 class="font-black text-slate-900">
                             {{ productName }}
@@ -163,11 +163,6 @@ const {
                             </p>
                         </div>
                     </div>
-                </section>
-            </GeneralModalContent>
-
-            <GeneralModalFooter :processing="form.processing" save-button-text="Registrar salida"
-                close-button-text="Cancelar" mode="delete" @save="submitExit" @close="closeModal" />
-        </div>
-    </div>
+        </section>
+    </GlobalModal>
 </template>

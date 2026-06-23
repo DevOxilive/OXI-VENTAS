@@ -1,8 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from 'vue'
-import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
-import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
-import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
+import { computed } from 'vue'
+import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import { getInventoryAlertsModalConfig } from '@/config/ModalConfigs/inventoryAlertsModalConfig'
 
 const props = defineProps({
     title: {
@@ -38,6 +37,11 @@ const subtitle = computed(() => {
     return 'Listado de lotes que requieren revisión'
 })
 
+const modalConfig = computed(() => getInventoryAlertsModalConfig({
+    title: props.title,
+    subtitle: subtitle.value,
+}))
+
 const emptyText = computed(() => {
     if (isLowStock.value) {
         return 'No hay productos con stock bajo para mostrar.'
@@ -68,12 +72,6 @@ const productValueClass = computed(() => {
 
 function closeModal() {
     emit('close')
-}
-
-function handleEscape(event) {
-    if (event.key === 'Escape') {
-        closeModal()
-    }
 }
 
 function productName(item) {
@@ -145,25 +143,14 @@ function batchStatus(batch) {
         || 'Sin información'
 }
 
-onMounted(() => {
-    document.addEventListener('keydown', handleEscape)
-})
-
-onBeforeUnmount(() => {
-    document.removeEventListener('keydown', handleEscape)
-})
 </script>
 
 <template>
-    <div class="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center">
-        <div class="absolute inset-0" @click="closeModal"></div>
-
-        <div class="relative bg-white w-full h-[100dvh] sm:h-[100dvh] md:h-[94vh] md:w-[96%] md:max-w-5xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden"
-            @click.stop>
-            <GeneralModalHeader :title="title" :subtitle="subtitle" :total-errors="0" mode="view" @close="closeModal" />
-
-            <GeneralModalContent :columns="1">
-                <section class="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 md:p-6 shadow-sm">
+    <GlobalModal
+        v-bind="modalConfig"
+        @close="closeModal"
+    >
+                <section class="p-1 sm:p-2">
                     <div v-if="hasItems" class="space-y-3">
                         <template v-if="isProductAlert">
                             <article v-for="product in batches" :key="product.id" class="rounded-2xl border p-4"
@@ -285,10 +272,5 @@ onBeforeUnmount(() => {
                         </p>
                     </div>
                 </section>
-            </GeneralModalContent>
-
-            <GeneralModalFooter :processing="false" save-button-text="Cerrar" mode="view" @close="closeModal"
-                @save="closeModal" />
-        </div>
-    </div>
+    </GlobalModal>
 </template>
