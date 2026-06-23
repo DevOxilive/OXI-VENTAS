@@ -3,6 +3,11 @@ import { computed, ref, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 import AuditBatchModal from '@/Components/Audits/PhysicalCounts/AuditBatchModal.vue'
 
+import {
+    ErrorAlert,
+    ToastAlert,
+} from '@/Components/Modales/UniversalActionModal'
+
 const props = defineProps({
     physicalCountId: {
         type: Number,
@@ -87,7 +92,16 @@ function submit() {
             form.expired_quantity = ''
             form.expiration_date = ''
             form.notes = ''
+            ToastAlert({
+                title: 'Conteo guardado correctamente',
+            })
         },
+        onError: () => {
+            ErrorAlert({
+                title: 'Error al guardar conteo',
+                message: 'No fue posible registrar las cantidades del conteo.',
+            })
+        }
     })
 }
 </script>

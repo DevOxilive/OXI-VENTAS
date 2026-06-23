@@ -271,6 +271,30 @@ Route::middleware([
         Route::get('/reports', fn() => Inertia::render('Inventory/Reports'))
             ->middleware('permission:inventory.view')
             ->name('reports');
+
+        Route::get('/branches/{branch}/reports/inventory', [ReportController::class, 'inventory'])
+            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->name('branches.reports.inventory');
+
+        Route::get('/branches/{branch}/reports/inventory/excel', [ReportController::class, 'exportExcel'])
+            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->name('branches.reports.inventory.excel');
+
+        Route::get('/branches/{branch}/reports/inventory/pdf', [ReportController::class, 'exportPdf'])
+            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->name('branches.reports.inventory.pdf');
+
+        Route::get('/branches/{branch}/reports/movements', [ReportController::class, 'movements'])
+            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->name('branches.reports.movements');
+
+        Route::get('/branches/{branch}/reports/movements/excel', [ReportController::class, 'exportMovementsExcel'])
+            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->name('branches.reports.movements.excel');
+
+        Route::get('/branches/{branch}/reports/movements/pdf', [ReportController::class, 'exportMovementsPdf'])
+            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->name('branches.reports.movements.pdf');
     });
 
     /*
@@ -310,21 +334,16 @@ Route::middleware([
             ->name('physical-counts.reports.export-pdf');
 
 
-           Route::get('/physical-count-entries/{entry}', [PhysicalCountController::class, 'showEntry'])
-    ->middleware('permission:audits.physical-counts.view,audits.physical-counts.update')
-    ->name('physical-count-entries.show');
+        Route::get('/physical-count-entries/{entry}', [PhysicalCountController::class, 'showEntry'])
+            ->name('physical-count-entries.show');
 
-Route::patch('/physical-count-entries/{entry}', [PhysicalCountController::class, 'updateEntry'])
-    ->middleware('permission:audits.physical-counts.update')
-    ->name('physical-count-entries.update');
+        Route::patch('/physical-count-entries/{entry}', [PhysicalCountController::class, 'updateEntry'])
+            ->name('physical-count-entries.update');
 
-Route::delete('/physical-count-entries/{entry}', [PhysicalCountController::class, 'destroyEntry'])
-    ->middleware('permission:audits.physical-counts.delete')
-    ->name('physical-count-entries.destroy');
-Route::get('/physical-counts/{physicalCount}/search-products', [PhysicalCountController::class, 'searchProducts'])
-    ->middleware('permission:audits.physical-counts.count,audits.physical-counts.update')
-    ->name('physical-counts.search-products');
-    
+        Route::delete('/physical-count-entries/{entry}', [PhysicalCountController::class, 'destroyEntry'])
+            ->name('physical-count-entries.destroy');
+
+
         Route::get('/physical-counts/{physicalCount}', [PhysicalCountController::class, 'show'])
             ->middleware('permission:audits.physical-counts.view,audits.physical-counts.count,audits.physical-counts.update')
             ->name('physical-counts.show');

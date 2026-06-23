@@ -57,8 +57,9 @@ class StockMovementController extends Controller
             */
 
             'batches' => ['nullable', 'array'],
-            'batches.*.lot_number' => ['nullable', 'string', 'max:100'],
-            'batches.*.expiration_date' => ['nullable', 'date'],
+            'batches.*.lot_number' => ['required_with:batches', 'string', 'max:100'],
+            'batches.*.expiration_date' => ['required_with:batches', 'date'],
+            'batches.*.received_at' => ['required_with:batches', 'date'],
             'batches.*.quantity' => [
                 'required_with:batches',
                 'numeric',

@@ -1,37 +1,26 @@
 <?php
 
-namespace App\Events;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-use App\Models\PhysicalCount;
-use Illuminate\Broadcasting\Channel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
-use Illuminate\Foundation\Events\Dispatchable;
-use Illuminate\Queue\SerializesModels;
-
-class PhysicalCountChanged implements ShouldBroadcastNow
+return new class extends Migration
 {
-    use Dispatchable, SerializesModels;
-
-    public int $physicalCountId;
-    public string $action;
-
-    public function __construct(
-        PhysicalCount $physicalCount,
-        string $action = 'updated'
-    ) {
-        $this->physicalCountId = $physicalCount->id;
-        $this->action = $action;
-    }
-
-    public function broadcastOn(): array
+    public function up(): void
     {
-        return [
-            new Channel('audits'),
-        ];
+        Schema::table('branch_products', function (Blueprint $table) {
+            if (!Schema::hasColumn('branch_products', 'barcode')) {
+                $table->string('barcode')->nullable()->after('product_id');
+            }
+        });
     }
 
-    public function broadcastAs(): string
+    public function down(): void
     {
-        return 'PhysicalCountChanged';
+        Schema::table('branch_products', function (Blueprint $table) {
+            if (Schema::hasColumn('branch_products', 'barcode')) {
+                $table->dropColumn('barcode');
+            }
+        });
     }
-}
+};

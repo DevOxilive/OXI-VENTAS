@@ -3,6 +3,15 @@ import { useToolbarConfig } from './useToolbarConfig'
 import { getToolbarActionClasses } from './toolbarClasses'
 
 const props = defineProps({
+    backButton: {
+        type: Boolean,
+        default: false,
+    },
+
+    backLabel: {
+        type: String,
+        default: 'Volver',
+    },
     title: String,
     subtitle: String,
     search: String,
@@ -27,6 +36,7 @@ const props = defineProps({
 })
 
 defineEmits([
+    'back',
     'update:search',
     'update:filter',
     'update:records-per-page',
@@ -43,10 +53,45 @@ const {
     getOptionLabel,
     getOptionValue,
 } = useToolbarConfig(props)
+
+function filterWrapperClasses(filter) {
+    if (!filter.fullWidth) return ''
+
+    return 'sm:col-span-2 lg:col-span-3 xl:col-span-5'
+}
+
+function optionToneClasses(option, active) {
+    if (!active) {
+        return 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+    }
+
+    const tones = {
+        red: 'border-red-200 bg-red-50 text-red-700 ring-2 ring-red-100',
+        amber: 'border-amber-200 bg-amber-50 text-amber-700 ring-2 ring-amber-100',
+        blue: 'border-blue-200 bg-blue-50 text-blue-700 ring-2 ring-blue-100',
+        rose: 'border-rose-200 bg-rose-50 text-rose-700 ring-2 ring-rose-100',
+        slate: 'border-slate-300 bg-slate-50 text-slate-700 ring-2 ring-slate-100',
+    }
+
+    return tones[option?.tone] ?? tones.slate
+}
 </script>
 
 <template>
     <section class="hidden md:block bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
+        <div class="hidden md:block space-y-3">
+            <div v-if="backButton">
+                <button type="button"
+                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                    @click="$emit('back')">
+                    <span class="material-symbols-outlined text-[19px]">
+                        arrow_back
+                    </span>
+
+                    {{ backLabel }}
+                </button>
+            </div>
+        </div>
         <div class="flex items-start justify-between gap-6">
             <div class="min-w-0">
                 <h2 v-if="title" class="text-xl font-black text-slate-800">
@@ -119,18 +164,73 @@ const {
             'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5': visibleFilters.length === 5,
             'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6': visibleFilters.length >= 6,
         }">
-            <select v-for="filter in visibleFilters" :key="filter.key" :value="filter.value ?? ''"
-                class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-                @change="$emit('update:filter', { key: filter.key, value: $event.target.value })">
-                <option :value="filter.emptyValue ?? ''">
-                    {{ filter.placeholder || filter.label }}
-                </option>
+            <div v-for="filter in visibleFilters" :key="filter.key" :class="filterWrapperClasses(filter)">
+                <div v-if="filter.type === 'button-group'">
+                    <p v-if="filter.label" class="mb-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                        {{ filter.label }}
+                    </p>
 
-                <option v-for="option in filter.options || []" :key="getOptionValue(option, filter)"
-                    :value="getOptionValue(option, filter)">
-                    {{ getOptionLabel(option, filter) }}
-                </option>
-            </select>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                        <button v-for="option in filter.options || []" :key="getOptionValue(option, filter)"
+                            type="button"
+                            class="min-h-[68px] rounded-xl border px-3 py-2 text-left transition"
+                            :class="optionToneClasses(option, String(filter.value ?? '') === String(getOptionValue(option, filter) ?? ''))"
+                            @click="$emit('update:filter', {
+                                key: filter.key,
+                                value: getOptionValue(option, filter)
+                            })">
+                            <span class="flex items-center gap-2 text-sm font-black">
+                                <span v-if="option.icon" class="material-symbols-outlined text-[18px]">
+                                    {{ option.icon }}
+                                </span>
+
+                                {{ getOptionLabel(option, filter) }}
+                            </span>
+
+                            <span v-if="option.description" class="mt-1 block text-xs opacity-70">
+                                {{ option.description }}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                <label v-else class="block">
+                    <span v-if="filter.label" class="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                        {{ filter.label }}
+                    </span>
+
+                    <input v-if="filter.type === 'date'" :value="filter.value ?? ''" type="date"
+                        class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                        @input="$emit('update:filter', {
+                            key: filter.key,
+                            value: $event.target.value
+                        })" />
+
+                    <input v-else-if="filter.type === 'text'" :value="filter.value ?? ''" type="text"
+                        :placeholder="filter.placeholder || filter.label"
+                        class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                        @input="$emit('update:filter', {
+                            key: filter.key,
+                            value: $event.target.value
+                        })" />
+
+                    <select v-else :value="filter.value ?? ''"
+                        class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                        @change="$emit('update:filter', {
+                            key: filter.key,
+                            value: $event.target.value
+                        })">
+                        <option :value="filter.emptyValue ?? ''">
+                            {{ filter.placeholder || filter.label }}
+                        </option>
+
+                        <option v-for="option in filter.options || []" :key="getOptionValue(option, filter)"
+                            :value="getOptionValue(option, filter)">
+                            {{ getOptionLabel(option, filter) }}
+                        </option>
+                    </select>
+                </label>
+            </div>
         </div>
 
         <p v-if="showCounter" class="text-xs text-slate-400">

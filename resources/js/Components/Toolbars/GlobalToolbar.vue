@@ -6,6 +6,16 @@ defineProps({
     title: String,
     subtitle: String,
 
+    backButton: {
+        type: Boolean,
+        default: false,
+    },
+
+    backLabel: {
+        type: String,
+        default: 'Regresar',
+    },
+
     search: {
         type: String,
         default: '',
@@ -16,7 +26,6 @@ defineProps({
     },
     showSearch: {
         type: Boolean,
-        
         default: true,
     },
 
@@ -66,6 +75,7 @@ defineProps({
 })
 
 defineEmits([
+    'back',
     'update:search',
     'update:filter',
     'update:records-per-page',
@@ -76,21 +86,23 @@ defineEmits([
 
 <template>
     <div>
-        <ToolbarDesktop :title="title" :subtitle="subtitle" :search="search" :search-placeholder="searchPlaceholder"
-            :show-search="showSearch" :filters="filters" :actions="actions" :tabs="tabs" :active-tab="activeTab"
-            :records-per-page="recordsPerPage" :records-per-page-options="recordsPerPageOptions"
-            :show-records-per-page="showRecordsPerPage" :total-records="totalRecords"
-            :filtered-records="filteredRecords" :show-counter="showCounter"
-            @update:search="$emit('update:search', $event)" @update:filter="$emit('update:filter', $event)"
+        <ToolbarDesktop :title="title" :subtitle="subtitle" :back-button="backButton" :back-label="backLabel"
+            :search="search" :search-placeholder="searchPlaceholder" :show-search="showSearch" :filters="filters"
+            :actions="actions" :tabs="tabs" :active-tab="activeTab" :records-per-page="recordsPerPage"
+            :records-per-page-options="recordsPerPageOptions" :show-records-per-page="showRecordsPerPage"
+            :total-records="totalRecords" :filtered-records="filteredRecords" :show-counter="showCounter"
+            @back="$emit('back')" @update:search="$emit('update:search', $event)"
+            @update:filter="$emit('update:filter', $event)"
             @update:records-per-page="$emit('update:records-per-page', $event)"
             @update:active-tab="$emit('update:active-tab', $event)" @action="$emit('action', $event)" />
 
-        <ToolbarMobile :title="title" :subtitle="subtitle" :search="search" :search-placeholder="searchPlaceholder"
-            :show-search="showSearch" :filters="filters" :actions="actions" :tabs="tabs" :active-tab="activeTab"
-            :records-per-page="recordsPerPage" :records-per-page-options="recordsPerPageOptions"
-            :show-records-per-page="showRecordsPerPage" :total-records="totalRecords"
-            :filtered-records="filteredRecords" :show-counter="showCounter"
-            @update:search="$emit('update:search', $event)" @update:filter="$emit('update:filter', $event)"
+        <ToolbarMobile :title="title" :subtitle="subtitle" :back-button="backButton" :back-label="backLabel"
+            :search="search" :search-placeholder="searchPlaceholder" :show-search="showSearch" :filters="filters"
+            :actions="actions" :tabs="tabs" :active-tab="activeTab" :records-per-page="recordsPerPage"
+            :records-per-page-options="recordsPerPageOptions" :show-records-per-page="showRecordsPerPage"
+            :total-records="totalRecords" :filtered-records="filteredRecords" :show-counter="showCounter"
+            @back="$emit('back')" @update:search="$emit('update:search', $event)"
+            @update:filter="$emit('update:filter', $event)"
             @update:records-per-page="$emit('update:records-per-page', $event)"
             @update:active-tab="$emit('update:active-tab', $event)" @action="$emit('action', $event)" />
     </div>

@@ -1,7 +1,5 @@
 import {
     computed,
-    nextTick,
-    onBeforeUnmount,
     onMounted,
     ref,
     watch,
@@ -241,10 +239,6 @@ export function useStockExitModal(props, emit) {
         emit("close");
     }
 
-    function handleEsc(e) {
-        if (e.key === "Escape") closeModal();
-    }
-
     watch(
         () => form.quantity,
         () => {
@@ -277,11 +271,6 @@ export function useStockExitModal(props, emit) {
 
     onMounted(() => {
         ensureExitReady();
-        window.addEventListener("keydown", handleEsc);
-    });
-
-    onBeforeUnmount(() => {
-        window.removeEventListener("keydown", handleEsc);
     });
 
     return {
