@@ -3,6 +3,10 @@ const props = defineProps({
     summary: {
         type: Object,
         default: () => ({})
+    },
+    canViewInventoryComparison: {
+        type: Boolean,
+        default: false
     }
 })
 
@@ -16,7 +20,7 @@ const cards = [
 
 <template>
     <div class="space-y-4">
-        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div v-if="canViewInventoryComparison" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <h2 class="text-lg font-semibold text-gray-900">
                 Progreso de auditoría
             </h2>

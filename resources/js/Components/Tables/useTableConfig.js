@@ -53,6 +53,10 @@ export function useTableConfig(props) {
 
     // Check permissions if specified
     if (action.permission && userPermissions) {
+      if (Array.isArray(action.permission)) {
+        return action.permission.some((permission) => userPermissions.can(permission))
+      }
+
       return userPermissions.can(action.permission)
     }
 

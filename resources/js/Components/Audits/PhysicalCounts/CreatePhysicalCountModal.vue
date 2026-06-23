@@ -1,24 +1,30 @@
 <script setup>
-import { watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
-
 
 const props = defineProps({
     show: {
         type: Boolean,
-        default: false
+        default: false,
     },
     branch: {
         type: Object,
-        default: null
-    }
+        default: null,
+    },
+    users: {
+        type: Array,
+        default: () => [],
+    },
 })
 
 const emit = defineEmits(['close'])
 
+const search = ref('')
+
 const form = useForm({
     name: '',
-    branch_id: ''
+    branch_id: '',
+    participant_ids: [],
 })
 
 watch(
@@ -29,7 +35,44 @@ watch(
     { immediate: true }
 )
 
-const submit = () => {
+watch(
+    () => props.show,
+    (show) => {
+        if (!show) {
+            search.value = ''
+        }
+    }
+)
+
+const filteredUsers = computed(() => {
+    const term = search.value.trim().toLowerCase()
+
+    if (!term) return props.users
+
+    return props.users.filter((user) => {
+        return [
+            user.name,
+            user.email,
+            user.role,
+        ]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(term))
+    })
+})
+
+function toggleParticipant(userId) {
+    const ids = new Set(form.participant_ids)
+
+    if (ids.has(userId)) {
+        ids.delete(userId)
+    } else {
+        ids.add(userId)
+    }
+
+    form.participant_ids = Array.from(ids)
+}
+
+function submit() {
     if (!props.branch) return
 
     form.branch_id = props.branch.id
@@ -38,10 +81,10 @@ const submit = () => {
         preserveScroll: true,
         onSuccess: () => {
             form.reset()
+            search.value = ''
             emit('close')
-        }
+        },
     })
-
 }
 </script>
 
@@ -50,15 +93,15 @@ const submit = () => {
         v-if="show"
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
-        <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+        <div class="w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl">
             <div class="mb-5 flex items-start justify-between gap-4">
                 <div>
                     <h2 class="text-xl font-bold text-gray-900">
-                        Nuevo conteo físico
+                        Nueva auditoria
                     </h2>
 
                     <p class="mt-1 text-sm text-gray-500">
-                        Crea una nueva sesión para la sucursal {{ branch?.name }}.
+                        Crea una sesion de captura para la sucursal {{ branch?.name }} y asigna participantes.
                     </p>
                 </div>
 
@@ -67,30 +110,74 @@ const submit = () => {
                     class="text-gray-400 hover:text-gray-600"
                     @click="emit('close')"
                 >
-                    ✕
+                    X
                 </button>
             </div>
 
-            <form @submit.prevent="submit" class="space-y-4">
+            <form class="space-y-4" @submit.prevent="submit">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">
-                        Nombre del conteo
+                        Nombre de la auditoria
                     </label>
 
                     <input
                         v-model="form.name"
                         type="text"
                         class="w-full rounded-lg border-gray-300 text-sm"
-                        placeholder="Ej. Conteo ##/##/####"
-
+                        placeholder="Ej. Conteo general de junio"
                     >
 
                     <p v-if="form.errors.name" class="mt-1 text-sm text-red-600">
                         {{ form.errors.name }}
                     </p>
+                </div>
 
-                    <p v-if="form.errors.branch_id" class="mt-1 text-sm text-red-600">
-                        {{ form.errors.branch_id }}
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-800">
+                                Participantes
+                            </p>
+                            <p class="text-xs text-slate-500">
+                                Solo los usuarios seleccionados podran capturar en esta auditoria.
+                            </p>
+                        </div>
+
+                        <input
+                            v-model="search"
+                            type="search"
+                            class="w-full rounded-lg border-gray-300 text-sm md:max-w-xs"
+                            placeholder="Buscar usuario"
+                        >
+                    </div>
+
+                    <div class="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
+                        <label
+                            v-for="user in filteredUsers"
+                            :key="user.id"
+                            class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3"
+                        >
+                            <input
+                                type="checkbox"
+                                :checked="form.participant_ids.includes(user.id)"
+                                class="mt-1 rounded border-slate-300"
+                                @change="toggleParticipant(user.id)"
+                            >
+
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-slate-800">
+                                    {{ user.name }}
+                                </p>
+
+                                <p class="text-xs text-slate-500">
+                                    {{ user.email }} · {{ user.role }}
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <p v-if="form.errors.participant_ids" class="mt-2 text-sm text-red-600">
+                        {{ form.errors.participant_ids }}
                     </p>
                 </div>
 
@@ -106,9 +193,9 @@ const submit = () => {
                     <button
                         type="submit"
                         class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-                   :disabled="form.processing || !props.branch"
+                        :disabled="form.processing || !props.branch"
                     >
-                        Crear conteo
+                        Crear auditoria
                     </button>
                 </div>
             </form>

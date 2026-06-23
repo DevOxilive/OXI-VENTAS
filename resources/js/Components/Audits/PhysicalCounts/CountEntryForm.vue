@@ -1,16 +1,21 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
+import AuditBatchModal from '@/Components/Audits/PhysicalCounts/AuditBatchModal.vue'
 
 const props = defineProps({
     physicalCountId: {
         type: Number,
-        required: true
+        required: true,
     },
     product: {
         type: Object,
-        default: null
-    }
+        default: null,
+    },
+    canViewStock: {
+        type: Boolean,
+        default: false,
+    },
 })
 
 const form = useForm({
@@ -22,8 +27,11 @@ const form = useForm({
     damaged_quantity: '',
     expired_quantity: '',
     expiration_date: '',
-    notes: ''
+    notes: '',
 })
+
+const showCreateBatch = ref(false)
+const pendingLotNumber = ref('')
 
 watch(
     () => props.product,
@@ -33,7 +41,12 @@ watch(
         form.branch_product_id = product.branch_product_id
         form.product_id = product.product_id
         form.scanned_code = product.scanned_code
-        form.product_batch_id = ''
+
+        const pendingBatch = pendingLotNumber.value
+            ? product.batches?.find((batch) => batch.lot_number === pendingLotNumber.value)
+            : null
+
+        form.product_batch_id = pendingBatch?.id ?? ''
     },
     { immediate: true }
 )
@@ -46,7 +59,24 @@ const invalidQuantities = computed(() => {
     return damagedQuantity.value + expiredQuantity.value > countedQuantity.value
 })
 
-const submit = () => {
+function batchOptionLabel(batch) {
+    const parts = [
+        `Lote: ${batch.lot_number ?? 'Sin lote'}`,
+        `Caduca: ${batch.expiration_date ?? 'Sin fecha'}`,
+    ]
+
+    if (props.canViewStock) {
+        parts.push(`Existencia: ${batch.quantity ?? 0}`)
+    }
+
+    return parts.join(' | ')
+}
+
+function handleBatchCreated(lotNumber) {
+    pendingLotNumber.value = lotNumber
+}
+
+function submit() {
     if (!props.product || invalidQuantities.value) return
 
     form.post(route('audits.physical-counts.entries.store', props.physicalCountId), {
@@ -57,7 +87,7 @@ const submit = () => {
             form.expired_quantity = ''
             form.expiration_date = ''
             form.notes = ''
-        }
+        },
     })
 }
 </script>
@@ -69,32 +99,37 @@ const submit = () => {
         </h2>
 
         <p class="mt-1 text-sm text-gray-500">
-            Registra las cantidades físicas encontradas para el producto seleccionado.
+            Registra las cantidades fisicas encontradas para el producto seleccionado.
         </p>
 
-        <div v-if="product?.batches?.length" class="mt-4">
-            <label class="mb-1 block text-sm font-medium text-gray-700">
-                Lote / caducidad
-            </label>
+        <div v-if="product" class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <label class="block text-sm font-medium text-gray-700">
+                    Lote / caducidad
+                </label>
 
-            <select
-                v-model="form.product_batch_id"
-                class="w-full rounded-lg border-gray-300 text-sm"
-            >
+                <button
+                    type="button"
+                    class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                    @click="showCreateBatch = true"
+                >
+                    Crear lote
+                </button>
+            </div>
+
+            <select v-model="form.product_batch_id" class="mt-3 w-full rounded-lg border-gray-300 text-sm">
                 <option value="">
                     Selecciona un lote
                 </option>
 
-                <option
-                    v-for="batch in product.batches"
-                    :key="batch.id"
-                    :value="batch.id"
-                >
-                    Lote: {{ batch.lot_number ?? 'Sin lote' }}
-                    | Existencia: {{ batch.quantity }}
-                    | Caduca: {{ batch.expiration_date ?? 'Sin fecha' }}
+                <option v-for="batch in product.batches || []" :key="batch.id" :value="batch.id">
+                    {{ batchOptionLabel(batch) }}
                 </option>
             </select>
+
+            <p v-if="product && !form.product_batch_id" class="mt-2 text-sm text-amber-600">
+                Selecciona el lote antes de guardar el conteo.
+            </p>
         </div>
 
         <form class="mt-4" @submit.prevent="submit">
@@ -116,7 +151,7 @@ const submit = () => {
 
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">
-                        Cantidad dañada
+                        Cantidad danada
                     </label>
 
                     <input
@@ -149,20 +184,18 @@ const submit = () => {
                 v-if="invalidQuantities"
                 class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
             >
-                La suma de dañados y caducados no puede ser mayor a la cantidad contada.
+                La suma de danados y caducados no puede ser mayor a la cantidad contada.
             </p>
-
-            <input
-                v-model="form.expiration_date"
-                type="date"
-                class="mt-4 w-full rounded-lg border-gray-300 text-sm"
-            >
 
             <textarea
                 v-model="form.notes"
                 placeholder="Observaciones del conteo"
                 class="mt-4 w-full rounded-lg border-gray-300 text-sm"
             />
+
+            <p v-if="form.errors.product_batch_id" class="mt-2 text-sm text-red-600">
+                {{ form.errors.product_batch_id }}
+            </p>
 
             <p v-if="form.errors.counted_quantity" class="mt-2 text-sm text-red-600">
                 {{ form.errors.counted_quantity }}
@@ -183,10 +216,18 @@ const submit = () => {
             <button
                 type="submit"
                 class="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                :disabled="form.processing || !product || invalidQuantities"
+                :disabled="form.processing || !product || !form.product_batch_id || invalidQuantities"
             >
                 Guardar conteo
             </button>
         </form>
+
+        <AuditBatchModal
+            v-if="showCreateBatch && product"
+            :physical-count-id="physicalCountId"
+            :product="product"
+            @created="handleBatchCreated"
+            @close="showCreateBatch = false"
+        />
     </div>
 </template>

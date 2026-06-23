@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
 
 class PhysicalCount extends Model
 {
@@ -15,6 +16,11 @@ class PhysicalCount extends Model
     'started_at',
     'closed_at',
 ];
+
+    protected $casts = [
+        'started_at' => 'datetime',
+        'closed_at' => 'datetime',
+    ];
 
     public function branch()
     {
@@ -29,5 +35,11 @@ class PhysicalCount extends Model
     public function entries()
     {
         return $this->hasMany(PhysicalCountEntry::class);
+    }
+
+    public function participants()
+    {
+        return $this->belongsToMany(User::class, 'physical_count_user')
+            ->withTimestamps();
     }
 }

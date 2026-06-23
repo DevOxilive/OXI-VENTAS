@@ -8,7 +8,7 @@ defineProps({
         required: true
     }
 })
-const { can } = usePermissions()
+const { canAny } = usePermissions()
 </script>
 
 <template>
@@ -31,7 +31,7 @@ const { can } = usePermissions()
             </div>
 
          <Link
-    v-if="can('audits.physical-counts.view')"
+    v-if="canAny(['audits.physical-counts.view', 'audits.physical-counts.count'])"
     :href="route('audits.physical-counts.show', physicalCount.id)"
     class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
 >

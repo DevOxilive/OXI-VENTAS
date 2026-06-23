@@ -28,6 +28,14 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    users: {
+        type: Array,
+        default: () => [],
+    },
+    canViewReports: {
+        type: Boolean,
+        default: false,
+    },
 })
 
 const { can } = usePermissions()
@@ -69,6 +77,7 @@ function handleToolbarFilter({ key, value }) {
 function handleToolbarAction(action) {
     if (action === 'create') {
         showCreateModal.value = true
+        return
     }
 }
 
@@ -166,6 +175,6 @@ onBeforeUnmount(() => {
             :show-pagination="false" @action="handleTableAction" />
 
         <CreatePhysicalCountModal v-if="can('audits.physical-counts.create')" :show="showCreateModal"
-            :branch="props.branch" @close="showCreateModal = false" />
+            :branch="props.branch" :users="props.users" @close="showCreateModal = false" />
     </PageLayout>
 </template>

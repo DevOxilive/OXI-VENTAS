@@ -55,7 +55,9 @@ const productName = computed(() =>
 )
 
 const scannedCode = computed(() =>
-    props.entry?.scanned_code ?? '-'
+    props.entry?.scanned_code && props.entry.scanned_code !== 'Seleccionado manualmente'
+        ? props.entry.scanned_code
+        : (props.entry?.branch_product?.barcode ?? '-')
 )
 
 const lotNumber = computed(() =>
