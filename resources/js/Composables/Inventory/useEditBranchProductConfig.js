@@ -1,5 +1,6 @@
 import { computed, reactive, watch } from "vue";
 import { useForm } from "@inertiajs/vue3";
+import { getModalRequestOptions } from "@/Components/Modales";
 
 export function useEditBranchProductConfig(product) {
     const frontendErrors = reactive({});
@@ -114,10 +115,14 @@ export function useEditBranchProductConfig(product) {
 
         form.patch(
             route("inventory.branch-inventory.update-config", productId),
-            {
-                preserveScroll: true,
+            getModalRequestOptions({
+                mode: "edit",
+                entityName: "ConfiguraciÃ³n",
+                successTitle: "ConfiguraciÃ³n actualizada correctamente",
+                errorTitle: "Error al actualizar configuraciÃ³n",
+                errorMessage: "No fue posible guardar la configuraciÃ³n del producto.",
                 onSuccess,
-            },
+            }),
         );
     }
 

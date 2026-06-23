@@ -10,10 +10,15 @@ import { getProductToolbarConfig } from "@/config/ToolbarConfigs/productToolbarC
 import { productTableConfig } from '@/config/TableConfigs/productTableConfig'
 import ProductRegisterModal from "@/Components/Inventory/ProductRegisterModal.vue";
 import PageLayout from '@/Layouts/PageLayout.vue'
+import {
+  ToastAlert,
+  UniversalActionModal,
+} from '@/Components/Modales/UniversalActionModal'
 
 defineOptions({
   layout: AdminLayout,
 });
+
 const { can } = usePermissions()
 
 const props = defineProps({
@@ -41,14 +46,13 @@ const props = defineProps({
 const showModal = ref(false);
 const modalMode = ref("create");
 const frontendErrors = ref({});
-const processing = ref(false);
-
 const search = ref(props.filters?.search ?? "");
 const branchFilter = ref("");
 const categoryFilter = ref("");
 const stockFilter = ref("");
-
 const recordsToShow = ref(Number(props.filters?.per_page ?? 50));
+
+const localProducts = ref([]);
 
 const product = ref({
   code: "",
@@ -70,6 +74,22 @@ const product = ref({
   errors: {},
 });
 
+const sourceProducts = computed(() => {
+  if (Array.isArray(props.productsDB)) {
+    return props.productsDB;
+  }
+
+  return props.productsDB?.data ?? [];
+});
+
+watch(
+  sourceProducts,
+  (products) => {
+    localProducts.value = [...products];
+  },
+  { immediate: true },
+);
+
 const productToolbarConfig = computed(() =>
   getProductToolbarConfig({
     branch: props.branch,
@@ -90,6 +110,7 @@ function handleProductToolbarAction(action) {
     openCreateModal()
   }
 }
+
 function handleProductTableAction({ action, row }) {
   if (action === 'view' && can('inventory.products.view')) {
     openViewModal(row)
@@ -103,16 +124,9 @@ function handleProductTableAction({ action, row }) {
     deleteProduct(row)
   }
 }
-const products = computed(() => {
-  if (Array.isArray(props.productsDB)) {
-    return props.productsDB;
-  }
-
-  return props.productsDB?.data ?? [];
-});
 
 const filteredProducts = computed(() => {
-  return products.value.filter((product) => {
+  return localProducts.value.filter((product) => {
     const matchesBranch =
       !branchFilter.value || product.branch_name === branchFilter.value || product.branch === branchFilter.value;
 
@@ -180,6 +194,7 @@ function resetProduct() {
 
   frontendErrors.value = {};
 }
+
 function openCreateModal() {
   resetProduct();
   modalMode.value = "create";
@@ -189,74 +204,56 @@ function openCreateModal() {
 function normalizeProduct(selectedProduct) {
   return {
     ...selectedProduct,
-
     code: selectedProduct.code || "",
     barcode:
       selectedProduct.barcode ||
       selectedProduct.bar_code ||
       selectedProduct.codigo_barras ||
       "",
-
     name: selectedProduct.name || "",
-
     category:
       selectedProduct.category_name ||
       selectedProduct.category ||
       "",
-
     unit: selectedProduct.unit || "",
-
     status: selectedProduct.status || "Disponible",
-
     branch:
       selectedProduct.branch ||
       selectedProduct.branch_name ||
       "",
-
     stock: selectedProduct.stock || 0,
-
     minStock:
       selectedProduct.minimum_stock ||
       selectedProduct.minStock ||
       0,
-
     lot: selectedProduct.lot || "",
-
     expirationDate:
       selectedProduct.expiration_date ||
       selectedProduct.expirationDate ||
       "",
-
     purchasePrice:
       selectedProduct.cost ||
       selectedProduct.purchasePrice ||
       "",
-
     salePrice:
       selectedProduct.price ||
       selectedProduct.salePrice ||
       "",
-
     supplier: selectedProduct.supplier || "",
-
     responsible: selectedProduct.responsible || "",
-
     notes: selectedProduct.notes || "",
-
     errors: {},
   };
 }
 
 function openEditModal(selectedProduct) {
   product.value = normalizeProduct(selectedProduct);
-
   modalMode.value = "edit";
   showModal.value = true;
 }
 
 function openViewModal(selectedProduct) {
   product.value = normalizeProduct(selectedProduct);
-
   modalMode.value = "view";
   showModal.value = true;
 }
@@ -270,48 +267,57 @@ function validateField(field) {
 }
 
 function submitProduct() {
-
   if (modalMode.value === "create") {
-
-    productsDB.value.push({
+    localProducts.value.push({
       ...product.value,
       id: Date.now(),
     });
-
   } else if (modalMode.value === "edit") {
-
-    const index = productsDB.value.findIndex(
+    const index = localProducts.value.findIndex(
       p => p.id === product.value.id
     );
 
     if (index !== -1) {
-      productsDB.value[index] = {
+      localProducts.value[index] = {
         ...product.value
       };
     }
   }
 
   closeModal();
+  ToastAlert({
+    title: modalMode.value === 'create'
+      ? 'Producto creado correctamente'
+      : 'Producto actualizado correctamente',
+  })
 }
 
-function deleteProduct(selectedProduct) {
+async function deleteProduct(selectedProduct) {
+  const result = await UniversalActionModal({
+    title: 'Eliminar producto',
+    message: `¿Deseas eliminar ${selectedProduct.name}?`,
+    confirmText: 'Sí, eliminar',
+    cancelText: 'Cancelar',
+    confirmButtonColor: '#ef4444',
+  })
 
-  const confirmed = confirm(
-    `¿Eliminar ${selectedProduct.name}?`
-  );
+  if (!result.isConfirmed) return;
 
-  if (!confirmed) return;
-
-  productsDB.value = productsDB.value.filter(
+  localProducts.value = localProducts.value.filter(
     p => p.id !== selectedProduct.id
   );
+
+  ToastAlert({
+    title: 'Producto eliminado correctamente',
+  })
 }
 </script>
+
 <template>
   <PageLayout>
     <template #toolbar>
       <GlobalToolbar v-bind="productToolbarConfig" :search="search" :records-per-page="recordsToShow"
-        :filtered-records="filteredProducts.length" :total-records="products.length" @update:search="search = $event"
+        :filtered-records="filteredProducts.length" :total-records="localProducts.length" @update:search="search = $event"
         @update:filter="handleProductToolbarFilter" @update:records-per-page="recordsToShow = $event"
         @action="handleProductToolbarAction" />
     </template>

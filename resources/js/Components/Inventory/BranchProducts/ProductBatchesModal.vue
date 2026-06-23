@@ -1,10 +1,9 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed } from 'vue'
 
-import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
-import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
-import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
-import BatchAdjustmentForm from '@/Components/Inventory/BranchProducts/BatchAdjustmentForm.vue'
+import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import InputField from '@/Components/Forms/InputField.vue'
+import { getProductBatchesModalConfig } from '@/config/ModalConfigs/productBatchesModalConfig'
 
 
 const emit = defineEmits(['close', 'select-batch', 'save'])
@@ -100,16 +99,15 @@ const selectedBatchTitle = computed(() => {
     return props.selectedBatch.lot_number || 'Sin lote'
 })
 
+const modalConfig = computed(() => getProductBatchesModalConfig({
+    totalErrors: props.totalErrors,
+    processing: props.processing,
+}))
+
 function closeModal() {
     if (props.processing) return
 
     emit('close')
-}
-
-function handleEsc(event) {
-    if (event.key === 'Escape') {
-        closeModal()
-    }
 }
 
 function formatDate(date) {
@@ -159,31 +157,17 @@ function selectBatch(batch) {
 
     emit('select-batch', batch)
 }
-
-onMounted(() => {
-    window.addEventListener('keydown', handleEsc)
-})
-
-onBeforeUnmount(() => {
-    window.removeEventListener('keydown', handleEsc)
-})
 </script>
 
 <template>
-    <div class="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" role="dialog"
-        aria-modal="true">
-        <div class="absolute inset-0" @click="closeModal"></div>
-
-        <div class="relative bg-white w-full h-[100dvh] md:h-auto md:max-h-[94vh] md:w-[96%] md:max-w-[1500px] rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden"
-            @click.stop>
-            <GeneralModalHeader title="Lotes del producto"
-                subtitle="Administra, consulta y ajusta los lotes de este producto." :total-errors="totalErrors"
-                mode="edit" @close="closeModal" />
-
-            <GeneralModalContent :columns="1">
-                <section class="w-full mx-auto rounded-3xl border border-slate-200 bg-white overflow-hidden">
-                    <div class="grid grid-cols-1 xl:grid-cols-[390px_minmax(0,1fr)]">
-                        <aside class="border-b xl:border-b-0 xl:border-r border-slate-200 bg-slate-50">
+    <GlobalModal
+        v-bind="modalConfig"
+        @save="$emit('save')"
+        @close="closeModal"
+    >
+                <section class="flex h-full min-h-0 w-full flex-col overflow-hidden xl:block">
+                    <div class="grid h-full min-h-0 grid-cols-1 xl:grid-cols-[390px_minmax(0,1fr)]">
+                        <aside class="flex min-h-0 flex-col border-b border-slate-200 bg-slate-50 xl:border-b-0 xl:border-r">
                             <div class="p-5 border-b border-slate-200 bg-white">
                                 <h3 class="font-black text-slate-900">
                                     {{ productName }}
@@ -194,8 +178,8 @@ onBeforeUnmount(() => {
                                 </p>
                             </div>
 
-                            <div class="p-4">
-                                <div v-if="batches.length" class="space-y-3 max-h-[620px] overflow-y-auto pr-1">
+                            <div class="min-h-0 flex-1 p-4">
+                                <div v-if="batches.length" class="h-full space-y-3 overflow-y-auto pr-1">
                                     <button v-for="batch in batches" :key="batch.id" type="button"
                                         class="w-full text-left rounded-2xl border px-4 py-4 bg-white transition"
                                         :class="isSelectedBatch(batch)
@@ -269,7 +253,7 @@ onBeforeUnmount(() => {
                             </div>
                         </aside>
 
-                        <section class="bg-white">
+                        <section class="flex min-h-0 flex-col bg-white">
                             <div
                                 class="border-b border-slate-200 px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                 <div>
@@ -294,12 +278,190 @@ onBeforeUnmount(() => {
                                 </div>
                             </div>
 
-                            <div class="p-5 max-h-[620px] overflow-y-auto">
-                                <BatchAdjustmentForm v-if="selectedBatch" :form="form" :frontend-errors="frontendErrors"
-                                    :processing="processing" :uses-lot="usesLot" :is-seasonal="isSeasonal"
-                                    :calculated-quantity="calculatedQuantity" :adjustment-text="adjustmentText"
-                                    :quantity-result-color="quantityResultColor" :toggle-lot="toggleLot"
-                                    :set-adjustment-type="setAdjustmentType" :validate-field="validateField" />
+                            <div class="min-h-0 flex-1 overflow-y-auto p-5">
+                                <section v-if="selectedBatch" class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+                                    <section class="space-y-4">
+                                        <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                                            <p class="text-sm font-black text-slate-800">
+                                                Información del lote
+                                            </p>
+
+                                            <div class="mt-4 space-y-4">
+                                                <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                                    <div class="flex items-center justify-between gap-4">
+                                                        <div>
+                                                            <p class="text-sm font-bold text-slate-800">
+                                                                Tiene lote?
+                                                            </p>
+                                                            <p class="text-xs text-slate-500 mt-0.5">
+                                                                Actívalo si este registro debe manejar número de lote.
+                                                            </p>
+                                                        </div>
+
+                                                        <button type="button" :disabled="processing"
+                                                            class="relative inline-flex h-8 w-16 items-center rounded-full transition disabled:opacity-50 shrink-0"
+                                                            :class="usesLot ? 'bg-[#1f1d2b]' : 'bg-slate-300'"
+                                                            @click="toggleLot">
+                                                            <span
+                                                                class="inline-block h-6 w-6 transform rounded-full bg-white shadow transition"
+                                                                :class="usesLot ? 'translate-x-9' : 'translate-x-1'" />
+
+                                                            <span class="absolute text-[10px] font-black uppercase"
+                                                                :class="usesLot ? 'left-3 text-white' : 'right-3 text-slate-600'">
+                                                                {{ usesLot ? 'Si' : 'No' }}
+                                                            </span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <InputField v-if="usesLot" v-model="form.lot_number" label="Numero de lote"
+                                                    placeholder="Ej. LALA-001" field="lot_number" :readonly="processing"
+                                                    :error="frontendErrors.lot_number" @validate="validateField" />
+
+                                                <InputField v-model="form.supplier" label="Proveedor" placeholder="Opcional"
+                                                    field="supplier" :readonly="processing" :error="frontendErrors.supplier"
+                                                    @validate="validateField" />
+
+                                                <InputField v-model="form.received_at" label="Fecha de ingreso"
+                                                    field="received_at" type="date" :readonly="processing"
+                                                    :error="frontendErrors.received_at" @validate="validateField" />
+
+                                                <InputField v-model="form.expiration_date" label="Fecha de caducidad"
+                                                    field="expiration_date" type="date" :readonly="processing"
+                                                    :error="frontendErrors.expiration_date" @validate="validateField" />
+
+                                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                                    <label class="block text-sm font-black text-slate-800 mb-1">
+                                                        Nota del ajuste
+                                                    </label>
+
+                                                    <p class="text-xs text-slate-500 mb-3">
+                                                        Esta nota quedará registrada en el historial de movimientos.
+                                                    </p>
+
+                                                    <textarea v-model="form.notes" :readonly="processing" rows="4" maxlength="500"
+                                                        placeholder="Ej. Corrección por error de captura..."
+                                                        class="w-full resize-none rounded-2xl border-slate-300 text-sm font-semibold focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+                                                        @input="validateField('notes')"></textarea>
+
+                                                    <div class="flex items-center justify-between mt-1">
+                                                        <p v-if="frontendErrors.notes" class="text-xs font-semibold text-red-600">
+                                                            {{ frontendErrors.notes }}
+                                                        </p>
+
+                                                        <p class="ml-auto text-[11px] font-bold text-slate-400">
+                                                            {{ form.notes.length }}/500
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <section class="space-y-4">
+                                        <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                                            <p class="text-sm font-black text-slate-800">
+                                                Configuración del lote
+                                            </p>
+
+                                            <div class="mt-4 space-y-4">
+                                                <div>
+                                                    <label class="block text-sm font-bold text-slate-700 mb-2">
+                                                        Estado del lote
+                                                    </label>
+
+                                                    <select v-model="form.status" :disabled="processing"
+                                                        class="w-full rounded-2xl border-slate-300 text-sm font-semibold focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+                                                        @change="validateField('status')">
+                                                        <option value="ACTIVE">Activo</option>
+                                                        <option value="INACTIVE">Inactivo</option>
+                                                        <option value="SEASONAL">Temporada</option>
+                                                    </select>
+
+                                                    <p v-if="frontendErrors.status" class="text-xs font-semibold text-red-600 mt-1">
+                                                        {{ frontendErrors.status }}
+                                                    </p>
+                                                </div>
+
+                                                <div v-if="isSeasonal"
+                                                    class="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                                                    <InputField v-model="form.season_start_date" label="Inicio de temporada"
+                                                        field="season_start_date" type="date" :readonly="processing"
+                                                        :error="frontendErrors.season_start_date" @validate="validateField" />
+
+                                                    <InputField v-model="form.season_end_date" label="Fin de temporada"
+                                                        field="season_end_date" type="date" :readonly="processing"
+                                                        :error="frontendErrors.season_end_date" @validate="validateField" />
+                                                </div>
+
+                                                <div v-else class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                                    <p class="text-sm font-semibold text-slate-700">
+                                                        Selecciona Temporada para habilitar las fechas.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <section class="space-y-4">
+                                        <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                                            <p class="text-sm font-black text-slate-800">
+                                                Ajuste de cantidad
+                                            </p>
+
+                                            <div class="mt-4 space-y-4">
+                                                <div class="grid grid-cols-2 gap-2 rounded-2xl bg-slate-200 p-1">
+                                                    <button type="button" :disabled="processing"
+                                                        class="rounded-xl px-4 py-2 text-sm font-black transition disabled:opacity-50"
+                                                        :class="form.adjustment_type === 'ADD'
+                                                            ? 'bg-white text-emerald-700 shadow'
+                                                            : 'text-slate-500'"
+                                                        @click="setAdjustmentType('ADD')">
+                                                        Agregar
+                                                    </button>
+
+                                                    <button type="button" :disabled="processing"
+                                                        class="rounded-xl px-4 py-2 text-sm font-black transition disabled:opacity-50"
+                                                        :class="form.adjustment_type === 'REMOVE'
+                                                            ? 'bg-white text-red-700 shadow'
+                                                            : 'text-slate-500'"
+                                                        @click="setAdjustmentType('REMOVE')">
+                                                        Eliminar
+                                                    </button>
+                                                </div>
+
+                                                <InputField v-model="form.adjustment_amount" label="Cantidad" placeholder="Ej. 2"
+                                                    field="adjustment_amount" type="number" :readonly="processing"
+                                                    :error="frontendErrors.adjustment_amount"
+                                                    @validate="validateField('adjustment_amount')" />
+
+                                                <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                                    <p class="text-xs text-slate-500">
+                                                        Cantidad actual
+                                                    </p>
+                                                    <p class="text-3xl font-black text-slate-900">
+                                                        {{ form.original_quantity }}
+                                                    </p>
+                                                </div>
+
+                                                <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                                    <p class="text-xs text-slate-500">
+                                                        Total después del ajuste
+                                                    </p>
+                                                    <p class="text-3xl font-black" :class="quantityResultColor">
+                                                        {{ calculatedQuantity }}
+                                                    </p>
+                                                </div>
+
+                                                <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                                    <p class="text-sm font-semibold" :class="quantityResultColor">
+                                                        {{ adjustmentText }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+                                </section>
 
                                 <div v-else
                                     class="min-h-[420px] flex items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50">
@@ -318,10 +480,5 @@ onBeforeUnmount(() => {
                         </section>
                     </div>
                 </section>
-            </GeneralModalContent>
-
-            <GeneralModalFooter :processing="processing" save-button-text="Guardar cambios" close-button-text="Cerrar"
-                mode="edit" @save="$emit('save')" @close="closeModal" />
-        </div>
-    </div>
+    </GlobalModal>
 </template>

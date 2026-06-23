@@ -20,7 +20,7 @@ const pageTitle = computed(() => {
 const reportGroups = [
     {
         key: 'audits',
-        title: 'Reportes de auditoria',
+        title: 'Reportes de auditoría',
         description: 'Conteos fisicos, diferencias, incidencias y validaciones internas.',
         icon: 'fact_check',
         disabled: true,

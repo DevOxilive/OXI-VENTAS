@@ -1,10 +1,9 @@
 <script setup>
-import { onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import { onMounted, computed, watch } from 'vue'
 import { useAdjustStockForm } from '@/Composables/Inventory/useAdjustStockForm'
+import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import { getStockEntryModalConfig } from '@/config/ModalConfigs/stockEntryModalConfig'
 
-import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
-import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
-import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 
@@ -44,6 +43,11 @@ const minExpirationDate = computed(() => {
 })
 
 const totalErrors = computed(() => errorSummary.value.length)
+
+const modalConfig = computed(() => getStockEntryModalConfig({
+    totalErrors: totalErrors.value,
+    processing: form.processing,
+}))
 
 function formatLotNumber(value) {
     if (!value) return ''
@@ -151,10 +155,6 @@ function closeModal() {
     emit('close')
 }
 
-function handleEsc(e) {
-    if (e.key === 'Escape') closeModal()
-}
-
 watch(
     () => entry.value?.quantity,
     () => syncQuantity()
@@ -168,27 +168,19 @@ watch(
 
 onMounted(() => {
     ensureEntryReady()
-    window.addEventListener('keydown', handleEsc)
-})
-
-onBeforeUnmount(() => {
-    window.removeEventListener('keydown', handleEsc)
 })
 </script>
 
 <template>
-    <div class="fixed inset-0 z-50 bg-black/60 flex items-end md:items-center justify-center" role="dialog"
-        aria-modal="true">
-        <div class="absolute inset-0" @click="closeModal"></div>
-
-        <div class="relative bg-white w-full h-[100dvh] md:h-auto md:max-h-[92vh] md:w-[96%] md:max-w-6xl rounded-t-[28px] md:rounded-3xl shadow-2xl flex flex-col overflow-hidden"
-            @click.stop>
-            <GeneralModalHeader title="Entrada" subtitle="Registra producto que entra al inventario."
-                :total-errors="totalErrors" mode="create" @close="closeModal" />
-
-            <GeneralModalContent :columns="1">
-                <section v-if="entry"
-                    class="w-full max-w-5xl mx-auto rounded-3xl border border-slate-200 bg-white overflow-hidden">
+    <GlobalModal
+        v-bind="modalConfig"
+        @save="saveEntry"
+        @close="closeModal"
+    >
+        <section
+            v-if="entry"
+            class="w-full overflow-hidden"
+        >
                     <div class="border-b border-slate-200 px-5 py-4">
                         <h3 class="font-black text-slate-900">
                             {{ productName }}
@@ -262,11 +254,6 @@ onBeforeUnmount(() => {
                             </p>
                         </div>
                     </div>
-                </section>
-            </GeneralModalContent>
-
-            <GeneralModalFooter :processing="form.processing" save-button-text="Registrar entrada"
-                close-button-text="Cancelar" mode="create" @save="saveEntry" @close="closeModal" />
-        </div>
-    </div>
+        </section>
+    </GlobalModal>
 </template>

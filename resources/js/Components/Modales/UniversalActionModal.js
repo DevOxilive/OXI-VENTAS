@@ -40,14 +40,14 @@ export function SuccessAlert({
     message = "La acción se ejecutó correctamente",
 } = {}) {
     return Swal.fire({
+        toast: true,
+        position: "top-start",
         icon: "success",
         title: title,
         text: message,
-        confirmButtonColor: "#22c55e",
-        customClass: {
-            popup: "rounded-2xl",
-            confirmButton: "px-5 py-2 rounded-full",
-        },
+        showConfirmButton: false,
+        timer: 2500,
+        timerProgressBar: true,
     });
 }
 
@@ -107,7 +107,7 @@ export function ToastAlert({
 } = {}) {
     return Swal.fire({
         toast: true,
-        position: "top-end",
+        position: "top-start",
         icon: icon,
         title: title,
         showConfirmButton: false,
