@@ -13,11 +13,17 @@ class PhysicalCountChanged implements ShouldBroadcastNow
     use Dispatchable, SerializesModels;
 
     public int $physicalCountId;
+    public array $physicalCount;
     public string $action;
 
     public function __construct(PhysicalCount $physicalCount, string $action = 'updated')
     {
         $this->physicalCountId = $physicalCount->id;
+        $this->physicalCount = [
+            'id' => $physicalCount->id,
+            'branch_id' => $physicalCount->branch_id,
+            'status' => $physicalCount->status,
+        ];
         $this->action = $action;
     }
 

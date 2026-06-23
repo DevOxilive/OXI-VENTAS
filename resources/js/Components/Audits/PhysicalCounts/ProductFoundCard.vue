@@ -1,9 +1,25 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
     product: {
         type: Object,
-        default: null
+        default: null,
+    },
+    canViewStock: {
+        type: Boolean,
+        default: false,
+    },
+})
+
+const scannedCodeLabel = computed(() => {
+    if (!props.product) return ''
+
+    if (props.product.scanned_code && props.product.scanned_code !== 'Seleccionado manualmente') {
+        return props.product.scanned_code
     }
+
+    return props.product.barcode || 'Sin codigo'
 })
 </script>
 
@@ -16,7 +32,7 @@ defineProps({
                 </h2>
 
                 <p class="mt-1 text-sm text-gray-500">
-                    Información del producto seleccionado para capturar conteo.
+                    Informacion del producto encontrado para capturar conteo.
                 </p>
             </div>
 
@@ -40,20 +56,20 @@ defineProps({
             </div>
 
             <div class="rounded-lg bg-slate-50 p-3">
-                <p class="text-xs font-medium text-slate-500">Código escaneado</p>
+                <p class="text-xs font-medium text-slate-500">Codigo escaneado</p>
                 <p class="mt-1 font-semibold text-slate-900">
-                    {{ product.scanned_code }}
+                    {{ scannedCodeLabel }}
                 </p>
             </div>
 
             <div class="rounded-lg bg-slate-50 p-3">
-                <p class="text-xs font-medium text-slate-500">Código principal</p>
+                <p class="text-xs font-medium text-slate-500">Codigo principal</p>
                 <p class="mt-1 font-semibold text-slate-900">
-                    {{ product.barcode }}
+                    {{ product.barcode || 'Sin codigo' }}
                 </p>
             </div>
 
-            <div class="rounded-lg bg-slate-50 p-3">
+            <div v-if="canViewStock" class="rounded-lg bg-slate-50 p-3">
                 <p class="text-xs font-medium text-slate-500">Stock en sistema</p>
                 <p class="mt-1 text-2xl font-bold text-slate-900">
                     {{ product.stock ?? 0 }}
@@ -62,7 +78,7 @@ defineProps({
         </div>
 
         <div
-            v-if="product?.batches?.length"
+            v-if="canViewStock && product?.batches?.length"
             class="mt-4 rounded-lg border border-slate-200 p-3"
         >
             <p class="text-sm font-semibold text-slate-800">
@@ -90,7 +106,7 @@ defineProps({
             v-else-if="!product"
             class="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500"
         >
-            Escanea un código para visualizar aquí el producto que se va a capturar.
+            Escanea un codigo para visualizar aqui el producto que se va a capturar.
         </p>
     </div>
 </template>

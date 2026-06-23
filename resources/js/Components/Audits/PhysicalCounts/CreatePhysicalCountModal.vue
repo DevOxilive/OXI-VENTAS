@@ -19,6 +19,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
+const search = ref('')
+
 const form = useForm({
     name: '',
     branch_id: '',

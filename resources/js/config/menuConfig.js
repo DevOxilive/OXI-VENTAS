@@ -150,6 +150,7 @@ export function generateMenu(role, permissions = [], branches = []) {
 
         ...(isAdmin ||
         can("audits.physical-counts.view") ||
+        can("audits.physical-counts.count") ||
         can("audits.physical-counts.create") ||
         can("audits.physical-counts.update") ||
         can("audits.physical-counts.delete")
@@ -159,6 +160,19 @@ export function generateMenu(role, permissions = [], branches = []) {
                       key: `inventory.${branch.slug}.physical-counts`,
                       icon: "fact_check",
                       url: route("audits.physical-counts.index", {
+                          branch: branch.slug,
+                      }),
+                  },
+              ]
+            : []),
+
+        ...(isAdmin || can("audits.physical-counts.reports")
+            ? [
+                  {
+                      text: "Reportes de auditoria",
+                      key: `inventory.${branch.slug}.physical-count-reports`,
+                      icon: "analytics",
+                      url: route("audits.physical-counts.reports", {
                           branch: branch.slug,
                       }),
                   },
@@ -194,6 +208,8 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("inventory.purchase-reports.update") ||
         can("inventory.purchase-reports.delete") ||
         can("audits.physical-counts.view") ||
+        can("audits.physical-counts.count") ||
+        can("audits.physical-counts.reports") ||
         can("audits.physical-counts.create") ||
         can("audits.physical-counts.update") ||
         can("audits.physical-counts.delete") ||

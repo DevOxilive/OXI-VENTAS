@@ -54,6 +54,9 @@ class PermissionSeeder extends Seeder
 'inventory.branches.delete',
 
             'audits.physical-counts.view',
+            'audits.physical-counts.count',
+            'audits.physical-counts.reports',
+            'audits.physical-counts.view-stock',
             'audits.physical-counts.create',
             'audits.physical-counts.update',
             'audits.physical-counts.delete',

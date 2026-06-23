@@ -39,14 +39,18 @@ export const physicalCountTableConfig = {
     actions: [
         {
             id: "open",
-            label: "Ingresar a auditoría",
+            label: "Ingresar a auditoria",
             icon: "login",
             variant: "blue",
-            permission: "audits.physical-counts.view",
+            permission: [
+                "audits.physical-counts.view",
+                "audits.physical-counts.count",
+                "audits.physical-counts.update",
+            ],
         },
         {
             id: "close",
-            label: "Cerrar auditoría",
+            label: "Cerrar auditoria",
             icon: "lock",
             variant: "amber",
             permission: "audits.physical-counts.update",
@@ -54,7 +58,7 @@ export const physicalCountTableConfig = {
         },
         {
             id: "reopen",
-            label: "Reabrir auditoría",
+            label: "Reabrir auditoria",
             icon: "restart_alt",
             variant: "green",
             permission: "audits.physical-counts.update",
@@ -70,7 +74,7 @@ export const physicalCountTableConfig = {
         },
         {
             id: "delete",
-            label: "Eliminar auditoría",
+            label: "Eliminar auditoria",
             icon: "delete",
             variant: "red",
             permission: "audits.physical-counts.delete",
@@ -79,5 +83,5 @@ export const physicalCountTableConfig = {
     ],
 
     mobileCardHeaderField: "name",
-    noDataMessage: "Todavía no hay conteos físicos creados.",
-};
+    noDataMessage: "Todavia no hay conteos fisicos creados.",
+}

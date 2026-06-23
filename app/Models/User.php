@@ -72,14 +72,31 @@ class User extends Authenticatable
         return $this->belongsToMany(Branch::class, 'branch_user');
     }
 
+    public function assignedPhysicalCounts()
+    {
+        return $this->belongsToMany(PhysicalCount::class, 'physical_count_user')
+            ->withTimestamps();
+    }
+
   public function hasPermission($permission)
 {
     if ($this->role?->name === 'Administrador') {
         return true;
     }
 
-    return $this->permissions()
-        ->where('name', $permission)
-        ->exists();
+    if ($this->relationLoaded('permissions') && $this->permissions->contains('name', $permission)) {
+        return true;
+    }
+
+    if (
+        $this->relationLoaded('role') &&
+        $this->role?->relationLoaded('permissions') &&
+        $this->role->permissions->contains('name', $permission)
+    ) {
+        return true;
+    }
+
+    return $this->permissions()->where('name', $permission)->exists()
+        || $this->role?->permissions()->where('name', $permission)->exists();
 }
 }
