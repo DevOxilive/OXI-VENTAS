@@ -27,87 +27,96 @@ class InventoryReportSeeder extends Seeder
     {
         Event::fakeFor(function () {
             DB::transaction(function () {
-                $branch = Branch::firstOrCreate(
-                    ['slug' => 'cecilia'],
-                    ['name' => 'Cecilia', 'active' => true]
-                );
-
-                $users = $this->reportUsers($branch);
                 $stockService = app(StockMovementService::class);
                 $categories = $this->categories();
 
-                $this->clearLegacyDemoInventory($branch);
-
-                for ($index = 1; $index <= self::PRODUCT_COUNT; $index++) {
-                    $product = $this->product($index, $categories);
-                    $branchProduct = $this->branchProduct($branch, $product, $index);
-
-                    $this->clearDemoInventory($branchProduct);
-
-                    $batches = $this->batchesForProduct($index);
-                    $entryUser = $users[$index % $users->count()];
-                    $entryDate = now()->subDays(120 - ($index % 70))->setTime(9, 0);
-                    $entryQuantity = collect($batches)->sum('quantity');
-
-                    $entryMovement = $stockService->move(
-                        branchProduct: $branchProduct,
-                        type: StockMovement::TYPE_IN,
-                        reason: StockMovement::REASON_PURCHASE,
-                        quantity: (float) $entryQuantity,
-                        notes: $index === 15
-                            ? 'Caso auditoria: ingreso inicial de 15 piezas, despues corregido a 14.'
-                            : 'Seeder reportes: entrada obligatoria con lotes.',
-                        userId: $entryUser->id,
-                        batches: $batches,
-                    );
-
-                    $this->dateMovement($entryMovement, $entryDate);
-                    $this->dateBatches($branchProduct, $batches, $entryDate);
-
-                    if ($index === 15) {
-                        $this->createCorrectionCase($stockService, $branchProduct, $users, $entryDate);
-                        continue;
-                    }
-
-                    if ($index % 10 === 0) {
-                        $this->consumeAllStock($stockService, $branchProduct, $users, $index);
-                        continue;
-                    }
-
-                    if ($index % 4 === 0) {
-                        $this->createExpiredMovement($stockService, $branchProduct, $users, $index);
-                    }
-
-                    if ($index % 5 === 0) {
-                        $this->createDamagedMovement($stockService, $branchProduct, $users, $index);
-                    }
-
-                    if ($index % 6 === 0) {
-                        $this->createManualAdjustment($stockService, $branchProduct, $users, $index);
-                    }
-
-                    if ($index % 7 === 0) {
-                        $this->createSaleMovement($stockService, $branchProduct, $users, $index);
-                    }
-                }
+                Branch::query()
+                    ->where('active', true)
+                    ->orderBy('name')
+                    ->get()
+                    ->each(fn (Branch $branch) => $this->seedBranch(
+                        branch: $branch,
+                        stockService: $stockService,
+                        categories: $categories,
+                    ));
             });
         });
+    }
+
+    private function seedBranch(Branch $branch, StockMovementService $stockService, $categories): void
+    {
+        $users = $this->reportUsers($branch);
+
+        $this->clearLegacyDemoInventory($branch);
+
+        for ($index = 1; $index <= self::PRODUCT_COUNT; $index++) {
+            $product = $this->product($index, $categories);
+            $branchProduct = $this->branchProduct($branch, $product, $index);
+
+            $this->clearDemoInventory($branchProduct);
+
+            $batches = $this->batchesForProduct($index);
+            $entryUser = $users[$index % $users->count()];
+            $entryDate = now()->subDays(120 - ($index % 70))->setTime(9, 0);
+            $entryQuantity = collect($batches)->sum('quantity');
+
+            $entryMovement = $stockService->move(
+                branchProduct: $branchProduct,
+                type: StockMovement::TYPE_IN,
+                reason: StockMovement::REASON_PURCHASE,
+                quantity: (float) $entryQuantity,
+                notes: $index === 15
+                    ? 'Caso auditoria: ingreso inicial de 15 piezas, despues corregido a 14.'
+                    : 'Seeder reportes: entrada obligatoria con lotes.',
+                userId: $entryUser->id,
+                batches: $batches,
+            );
+
+            $this->dateMovement($entryMovement, $entryDate);
+            $this->dateBatches($branchProduct, $batches, $entryDate);
+
+            if ($index === 15) {
+                $this->createCorrectionCase($stockService, $branchProduct, $users, $entryDate);
+                continue;
+            }
+
+            if ($index % 10 === 0) {
+                $this->consumeAllStock($stockService, $branchProduct, $users, $index);
+                continue;
+            }
+
+            if ($index % 4 === 0) {
+                $this->createExpiredMovement($stockService, $branchProduct, $users, $index);
+            }
+
+            if ($index % 5 === 0) {
+                $this->createDamagedMovement($stockService, $branchProduct, $users, $index);
+            }
+
+            if ($index % 6 === 0) {
+                $this->createManualAdjustment($stockService, $branchProduct, $users, $index);
+            }
+
+            if ($index % 7 === 0) {
+                $this->createSaleMovement($stockService, $branchProduct, $users, $index);
+            }
+        }
     }
 
     private function reportUsers(Branch $branch)
     {
         return collect([
-            ['name' => 'Cecilia Reportes - Ana Caducidades', 'email' => 'ana.caducidades@oxi-demo.test'],
-            ['name' => 'Cecilia Reportes - Bruno Danados', 'email' => 'bruno.danados@oxi-demo.test'],
-            ['name' => 'Cecilia Reportes - Carla Ajustes', 'email' => 'carla.ajustes@oxi-demo.test'],
-            ['name' => 'Cecilia Reportes - Diego Entradas', 'email' => 'diego.entradas@oxi-demo.test'],
-            ['name' => 'Cecilia Reportes - Elena Ventas', 'email' => 'elena.ventas@oxi-demo.test'],
+            ['name' => 'Ana Caducidades', 'email' => 'ana.caducidades@oxilive.com.mx'],
+            ['name' => 'Bruno Danados', 'email' => 'bruno.danados@oxilive.com.mx'],
+            ['name' => 'Carla Ajustes', 'email' => 'carla.ajustes@oxilive.com.mx'],
+            ['name' => 'Diego Entradas', 'email' => 'diego.entradas@oxilive.com.mx'],
+            ['name' => 'Elena Ventas', 'email' => 'elena.ventas@oxilive.com.mx'],
         ])->map(fn (array $user) => User::updateOrCreate(
             ['email' => $user['email']],
             [
                 'name' => $user['name'],
                 'password' => Hash::make('password'),
-                'branch_id' => $branch->id,
+                'branch_id' => null,
             ]
         ))->values();
     }

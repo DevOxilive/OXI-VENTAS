@@ -37,6 +37,11 @@ class PhysicalCount extends Model
         return $this->hasMany(PhysicalCountEntry::class);
     }
 
+    public function snapshot()
+    {
+        return $this->hasOne(PhysicalCountSnapshot::class);
+    }
+
     public function participants()
     {
         return $this->belongsToMany(User::class, 'physical_count_user')

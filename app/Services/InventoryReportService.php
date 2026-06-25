@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\ProductBatch;
 use App\Models\StockMovement;
+use App\Support\FlexibleSearch;
 use Illuminate\Support\Facades\DB;
 
 class InventoryReportService
@@ -422,10 +423,20 @@ class InventoryReportService
             return;
         }
 
-        $query->where(function ($searchQuery) use ($filters, $columns) {
-            foreach ($columns as $column) {
-                $searchQuery->orWhere($column, 'like', '%' . $filters['search'] . '%');
-            }
+        FlexibleSearch::apply($query, $filters['search'], function ($searchQuery, $phrase, $terms) use ($columns) {
+            FlexibleSearch::orWhereColumns($searchQuery, array_merge($columns, [
+                'branch_products.barcode',
+            ]), $phrase, $terms);
+
+            FlexibleSearch::orWhereExists($searchQuery, function ($subQuery) use ($phrase, $terms) {
+                $subQuery
+                    ->select(DB::raw(1))
+                    ->from('barcodes')
+                    ->whereColumn('barcodes.product_id', 'products.id')
+                    ->where(function ($barcodeQuery) use ($phrase, $terms) {
+                        FlexibleSearch::orWhereColumns($barcodeQuery, ['barcodes.code'], $phrase, $terms);
+                    });
+            });
         });
     }
 

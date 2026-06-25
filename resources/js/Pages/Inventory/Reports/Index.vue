@@ -23,7 +23,8 @@ const reportGroups = [
         title: 'Reportes de auditoría',
         description: 'Conteos fisicos, diferencias, incidencias y validaciones internas.',
         icon: 'fact_check',
-        disabled: true,
+        disabled: false,
+        routeName: 'inventory.branches.reports.audits',
     },
     {
         key: 'sales',

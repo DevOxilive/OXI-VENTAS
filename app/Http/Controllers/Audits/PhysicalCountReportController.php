@@ -10,6 +10,8 @@ use App\Models\Category;
 use App\Models\PhysicalCount;
 use App\Models\PhysicalCountEntry;
 use App\Models\User;
+use App\Services\PhysicalCountSnapshotService;
+use App\Support\FlexibleSearch;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -19,6 +21,11 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class PhysicalCountReportController extends Controller
 {
+    public function __construct(
+        private PhysicalCountSnapshotService $snapshotService
+    ) {
+    }
+
     public function index(Request $request)
     {
         abort_unless($this->canViewReports($request), 403, 'No tienes permisos para ver reportes de auditoria.');
@@ -28,7 +35,7 @@ class PhysicalCountReportController extends Controller
         $payload = $this->buildReportPayload($branch, $filters, true);
         $filterLabels = $this->buildFilterLabels($filters, $payload['audits']);
 
-        return Inertia::render('Audits/PhysicalCounts/Reports', [
+        return Inertia::render('Inventory/Reports/PhysicalCountsReports', [
             'branch' => $branch,
             'branches' => Branch::where('active', true)
                 ->select('id', 'name', 'slug', 'color')
@@ -112,6 +119,16 @@ class PhysicalCountReportController extends Controller
             ->latest()
             ->get();
 
+        $this->hydrateAuditSnapshots($audits);
+
+        $snapshotRows = $this->snapshotService->buildProductRows($audits);
+        if ($filters['category_id']) {
+            $snapshotRows = $snapshotRows
+                ->where('category_id', (int) $filters['category_id'])
+                ->values();
+        }
+
+        $allowedBranchProductIds = $snapshotRows->pluck('branch_product_id')->unique()->values()->all();
         $auditIds = $audits->pluck('id');
 
         $entries = PhysicalCountEntry::with([
@@ -123,14 +140,26 @@ class PhysicalCountReportController extends Controller
             ->whereIn('physical_count_id', $auditIds)
             ->when($filters['user_id'], fn ($query, $userId) => $query->where('user_id', $userId))
             ->when($filters['search'], function ($query, $search) {
-                $query->where(function ($subQuery) use ($search) {
-                    $subQuery
-                        ->where('scanned_code', 'LIKE', "%{$search}%")
-                        ->orWhere('notes', 'LIKE', "%{$search}%")
-                        ->orWhereHas('branchProduct.product', fn ($productQuery) => $productQuery->where('name', 'LIKE', "%{$search}%"))
-                        ->orWhereHas('user', fn ($userQuery) => $userQuery->where('name', 'LIKE', "%{$search}%"));
+                FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($subQuery, [
+                        'scanned_code',
+                        'notes',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct', [
+                        'barcode',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct.product', [
+                        'name',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'user', [
+                        'name',
+                    ], $phrase, $terms);
                 });
             })
+            ->when($allowedBranchProductIds !== [], fn ($query) => $query->whereIn('branch_product_id', $allowedBranchProductIds))
             ->get();
 
         $activeBranchProducts = BranchProduct::with([
@@ -144,7 +173,7 @@ class PhysicalCountReportController extends Controller
             })
             ->get();
 
-        $comparisonRows = collect($this->buildComparisonRows($audits, $entries, $activeBranchProducts->pluck('id')->all()))
+        $comparisonRows = collect($this->buildComparisonRows($audits, $entries, $snapshotRows))
             ->map(function ($row) {
                 $row['row_type_label'] = 'Contado';
                 $row['status_label'] = match ($row['status']) {
@@ -157,7 +186,7 @@ class PhysicalCountReportController extends Controller
                 return $row;
             });
 
-        $pendingRows = collect($this->buildPendingRows($activeBranchProducts, $comparisonRows->all(), $audits))
+        $pendingRows = collect($this->buildPendingRows($snapshotRows, $comparisonRows->all(), $audits, $activeBranchProducts))
             ->map(function ($row) {
                 $row['row_type_label'] = 'No encontrado';
                 $row['status_label'] = 'Pendiente';
@@ -283,19 +312,19 @@ class PhysicalCountReportController extends Controller
         ];
     }
 
-    private function buildComparisonRows(Collection $audits, Collection $entries, ?array $allowedBranchProductIds = null): array
+    private function buildComparisonRows(Collection $audits, Collection $entries, ?Collection $snapshotRows = null): array
     {
         $auditsById = $audits->keyBy('id');
+        $snapshotByKey = ($snapshotRows ?? collect())
+            ->keyBy(fn ($row) => $row['physical_count_id'] . ':' . $row['branch_product_id']);
 
         return $entries
-            ->when($allowedBranchProductIds !== null, function ($collection) use ($allowedBranchProductIds) {
-                return $collection->whereIn('branch_product_id', $allowedBranchProductIds);
-            })
             ->groupBy(fn ($entry) => $entry->physical_count_id . ':' . $entry->branch_product_id)
-            ->map(function ($group) use ($auditsById) {
+            ->map(function ($group, $groupKey) use ($auditsById, $snapshotByKey) {
                 $first = $group->first();
                 $audit = $auditsById->get($first->physical_count_id);
-                $systemStock = (float) ($first->branchProduct?->stock ?? 0);
+                $snapshot = $snapshotByKey->get($groupKey);
+                $systemStock = (float) ($snapshot['system_stock'] ?? ($first->branchProduct?->stock ?? 0));
                 $countedStock = (float) $group->sum('counted_quantity');
                 $damagedStock = (float) $group->sum('damaged_quantity');
                 $expiredStock = (float) $group->sum('expired_quantity');
@@ -311,10 +340,10 @@ class PhysicalCountReportController extends Controller
                     'folio' => $audit?->folio ?? 'Sin folio',
                     'audit_date' => optional($audit?->started_at)->toDateString(),
                     'branch_product_id' => $first->branch_product_id,
-                    'product_name' => $first->branchProduct?->product?->name ?? 'Sin producto',
-                    'category_name' => $first->branchProduct?->product?->category?->name ?? 'Sin categoria',
-                    'subcategory_name' => $first->branchProduct?->product?->subcategory?->name ?? 'Sin subcategoria',
-                    'scanned_code' => $first->scanned_code ?: ($first->branchProduct?->barcode ?? '-'),
+                    'product_name' => $snapshot['product_name'] ?? $first->branchProduct?->product?->name ?? 'Sin producto',
+                    'category_name' => $snapshot['category_name'] ?? $first->branchProduct?->product?->category?->name ?? 'Sin categoria',
+                    'subcategory_name' => $snapshot['subcategory_name'] ?? $first->branchProduct?->product?->subcategory?->name ?? 'Sin subcategoria',
+                    'scanned_code' => $first->scanned_code ?: ($snapshot['scanned_code'] ?? $first->branchProduct?->barcode ?? '-'),
                     'system_stock' => $systemStock,
                     'counted_stock' => $countedStock,
                     'damaged_stock' => $damagedStock,
@@ -328,12 +357,49 @@ class PhysicalCountReportController extends Controller
             ->all();
     }
 
-    private function buildPendingRows(Collection $activeBranchProducts, array $comparisonRows, Collection $audits): array
+    private function buildPendingRows(
+        Collection $snapshotRows,
+        array $comparisonRows,
+        Collection $audits,
+        ?Collection $activeBranchProducts = null
+    ): array
     {
+        if ($snapshotRows->isNotEmpty()) {
+            $countedKeys = collect($comparisonRows)
+                ->map(fn ($row) => $row['physical_count_id'] . ':' . $row['branch_product_id'])
+                ->unique();
+
+            return $snapshotRows
+                ->reject(fn ($row) => $countedKeys->contains($row['physical_count_id'] . ':' . $row['branch_product_id']))
+                ->map(fn ($row) => [
+                    'id' => 'pending-' . $row['physical_count_id'] . '-' . $row['branch_product_id'],
+                    'row_type' => 'pending',
+                    'status' => 'pending',
+                    'physical_count_id' => $row['physical_count_id'],
+                    'audit_name' => $row['audit_name'],
+                    'folio' => $row['folio'],
+                    'audit_date' => $row['audit_date'],
+                    'branch_product_id' => $row['branch_product_id'],
+                    'product_name' => $row['product_name'],
+                    'category_name' => $row['category_name'],
+                    'subcategory_name' => $row['subcategory_name'],
+                    'scanned_code' => $row['scanned_code'],
+                    'system_stock' => (float) $row['system_stock'],
+                    'counted_stock' => 0,
+                    'damaged_stock' => 0,
+                    'expired_stock' => 0,
+                    'difference' => null,
+                    'participants' => [],
+                    'last_entry_at' => null,
+                ])
+                ->values()
+                ->all();
+        }
+
         $countedIds = collect($comparisonRows)->pluck('branch_product_id')->unique();
         $firstAudit = $audits->first();
 
-        return $activeBranchProducts
+        return ($activeBranchProducts ?? collect())
             ->reject(fn ($branchProduct) => $countedIds->contains($branchProduct->id))
             ->map(function ($branchProduct) use ($firstAudit) {
                 return [
@@ -360,6 +426,17 @@ class PhysicalCountReportController extends Controller
             })
             ->values()
             ->all();
+    }
+
+    private function hydrateAuditSnapshots(Collection $audits): void
+    {
+        $audits->load('snapshot.items');
+
+        $audits
+            ->filter(fn ($audit) => $audit->status === 'open' && $audit->snapshot === null)
+            ->each(fn ($audit) => $this->snapshotService->ensureForAudit($audit));
+
+        $audits->load('snapshot.items');
     }
 
     private function buildExportData(array $payload, string $reportType): array

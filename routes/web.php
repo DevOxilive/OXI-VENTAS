@@ -268,7 +268,15 @@ Route::middleware([
             ->middleware('permission:inventory.view,inventory.branches.view')
             ->name('branches.reports');
 
-        Route::get('/reports', fn() => Inertia::render('Inventory/Reports'))
+        Route::get('/branches/{branch}/reports/audits', function (\App\Models\Branch $branch) {
+            return redirect()->route('audits.physical-counts.reports', [
+                'branch' => $branch->slug,
+            ]);
+        })
+            ->middleware('permission:audits.physical-counts.reports')
+            ->name('branches.reports.audits');
+
+        Route::get('/reports', fn() => Inertia::render('Inventory/Reports/Index'))
             ->middleware('permission:inventory.view')
             ->name('reports');
 
