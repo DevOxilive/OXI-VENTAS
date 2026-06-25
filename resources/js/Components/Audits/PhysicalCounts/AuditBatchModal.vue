@@ -1,10 +1,6 @@
 <script setup>
 import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { useForm } from '@inertiajs/vue3'
-
-import GeneralModalContent from '@/Components/Forms/GeneralModalContent.vue'
-import GeneralModalFooter from '@/Components/Forms/GeneralModalFooter.vue'
-import GeneralModalHeader from '@/Components/Forms/GeneralModalHeader.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 

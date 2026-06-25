@@ -2,17 +2,15 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Reportes de auditoria</title>
+    <title>Reporte de auditoria</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; font-size: 10px; color: #111827; }
         h1 { font-size: 18px; margin-bottom: 4px; }
-        h2 { font-size: 13px; margin-top: 20px; margin-bottom: 8px; }
+        h2 { font-size: 13px; margin-top: 18px; margin-bottom: 8px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #d1d5db; padding: 5px; text-align: left; vertical-align: top; }
         th { background: #f3f4f6; }
         .muted { color: #6b7280; }
-        .summary td, .summary th { width: 25%; }
-        .filters td, .filters th { width: 25%; }
     </style>
 </head>
 <body>
@@ -20,11 +18,12 @@
 
     <p class="muted">
         Sucursal: {{ $branch->name ?? 'Sin sucursal' }}<br>
-        Generado: {{ now()->format('d/m/Y H:i') }}
+        Generado: {{ now()->format('d/m/Y H:i') }}<br>
+        Tipo de reporte: {{ $sectionTitle }}
     </p>
 
-    <h2>Resumen</h2>
-    <table class="summary">
+    <h2>Resumen general</h2>
+    <table>
         <tr>
             <th>Auditorias</th>
             <td>{{ $summary['audits'] ?? 0 }}</td>
@@ -52,60 +51,46 @@
     </table>
 
     <h2>Filtros aplicados</h2>
-    <table class="filters">
+    <table>
         <tr>
             <th>Auditoria</th>
-            <td>{{ $filters['physical_count_id'] ?: 'Todas' }}</td>
+            <td>{{ $filterLabels['audit'] ?? 'Todas' }}</td>
             <th>Usuario</th>
-            <td>{{ $filters['user_id'] ?: 'Todos' }}</td>
+            <td>{{ $filterLabels['user'] ?? 'Todos' }}</td>
         </tr>
         <tr>
             <th>Categoria</th>
-            <td>{{ $filters['category_id'] ?: 'Todas' }}</td>
-            <th>Estado</th>
-            <td>{{ $filters['status'] ?: 'Todos' }}</td>
+            <td>{{ $filterLabels['category'] ?? 'Todas' }}</td>
+            <th>Resultado</th>
+            <td>{{ $filterLabels['status'] ?? 'Todos' }}</td>
         </tr>
         <tr>
             <th>Periodo</th>
-            <td>{{ $filters['start_date'] ?: '-' }} al {{ $filters['end_date'] ?: '-' }}</td>
+            <td>{{ $filterLabels['report_date'] ?? 'Sin fecha' }} ({{ $filterLabels['date_scope'] ?? 'Por dia' }})</td>
             <th>Busqueda</th>
-            <td>{{ $filters['search'] ?: 'Sin filtro' }}</td>
+            <td>{{ $filterLabels['search'] ?? 'Sin filtro' }}</td>
         </tr>
     </table>
 
-    <h2>Resultados</h2>
+    <h2>{{ $sectionTitle }}</h2>
     <table>
         <thead>
             <tr>
-                <th>Auditoria</th>
-                <th>Producto</th>
-                <th>Categoria</th>
-                <th>Codigo</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Sistema</th>
-                <th>Conteo</th>
-                <th>Diferencia</th>
-                <th>Usuarios</th>
+                @foreach ($headings as $heading)
+                    <th>{{ $heading }}</th>
+                @endforeach
             </tr>
         </thead>
         <tbody>
-            @forelse ($reportRows as $row)
+            @forelse ($rows as $row)
                 <tr>
-                    <td>{{ $row['audit_name'] ?? 'Sin auditoria' }}<br>{{ $row['folio'] ?? '' }}</td>
-                    <td>{{ $row['product_name'] ?? '' }}</td>
-                    <td>{{ $row['category_name'] ?? '' }}</td>
-                    <td>{{ $row['scanned_code'] ?? '' }}</td>
-                    <td>{{ $row['row_type_label'] ?? '' }}</td>
-                    <td>{{ $row['status_label'] ?? '' }}</td>
-                    <td>{{ $row['system_stock'] ?? 0 }}</td>
-                    <td>{{ $row['counted_stock'] ?? 0 }}</td>
-                    <td>{{ $row['difference'] ?? '-' }}</td>
-                    <td>{{ implode(', ', $row['participants'] ?? []) }}</td>
+                    @foreach ($row as $value)
+                        <td>{{ $value }}</td>
+                    @endforeach
                 </tr>
             @empty
                 <tr>
-                    <td colspan="10">No hay resultados con los filtros seleccionados.</td>
+                    <td colspan="{{ count($headings) }}">No hay resultados con los filtros seleccionados.</td>
                 </tr>
             @endforelse
         </tbody>
