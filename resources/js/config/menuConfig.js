@@ -166,20 +166,10 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        ...(isAdmin || can("audits.physical-counts.reports")
-            ? [
-                  {
-                      text: "Reportes de auditoria",
-                      key: `inventory.${branch.slug}.physical-count-reports`,
-                      icon: "analytics",
-                      url: route("audits.physical-counts.reports", {
-                          branch: branch.slug,
-                      }),
-                  },
-              ]
-            : []),
-
-        ...(isAdmin || can("inventory.view") || can("inventory.branches.view")
+        ...(isAdmin ||
+        can("audits.physical-counts.reports") ||
+        can("inventory.view") ||
+        can("inventory.branches.view")
             ? [
                   {
                       text: "Reportes",

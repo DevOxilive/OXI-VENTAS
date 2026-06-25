@@ -4,17 +4,18 @@ namespace App\Http\Controllers\Audits;
 
 use App\Events\PhysicalCountChanged;
 use App\Exports\PhysicalCountExport;
-use App\Exports\PhysicalCountReportExport;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\PhysicalCount;
 use App\Models\PhysicalCountEntry;
-use App\Models\ProductAlternativeCode;
 use App\Models\ProductBatch;
 use App\Models\StockMovement;
+use App\Models\StockMovementBatch;
 use App\Models\User;
+use App\Services\PhysicalCountSnapshotService;
+use App\Support\FlexibleSearch;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -25,6 +26,11 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class PhysicalCountController extends Controller
 {
+    public function __construct(
+        private PhysicalCountSnapshotService $snapshotService
+    ) {
+    }
+
     public function index(Request $request)
     {
         $branch = $this->resolveBranch($request->query('branch'));
@@ -34,7 +40,7 @@ class PhysicalCountController extends Controller
             ->where('branch_id', $branch->id)
             ->latest();
 
-        if (!$this->canManageAudits($user)) {
+        if (! $this->canManageAudits($user)) {
             $physicalCountsQuery->whereHas('participants', function ($query) use ($user) {
                 $query->where('users.id', $user->id);
             });
@@ -85,31 +91,53 @@ class PhysicalCountController extends Controller
             ->latest();
 
         $audits = $auditsQuery->get();
+        $this->hydrateAuditSnapshots($audits);
+
+        $snapshotRows = $this->snapshotService->buildProductRows($audits);
+        if ($filters['category_id']) {
+            $snapshotRows = $snapshotRows
+                ->where('category_id', (int) $filters['category_id'])
+                ->values();
+        }
+
+        $allowedBranchProductIds = $snapshotRows->pluck('branch_product_id')->unique()->values()->all();
         $auditIds = $audits->pluck('id');
 
         $entries = PhysicalCountEntry::with([
-                'user:id,name',
-                'productBatch:id,branch_product_id,lot_number,expiration_date',
-                'branchProduct.product.category:id,name',
-                'branchProduct.product.subcategory:id,name,category_id',
-            ])
+            'user:id,name',
+            'productBatch:id,branch_product_id,lot_number,expiration_date',
+            'branchProduct.product.category:id,name',
+            'branchProduct.product.subcategory:id,name,category_id',
+        ])
             ->whereIn('physical_count_id', $auditIds)
             ->when($filters['user_id'], fn ($query, $userId) => $query->where('user_id', $userId))
             ->when($filters['search'], function ($query, $search) {
-                $query->where(function ($subQuery) use ($search) {
-                    $subQuery
-                        ->where('scanned_code', 'LIKE', "%{$search}%")
-                        ->orWhere('notes', 'LIKE', "%{$search}%")
-                        ->orWhereHas('branchProduct.product', fn ($productQuery) => $productQuery->where('name', 'LIKE', "%{$search}%"))
-                        ->orWhereHas('user', fn ($userQuery) => $userQuery->where('name', 'LIKE', "%{$search}%"));
+                FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($subQuery, [
+                        'scanned_code',
+                        'notes',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct', [
+                        'barcode',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct.product', [
+                        'name',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'user', [
+                        'name',
+                    ], $phrase, $terms);
                 });
             })
+            ->when($allowedBranchProductIds !== [], fn ($query) => $query->whereIn('branch_product_id', $allowedBranchProductIds))
             ->get();
 
         $activeBranchProductsQuery = BranchProduct::with([
-                'product.category:id,name',
-                'product.subcategory:id,name,category_id',
-            ])
+            'product.category:id,name',
+            'product.subcategory:id,name,category_id',
+        ])
             ->where('branch_id', $branch->id)
             ->where('status', BranchProduct::STATUS_ACTIVE)
             ->when($filters['category_id'], function ($query, $categoryId) {
@@ -123,10 +151,9 @@ class PhysicalCountController extends Controller
             });
 
         $activeBranchProducts = $activeBranchProductsQuery->get();
-        $allowedBranchProductIds = $activeBranchProducts->pluck('id')->all();
 
-        $comparisonRows = $this->buildComparisonRows($audits, $entries, $allowedBranchProductIds);
-        $pendingRows = $this->buildPendingRows($activeBranchProducts, $comparisonRows, $audits);
+        $comparisonRows = $this->buildComparisonRows($audits, $entries, $snapshotRows);
+        $pendingRows = $this->buildPendingRows($snapshotRows, $comparisonRows, $audits, $activeBranchProducts);
         $reportRows = collect([...$comparisonRows, ...$pendingRows]);
 
         if ($filters['status'] !== '') {
@@ -154,7 +181,7 @@ class PhysicalCountController extends Controller
             'matched_products' => collect($comparisonRows)->where('status', 'matched')->count(),
         ];
 
-        return Inertia::render('Audits/PhysicalCounts/Reports', [
+        return Inertia::render('Inventory/Reports/PhysicalCountsReports', [
             'branch' => $branch,
             'branches' => Branch::where('active', true)
                 ->select('id', 'name', 'slug', 'color')
@@ -186,7 +213,7 @@ class PhysicalCountController extends Controller
 
         $branch = Branch::findOrFail($data['branch_id']);
         $nextId = (PhysicalCount::max('id') ?? 0) + 1;
-        $folio = 'AUD-' . now()->format('Ymd') . '-' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
+        $folio = 'AUD-'.now()->format('Ymd').'-'.str_pad($nextId, 4, '0', STR_PAD_LEFT);
 
         $physicalCount = PhysicalCount::create([
             'folio' => $folio,
@@ -204,6 +231,7 @@ class PhysicalCountController extends Controller
             ->values();
 
         $physicalCount->participants()->sync($participantIds);
+        $this->snapshotService->ensureForAudit($physicalCount);
 
         broadcast(new PhysicalCountChanged($physicalCount, 'created'))->toOthers();
 
@@ -247,6 +275,7 @@ class PhysicalCountController extends Controller
             return back()->withErrors([
                 'status' => 'Solo auditorías abiertas pueden eliminarse.',
             ]);
+
         }
 
         $branchSlug = $physicalCount->branch?->slug;
@@ -262,6 +291,12 @@ class PhysicalCountController extends Controller
     public function show(Request $request, PhysicalCount $physicalCount)
     {
         $this->abortIfCannotCapture($request, $physicalCount);
+
+        if ($physicalCount->status === 'open') {
+            $this->snapshotService->ensureForAudit($physicalCount);
+        } else {
+            $physicalCount->load('snapshot.items');
+        }
 
         $physicalCount->load(['branch', 'creator', 'participants:id,name']);
 
@@ -282,6 +317,7 @@ class PhysicalCountController extends Controller
     public function storeEntry(Request $request, PhysicalCount $physicalCount)
     {
         $this->abortIfCannotCapture($request, $physicalCount);
+        $this->snapshotService->ensureForAudit($physicalCount);
 
         if ($physicalCount->status !== 'open') {
             return back()->withErrors([
@@ -323,7 +359,7 @@ class PhysicalCountController extends Controller
             ->where('branch_product_id', $branchProduct->id)
             ->exists();
 
-        if (!$batchBelongsToProduct) {
+        if (! $batchBelongsToProduct) {
             return back()->withErrors([
                 'product_batch_id' => 'El lote seleccionado no pertenece al producto de esta auditoría.',
             ]);
@@ -432,37 +468,28 @@ class PhysicalCountController extends Controller
         $products = BranchProduct::with('product')
             ->where('branch_id', $physicalCount->branch_id)
             ->where(function ($query) use ($search) {
-                $query
-                    ->where('branch_products.barcode', 'LIKE', "%{$search}%")
-                    ->orWhereHas('product', fn ($productQuery) => $productQuery->where('name', 'LIKE', "%{$search}%"))
-                    ->orWhereExists(function ($subQuery) use ($search) {
-                        $subQuery->select(DB::raw(1))
-                            ->from('barcodes')
-                            ->whereColumn('barcodes.product_id', 'branch_products.product_id')
-                            ->where('barcodes.active', 1)
-                            ->where('barcodes.code', 'LIKE', "%{$search}%");
-                    })
-                    ->orWhereExists(function ($subQuery) use ($search) {
-                        $subQuery->select(DB::raw(1))
-                            ->from('product_alternative_codes')
-                            ->whereColumn('product_alternative_codes.product_id', 'branch_products.product_id')
-                            ->where('product_alternative_codes.code', 'LIKE', "%{$search}%");
-                    });
+                $terms = FlexibleSearch::terms($search);
+
+                FlexibleSearch::orWhereColumns($query, ['branch_products.barcode'], $search, $terms);
+                FlexibleSearch::orWhereHasColumns($query, 'product', ['name'], $search, $terms);
+
+                FlexibleSearch::orWhereExists($query, function ($subQuery) use ($search, $terms) {
+                    $subQuery->select(DB::raw(1))
+                        ->from('barcodes')
+                        ->whereColumn('barcodes.product_id', 'branch_products.product_id')
+                        ->where('barcodes.active', 1)
+                        ->where(function ($barcodeQuery) use ($search, $terms) {
+                            FlexibleSearch::orWhereColumns($barcodeQuery, ['barcodes.code'], $search, $terms);
+                        });
+                });
             })
             ->limit(10)
             ->get()
             ->map(function ($branchProduct) use ($search, $canViewStock) {
                 $matchedCode = $branchProduct->barcode;
 
-                if (!$matchedCode) {
+                if (! $matchedCode) {
                     $matchedCode = DB::table('barcodes')
-                        ->where('product_id', $branchProduct->product_id)
-                        ->where('code', $search)
-                        ->value('code');
-                }
-
-                if (!$matchedCode) {
-                    $matchedCode = DB::table('product_alternative_codes')
                         ->where('product_id', $branchProduct->product_id)
                         ->where('code', $search)
                         ->value('code');
@@ -499,21 +526,21 @@ class PhysicalCountController extends Controller
         $branchProduct = null;
         $code = trim($data['code'] ?? '');
 
-        if (!empty($data['branch_product_id'])) {
+        if (! empty($data['branch_product_id'])) {
             $branchProduct = BranchProduct::with('product')
                 ->where('id', $data['branch_product_id'])
                 ->where('branch_id', $physicalCount->branch_id)
                 ->first();
         }
 
-        if (!$branchProduct && $code !== '') {
+        if (! $branchProduct && $code !== '') {
             $branchProduct = BranchProduct::with('product')
                 ->where('branch_id', $physicalCount->branch_id)
                 ->where('barcode', $code)
                 ->first();
         }
 
-        if (!$branchProduct && $code !== '') {
+        if (! $branchProduct && $code !== '') {
             $barcode = DB::table('barcodes')
                 ->where('code', $code)
                 ->where('active', 1)
@@ -527,25 +554,14 @@ class PhysicalCountController extends Controller
             }
         }
 
-        if (!$branchProduct && $code !== '') {
-            $alternativeCode = ProductAlternativeCode::where('code', $code)->first();
-
-            if ($alternativeCode) {
-                $branchProduct = BranchProduct::with('product')
-                    ->where('branch_id', $physicalCount->branch_id)
-                    ->where('product_id', $alternativeCode->product_id)
-                    ->first();
-            }
-        }
-
-        if (!$branchProduct && $code !== '') {
+        if (! $branchProduct && $code !== '') {
             $branchProduct = BranchProduct::with('product')
                 ->where('branch_id', $physicalCount->branch_id)
                 ->whereHas('product', fn ($query) => $query->where('name', 'LIKE', "%{$code}%"))
                 ->first();
         }
 
-        if (!$branchProduct) {
+        if (! $branchProduct) {
             return back()->withErrors([
                 'code' => 'No se encontró un producto con ese código o nombre en la sucursal auditada.',
             ]);
@@ -660,66 +676,85 @@ class PhysicalCountController extends Controller
             ]);
         }
 
-        $comparison = $physicalCount->entries()
-            ->select(
-                'branch_product_id',
-                DB::raw('SUM(counted_quantity) as counted_stock'),
-                DB::raw('SUM(damaged_quantity) as damaged_stock'),
-                DB::raw('SUM(expired_quantity) as expired_stock')
-            )
-            ->groupBy('branch_product_id')
-            ->get();
+        DB::transaction(function () use ($physicalCount) {
+            $comparison = $physicalCount->entries()
+                ->select(
+                    'branch_product_id',
+                    'product_batch_id',
+                    DB::raw('SUM(counted_quantity) as counted_stock'),
+                    DB::raw('SUM(damaged_quantity) as damaged_stock'),
+                    DB::raw('SUM(expired_quantity) as expired_stock')
+                )
+                ->whereNotNull('product_batch_id')
+                ->groupBy('branch_product_id', 'product_batch_id')
+                ->get();
 
-        foreach ($comparison as $item) {
-            $branchProduct = BranchProduct::find($item->branch_product_id);
+            foreach ($comparison as $item) {
+                $batch = ProductBatch::whereKey($item->product_batch_id)
+                    ->lockForUpdate()
+                    ->first();
 
-            if (!$branchProduct) {
-                continue;
+                if (! $batch) {
+                    continue;
+                }
+
+                $branchProduct = BranchProduct::whereKey($batch->branch_product_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $branchProduct) {
+                    continue;
+                }
+
+                $previousBatchQuantity = (float) $batch->quantity;
+                $previousStock = (float) $branchProduct->stock;
+                $countedStock = (float) $item->counted_stock;
+                $damagedStock = (float) $item->damaged_stock;
+                $expiredStock = (float) $item->expired_stock;
+                $newBatchQuantity = max(0, $countedStock - $damagedStock - $expiredStock);
+                $difference = $newBatchQuantity - $previousBatchQuantity;
+
+                if ($difference === 0.0) {
+                    continue;
+                }
+
+                $batch->update([
+                    'quantity' => $newBatchQuantity,
+                ]);
+
+                $newStock = $this->syncBranchProductStockFromBatches($branchProduct);
+
+                $this->syncBranchInventoryStock($physicalCount, $branchProduct, $newStock);
+
+                $movement = StockMovement::create([
+                    'branch_product_id' => $branchProduct->id,
+                    'type' => StockMovement::TYPE_ADJUSTMENT,
+                    'reason' => StockMovement::REASON_INVENTORY_DIFFERENCE,
+                    'quantity' => abs($difference),
+                    'previous_stock' => $previousStock,
+                    'new_stock' => $newStock,
+                    'user_id' => Auth::id(),
+                    'notes' => sprintf(
+                        'Ajuste aplicado desde auditoría %s | Contado: %s | Dañado: %s | Caducado: %s',
+                        $physicalCount->folio,
+                        $countedStock,
+                        $damagedStock,
+                        $expiredStock
+                    ),
+                ]);
+
+                StockMovementBatch::create([
+                    'stock_movement_id' => $movement->id,
+                    'product_batch_id' => $batch->id,
+                    'quantity' => abs($difference),
+                    'previous_batch_quantity' => $previousBatchQuantity,
+                    'new_batch_quantity' => $newBatchQuantity,
+                    'allocation_method' => StockMovementBatch::ALLOCATION_MANUAL,
+                ]);
             }
 
-            $previousStock = (float) $branchProduct->stock;
-            $countedStock = (float) $item->counted_stock;
-            $damagedStock = (float) $item->damaged_stock;
-            $expiredStock = (float) $item->expired_stock;
-            $newStock = max(0, $countedStock - $damagedStock - $expiredStock);
-            $difference = $newStock - $previousStock;
-
-            if ($difference === 0.0) {
-                continue;
-            }
-
-            $branchProduct->update(['stock' => $newStock]);
-
-            DB::table('branch_inventory')->updateOrInsert(
-                [
-                    'branch_id' => $physicalCount->branch_id,
-                    'product_id' => $branchProduct->product_id,
-                ],
-                [
-                    'current_stock' => $newStock,
-                    'updated_at' => now(),
-                ]
-            );
-
-            StockMovement::create([
-                'branch_product_id' => $branchProduct->id,
-                'type' => 'ADJUSTMENT',
-                'reason' => 'INVENTORY_DIFFERENCE',
-                'quantity' => abs($difference),
-                'previous_stock' => $previousStock,
-                'new_stock' => $newStock,
-                'user_id' => Auth::id(),
-                'notes' => sprintf(
-                    'Ajuste aplicado desde auditoría %s | Contado: %s | Dañado: %s | Caducado: %s',
-                    $physicalCount->folio,
-                    $countedStock,
-                    $damagedStock,
-                    $expiredStock
-                ),
-            ]);
-        }
-
-        $physicalCount->update(['status' => 'applied']);
+            $physicalCount->update(['status' => 'applied']);
+        });
         broadcast(new PhysicalCountChanged($physicalCount, 'applied'))->toOthers();
 
         return redirect()
@@ -727,15 +762,49 @@ class PhysicalCountController extends Controller
             ->with('success', 'Ajustes aplicados correctamente al inventario.');
     }
 
+    private function syncBranchProductStockFromBatches(BranchProduct $branchProduct): float
+    {
+        $stock = (float) ProductBatch::where('branch_product_id', $branchProduct->id)
+            ->whereIn('status', [
+                ProductBatch::STATUS_ACTIVE,
+                ProductBatch::STATUS_SEASONAL,
+            ])
+            ->where('quantity', '>', 0)
+            ->sum('quantity');
+
+        $branchProduct->update([
+            'stock' => $stock,
+        ]);
+
+        return $stock;
+    }
+
+    private function syncBranchInventoryStock(
+        PhysicalCount $physicalCount,
+        BranchProduct $branchProduct,
+        float $newStock
+    ): void {
+        DB::table('branch_inventory')->updateOrInsert(
+            [
+                'branch_id' => $physicalCount->branch_id,
+                'product_id' => $branchProduct->product_id,
+            ],
+            [
+                'current_stock' => $newStock,
+                'updated_at' => now(),
+            ]
+        );
+    }
+
     public function exportPdf(Request $request, PhysicalCount $physicalCount)
     {
         $this->abortIfCannotManageAudit($request, $physicalCount);
 
-        $physicalCount->load(['branch', 'creator']);
+        $physicalCount->load(['branch', 'creator', 'snapshot.items']);
         $comparison = collect($this->buildComparisonRows(
             collect([$physicalCount]),
             $physicalCount->entries()->with(['branchProduct.product', 'user', 'productBatch'])->get(),
-            null
+            $this->snapshotService->buildProductRows(collect([$physicalCount]))
         ));
 
         $summary = [
@@ -753,7 +822,7 @@ class PhysicalCountController extends Controller
             'comparison' => $comparison,
         ])->setPaper('letter', 'portrait');
 
-        return $pdf->download('conteo-fisico-' . $physicalCount->id . '.pdf');
+        return $pdf->download('conteo-fisico-'.$physicalCount->id.'.pdf');
     }
 
     public function exportExcel(Request $request, PhysicalCount $physicalCount)
@@ -762,23 +831,23 @@ class PhysicalCountController extends Controller
 
         return Excel::download(
             new PhysicalCountExport($physicalCount),
-            'conteo-fisico-' . $physicalCount->id . '.xlsx'
+            'conteo-fisico-'.$physicalCount->id.'.xlsx'
         );
     }
 
-    private function buildComparisonRows(Collection $audits, Collection $entries, ?array $allowedBranchProductIds = null): array
+    private function buildComparisonRows(Collection $audits, Collection $entries, ?Collection $snapshotRows = null): array
     {
         $auditsById = $audits->keyBy('id');
+        $snapshotByKey = ($snapshotRows ?? collect())
+            ->keyBy(fn ($row) => $row['physical_count_id'].':'.$row['branch_product_id']);
 
         return $entries
-            ->when($allowedBranchProductIds !== null, function ($collection) use ($allowedBranchProductIds) {
-                return $collection->whereIn('branch_product_id', $allowedBranchProductIds);
-            })
-            ->groupBy(fn ($entry) => $entry->physical_count_id . ':' . $entry->branch_product_id)
-            ->map(function ($group) use ($auditsById) {
+            ->groupBy(fn ($entry) => $entry->physical_count_id.':'.$entry->branch_product_id)
+            ->map(function ($group, $groupKey) use ($auditsById, $snapshotByKey) {
                 $first = $group->first();
                 $audit = $auditsById->get($first->physical_count_id);
-                $systemStock = (float) ($first->branchProduct?->stock ?? 0);
+                $snapshot = $snapshotByKey->get($groupKey);
+                $systemStock = (float) ($snapshot['system_stock'] ?? ($first->branchProduct?->stock ?? 0));
                 $countedStock = (float) $group->sum('counted_quantity');
                 $damagedStock = (float) $group->sum('damaged_quantity');
                 $expiredStock = (float) $group->sum('expired_quantity');
@@ -786,7 +855,7 @@ class PhysicalCountController extends Controller
                 $difference = $sellableStock - $systemStock;
 
                 return [
-                    'id' => $first->physical_count_id . '-' . $first->branch_product_id,
+                    'id' => $first->physical_count_id.'-'.$first->branch_product_id,
                     'row_type' => 'counted',
                     'status' => $difference < 0 ? 'missing' : ($difference > 0 ? 'surplus' : 'matched'),
                     'physical_count_id' => $first->physical_count_id,
@@ -794,10 +863,10 @@ class PhysicalCountController extends Controller
                     'folio' => $audit?->folio ?? 'Sin folio',
                     'audit_date' => optional($audit?->started_at)->toDateString(),
                     'branch_product_id' => $first->branch_product_id,
-                    'product_name' => $first->branchProduct?->product?->name ?? 'Sin producto',
-                    'category_name' => $first->branchProduct?->product?->category?->name ?? 'Sin categoría',
-                    'subcategory_name' => $first->branchProduct?->product?->subcategory?->name ?? 'Sin subcategoría',
-                    'scanned_code' => $first->scanned_code ?: ($first->branchProduct?->barcode ?? '-'),
+                    'product_name' => $snapshot['product_name'] ?? $first->branchProduct?->product?->name ?? 'Sin producto',
+                    'category_name' => $snapshot['category_name'] ?? $first->branchProduct?->product?->category?->name ?? 'Sin categoría',
+                    'subcategory_name' => $snapshot['subcategory_name'] ?? $first->branchProduct?->product?->subcategory?->name ?? 'Sin subcategoría',
+                    'scanned_code' => $first->scanned_code ?: ($snapshot['scanned_code'] ?? $first->branchProduct?->barcode ?? '-'),
                     'system_stock' => $systemStock,
                     'counted_stock' => $countedStock,
                     'damaged_stock' => $damagedStock,
@@ -811,16 +880,53 @@ class PhysicalCountController extends Controller
             ->all();
     }
 
-    private function buildPendingRows(Collection $activeBranchProducts, array $comparisonRows, Collection $audits): array
+    private function buildPendingRows(
+        Collection $snapshotRows,
+        array $comparisonRows,
+        Collection $audits,
+        ?Collection $activeBranchProducts = null
+    ): array
     {
+        if ($snapshotRows->isNotEmpty()) {
+            $countedKeys = collect($comparisonRows)
+                ->map(fn ($row) => $row['physical_count_id'].':'.$row['branch_product_id'])
+                ->unique();
+
+            return $snapshotRows
+                ->reject(fn ($row) => $countedKeys->contains($row['physical_count_id'].':'.$row['branch_product_id']))
+                ->map(fn ($row) => [
+                    'id' => 'pending-'.$row['physical_count_id'].'-'.$row['branch_product_id'],
+                    'row_type' => 'pending',
+                    'status' => 'pending',
+                    'physical_count_id' => $row['physical_count_id'],
+                    'audit_name' => $row['audit_name'],
+                    'folio' => $row['folio'],
+                    'audit_date' => $row['audit_date'],
+                    'branch_product_id' => $row['branch_product_id'],
+                    'product_name' => $row['product_name'],
+                    'category_name' => $row['category_name'],
+                    'subcategory_name' => $row['subcategory_name'],
+                    'scanned_code' => $row['scanned_code'],
+                    'system_stock' => (float) $row['system_stock'],
+                    'counted_stock' => 0,
+                    'damaged_stock' => 0,
+                    'expired_stock' => 0,
+                    'difference' => null,
+                    'participants' => [],
+                    'last_entry_at' => null,
+                ])
+                ->values()
+                ->all();
+        }
+
         $countedIds = collect($comparisonRows)->pluck('branch_product_id')->unique();
         $firstAudit = $audits->first();
 
-        return $activeBranchProducts
+        return ($activeBranchProducts ?? collect())
             ->reject(fn ($branchProduct) => $countedIds->contains($branchProduct->id))
             ->map(function ($branchProduct) use ($firstAudit) {
                 return [
-                    'id' => 'pending-' . $branchProduct->id,
+                    'id' => 'pending-'.$branchProduct->id,
                     'row_type' => 'pending',
                     'status' => 'pending',
                     'physical_count_id' => null,
@@ -852,6 +958,41 @@ class PhysicalCountController extends Controller
         ?string $code = null
     ): array {
         $canViewStock = $this->canViewAuditStock($request);
+        $physicalCount->loadMissing('snapshot.items');
+        $snapshotRow = $this->snapshotService
+            ->buildProductRows(collect([$physicalCount]))
+            ->firstWhere('branch_product_id', $branchProduct->id);
+
+        if ($snapshotRow) {
+            $payload = [
+                'branch_product_id' => $branchProduct->id,
+                'product_id' => $branchProduct->product_id,
+                'name' => $snapshotRow['product_name'],
+                'barcode' => $snapshotRow['scanned_code'] ?: $code,
+                'scanned_code' => $code ?: ($snapshotRow['scanned_code'] ?: 'Sin código escaneado'),
+                'batches' => collect($snapshotRow['snapshot_batches'] ?? [])
+                    ->map(function ($batch) use ($canViewStock) {
+                        $payload = [
+                            'id' => $batch['id'],
+                            'lot_number' => $batch['lot_number'],
+                            'expiration_date' => $batch['expiration_date'],
+                        ];
+
+                        if ($canViewStock) {
+                            $payload['quantity'] = $batch['quantity'];
+                        }
+
+                        return $payload;
+                    })
+                    ->values(),
+            ];
+
+            if ($canViewStock) {
+                $payload['stock'] = (float) $snapshotRow['system_stock'];
+            }
+
+            return $payload;
+        }
 
         $batches = ProductBatch::where('branch_product_id', $branchProduct->id)
             ->orderBy('expiration_date')
@@ -892,6 +1033,17 @@ class PhysicalCountController extends Controller
         return $payload;
     }
 
+    private function hydrateAuditSnapshots(Collection $audits): void
+    {
+        $audits->load('snapshot.items');
+
+        $audits
+            ->filter(fn ($audit) => $audit->status === 'open' && $audit->snapshot === null)
+            ->each(fn ($audit) => $this->snapshotService->ensureForAudit($audit));
+
+        $audits->load('snapshot.items');
+    }
+
     private function availableAuditUsers(): Collection
     {
         return User::with('role:id,name')
@@ -908,7 +1060,7 @@ class PhysicalCountController extends Controller
 
     private function resolveBranch(?string $branchSlug): Branch
     {
-        if (!$branchSlug) {
+        if (! $branchSlug) {
             return Branch::where('active', true)
                 ->orderBy('name')
                 ->select('id', 'name', 'slug', 'color')
@@ -941,7 +1093,7 @@ class PhysicalCountController extends Controller
 
     private function isAssignedParticipant(?User $user, PhysicalCount $physicalCount): bool
     {
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 

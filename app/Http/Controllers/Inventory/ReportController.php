@@ -19,7 +19,7 @@ class ReportController extends Controller
 {
     public function index(Branch $branch)
     {
-        return Inertia::render('Inventory/Reports', [
+        return Inertia::render('Inventory/Reports/Index', [
             'currentBranch' => $branch,
         ]);
     }

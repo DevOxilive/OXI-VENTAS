@@ -9,6 +9,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use App\Support\FlexibleSearch;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
@@ -81,9 +82,11 @@ class UserController extends Controller
                 'role_id',
             ])
             ->when($search, function ($query) use ($search) {
-                $query->where(function ($subQuery) use ($search) {
-                    $subQuery->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
+                FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($subQuery, [
+                        'name',
+                        'email',
+                    ], $phrase, $terms);
                 });
             })
             ->orderBy('id', 'desc')
@@ -92,12 +95,17 @@ class UserController extends Controller
 
         $employeesDB = Employee::doesntHave('user')
             ->when($search, function ($query) use ($search) {
-                $query->where(function ($subQuery) use ($search) {
-                    $subQuery->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('position', 'like', "%{$search}%")
-                        ->orWhere('department', 'like', "%{$search}%");
+                FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($subQuery, [
+                        'first_name',
+                        'last_name',
+                        'email',
+                        'phone',
+                        'position',
+                        'department',
+                        'nss',
+                        'rfc',
+                    ], $phrase, $terms);
                 });
             })
             ->orderBy('id', 'desc')

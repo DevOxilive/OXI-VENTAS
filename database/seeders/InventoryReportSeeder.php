@@ -105,21 +105,18 @@ class InventoryReportSeeder extends Seeder
 
     private function reportUsers(Branch $branch)
     {
-        $branchSlug = $branch->slug;
-        $branchName = $branch->name;
-
         return collect([
-            ['name' => "{$branchName} Reportes - Ana Caducidades", 'email' => "ana.caducidades.{$branchSlug}@oxi-demo.test"],
-            ['name' => "{$branchName} Reportes - Bruno Danados", 'email' => "bruno.danados.{$branchSlug}@oxi-demo.test"],
-            ['name' => "{$branchName} Reportes - Carla Ajustes", 'email' => "carla.ajustes.{$branchSlug}@oxi-demo.test"],
-            ['name' => "{$branchName} Reportes - Diego Entradas", 'email' => "diego.entradas.{$branchSlug}@oxi-demo.test"],
-            ['name' => "{$branchName} Reportes - Elena Ventas", 'email' => "elena.ventas.{$branchSlug}@oxi-demo.test"],
+            ['name' => 'Ana Caducidades', 'email' => 'ana.caducidades@oxilive.com.mx'],
+            ['name' => 'Bruno Danados', 'email' => 'bruno.danados@oxilive.com.mx'],
+            ['name' => 'Carla Ajustes', 'email' => 'carla.ajustes@oxilive.com.mx'],
+            ['name' => 'Diego Entradas', 'email' => 'diego.entradas@oxilive.com.mx'],
+            ['name' => 'Elena Ventas', 'email' => 'elena.ventas@oxilive.com.mx'],
         ])->map(fn (array $user) => User::updateOrCreate(
             ['email' => $user['email']],
             [
                 'name' => $user['name'],
                 'password' => Hash::make('password'),
-                'branch_id' => $branch->id,
+                'branch_id' => null,
             ]
         ))->values();
     }

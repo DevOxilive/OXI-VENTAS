@@ -7,6 +7,7 @@ use App\Models\Employee;
 use Illuminate\Http\Request;
 use App\Events\EmployeeChanged;
 use App\Exports\EmployeeExport;
+use App\Support\FlexibleSearch;
 use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
@@ -26,13 +27,17 @@ class EmployeeController extends Controller
 
         $employeesDB = Employee::query()
             ->when($search, function ($query) use ($search) {
-                $query->where(function ($subQuery) use ($search) {
-                    $subQuery->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%")
-                        ->orWhere('position', 'like', "%{$search}%")
-                        ->orWhere('department', 'like', "%{$search}%");
+                FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($subQuery, [
+                        'first_name',
+                        'last_name',
+                        'email',
+                        'phone',
+                        'position',
+                        'department',
+                        'nss',
+                        'rfc',
+                    ], $phrase, $terms);
                 });
             })
             ->when($employmentStatus, function ($query) use ($employmentStatus) {
