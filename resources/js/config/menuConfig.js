@@ -131,22 +131,22 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        ...(isAdmin ||
-        can("inventory.purchase-reports.view") ||
-        can("inventory.purchase-reports.create") ||
-        can("inventory.purchase-reports.update") ||
-        can("inventory.purchase-reports.delete")
-            ? [
-                  {
-                      text: "Reporte de compra",
-                      key: `inventory.${branch.slug}.purchase-report`,
-                      icon: "shopping_cart",
-                      url: route("inventory.branches.purchase-reports.index", {
-                          branch: branch.id,
-                      }),
-                  },
-              ]
-            : []),
+        // ...(isAdmin ||
+        // can("inventory.purchase-reports.view") ||
+        // can("inventory.purchase-reports.create") ||
+        // can("inventory.purchase-reports.update") ||
+        // can("inventory.purchase-reports.delete")
+        //     ? [
+        //           {
+        //               text: "Reporte de compra",
+        //               key: `inventory.${branch.slug}.purchase-report`,
+        //               icon: "shopping_cart",
+        //               url: route("inventory.branches.purchase-reports.index", {
+        //                   branch: branch.id,
+        //               }),
+        //           },
+        //       ]
+        //     : []),
 
         ...(isAdmin ||
         can("audits.physical-counts.view") ||
