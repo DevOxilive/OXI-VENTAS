@@ -18,6 +18,12 @@ const menuItems = computed(() => generateMenu(
     page.props.branches ?? []
 ))
 
+const branchKeys = computed(() =>
+    menuItems.value
+        .find((item) => item.key === 'branches')
+        ?.children?.map((branch) => branch.key) ?? []
+)
+
 const sidebarOpen = ref(false)
 const desktopSidebarCollapsed = ref(false)
 const desktopSidebarStorageKey = 'desktopSidebarCollapsed'
@@ -117,6 +123,7 @@ watch(desktopSidebarCollapsed, (value) => {
             <SidebarItem
                 :items="menuItems"
                 :extended="!desktopSidebarCollapsed"
+                :branch-keys="branchKeys"
                 @expand-request="expandDesktopSidebar"
             />
         </aside>

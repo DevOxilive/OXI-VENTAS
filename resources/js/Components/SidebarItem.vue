@@ -15,6 +15,10 @@ const props = defineProps({
         type: String,
         default: null,
     },
+    branchKeys: {
+        type: Array,
+        default: () => [],
+    },
 })
 
 const emit = defineEmits(["expand-request"])
@@ -28,7 +32,7 @@ const openItems = reactive(
 )
 
 const currentPath = computed(() =>
-    normalizeUrl(page.url?.split("?")[0] || ""),
+    normalizeUrl(page.url || ""),
 )
 
 function saveOpenItems() {
@@ -38,17 +42,23 @@ function saveOpenItems() {
 }
 
 function normalizeUrl(url) {
-    return url?.replace(/\/$/, "") || ""
+    if (!url) return ""
+
+    const parsedUrl = new URL(
+        url,
+        typeof window !== "undefined" ? window.location.origin : "http://localhost",
+    )
+
+    const normalizedPath = parsedUrl.pathname.replace(/\/$/, "")
+
+    return `${normalizedPath}${parsedUrl.search || ""}`
 }
 
 function isActiveItem(item) {
     if (!item.url) return false
 
     const target = normalizeUrl(
-        new URL(
-            item.url,
-            typeof window !== "undefined" ? window.location.origin : "http://localhost",
-        ).pathname,
+        item.url,
     )
 
     return currentPath.value === target
@@ -72,6 +82,43 @@ function getItemTone(item) {
     return item.color || props.parentColor || null
 }
 
+function resolveBranchKey(item) {
+    if (!item) return null
+
+    if (item.isBranch) {
+        return item.key
+    }
+
+    const parts = String(item.key || '').split('.')
+
+    if (parts[0] === 'inventory' && parts[1]) {
+        return parts[1]
+    }
+
+    return null
+}
+
+function collapseOtherBranches(activeBranchKey) {
+    if (!activeBranchKey) return
+
+    props.branchKeys.forEach((branchKey) => {
+        if (branchKey === activeBranchKey) {
+            openItems[branchKey] = true
+            return
+        }
+
+        openItems[branchKey] = false
+
+        Object.keys(openItems).forEach((key) => {
+            if (key.startsWith(`inventory.${branchKey}.`)) {
+                openItems[key] = false
+            }
+        })
+    })
+
+    saveOpenItems()
+}
+
 function isOpen(item) {
     if (hasActiveChild(item)) {
         return true
@@ -89,15 +136,19 @@ function toggleItem(item) {
     const nextValue = !isOpen(item)
 
     if (item.isBranch) {
-        props.items.forEach((sibling) => {
-            if (sibling.isBranch && sibling.key !== item.key) {
-                openItems[sibling.key] = false
-            }
-        })
+        collapseOtherBranches(item.key)
     }
 
     openItems[item.key] = nextValue
     saveOpenItems()
+}
+
+function handleLinkClick(item) {
+    const activeBranchKey = resolveBranchKey(item)
+
+    if (activeBranchKey) {
+        collapseOtherBranches(activeBranchKey)
+    }
 }
 
 function itemStyle(item) {
@@ -177,6 +228,7 @@ function iconStyle(item) {
                     :href="item.url"
                     class="group flex items-center gap-3 rounded-xl px-3 py-3 text-slate-700 transition hover:bg-slate-100"
                     :style="itemStyle(item)"
+                    @click="handleLinkClick(item)"
                     @mouseenter="hoveredItem = item.key"
                     @mouseleave="hoveredItem = null"
                 >
@@ -231,6 +283,7 @@ function iconStyle(item) {
                     :items="item.children"
                     :extended="extended"
                     :parent-color="getItemTone(item)"
+                    :branch-keys="branchKeys"
                     @expand-request="$emit('expand-request', $event)"
                 />
             </div>
