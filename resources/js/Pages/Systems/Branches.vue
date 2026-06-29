@@ -71,6 +71,27 @@ const modalConfig = computed(() =>
   }),
 )
 
+const branchActions = computed(() =>
+  branchTableConfig.actions.map((action) => ({
+    ...action,
+    hidden: (row) => {
+      if (typeof action.hidden === "function" && action.hidden(row)) {
+        return true
+      }
+
+      if (Array.isArray(action.permission)) {
+        return !action.permission.some((permission) => can(permission))
+      }
+
+      if (action.permission) {
+        return !can(action.permission)
+      }
+
+      return false
+    },
+  })),
+)
+
 function resetForm() {
   form.reset()
   form.clearErrors()
@@ -248,7 +269,7 @@ onBeforeUnmount(() => {
     <GlobalTable
       :items="filteredBranches"
       :columns="branchTableConfig.columns"
-      :actions="branchTableConfig.actions"
+      :actions="branchActions"
       :row-key="branchTableConfig.rowKey"
       :no-data-message="branchTableConfig.noDataMessage"
       :mobile-card-header-field="branchTableConfig.mobileCardHeaderField"

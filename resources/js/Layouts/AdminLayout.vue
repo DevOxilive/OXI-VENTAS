@@ -30,6 +30,8 @@ const desktopSidebarCollapsed = ref(false)
 const desktopSidebarStorageKey = 'desktopSidebarCollapsed'
 let systemsChannel = null
 let activityChannel = null
+let handleUserChanged = null
+let handleRealtimeActivity = null
 
 function toggleSidebar() {
     sidebarOpen.value = !sidebarOpen.value
@@ -50,37 +52,41 @@ onMounted(() => {
 
     if (!window.Echo || !page.props.auth?.user?.id) return
 
-    systemsChannel = window.Echo.channel('systems')
-        .listen('.UserChanged', (event) => {
-            if (Number(page.props.auth.user.id) !== Number(event.userId)) return
+    handleUserChanged = (event) => {
+        if (Number(page.props.auth.user.id) !== Number(event.userId)) return
 
-            updateLivePermissions({
-                permissions: event.permissions || [],
-                role: event.role,
-            })
-
-            router.reload({
-                only: ['auth'],
-                preserveScroll: true,
-                preserveState: true,
-            })
+        updateLivePermissions({
+            permissions: event.permissions || [],
+            role: event.role,
         })
 
-    activityChannel = window.Echo.channel('activity')
-        .listen('.realtime.activity', (event) => {
-            ToastAlert({
-                icon: 'info',
-                title: event.message || 'Hay una actualizacion en tiempo real',
-            })
+        router.reload({
+            only: ['auth'],
+            preserveScroll: true,
+            preserveState: true,
         })
-})
-onBeforeUnmount(() => {
-    if (systemsChannel) {
-        systemsChannel.stopListening('.UserChanged')
     }
 
-    if (activityChannel) {
-        activityChannel.stopListening('.realtime.activity')
+    handleRealtimeActivity = (event) => {
+        ToastAlert({
+            icon: 'info',
+            title: event.message || 'Hay una actualizacion en tiempo real',
+        })
+    }
+
+    systemsChannel = window.Echo.channel('systems')
+        .listen('.UserChanged', handleUserChanged)
+
+    activityChannel = window.Echo.channel('activity')
+        .listen('.realtime.activity', handleRealtimeActivity)
+})
+onBeforeUnmount(() => {
+    if (systemsChannel && handleUserChanged) {
+        systemsChannel.stopListening('.UserChanged', handleUserChanged)
+    }
+
+    if (activityChannel && handleRealtimeActivity) {
+        activityChannel.stopListening('.realtime.activity', handleRealtimeActivity)
     }
 })
 

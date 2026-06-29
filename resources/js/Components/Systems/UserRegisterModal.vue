@@ -13,6 +13,10 @@ const props = defineProps({
     isEditing: Boolean,
     canSave: Boolean,
     isSalesRole: Boolean,
+    lockedPermissionIds: {
+        type: Array,
+        default: () => [],
+    },
     moduleLabel: {
         type: Function,
         required: true,
@@ -217,11 +221,21 @@ function closeModal() {
                                                 {{ permissionLabel(permission.name) }}
                                             </span>
 
-                                            <div
-                                                class="flex h-5 w-10 cursor-pointer items-center rounded-full p-1 transition"
+                                            <div class="flex items-center gap-2">
+                                                <span
+                                                    v-if="lockedPermissionIds.includes(permission.id)"
+                                                    class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500"
+                                                >
+                                                    Rol
+                                                </span>
+
+                                                <div
+                                                class="flex h-5 w-10 items-center rounded-full p-1 transition"
                                                 :class="form.permissions.includes(permission.id)
                                                     ? 'bg-green-500'
-                                                    : 'bg-gray-300'"
+                                                    : 'bg-gray-300'
+                                                "
+                                                :style="lockedPermissionIds.includes(permission.id) ? 'cursor:pointer;' : 'cursor:pointer;'"
                                                 @click="$emit('toggle-permission', permission.id)"
                                             >
                                                 <div
@@ -230,6 +244,7 @@ function closeModal() {
                                                         ? 'translate-x-5'
                                                         : 'translate-x-0'"
                                                 />
+                                            </div>
                                             </div>
                                         </div>
 

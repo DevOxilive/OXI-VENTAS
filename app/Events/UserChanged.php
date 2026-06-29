@@ -19,13 +19,13 @@ class UserChanged implements ShouldBroadcastNow
 
     public function __construct(User $user, string $action = 'updated')
     {
-        $user->loadMissing(['role', 'permissions']);
+        $user->loadMissing(['role.permissions', 'permissions']);
 
         $this->userId = $user->id;
         $this->action = $action;
         $this->role = $user->role?->name;
 
-        $this->permissions = $user->permissions
+        $this->permissions = $user->all_permissions
             ->pluck('name')
             ->values()
             ->toArray();

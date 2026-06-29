@@ -17,6 +17,40 @@ use Inertia\Inertia;
 
 class UserController extends Controller
 {
+    private function syncUserPermissionOverrides(User $user, Role $role, array $finalPermissionIds = []): void
+    {
+        $rolePermissionIds = $role->permissions()
+            ->pluck('permissions.id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $finalPermissionIds = collect($finalPermissionIds)
+            ->filter(fn ($id) => filled($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $allowedPermissionIds = $finalPermissionIds
+            ->diff($rolePermissionIds)
+            ->values();
+
+        $deniedPermissionIds = $rolePermissionIds
+            ->diff($finalPermissionIds)
+            ->values();
+
+        $syncPayload = [];
+
+        foreach ($allowedPermissionIds as $permissionId) {
+            $syncPayload[$permissionId] = ['mode' => 'allow'];
+        }
+
+        foreach ($deniedPermissionIds as $permissionId) {
+            $syncPayload[$permissionId] = ['mode' => 'deny'];
+        }
+
+        $user->permissions()->sync($syncPayload);
+    }
+
     private function checkPermission(string $permission): void
     {
         /** @var \App\Models\User|null $user */
@@ -166,7 +200,11 @@ class UserController extends Controller
             'role_id' => $validated['role_id'],
         ]);
 
-        $user->permissions()->sync($validated['permissions'] ?? []);
+        $this->syncUserPermissionOverrides(
+            $user,
+            $role,
+            $validated['permissions'] ?? [],
+        );
 
         $user->branches()->sync(
             $role->name === 'Ventas'
@@ -219,7 +257,11 @@ class UserController extends Controller
 
         $user->update($userData);
 
-        $user->permissions()->sync($validated['permissions'] ?? []);
+        $this->syncUserPermissionOverrides(
+            $user,
+            $role,
+            $validated['permissions'] ?? [],
+        );
 
         $user->branches()->sync(
             $role->name === 'Ventas'

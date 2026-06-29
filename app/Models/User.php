@@ -40,7 +40,9 @@ class User extends Authenticatable
 
     public function permissions()
     {
-        return $this->belongsToMany(Permission::class);
+        return $this->belongsToMany(Permission::class)
+            ->withPivot('mode')
+            ->withTimestamps();
     }
 
     public function role()
@@ -55,15 +57,21 @@ class User extends Authenticatable
 
     public function getAllPermissionsAttribute()
     {
-        $directPermissions = $this->permissions ?? collect();
+        $this->loadMissing(['role.permissions', 'permissions']);
 
-        $rolePermissions = $this->role
-            ? $this->role->permissions
-            : collect();
+        $rolePermissions = ($this->role?->permissions ?? collect())->keyBy('id');
+        $directPermissions = ($this->permissions ?? collect())->keyBy('id');
 
-        return $directPermissions
-            ->merge($rolePermissions)
-            ->unique('id')
+        $allowedPermissions = $directPermissions
+            ->filter(fn ($permission) => ($permission->pivot?->mode ?? 'allow') === 'allow');
+
+        $deniedPermissionIds = $directPermissions
+            ->filter(fn ($permission) => $permission->pivot?->mode === 'deny')
+            ->keys();
+
+        return $rolePermissions
+            ->merge($allowedPermissions)
+            ->except($deniedPermissionIds->all())
             ->values();
     }
 
@@ -78,25 +86,12 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
-  public function hasPermission($permission)
-{
-    if ($this->role?->name === 'Administrador') {
-        return true;
-    }
+    public function hasPermission($permission)
+    {
+        if ($this->role?->name === 'Administrador') {
+            return true;
+        }
 
-    if ($this->relationLoaded('permissions') && $this->permissions->contains('name', $permission)) {
-        return true;
+        return $this->all_permissions->contains('name', $permission);
     }
-
-    if (
-        $this->relationLoaded('role') &&
-        $this->role?->relationLoaded('permissions') &&
-        $this->role->permissions->contains('name', $permission)
-    ) {
-        return true;
-    }
-
-    return $this->permissions()->where('name', $permission)->exists()
-        || $this->role?->permissions()->where('name', $permission)->exists();
-}
 }
