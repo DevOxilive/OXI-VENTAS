@@ -31,6 +31,35 @@ class PermissionSeeder extends Seeder
             'inventory.create',
             'inventory.update',
             'inventory.delete',
+            'branches.view',
+            'branches.create',
+            'branches.update',
+            'branches.delete',
+
+            'inventory.products.view',
+            'inventory.products.create',
+            'inventory.products.update',
+            'inventory.products.delete',
+
+            'inventory.branches.view',
+            'inventory.purchase-reports.view',
+            'inventory.purchase-reports.create',
+
+            'inventory.purchase-reports.create',
+'inventory.purchase-reports.update',
+'inventory.purchase-reports.delete',
+
+'inventory.branches.create',
+'inventory.branches.update',
+'inventory.branches.delete',
+
+            'audits.physical-counts.view',
+            'audits.physical-counts.count',
+            'audits.physical-counts.reports',
+            'audits.physical-counts.view-stock',
+            'audits.physical-counts.create',
+            'audits.physical-counts.update',
+            'audits.physical-counts.delete',
         ];
 
         foreach ($permissions as $permission) {

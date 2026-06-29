@@ -7,45 +7,91 @@ use App\Models\Employee;
 use Illuminate\Http\Request;
 use App\Events\EmployeeChanged;
 use App\Exports\EmployeeExport;
+use App\Support\FlexibleSearch;
 use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $employees = Employee::latest()->get()->map(function ($employee) {
-            return [
-                'id' => $employee->id,
-                'firstName' => $employee->first_name,
-                'lastName' => $employee->last_name,
-                'email' => $employee->email,
-                'phone' => $employee->phone,
-                'street' => $employee->street,
-                'externalNumber' => $employee->external_number,
-                'internalNumber' => $employee->internal_number,
-                'postalCode' => $employee->postal_code,
-                'neighborhood' => $employee->neighborhood,
-                'municipality' => $employee->municipality,
-                'addressState' => $employee->address_state,
-                'mapsUrl' => $employee->maps_url,
-                'startDate' => $employee->start_date,
-                'employmentStatus' => $employee->employment_status,
-                'photo' => $employee->photo,
-                'position' => $employee->position,
-                'department' => $employee->department,
-                'bank' => $employee->bank,
-                'accountNumber' => $employee->account_number,
-                'educationLevel' => $employee->education_level,
-                'specialty' => $employee->specialty,
-                'contractType' => $employee->contract_type,
-                'seniority' => $employee->seniority,
-                'nss' => $employee->nss,
-                'rfc' => $employee->rfc,
-            ];
-        });
+        $search = $request->input('search');
+        $perPage = (int) $request->input('per_page', 50);
+
+        if (!in_array($perPage, [10, 25, 50, 100])) {
+            $perPage = 50;
+        }
+
+        $employmentStatus = $request->input('employmentStatus');
+        $department = $request->input('department');
+        $position = $request->input('position');
+
+        $employeesDB = Employee::query()
+            ->when($search, function ($query) use ($search) {
+                FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($subQuery, [
+                        'first_name',
+                        'last_name',
+                        'email',
+                        'phone',
+                        'position',
+                        'department',
+                        'nss',
+                        'rfc',
+                    ], $phrase, $terms);
+                });
+            })
+            ->when($employmentStatus, function ($query) use ($employmentStatus) {
+                $query->where('employment_status', $employmentStatus);
+            })
+            ->when($department, function ($query) use ($department) {
+                $query->where('department', $department);
+            })
+            ->when($position, function ($query) use ($position) {
+                $query->where('position', 'like', "%{$position}%");
+            })
+            ->orderBy('id', 'desc')
+            ->paginate($perPage)
+            ->withQueryString()
+            ->through(function ($employee) {
+                return [
+                    'id' => $employee->id,
+                    'firstName' => $employee->first_name,
+                    'lastName' => $employee->last_name,
+                    'email' => $employee->email,
+                    'phone' => $employee->phone,
+                    'street' => $employee->street,
+                    'externalNumber' => $employee->external_number,
+                    'internalNumber' => $employee->internal_number,
+                    'postalCode' => $employee->postal_code,
+                    'neighborhood' => $employee->neighborhood,
+                    'municipality' => $employee->municipality,
+                    'addressState' => $employee->address_state,
+                    'mapsUrl' => $employee->maps_url,
+                    'startDate' => $employee->start_date,
+                    'employmentStatus' => $employee->employment_status,
+                    'photo' => $employee->photo,
+                    'position' => $employee->position,
+                    'department' => $employee->department,
+                    'bank' => $employee->bank,
+                    'accountNumber' => $employee->account_number,
+                    'educationLevel' => $employee->education_level,
+                    'specialty' => $employee->specialty,
+                    'contractType' => $employee->contract_type,
+                    'seniority' => $employee->seniority,
+                    'nss' => $employee->nss,
+                    'rfc' => $employee->rfc,
+                ];
+            });
 
         return Inertia::render('HumanResources/Employees', [
-            'employeesDB' => $employees
+            'employeesDB' => $employeesDB,
+            'filters' => [
+                'search' => $search,
+                'perPage' => $perPage,
+                'employmentStatus' => $employmentStatus,
+                'department' => $department,
+                'position' => $position,
+            ],
         ]);
     }
 
@@ -88,6 +134,7 @@ class EmployeeController extends Controller
         ]);
 
         broadcast(new EmployeeChanged('created', $employee->id))->toOthers();
+
         return redirect()->back();
     }
 
@@ -131,13 +178,13 @@ class EmployeeController extends Controller
         ]);
 
         broadcast(new EmployeeChanged('updated', $employee->id))->toOthers();
+
         return redirect()->back();
     }
 
     public function destroy($id)
     {
         $employee = Employee::findOrFail($id);
-
         $employeeId = $employee->id;
 
         $employee->delete();

@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\PurchaseReport;
 use Illuminate\Http\Request;
+use App\Support\FlexibleSearch;
 use Inertia\Inertia;
 
 class PurchaseReportController extends Controller
@@ -29,13 +30,19 @@ class PurchaseReportController extends Controller
             ])
             ->where('branch_id', $branch->id)
             ->when($filters['search'], function ($query, $search) {
-                $query->whereHas('product', function ($productQuery) use ($search) {
-                    $productQuery
-                        ->where('name', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%")
-                        ->orWhereHas('barcodes', function ($barcodeQuery) use ($search) {
-                            $barcodeQuery->where('barcode', 'like', "%{$search}%");
-                        });
+                FlexibleSearch::apply($query, $search, function ($searchQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($searchQuery, [
+                        'branch_products.barcode',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product', [
+                        'name',
+                        'code',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
+                        'code',
+                    ], $phrase, $terms);
                 });
             })
             ->when($filters['category'], function ($query, $category) {
@@ -59,8 +66,8 @@ class PurchaseReportController extends Controller
                 'product_id' => $item->product?->id,
                 'name' => $item->product?->name ?? 'Producto sin nombre',
                 'code' => $item->product?->code ?? '',
-                'main_barcode' => $item->product?->barcodes?->first()?->barcode ?? '',
-                'barcodes' => $item->product?->barcodes?->pluck('barcode')->values() ?? [],
+                'main_barcode' => $item->product?->barcodes?->first()?->code ?? '',
+                'barcodes' => $item->product?->barcodes?->pluck('code')->values() ?? [],
                 'category' => $item->product?->category?->name ?? 'Sin categoría',
                 'subcategory' => $item->product?->subcategory?->name ?? 'Sin subcategoría',
                 'stock' => (float) $item->stock,
@@ -170,11 +177,19 @@ class PurchaseReportController extends Controller
             ])
             ->where('branch_id', $branch->id)
             ->when($filters['search'], function ($query, $search) {
-                $query->whereHas('product', function ($productQuery) use ($search) {
-                    $productQuery
-                        ->where('name', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%")
-                        ->orWhereHas('barcodes', fn($barcodeQuery) => $barcodeQuery->where('barcode', 'like', "%{$search}%"));
+                FlexibleSearch::apply($query, $search, function ($searchQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($searchQuery, [
+                        'branch_products.barcode',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product', [
+                        'name',
+                        'code',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
+                        'code',
+                    ], $phrase, $terms);
                 });
             })
             ->when($filters['category'], fn($query, $category) => $query->whereHas('product.category', fn($q) => $q->where('name', $category)))
@@ -189,8 +204,8 @@ class PurchaseReportController extends Controller
                 'product_id' => $item->product?->id,
                 'name' => $item->product?->name ?? 'Producto sin nombre',
                 'code' => $item->product?->code ?? '',
-                'main_barcode' => $item->product?->barcodes?->first()?->barcode ?? '',
-                'barcodes' => $item->product?->barcodes?->pluck('barcode')->values() ?? [],
+                'main_barcode' => $item->product?->barcodes?->first()?->code ?? '',
+                'barcodes' => $item->product?->barcodes?->pluck('code')->values() ?? [],
                 'category' => $item->product?->category?->name ?? 'Sin categoría',
                 'subcategory' => $item->product?->subcategory?->name ?? 'Sin subcategoría',
                 'stock' => (float) $item->stock,

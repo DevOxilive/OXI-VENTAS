@@ -14,6 +14,7 @@ class BranchProduct extends Model
     protected $fillable = [
         'branch_id',
         'product_id',
+        'barcode',
         'stock',
         'min_stock',
         'status',

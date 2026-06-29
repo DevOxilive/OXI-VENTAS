@@ -24,6 +24,10 @@ defineProps({
     type: Number,
     default: 10,
   },
+  canCreate: {
+  type: Boolean,
+  default: false,
+},
 })
 
 defineEmits([
@@ -64,8 +68,7 @@ defineEmits([
           <option :value="100">100</option>
           <option :value="200">200</option>
         </select>
-
-        <button @click="$emit('create')"
+<button v-if="canCreate" @click="$emit('create')"
           class="px-5 py-2.5 rounded-2xl bg-black text-white font-medium shadow-sm hover:bg-slate-800 transition">
           + Agregar
         </button>

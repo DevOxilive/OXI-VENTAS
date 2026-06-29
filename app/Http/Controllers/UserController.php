@@ -9,6 +9,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use App\Support\FlexibleSearch;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
@@ -24,36 +25,96 @@ class UserController extends Controller
             abort(401);
         }
 
-        $user->load(['permissions', 'role.permissions']);
+        $user->load(['permissions']);
 
         if (!$user->hasPermission($permission)) {
             abort(403, 'No tienes permiso');
         }
     }
 
-    public function index()
+    private function checkAnyPermission(array $permissions): void
     {
-        $this->checkPermission('users.view');
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        if (!$user) {
+            abort(401);
+        }
+
+        $user->load(['permissions']);
+
+        foreach ($permissions as $permission) {
+            if ($user->hasPermission($permission)) {
+                return;
+            }
+        }
+
+        abort(403, 'No tienes permiso');
+    }
+
+    public function index(Request $request)
+    {
+        $this->checkAnyPermission([
+            'users.view',
+            'users.create',
+            'users.update',
+            'users.delete',
+        ]);
+
+        $search = $request->input('search');
+        $perPage = (int) $request->input('per_page', 50);
+
+        if (!in_array($perPage, [10, 25, 50, 100])) {
+            $perPage = 50;
+        }
+        $view = $request->input('view', 'users');
+
+        $usersDB = User::with([
+            'role.permissions',
+            'permissions',
+            'branches',
+        ])
+            ->select([
+                'id',
+                'employee_id',
+                'name',
+                'email',
+                'role_id',
+            ])
+            ->when($search, function ($query) use ($search) {
+                FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($subQuery, [
+                        'name',
+                        'email',
+                    ], $phrase, $terms);
+                });
+            })
+            ->orderBy('id', 'desc')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $employeesDB = Employee::doesntHave('user')
+            ->when($search, function ($query) use ($search) {
+                FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($subQuery, [
+                        'first_name',
+                        'last_name',
+                        'email',
+                        'phone',
+                        'position',
+                        'department',
+                        'nss',
+                        'rfc',
+                    ], $phrase, $terms);
+                });
+            })
+            ->orderBy('id', 'desc')
+            ->paginate($perPage)
+            ->withQueryString();
 
         return Inertia::render('Systems/Users', [
-            'employees' => Employee::doesntHave('user')
-                ->orderBy('id', 'desc')
-                ->get(),
-
-            'users' => User::with([
-                'role.permissions',
-                'permissions',
-                'branches',
-            ])
-                ->select([
-                    'id',
-                    'employee_id',
-                    'name',
-                    'email',
-                    'role_id',
-                ])
-                ->orderBy('id', 'desc')
-                ->get(),
+            'employeesDB' => $employeesDB,
+            'usersDB' => $usersDB,
 
             'roles' => Role::with('permissions')
                 ->orderBy('name')
@@ -64,9 +125,14 @@ class UserController extends Controller
             'branches' => Branch::where('active', true)
                 ->orderBy('name')
                 ->get(),
+
+            'filters' => [
+                'search' => $search,
+                'perPage' => $perPage,
+                'view' => $view,
+            ],
         ]);
     }
-
     public function store(Request $request)
     {
         $this->checkPermission('users.create');
@@ -100,6 +166,7 @@ class UserController extends Controller
         ]);
 
         $user->permissions()->sync($validated['permissions'] ?? []);
+
         $user->branches()->sync(
             $role->name === 'Ventas'
             ? ($validated['branch_ids'] ?? [])
@@ -151,6 +218,7 @@ class UserController extends Controller
         $user->update($userData);
 
         $user->permissions()->sync($validated['permissions'] ?? []);
+
         $user->branches()->sync(
             $role->name === 'Ventas'
             ? ($validated['branch_ids'] ?? [])
@@ -159,7 +227,11 @@ class UserController extends Controller
 
         $user->load(['role', 'permissions', 'branches']);
 
-        broadcast(new UserChanged($user, 'updated'))->toOthers();
+        try {
+            broadcast(new UserChanged($user, 'updated'))->toOthers();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return redirect()
             ->route('systems.users.index')
@@ -172,7 +244,11 @@ class UserController extends Controller
 
         $user->load(['role', 'permissions', 'branches']);
 
-        broadcast(new UserChanged($user, 'deleted'))->toOthers();
+        try {
+            broadcast(new UserChanged($user, 'deleted'))->toOthers();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         $user->permissions()->detach();
         $user->branches()->detach();

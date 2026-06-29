@@ -1,36 +1,64 @@
-    <script setup>
-    import SidebarItem from '@/Components/SidebarItem.vue'
-    import { Link, usePage } from '@inertiajs/vue3'
-    import { generateMenu } from '@/config/menuConfig'
-    import { ref, computed } from 'vue'
+<script setup>
+import SidebarItem from '@/Components/SidebarItem.vue'
+import { Link, usePage, router } from '@inertiajs/vue3'
+import { generateMenu } from '@/config/menuConfig'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import {
+    usePermissions,
+    updateLivePermissions
+} from '@/Composables/usePermissions'
 
-    const page = usePage()
-   const menuItems = computed(() => generateMenu(
-    page.props.auth.user?.role?.name,
-    page.props.auth.permissions ?? [],
+const page = usePage()
+
+const { permissions, role } = usePermissions()
+
+const menuItems = computed(() => generateMenu(
+    role.value,
+    permissions.value,
     page.props.branches ?? []
 ))
 
-    const role = page.props.auth.user?.role?.name
-    const permissions = page.props.auth.permissions || []
+const sidebarOpen = ref(false)
+const desktopSidebarCollapsed = ref(false)
 
-    const sidebarOpen = ref(false)
-    const desktopSidebarCollapsed = ref(false)
+function toggleSidebar() {
+    sidebarOpen.value = !sidebarOpen.value
+}
 
-    function toggleSidebar() {
-        sidebarOpen.value = !sidebarOpen.value
-    }
+function toggleDesktopSidebar() {
+    desktopSidebarCollapsed.value = !desktopSidebarCollapsed.value
+}
+onMounted(() => {
+    if (!window.Echo || !page.props.auth?.user?.id) return
 
-    function toggleDesktopSidebar() {
-        desktopSidebarCollapsed.value = !desktopSidebarCollapsed.value
-    }
- 
+    window.Echo.channel('systems')
+        .listen('.UserChanged', (event) => {
+            console.log('EVENTO GLOBAL RECIBIDO', event)
 
+            if (Number(page.props.auth.user.id) !== Number(event.userId)) return
+
+            updateLivePermissions({
+                permissions: event.permissions || [],
+                role: event.role,
+            })
+
+            router.reload({
+                only: ['auth'],
+                preserveScroll: true,
+                preserveState: true,
+            })
+        })
+})
+onBeforeUnmount(() => {
+    if (!window.Echo) return
+
+    window.Echo.leave('systems')
+})
 </script>
 
 <template>
 
-<div class="flex h-dvh bg-white overflow-hidden">
+    <div class="flex h-dvh bg-white overflow-hidden">
         <div v-if="sidebarOpen" class="fixed inset-0 bg-black/40 z-40 md:hidden" @click="toggleSidebar" />
 
         <aside class="fixed md:static z-50 md:z-auto bg-white border-r shadow-sm flex flex-col
@@ -106,7 +134,7 @@
                 </div>
             </header>
 
-            <main class="flex-1 min-h-0 overflow-y-auto p-4 md:p-8">
+            <main class="flex-1 min-h-0 overflow-y-auto">
                 <slot />
             </main>
 

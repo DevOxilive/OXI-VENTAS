@@ -1,0 +1,101 @@
+export const inventoryMovementReportTableConfig = {
+    columns: [
+        {
+            key: "movement_date",
+            label: "Fecha",
+            format: "date",
+            mobileLabel: "Fecha",
+            mobileDisplay: true,
+        },
+        {
+            key: "product",
+            label: "Producto",
+            format: "text",
+            mobileLabel: "Producto",
+            mobileSecondary: true,
+            width: "260px",
+        },
+        {
+            key: "category",
+            label: "Categoria",
+            format: "text",
+        },
+        {
+            key: "lot_number",
+            label: "Lote",
+            format: "text",
+            mobileLabel: "Lote",
+            mobileDisplay: true,
+        },
+        {
+            key: "status_label",
+            label: "Tipo",
+            format: "badge",
+            formatOptions: {
+                statusMap: {
+                    Entrada: "green",
+                    Salida: "red",
+                    Ajuste: "blue",
+                },
+            },
+            mobileLabel: "Tipo",
+            mobileBadge: true,
+        },
+        {
+            key: "movement_reason_label",
+            label: "Motivo",
+            format: "text",
+            mobileLabel: "Motivo",
+            mobileDisplay: true,
+        },
+        {
+            key: "quantity",
+            label: "Cantidad",
+            format: "number",
+            mobileLabel: "Cantidad",
+            mobileDisplay: true,
+        },
+        {
+            key: "previous_stock",
+            label: "Stock anterior",
+            format: "number",
+        },
+        {
+            key: "new_stock",
+            label: "Stock nuevo",
+            format: "number",
+        },
+        {
+            key: "current_stock",
+            label: "Stock actual",
+            format: "number",
+        },
+        {
+            key: "expiration_date",
+            label: "Caducidad lote",
+            format: "date",
+        },
+        {
+            key: "user",
+            label: "Usuario",
+            format: "text",
+            width: "220px",
+            cellClass: "max-w-[220px]",
+        },
+        {
+            key: "notes",
+            label: "Notas",
+            format: "text",
+            width: "300px",
+            cellClass: "max-w-[300px]",
+        },
+    ],
+
+    actions: [],
+    mobileCardHeaderField: "product",
+    noDataMessage: "No hay movimientos que coincidan con los filtros aplicados",
+    rowKey: "id",
+    striped: true,
+    hoverEffect: true,
+    showPagination: false,
+};

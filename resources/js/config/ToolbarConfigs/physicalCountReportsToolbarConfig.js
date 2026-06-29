@@ -1,0 +1,126 @@
+export function getPhysicalCountReportsToolbarConfig({
+    branch,
+    form,
+    branches = [],
+    audits = [],
+    users = [],
+    categories = [],
+} = {}) {
+    return {
+        title: 'Reportes de auditoria',
+        subtitle: branch?.name
+            ? `Sucursal ${branch.name}`
+            : 'Consulta los resultados operativos de auditoria.',
+        backButton: true,
+        backLabel: 'Centro de reportes',
+        showSearch: false,
+        showRecordsPerPage: false,
+        showCounter: false,
+        filters: [
+            {
+                key: 'branch',
+                label: 'Sucursal',
+                placeholder: 'Todas las sucursales',
+                value: form.branch,
+                options: branches,
+                optionLabel: 'name',
+                optionValue: 'slug',
+            },
+            {
+                key: 'physical_count_id',
+                label: 'Auditoria',
+                placeholder: 'Todas las auditorias',
+                value: form.physical_count_id,
+                options: audits.map((audit) => ({
+                    label: `${audit.name} - ${audit.folio}`,
+                    value: audit.id,
+                })),
+            },
+            {
+                key: 'user_id',
+                label: 'Usuario',
+                placeholder: 'Todos los usuarios',
+                value: form.user_id,
+                options: users,
+                optionLabel: 'name',
+                optionValue: 'id',
+            },
+            {
+                key: 'category_id',
+                label: 'Categoria',
+                placeholder: 'Todas las categorias',
+                value: form.category_id,
+                options: categories,
+                optionLabel: 'name',
+                optionValue: 'id',
+            },
+            {
+                key: 'status',
+                label: 'Resultado',
+                placeholder: 'Todos los resultados',
+                value: form.status,
+                options: [
+                    { label: 'Encontrados', value: 'found' },
+                    { label: 'No encontrados', value: 'not_found' },
+                    { label: 'Contados', value: 'counted' },
+                    { label: 'Faltantes', value: 'missing' },
+                    { label: 'No faltantes', value: 'not_missing' },
+                    { label: 'Sobrantes', value: 'surplus' },
+                    { label: 'Correctos', value: 'matched' },
+                ],
+            },
+            {
+                key: 'date_scope',
+                label: 'Lectura',
+                placeholder: 'Tipo de fecha',
+                value: form.date_scope,
+                options: [
+                    { label: 'Por dia', value: 'day' },
+                    { label: 'Por mes', value: 'month' },
+                    { label: 'Por ano', value: 'year' },
+                ],
+            },
+            {
+                key: 'report_date',
+                label: 'Fecha',
+                type: 'date',
+                value: form.report_date,
+            },
+            {
+                key: 'search',
+                label: 'Busqueda',
+                type: 'text',
+                placeholder: 'Codigo, producto, folio o usuario',
+                value: form.search ?? '',
+                fullWidth: true,
+            },
+        ],
+        actions: [
+            {
+                id: 'clear',
+                label: 'Limpiar',
+                icon: 'restart_alt',
+                variant: 'slate',
+            },
+            {
+                id: 'excel',
+                label: 'Excel',
+                icon: 'table_view',
+                variant: 'green',
+            },
+            {
+                id: 'pdf',
+                label: 'PDF',
+                icon: 'picture_as_pdf',
+                variant: 'red',
+            },
+        ],
+        tabs: [
+            { key: 'summary', label: 'Resumen', icon: 'dashboard' },
+            { key: 'detail', label: 'Detalle', icon: 'list_alt' },
+            { key: 'users', label: 'Usuarios', icon: 'group' },
+            { key: 'categories', label: 'Categorias', icon: 'category' },
+            { key: 'differences', label: 'Diferencias', icon: 'analytics' },
+        ],
+    }
+}

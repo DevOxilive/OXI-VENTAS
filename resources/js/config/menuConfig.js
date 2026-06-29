@@ -1,8 +1,5 @@
 export function generateMenu(role, permissions = [], branches = []) {
     const isAdmin = role === "Administrador";
-    const isSystems = role === "Sistemas";
-    const isHumanResources = role === "Recursos Humanos";
-    const isInventory = role === "Inventario";
 
     const can = (permission) => permissions.includes(permission);
 
@@ -15,14 +12,57 @@ export function generateMenu(role, permissions = [], branches = []) {
         url: route("dashboard"),
     });
 
-    if (isAdmin || isSystems || can("users.view") || can("roles.view")) {
+    /*
+    |--------------------------------------------------------------------------
+    | CAPITAL HUMANO
+    |--------------------------------------------------------------------------
+    */
+    if (
+        isAdmin ||
+        can("employees.view") ||
+        can("employees.create") ||
+        can("employees.update") ||
+        can("employees.delete")
+    ) {
+        menu.push({
+            text: "Capital Humano",
+            key: "human-resources",
+            icon: "badge",
+            url: route("human-resources.employees.index"),
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SISTEMAS
+    |--------------------------------------------------------------------------
+    */
+    if (
+        isAdmin ||
+        can("users.view") ||
+        can("users.create") ||
+        can("users.update") ||
+        can("users.delete") ||
+        can("roles.view") ||
+        can("roles.create") ||
+        can("roles.update") ||
+        can("roles.delete") ||
+        can("branches.view") ||
+        can("branches.create") ||
+        can("branches.update") ||
+        can("branches.delete")
+    ) {
         menu.push({
             text: "Sistemas",
             key: "systems",
             icon: "settings",
             isOpen: false,
             children: [
-                ...(isAdmin || isSystems || can("users.view")
+                ...(isAdmin ||
+                can("users.view") ||
+                can("users.create") ||
+                can("users.update") ||
+                can("users.delete")
                     ? [
                           {
                               text: "Registro de Usuarios",
@@ -30,9 +70,18 @@ export function generateMenu(role, permissions = [], branches = []) {
                               icon: "security",
                               url: route("systems.users.index"),
                           },
+                      ]
+                    : []),
+
+                ...(isAdmin ||
+                can("branches.view") ||
+                can("branches.create") ||
+                can("branches.update") ||
+                can("branches.delete")
+                    ? [
                           {
                               text: "Registro de Sucursales",
-                              key: "branches",
+                              key: "systems.branches",
                               icon: "store",
                               url: route("branches.index"),
                           },
@@ -42,56 +91,17 @@ export function generateMenu(role, permissions = [], branches = []) {
         });
     }
 
-    if (isAdmin || isHumanResources || can("employees.view")) {
-        menu.push({
-            text: "Capital Humano",
-            key: "human-resources",
-            icon: "badge",
-            url: route("human-resources.employees.index"),
-        });
-    }
-
-    if (
-        isAdmin ||
-        isSystems ||
-        isInventory ||
-        can("audits.physical-counts.view")
-    ) {
-        menu.push({
-            text: "Auditorías",
-            key: "audits",
-            icon: "fact_check",
-            isOpen: false,
-            children: [
-                {
-                    text: "Conteo físico",
-                    key: "audits.physical-counts",
-                    icon: "inventory_2",
-                    url: route("audits.physical-counts.index"),
-                },
-            ],
-        });
-    }
-
- const inventoryOptions = (branch) => [
-    //  //   ...(isAdmin ||
-    //     isInventory ||
-    //     can("inventory.dashboard.view") ||
-    //     can("inventory.view")
-    //         ? [
-    //               {
-    //                   text: "Dashboard",
-    //                   key: `inventory.${branch.slug}.dashboard`,
-    //                   icon: "dashboard",
-    //                   url: route("inventory.dashboard"),
-    //               },
-    //           ]
-    //         : []),
-
+    /*
+    |--------------------------------------------------------------------------
+    | SUCURSALES / INVENTARIO / AUDITORÍAS POR SUCURSAL
+    |--------------------------------------------------------------------------
+    */
+    const inventoryOptions = (branch) => [
         ...(isAdmin ||
-        isInventory ||
         can("inventory.products.view") ||
-        can("inventory.view")
+        can("inventory.products.create") ||
+        can("inventory.products.update") ||
+        can("inventory.products.delete")
             ? [
                   {
                       text: "Productos",
@@ -105,31 +115,16 @@ export function generateMenu(role, permissions = [], branches = []) {
             : []),
 
         ...(isAdmin ||
-        isInventory ||
         can("inventory.branches.view") ||
-        can("inventory.view")
+        can("inventory.branches.create") ||
+        can("inventory.branches.update") ||
+        can("inventory.branches.delete")
             ? [
                   {
                       text: "Inventario",
                       key: `inventory.${branch.slug}.inventory`,
                       icon: "inventory_2",
-                      url: route("inventario.branches.inventory", {
-                          branch: branch.id,
-                      }),
-                  },
-              ]
-            : []),
-
-        ...(isAdmin ||
-        isInventory ||
-        can("inventory.purchase-reports.view") ||
-        can("inventory.view")
-            ? [
-                  {
-                      text: "Reporte de compra",
-                      key: `inventory.${branch.slug}.purchase-report`,
-                      icon: "shopping_cart",
-                      url: route("inventario.branches.purchase-reports.index", {
+                      url: route("inventory.branches.inventory", {
                           branch: branch.id,
                       }),
                   },
@@ -137,23 +132,81 @@ export function generateMenu(role, permissions = [], branches = []) {
             : []),
 
         // ...(isAdmin ||
-        // isInventory ||
-        // can("inventory.reports.view") ||
-        // can("inventory.view")
+        // can("inventory.purchase-reports.view") ||
+        // can("inventory.purchase-reports.create") ||
+        // can("inventory.purchase-reports.update") ||
+        // can("inventory.purchase-reports.delete")
         //     ? [
         //           {
-        //               text: "Reportes",
-        //               key: `inventory.${branch.slug}.reports`,
-        //               icon: "bar_chart",
-        //               url: route("inventario.branches.reports", {
+        //               text: "Reporte de compra",
+        //               key: `inventory.${branch.slug}.purchase-report`,
+        //               icon: "shopping_cart",
+        //               url: route("inventory.branches.purchase-reports.index", {
         //                   branch: branch.id,
         //               }),
         //           },
         //       ]
         //     : []),
+
+        ...(isAdmin ||
+        can("audits.physical-counts.view") ||
+        can("audits.physical-counts.count") ||
+        can("audits.physical-counts.create") ||
+        can("audits.physical-counts.update") ||
+        can("audits.physical-counts.delete")
+            ? [
+                  {
+                      text: "Auditorías",
+                      key: `inventory.${branch.slug}.physical-counts`,
+                      icon: "fact_check",
+                      url: route("audits.physical-counts.index", {
+                          branch: branch.slug,
+                      }),
+                  },
+              ]
+            : []),
+
+        ...(isAdmin ||
+        can("audits.physical-counts.reports") ||
+        can("inventory.view") ||
+        can("inventory.branches.view")
+            ? [
+                  {
+                      text: "Reportes",
+                      key: `inventory.${branch.slug}.reports`,
+                      icon: "bar_chart",
+                      url: route("inventory.branches.reports", {
+                          branch: branch.id,
+                      }),
+                  },
+              ]
+            : []),
     ];
 
-    if (isAdmin || isInventory || can("inventory.view")) {
+    const canSeeBranchesSection =
+        isAdmin ||
+        can("inventory.products.view") ||
+        can("inventory.products.create") ||
+        can("inventory.products.update") ||
+        can("inventory.products.delete") ||
+        can("inventory.branches.view") ||
+        can("inventory.branches.create") ||
+        can("inventory.branches.update") ||
+        can("inventory.branches.delete") ||
+        can("inventory.purchase-reports.view") ||
+        can("inventory.purchase-reports.create") ||
+        can("inventory.purchase-reports.update") ||
+        can("inventory.purchase-reports.delete") ||
+        can("audits.physical-counts.view") ||
+        can("audits.physical-counts.count") ||
+        can("audits.physical-counts.reports") ||
+        can("audits.physical-counts.create") ||
+        can("audits.physical-counts.update") ||
+        can("audits.physical-counts.delete") ||
+        can("inventory.view") ||
+        can("inventory.branches.view");
+
+    if (canSeeBranchesSection) {
         menu.push({
             text: "Sucursales",
             key: "branches",
@@ -171,7 +224,8 @@ export function generateMenu(role, permissions = [], branches = []) {
                     isBranch: true,
                     isOpen: false,
                     children: inventoryOptions(branch),
-                })),
+                }))
+                .filter((branchItem) => branchItem.children.length),
         });
     }
 

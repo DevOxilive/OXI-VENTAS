@@ -10,7 +10,9 @@ use App\Models\Product;
 use App\Models\ProductBatch;
 use App\Models\Subcategory;
 use Illuminate\Http\Request;
+use App\Support\FlexibleSearch;
 use Inertia\Inertia;
+
 
 class BranchInventoryController extends Controller
 {
@@ -34,6 +36,7 @@ class BranchInventoryController extends Controller
                 'id',
                 'branch_id',
                 'product_id',
+                'barcode',
                 'stock',
                 'min_stock',
                 'status',
@@ -46,11 +49,18 @@ class BranchInventoryController extends Controller
             ])
             ->when($branch, fn($query) => $query->where('branch_id', $branch->id))
             ->when($request->filled('search'), function ($query) use ($request) {
-                $search = $request->search;
+                FlexibleSearch::apply($query, $request->search, function ($searchQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($searchQuery, [
+                        'branch_products.barcode',
+                    ], $phrase, $terms);
 
-                $query->whereHas('product', function ($query) use ($search) {
-                    $query->where('name', 'like', "%{$search}%")
-                        ->orWhereHas('barcodes', fn($query) => $query->where('code', 'like', "%{$search}%"));
+                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product', [
+                        'name',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
+                        'code',
+                    ], $phrase, $terms);
                 });
             })
             ->when($request->filled('category'), function ($query) use ($request) {

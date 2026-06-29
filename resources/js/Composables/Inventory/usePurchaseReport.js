@@ -74,7 +74,7 @@ export function usePurchaseReport(props) {
 
     function applyFilters() {
         router.get(
-            route("inventario.branches.purchase-reports.create", {
+            route("inventory.branches.purchase-reports.create", {
                 branch: props.currentBranch.id,
             }),
             localFilters.value,
@@ -88,7 +88,7 @@ export function usePurchaseReport(props) {
 
     function saveDraft() {
         router.post(
-            route("inventario.branches.purchase-reports.store", {
+            route("inventory.branches.purchase-reports.store", {
                 branch: props.currentBranch.id,
             }),
             {

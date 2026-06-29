@@ -1,34 +1,49 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { computed, onMounted, onBeforeUnmount } from 'vue'
+import PageLayout from '@/Layouts/PageLayout.vue'
+
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
-import EmployeeMobileCards from '@/Components/HumanResources/EmployeeMobileCards.vue'
+
 import { useEmployeeActions } from '@/Composables/HumanResources/useEmployeeActions'
-import { useEmployeeFilters } from '@/Composables/HumanResources/useEmployeeFilters'
 import { useEmployeeExport } from '@/Composables/HumanResources/useEmployeeExport'
-import EmployeeRegisterModal from '@/Components/Forms/EmployeeRegisterModal.vue'
-import EmployeeToolbar from '@/Components/HumanResources/EmployeeToolbar.vue'
-import EmployeeTable from '@/Components/HumanResources/EmployeeTable.vue'
 import { usePermissions } from '@/Composables/usePermissions'
+
+import EmployeeToolbar from '@/Components/HumanResourses/EmployeeToolbar.vue'
+import EmployeeTable from '@/Components/HumanResourses/EmployeeTable.vue'
+import EmployeeRegisterModal from '@/Components/HumanResourses/EmployeeRegisterModal.vue'
 
 defineOptions({ layout: AdminLayout })
 
 const { can } = usePermissions()
 
 const props = defineProps({
-    employeesDB: Array
+    employeesDB: {
+        type: Object,
+        default: () => ({}),
+    },
+    filters: {
+        type: Object,
+        default: () => ({}),
+    },
 })
 
-const employeesDB = computed(() => props.employeesDB ?? [])
+const search = ref(props.filters.search || '')
+const recordsPerPage = ref(props.filters.perPage || 50)
 
-const {
-    statusFilter,
-    departmentFilter,
-    positionFilter,
-    recordsToShow,
-    search,
-    filteredEmployees
-} = useEmployeeFilters(employeesDB)
+const statusFilter = ref(props.filters.employmentStatus || '')
+const departmentFilter = ref(props.filters.department || '')
+const positionFilter = ref(props.filters.position || '')
+
+const employees = computed(() => props.employeesDB?.data || [])
+const employeePaginator = computed(() => props.employeesDB || {})
+
+const normalizedEmployees = computed(() =>
+    employees.value.map((employee) => ({
+        ...employee,
+        fullName: `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
+    }))
+)
 
 const { exportExcel } = useEmployeeExport(
     statusFilter,
@@ -45,26 +60,54 @@ const {
     openEditModal,
     openViewModal,
     closeModal,
-    deleteEmployee
+    deleteEmployee,
 } = useEmployeeActions()
 
 function reloadEmployees() {
-    router.reload({
-        only: ['employeesDB'],
+    router.get(route('human-resources.employees.index'), {
+        search: search.value,
+        per_page: recordsPerPage.value,
+        employmentStatus: statusFilter.value,
+        department: departmentFilter.value,
+        position: positionFilter.value,
+    }, {
         preserveScroll: true,
         preserveState: true,
+        replace: true,
     })
+}
+
+function handlePageChange(url) {
+    if (!url) return
+
+    router.get(url, {}, {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    })
+}
+
+watch(search, reloadEmployees)
+watch(recordsPerPage, reloadEmployees)
+watch(statusFilter, reloadEmployees)
+watch(departmentFilter, reloadEmployees)
+watch(positionFilter, reloadEmployees)
+
+function handleEmployeeTableAction({ action, row }) {
+    if (action === 'view' && can('employees.view')) openViewModal(row)
+    if (action === 'edit' && can('employees.update')) openEditModal(row)
+    if (action === 'delete' && can('employees.delete')) deleteEmployee(row)
+}
+
+function handleEmployeeToolbarAction(action) {
+    if (action === 'create' && can('employees.create')) openCreateModal()
+    if (action === 'export' && can('files.export')) exportExcel()
 }
 
 onMounted(() => {
     if (!window.Echo) return
 
     window.Echo.channel('systems')
-        .listen('.employee.changed', (event) => {
-            console.log('Empleado actualizado en tiempo real desde RH', event)
-
-            reloadEmployees()
-        })
 })
 
 onBeforeUnmount(() => {
@@ -75,24 +118,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="bg-[#f6f3f7] min-h-screen rounded-2xl md:rounded-3xl p-4 md:p-6">
+    <PageLayout>
+        <template #toolbar>
+            <EmployeeToolbar :search="search" :records-per-page="recordsPerPage"
+                :filtered-records="normalizedEmployees.length" :total-records="employeePaginator?.total || 0"
+                :can-create="can('employees.create')" :can-export="can('files.export')"
+                @action="handleEmployeeToolbarAction" @update:search="search = $event"
+                @update:records-per-page="recordsPerPage = $event" />
+        </template>
 
-        <h1 class="text-lg md:text-xl font-semibold text-slate-700 mb-5">
-            Empleados
-        </h1>
-
-        <EmployeeToolbar :filteredEmployees="filteredEmployees" :employeesDB="employeesDB"
-            :recordsToShow="recordsToShow" @create="openCreateModal" @excel="exportExcel"
-            @update:recordsToShow="recordsToShow = $event" />
-
-        <EmployeeTable :filteredEmployees="filteredEmployees" :search="search" :positionFilter="positionFilter"
-            :departmentFilter="departmentFilter" :statusFilter="statusFilter" @update:search="search = $event"
-            @update:positionFilter="positionFilter = $event" @update:departmentFilter="departmentFilter = $event"
-            @update:statusFilter="statusFilter = $event" @view="openViewModal" @edit="openEditModal"
-            @delete="deleteEmployee" />
-
-        <EmployeeMobileCards :filteredEmployees="filteredEmployees" @view="openViewModal" @edit="openEditModal"
-            @delete="deleteEmployee" />
+        <EmployeeTable :employees="normalizedEmployees" :pagination="employeePaginator" @page-change="handlePageChange"
+            @action="handleEmployeeTableAction" />
 
         <EmployeeRegisterModal v-if="
             showModal &&
@@ -102,6 +138,5 @@ onBeforeUnmount(() => {
                 (modalMode === 'view' && can('employees.view'))
             )
         " :mode="modalMode" :employeeToEdit="selectedEmployee" @close="closeModal" />
-
-    </div>
+    </PageLayout>
 </template>

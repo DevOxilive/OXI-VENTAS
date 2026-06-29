@@ -292,7 +292,7 @@ export function useBatchAdjustmentModal(products) {
         processing.value = true;
 
         router.put(
-            route("inventario.product-batches.update", form.id),
+            route("inventory.product-batches.update", form.id),
             {
                 lot_number: usesLot.value ? form.lot_number || null : null,
                 expiration_date: form.expiration_date || null,

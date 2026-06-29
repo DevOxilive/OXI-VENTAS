@@ -72,13 +72,22 @@ function getBranchKey(item) {
     return
 }
 
-    openItems[item.key] = nextValue
+  openItems[item.key] = nextValue
 
-    if (branchKey) {
-        localStorage.setItem('activeBranch', branchKey)
-        openItems.branches = true
-        openItems[branchKey] = true
-    }
+if ((item.key === 'branches' || item.key === 'sucursales') && !nextValue) {
+    props.items.forEach((child) => {
+        if (child.isBranch) {
+            openItems[child.key] = false
+            openItems[`${child.key}:manual`] = true
+        }
+    })
+}
+
+if (branchKey) {
+    localStorage.setItem('activeBranch', branchKey)
+    openItems.branches = true
+    openItems[branchKey] = true
+}
 
     saveOpenItems()
 }
@@ -130,9 +139,9 @@ function isOpen(item) {
         )
     }
 
-    if (item.key === 'branches' || item.key === 'sucursales') {
-        return hasActiveChild(item) || !!openItems[item.key]
-    }
+ if (item.key === 'branches' || item.key === 'sucursales') {
+    return !!openItems[item.key]
+}
 
     if (hasActiveChild(item)) {
         return true
@@ -211,7 +220,20 @@ function iconStyle(item) {
 function saveCurrentBranch(item) {
     const branchKey = getBranchKey(item)
 
-    if (!branchKey) return
+    if (!branchKey) {
+        openItems.branches = false
+        openItems.sucursales = false
+
+        props.items.forEach((child) => {
+            if (child.isBranch) {
+                openItems[child.key] = false
+                openItems[`${child.key}:manual`] = true
+            }
+        })
+
+        saveOpenItems()
+        return
+    }
 
     localStorage.setItem('activeBranch', branchKey)
 

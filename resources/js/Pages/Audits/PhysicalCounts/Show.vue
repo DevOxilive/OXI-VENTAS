@@ -1,163 +1,135 @@
 <script setup>
-import PhysicalCountHeader from "@/Components/Audits/PhysicalCounts/PhysicalCountHeader.vue";
-import ProductScanForm from "@/Components/Audits/PhysicalCounts/ProductScanForm.vue";
-import ProductFoundCard from "@/Components/Audits/PhysicalCounts/ProductFoundCard.vue";
-import CountEntryForm from "@/Components/Audits/PhysicalCounts/CountEntryForm.vue";
-import CountEntriesTable from "@/Components/Audits/PhysicalCounts/CountEntriesTable.vue";
-import PhysicalCountSummary from "@/Components/Audits/PhysicalCounts/PhysicalCountSummary.vue";
-import InventoryComparisonTable from "@/Components/Audits/PhysicalCounts/InventoryComparisonTable.vue";
-import { router } from "@inertiajs/vue3";
+import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { router } from '@inertiajs/vue3'
+
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import PageLayout from '@/Layouts/PageLayout.vue'
+import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
+import ProductScanForm from '@/Components/Audits/PhysicalCounts/ProductScanForm.vue'
+import ProductFoundCard from '@/Components/Audits/PhysicalCounts/ProductFoundCard.vue'
+import CountEntryForm from '@/Components/Audits/PhysicalCounts/CountEntryForm.vue'
+import { getPhysicalCountDetailToolbarConfig } from '@/config/ToolbarConfigs/physicalCountDetailToolbarConfig'
+import { usePermissions } from '@/Composables/usePermissions'
+
+defineOptions({ layout: AdminLayout })
 
 const props = defineProps({
-  physicalCount: Object,
-  entries: Array,
-  summary: Array,
-  scannedProduct: Object,
-  comparison: Array,
-});
-const closePhysicalCount = () => {
-  if (
-    !confirm(
-      "¿Seguro que quieres finalizar esta auditoría? Ya no se podrán registrar más conteos."
-    )
-  ) {
-    return;
-  }
+    physicalCount: {
+        type: Object,
+        required: true,
+    },
+    scannedProduct: {
+        type: Object,
+        default: null,
+    },
+    canViewReports: {
+        type: Boolean,
+        default: false,
+    },
+})
 
-  router.patch(
-    route("audits.physical-counts.close", props.physicalCount.id),
-    {},
-    {
-      preserveScroll: true,
-    }
-  );
-};
-const applyAdjustments = () => {
-  if (
-    !confirm(
-      "¿Seguro que quieres aplicar estos ajustes al inventario? Esta acción actualizará el stock del sistema y ya no se podrá modificar la auditoría."
-    )
-  ) {
-    return;
-  }
+const { can } = usePermissions()
 
-  router.patch(
-    route("audits.physical-counts.apply-adjustments", props.physicalCount.id),
-    {},
-    {
-      preserveScroll: true,
-    }
-  );
-};
-const reopenPhysicalCount = () => {
-  if (
-    !confirm(
-      "¿Seguro que quieres reabrir esta auditoría? Se podrán registrar nuevos conteos."
-    )
-  ) {
-    return;
-  }
+const isOpen = computed(() => props.physicalCount.status === 'open')
+const canViewAuditStock = computed(() => can('audits.physical-counts.view-stock'))
 
-  router.patch(
-    route("audits.physical-counts.reopen", props.physicalCount.id),
-    {},
-    {
-      preserveScroll: true,
+const toolbarConfig = computed(() =>
+    getPhysicalCountDetailToolbarConfig({
+        physicalCount: props.physicalCount,
+    })
+)
+
+function handleToolbarAction(action) {
+    if (action === 'back') {
+        router.visit(route('audits.physical-counts.index', {
+            branch: props.physicalCount.branch.slug,
+        }))
+        return
     }
-  );
-};
+}
+
+function reloadAuditDetail() {
+    router.reload({
+        only: ['scannedProduct'],
+        preserveScroll: true,
+        preserveState: true,
+    })
+}
+
+onMounted(() => {
+    if (!window.Echo) return
+
+    window.Echo.channel('audits')
+        .listen('.PhysicalCountChanged', (event) => {
+            if (event.physicalCount?.id !== props.physicalCount.id) return
+            reloadAuditDetail()
+        })
+})
+
+onBeforeUnmount(() => {
+    if (!window.Echo) return
+    window.Echo.leave('audits')
+})
 </script>
+
 <template>
-        <AdminLayout>
-  <div class="p-6 space-y-6">
-    <div class="flex items-start justify-between gap-4">
-      <PhysicalCountHeader
-        :title="physicalCount?.name ?? 'Conteo físico'"
-       :subtitle="`Folio: ${physicalCount?.folio ?? 'Sin folio'} | Sucursal: ${physicalCount?.branch?.name ?? 'Sin sucursal seleccionada'}`"
-      />
-      <a
-    :href="route('audits.physical-counts.export-pdf', physicalCount.id)"
-    class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
->
-    Exportar PDF
-</a>
-      <a
-        :href="route('audits.physical-counts.export-excel', physicalCount.id)"
-        class="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
-      >
-        Exportar Excel
-      </a>
-      
-      <button
-        v-if="physicalCount.status === 'open'"
-        type="button"
-        class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
-        @click="closePhysicalCount"
-      >
-        Finalizar auditoría
-      </button>
-      <button
-        v-if="physicalCount.status === 'closed'"
-        type="button"
-        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-        @click="reopenPhysicalCount"
-      >
-        Reabrir auditoría
-      </button>
-      <button
-        v-if="physicalCount.status === 'closed'"
-        type="button"
-        class="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700"
-        @click="applyAdjustments"
-      >
-        Aplicar ajustes
-      </button>
-    </div>
-<div
-    v-if="physicalCount.status === 'closed'"
-    class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-600"
->
-    Esta auditoría ya fue finalizada. Puedes reabrirla o aplicar ajustes al inventario.
-</div>
-
-<div
-    v-if="physicalCount.status === 'applied'"
-    class="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700"
->
-    Esta auditoría ya fue aplicada al inventario.
-</div>
-
-    <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
-      <div class="space-y-6 xl:col-span-8">
-        <template v-if="physicalCount.status === 'open'">
-          <ProductScanForm :physical-count-id="physicalCount.id" />
-
-          <ProductFoundCard :product="scannedProduct" />
-
-          <CountEntryForm
-            :physical-count-id="physicalCount.id"
-            :product="scannedProduct"
-          />
+    <PageLayout>
+        <template #toolbar>
+            <GlobalToolbar
+                v-bind="toolbarConfig"
+                :show-search="false"
+                :show-records-per-page="false"
+                :show-counter="false"
+                @action="handleToolbarAction"
+            />
         </template>
 
-        <div
-          v-else
-          class="rounded-xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-600"
-        >
-          Esta auditoría está finalizada. La captura está bloqueada y solo puede
-          consultarse la información.
+        <div class="space-y-6">
+            <div
+                v-if="physicalCount.status === 'closed'"
+                class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+            >
+                Esta auditoria ya fue finalizada. La captura esta bloqueada.
+            </div>
+
+            <div
+                v-if="physicalCount.status === 'applied'"
+                class="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+            >
+                Esta auditoria ya fue aplicada al inventario.
+            </div>
+
+            <div class="space-y-6">
+                <template v-if="isOpen">
+                    <ProductScanForm :physical-count-id="physicalCount.id" />
+
+                    <ProductFoundCard
+                        :product="scannedProduct"
+                        :can-view-stock="canViewAuditStock"
+                    />
+
+                    <CountEntryForm
+                        v-if="scannedProduct"
+                        :physical-count-id="physicalCount.id"
+                        :product="scannedProduct"
+                        :can-view-stock="canViewAuditStock"
+                    />
+
+                    <div
+                        v-else
+                        class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-500"
+                    >
+                        Selecciona un producto para habilitar la captura de conteo.
+                    </div>
+                </template>
+
+                <div
+                    v-else
+                    class="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600"
+                >
+                    Esta auditoria esta cerrada. Solo puede consultarse desde reportes.
+                </div>
+            </div>
         </div>
-
-        <CountEntriesTable :entries="entries" />
-
-        <InventoryComparisonTable :comparison="comparison" />
-      </div>
-
-      <div class="xl:col-span-4">
-        <PhysicalCountSummary :summary="summary" />
-      </div>
-    </div>
-  </div>
-  </AdminLayout>
+    </PageLayout>
 </template>
