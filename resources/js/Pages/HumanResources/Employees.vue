@@ -86,6 +86,14 @@ function reloadEmployees() {
     })
 }
 
+function refreshEmployeesRealtime() {
+    router.reload({
+        only: ['employeesDB'],
+        preserveScroll: true,
+        preserveState: true,
+    })
+}
+
 function handlePageChange(url) {
     if (!url) return
 
@@ -125,7 +133,7 @@ onMounted(() => {
                 closeModal()
             }
 
-            reloadEmployees()
+            refreshEmployeesRealtime()
         })
 })
 
