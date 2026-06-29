@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useEmployeeForm } from '@/Composables/HumanResources/useEmployeeForm'
 
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
@@ -71,9 +71,16 @@ watch(
     },
 )
 
-onMounted(() => {
-    loadEditData()
-})
+watch(
+    () => [props.mode, props.employeeToEdit],
+    () => {
+        loadEditData()
+    },
+    {
+        immediate: true,
+        deep: true,
+    },
+)
 </script>
 
 <template>
