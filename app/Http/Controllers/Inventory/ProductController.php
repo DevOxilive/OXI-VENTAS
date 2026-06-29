@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Events\ProductChanged;
+use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
@@ -148,7 +150,7 @@ class ProductController extends Controller
             $imagePath = $request->file('image')->store('products', 'public');
         }
 
-        DB::transaction(function () use ($data, $branch, $imagePath, $barcodes) {
+        [$product, $branchIds] = DB::transaction(function () use ($data, $branch, $imagePath, $barcodes) {
             $product = Product::create([
                 'name' => $data['name'],
                 'description' => null,
@@ -189,7 +191,12 @@ class ProductController extends Controller
                     'entry_date' => $data['entry_date'],
                 ]);
             }
+
+            return [$product, $branchIds->all()];
         });
+
+        broadcast(new ProductChanged('created', $product->id, $branchIds))->toOthers();
+        event(RealtimeActivityLogged::message('creó', 'el producto', $product->name, 'Inventario', 'created'));
 
         return back()->with('success', 'Producto creado correctamente');
     }
@@ -227,7 +234,12 @@ class ProductController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($request, $data, $product, $branch, $barcodes) {
+        $previousBranchIds = BranchProduct::where('product_id', $product->id)
+            ->pluck('branch_id')
+            ->map(fn($id) => (int) $id)
+            ->values();
+
+        $branchIds = DB::transaction(function () use ($request, $data, $product, $branch, $barcodes) {
             $imagePath = $product->image;
 
             if ($request->hasFile('image')) {
@@ -292,13 +304,32 @@ class ProductController extends Controller
                 ->update([
                     'status' => BranchProduct::STATUS_INACTIVE,
                 ]);
+
+            return $branchIds->all();
         });
+
+        $affectedBranchIds = $previousBranchIds
+            ->merge($branchIds)
+            ->unique()
+            ->values()
+            ->all();
+
+        broadcast(new ProductChanged('updated', $product->id, $affectedBranchIds))->toOthers();
+        event(RealtimeActivityLogged::message('actualizó', 'el producto', $product->name, 'Inventario', 'updated'));
 
         return back()->with('success', 'Producto actualizado correctamente');
     }
 
     public function destroy(Branch $branch, Product $product)
     {
+        $productId = $product->id;
+        $productName = $product->name;
+        $branchIds = BranchProduct::where('product_id', $product->id)
+            ->pluck('branch_id')
+            ->map(fn($id) => (int) $id)
+            ->values()
+            ->all();
+
         DB::transaction(function () use ($branch, $product) {
             BranchProduct::where('branch_id', $branch->id)
                 ->where('product_id', $product->id)
@@ -317,6 +348,9 @@ class ProductController extends Controller
                 $product->delete();
             }
         });
+
+        broadcast(new ProductChanged('deleted', $productId, $branchIds))->toOthers();
+        event(RealtimeActivityLogged::message('eliminó', 'el producto', $productName, 'Inventario', 'deleted'));
 
         return back()->with('success', 'Producto eliminado correctamente');
     }

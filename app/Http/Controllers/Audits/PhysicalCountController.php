@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Audits;
 
 use App\Events\PhysicalCountChanged;
+use App\Events\RealtimeActivityLogged;
 use App\Exports\PhysicalCountExport;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
@@ -234,6 +235,7 @@ class PhysicalCountController extends Controller
         $this->snapshotService->ensureForAudit($physicalCount);
 
         broadcast(new PhysicalCountChanged($physicalCount, 'created'))->toOthers();
+        event(RealtimeActivityLogged::message('creó', 'la auditoría', $physicalCount->folio, 'Auditorías', 'created'));
 
         return redirect()
             ->route('audits.physical-counts.index', ['branch' => $branch->slug])
@@ -263,6 +265,7 @@ class PhysicalCountController extends Controller
         $physicalCount->participants()->sync($participantIds);
 
         broadcast(new PhysicalCountChanged($physicalCount, 'updated'))->toOthers();
+        event(RealtimeActivityLogged::message('actualizó', 'la auditoría', $physicalCount->folio, 'Auditorías', 'updated'));
 
         return back()->with('success', 'Auditoría actualizada correctamente.');
     }
@@ -279,9 +282,11 @@ class PhysicalCountController extends Controller
         }
 
         $branchSlug = $physicalCount->branch?->slug;
+        $folio = $physicalCount->folio;
         $physicalCount->delete();
 
         broadcast(new PhysicalCountChanged($physicalCount, 'deleted'))->toOthers();
+        event(RealtimeActivityLogged::message('eliminó', 'la auditoría', $folio, 'Auditorías', 'deleted'));
 
         return redirect()
             ->route('audits.physical-counts.index', ['branch' => $branchSlug])
@@ -380,6 +385,7 @@ class PhysicalCountController extends Controller
         ]);
 
         broadcast(new PhysicalCountChanged($physicalCount, 'entry_created'))->toOthers();
+        event(RealtimeActivityLogged::message('registró', 'una captura en la auditoría', $physicalCount->folio, 'Auditorías', 'entry_created'));
 
         return redirect()
             ->route('audits.physical-counts.show', $physicalCount)
@@ -426,6 +432,7 @@ class PhysicalCountController extends Controller
 
         $entry->update($data);
         broadcast(new PhysicalCountChanged($entry->physicalCount, 'entry_updated'))->toOthers();
+        event(RealtimeActivityLogged::message('actualizó', 'una captura en la auditoría', $entry->physicalCount->folio, 'Auditorías', 'entry_updated'));
 
         return back()->with('success', 'Registro actualizado correctamente.');
     }
@@ -445,6 +452,7 @@ class PhysicalCountController extends Controller
         $entry->delete();
 
         broadcast(new PhysicalCountChanged($physicalCount, 'entry_deleted'))->toOthers();
+        event(RealtimeActivityLogged::message('eliminó', 'una captura en la auditoría', $physicalCount->folio, 'Auditorías', 'entry_deleted'));
 
         return back()->with('success', 'Registro eliminado correctamente.');
     }
@@ -614,6 +622,7 @@ class PhysicalCountController extends Controller
         );
 
         broadcast(new PhysicalCountChanged($physicalCount, 'batch_created'))->toOthers();
+        event(RealtimeActivityLogged::message('creó', 'un lote en la auditoría', $physicalCount->folio, 'Auditorías', 'batch_created'));
 
         return back()->with([
             'success' => 'Lote creado correctamente para la auditoría.',
@@ -642,6 +651,7 @@ class PhysicalCountController extends Controller
         ]);
 
         broadcast(new PhysicalCountChanged($physicalCount, 'closed'))->toOthers();
+        event(RealtimeActivityLogged::message('cerró', 'la auditoría', $physicalCount->folio, 'Auditorías', 'closed'));
 
         return back()->with('success', 'Auditoría cerrada correctamente.');
     }
@@ -662,6 +672,7 @@ class PhysicalCountController extends Controller
         ]);
 
         broadcast(new PhysicalCountChanged($physicalCount, 'reopened'))->toOthers();
+        event(RealtimeActivityLogged::message('reabrió', 'la auditoría', $physicalCount->folio, 'Auditorías', 'reopened'));
 
         return back()->with('success', 'Auditoría reabierta correctamente.');
     }
@@ -756,6 +767,7 @@ class PhysicalCountController extends Controller
             $physicalCount->update(['status' => 'applied']);
         });
         broadcast(new PhysicalCountChanged($physicalCount, 'applied'))->toOthers();
+        event(RealtimeActivityLogged::message('aplicó ajustes de', 'la auditoría', $physicalCount->folio, 'Auditorías', 'applied'));
 
         return redirect()
             ->route('audits.physical-counts.show', $physicalCount)

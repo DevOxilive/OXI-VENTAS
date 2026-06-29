@@ -1,6 +1,8 @@
 <?php
 namespace App\Http\Controllers;
 
+use App\Events\BranchChanged;
+use App\Events\RealtimeActivityLogged;
 use App\Models\Branch;
 use App\Models\Product;
 use App\Models\BranchProduct;
@@ -69,7 +71,7 @@ class BranchController extends Controller
             'color' => ['nullable', 'string', 'max:20'],
         ]);
 
-        DB::transaction(function () use ($data) {
+        $branch = DB::transaction(function () use ($data) {
             $branch = Branch::create([
                 'name' => $data['name'],
                 'slug' => Str::slug($data['name']),
@@ -96,9 +98,13 @@ class BranchController extends Controller
                         );
                     }
                 });
+
+            return $branch;
         });
 
         Cache::forget('active_branches');
+        broadcast(BranchChanged::fromBranch($branch, 'created'))->toOthers();
+        event(RealtimeActivityLogged::message('creó', 'la sucursal', $branch->name, 'Sistemas', 'created'));
 
         return redirect()->back();
     }
@@ -121,6 +127,8 @@ class BranchController extends Controller
         ]);
 
         Cache::forget('active_branches');
+        broadcast(BranchChanged::fromBranch($branch, 'updated'))->toOthers();
+        event(RealtimeActivityLogged::message('actualizó', 'la sucursal', $branch->name, 'Sistemas', 'updated'));
 
         return redirect()->back();
     }
@@ -129,9 +137,15 @@ class BranchController extends Controller
     {
         $this->checkPermission('branches.delete');
 
+        $branchId = $branch->id;
+        $branchSlug = $branch->slug;
+        $branchName = $branch->name;
+
         $branch->delete();
 
         Cache::forget('active_branches');
+        broadcast(new BranchChanged('deleted', $branchId, $branchSlug))->toOthers();
+        event(RealtimeActivityLogged::message('eliminó', 'la sucursal', $branchName, 'Sistemas', 'deleted'));
 
         return back()->with('success', 'Sucursal eliminada correctamente');
     }

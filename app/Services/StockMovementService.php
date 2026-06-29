@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Events\InventoryStockUpdated;
+use App\Events\RealtimeActivityLogged;
 use App\Models\BranchProduct;
 use App\Models\ProductBatch;
 use App\Models\StockMovement;
@@ -162,9 +163,26 @@ class StockMovementService
             ]);
 
             event(new InventoryStockUpdated($branchProduct));
+            event(RealtimeActivityLogged::message(
+                $this->activityActionLabel($type),
+                'stock del producto',
+                $branchProduct->product?->name,
+                'Inventario',
+                $type,
+            ));
 
             return $movement;
         });
+    }
+
+    private function activityActionLabel(string $type): string
+    {
+        return match ($type) {
+            StockMovement::TYPE_IN => 'registró una entrada de',
+            StockMovement::TYPE_OUT => 'registró una salida de',
+            StockMovement::TYPE_ADJUSTMENT => 'ajustó',
+            default => 'actualizó',
+        };
     }
 
     private function validateMovement(string $type, string $reason, float $quantity): void

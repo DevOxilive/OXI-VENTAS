@@ -7,6 +7,7 @@ import {
     usePermissions,
     updateLivePermissions
 } from '@/Composables/usePermissions'
+import { ToastAlert } from '@/Components/Modales/UniversalActionModal'
 
 const page = usePage()
 
@@ -27,6 +28,8 @@ const branchKeys = computed(() =>
 const sidebarOpen = ref(false)
 const desktopSidebarCollapsed = ref(false)
 const desktopSidebarStorageKey = 'desktopSidebarCollapsed'
+let systemsChannel = null
+let activityChannel = null
 
 function toggleSidebar() {
     sidebarOpen.value = !sidebarOpen.value
@@ -47,10 +50,8 @@ onMounted(() => {
 
     if (!window.Echo || !page.props.auth?.user?.id) return
 
-    window.Echo.channel('systems')
+    systemsChannel = window.Echo.channel('systems')
         .listen('.UserChanged', (event) => {
-            console.log('EVENTO GLOBAL RECIBIDO', event)
-
             if (Number(page.props.auth.user.id) !== Number(event.userId)) return
 
             updateLivePermissions({
@@ -64,11 +65,23 @@ onMounted(() => {
                 preserveState: true,
             })
         })
+
+    activityChannel = window.Echo.channel('activity')
+        .listen('.realtime.activity', (event) => {
+            ToastAlert({
+                icon: 'info',
+                title: event.message || 'Hay una actualizacion en tiempo real',
+            })
+        })
 })
 onBeforeUnmount(() => {
-    if (!window.Echo) return
+    if (systemsChannel) {
+        systemsChannel.stopListening('.UserChanged')
+    }
 
-    window.Echo.leave('systems')
+    if (activityChannel) {
+        activityChannel.stopListening('.realtime.activity')
+    }
 })
 
 watch(desktopSidebarCollapsed, (value) => {

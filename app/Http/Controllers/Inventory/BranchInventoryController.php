@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Events\InventoryStockUpdated;
+use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
@@ -375,7 +377,7 @@ class BranchInventoryController extends Controller
             'status' => ['nullable', 'in:active,inactive,seasonal'],
         ]);
 
-        BranchProduct::create([
+        $branchProduct = BranchProduct::create([
             'branch_id' => $validated['branch_id'],
             'product_id' => $validated['product_id'],
             'stock' => $validated['stock'],
@@ -384,6 +386,15 @@ class BranchInventoryController extends Controller
             'last_restocked_at' => null,
             'inactive_candidate_after_days' => 90,
         ]);
+
+        event(new InventoryStockUpdated($branchProduct));
+        event(RealtimeActivityLogged::message(
+            'asignó',
+            'el producto a una sucursal',
+            $branchProduct->product?->name,
+            'Inventario',
+            'assigned',
+        ));
 
         return back()->with('success', 'Producto asignado a sucursal correctamente.');
     }
@@ -407,6 +418,15 @@ class BranchInventoryController extends Controller
                 ? $validated['season_end_date']
                 : null,
         ]);
+
+        event(new InventoryStockUpdated($branchProduct));
+        event(RealtimeActivityLogged::message(
+            'actualizó',
+            'la configuración de inventario del producto',
+            $branchProduct->product?->name,
+            'Inventario',
+            'configured',
+        ));
 
         return back()->with('success', 'Configuración del producto actualizada correctamente.');
     }

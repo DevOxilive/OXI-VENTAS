@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\UserChanged;
+use App\Events\RealtimeActivityLogged;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Permission;
@@ -176,6 +177,7 @@ class UserController extends Controller
         $user->load(['role', 'permissions', 'branches']);
 
         broadcast(new UserChanged($user, 'created'))->toOthers();
+        event(RealtimeActivityLogged::message('creó', 'el usuario', $user->email, 'Sistemas', 'created'));
 
         return redirect()
             ->route('systems.users.index')
@@ -229,6 +231,7 @@ class UserController extends Controller
 
         try {
             broadcast(new UserChanged($user, 'updated'))->toOthers();
+            event(RealtimeActivityLogged::message('actualizó', 'el usuario', $user->email, 'Sistemas', 'updated'));
         } catch (\Throwable $e) {
             report($e);
         }
@@ -243,9 +246,11 @@ class UserController extends Controller
         $this->checkPermission('users.delete');
 
         $user->load(['role', 'permissions', 'branches']);
+        $userEmail = $user->email;
 
         try {
             broadcast(new UserChanged($user, 'deleted'))->toOthers();
+            event(RealtimeActivityLogged::message('eliminó', 'el usuario', $userEmail, 'Sistemas', 'deleted'));
         } catch (\Throwable $e) {
             report($e);
         }

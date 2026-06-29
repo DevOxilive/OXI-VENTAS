@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Inventory;
 
 use App\Events\InventoryStockUpdated;
+use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Controller;
 use App\Models\ProductBatch;
 use App\Models\BranchProduct;
@@ -148,6 +149,13 @@ class ProductBatchController extends Controller
         });
 
         event(new InventoryStockUpdated($branchProduct));
+        event(RealtimeActivityLogged::message(
+            'actualizó',
+            'el lote del producto',
+            $branchProduct->product?->name,
+            'Inventario',
+            'batch_updated',
+        ));
 
         return back()->with('success', 'Lote actualizado correctamente.');
     }

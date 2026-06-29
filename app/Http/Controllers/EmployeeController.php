@@ -6,6 +6,7 @@ use Inertia\Inertia;
 use App\Models\Employee;
 use Illuminate\Http\Request;
 use App\Events\EmployeeChanged;
+use App\Events\RealtimeActivityLogged;
 use App\Exports\EmployeeExport;
 use App\Support\FlexibleSearch;
 use Maatwebsite\Excel\Facades\Excel;
@@ -134,6 +135,7 @@ class EmployeeController extends Controller
         ]);
 
         broadcast(new EmployeeChanged('created', $employee->id))->toOthers();
+        event(RealtimeActivityLogged::message('creó', 'el empleado', trim("{$employee->first_name} {$employee->last_name}"), 'Recursos humanos', 'created'));
 
         return redirect()->back();
     }
@@ -178,6 +180,7 @@ class EmployeeController extends Controller
         ]);
 
         broadcast(new EmployeeChanged('updated', $employee->id))->toOthers();
+        event(RealtimeActivityLogged::message('actualizó', 'el empleado', trim("{$employee->first_name} {$employee->last_name}"), 'Recursos humanos', 'updated'));
 
         return redirect()->back();
     }
@@ -186,10 +189,12 @@ class EmployeeController extends Controller
     {
         $employee = Employee::findOrFail($id);
         $employeeId = $employee->id;
+        $employeeName = trim("{$employee->first_name} {$employee->last_name}");
 
         $employee->delete();
 
         broadcast(new EmployeeChanged('deleted', $employeeId))->toOthers();
+        event(RealtimeActivityLogged::message('eliminó', 'el empleado', $employeeName, 'Recursos humanos', 'deleted'));
 
         return redirect()->back();
     }
