@@ -93,7 +93,7 @@ function closeFromBackdrop(closeOnBackdrop) {
 
 <template>
     <div
-        class="fixed inset-0 z-[9999] hidden items-center justify-center p-6 md:flex"
+        class="fixed inset-0 z-[9999] hidden overflow-y-auto p-4 md:flex md:items-center md:justify-center md:p-6"
     >
         <div
             class="absolute inset-0"
@@ -102,7 +102,7 @@ function closeFromBackdrop(closeOnBackdrop) {
         />
 
         <section
-            class="relative flex w-full flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+            class="relative my-4 flex w-full flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
             :class="panelClass"
             :style="getModalPanelStyle({ size, height })"
             role="dialog"

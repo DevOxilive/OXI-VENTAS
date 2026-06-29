@@ -64,7 +64,6 @@ function handleInput(e) {
 
 function blockExtraInput(e) {
     if (isDateField.value) {
-        e.preventDefault()
         return
     }
 
@@ -111,7 +110,7 @@ function blockExtraInput(e) {
             </span>
         </span>
         <input :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
-            :readonly="readonly" :inputmode="isDateField ? 'none' : undefined" @keydown="blockExtraInput"
+            :readonly="readonly" @keydown="blockExtraInput"
             @wheel="preventNumberWheel" @input="handleInput" @blur="emit('validate', field)" :class="[
                 'w-full py-3 rounded-xl border outline-none transition text-sm',
                 hasLeftAddon ? 'pl-11 pr-4' : 'px-4',

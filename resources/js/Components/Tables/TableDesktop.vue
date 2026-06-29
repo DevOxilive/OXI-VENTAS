@@ -98,6 +98,13 @@ function renderCellContent(row, column) {
     }
   }
 
+  if (column.format === 'swatch') {
+    return {
+      type: 'swatch',
+      ...formatted,
+    }
+  }
+
   return {
     type: 'text',
     content: formatted,
@@ -156,6 +163,19 @@ function renderCellContent(row, column) {
                 <span v-else class="text-slate-400 text-xs">
                   {{ column.formatOptions?.fallback || 'Sin imagen' }}
                 </span>
+              </template>
+
+              <template v-else-if="column.format === 'swatch'">
+                <div class="flex items-center gap-3">
+                  <span
+                    class="h-4 w-4 shrink-0 rounded-full border border-slate-200"
+                    :style="{ backgroundColor: renderCellContent(row, column).color }"
+                  />
+
+                  <span class="font-medium text-slate-700">
+                    {{ renderCellContent(row, column).label }}
+                  </span>
+                </div>
               </template>
 
               <template v-else>

@@ -23,9 +23,9 @@ const gridClass = {
 
 <template>
     <main
-        class="min-h-0 flex-1 bg-white p-4 sm:p-5 md:p-6"
+        class="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white p-4 sm:p-5 md:p-6"
         :class="[
-            scrollMode === 'controlled' ? 'overflow-hidden' : 'overflow-y-auto',
+            scrollMode === 'controlled' ? 'overflow-hidden' : '',
             contentClass,
         ]"
     >
@@ -33,7 +33,7 @@ const gridClass = {
             class="grid gap-6"
             :class="[
                 gridClass[columns] || gridClass[2],
-                scrollMode === 'controlled' ? 'h-full min-h-0' : 'min-h-full',
+                scrollMode === 'controlled' ? 'h-full min-h-0' : 'min-h-0',
             ]"
         >
             <slot />

@@ -71,6 +71,64 @@ export function useEmployeeForm(props, emit) {
 
     const frontendErrors = reactive({});
 
+    function normalizeRfcText(value = "") {
+        return value
+            .toString()
+            .toUpperCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^A-ZÑ&\s]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    function getFirstInternalVowel(word = "") {
+        return word.slice(1).match(/[AEIOU]/)?.[0] || "X";
+    }
+
+    function getRelevantGivenName(words = []) {
+        const ignoredNames = new Set(["JOSE", "J", "MARIA", "MA", "MA."]);
+        return words.find((word) => !ignoredNames.has(word)) || words[0] || "";
+    }
+
+    function buildRfcNamePrefix(firstName = "", lastName = "") {
+        const normalizedFirstName = normalizeRfcText(firstName);
+        const normalizedLastName = normalizeRfcText(lastName);
+
+        if (!normalizedFirstName && !normalizedLastName) {
+            return "";
+        }
+
+        const firstNameParts = normalizedFirstName.split(" ").filter(Boolean);
+        const lastNameParts = normalizedLastName.split(" ").filter(Boolean);
+
+        const paternalSurname = lastNameParts[0] || "";
+        const maternalSurname = lastNameParts[1] || "";
+        const relevantFirstName = getRelevantGivenName(firstNameParts);
+
+        const prefix = [
+            paternalSurname[0] || "X",
+            getFirstInternalVowel(paternalSurname),
+            maternalSurname[0] || "X",
+            relevantFirstName[0] || "X",
+        ].join("");
+
+        return prefix.slice(0, 4);
+    }
+
+    function syncRfcPrefix() {
+        if (props.mode === "view") return;
+
+        const prefix = buildRfcNamePrefix(employee.firstName, employee.lastName);
+        const currentRfc = (employee.rfc || "").toUpperCase().replace(/[^A-Z0-9Ñ&]/g, "");
+        const suffix = currentRfc.slice(4);
+        const nextRfc = `${prefix}${suffix}`.slice(0, 13);
+
+        if (employee.rfc !== nextRfc) {
+            employee.rfc = nextRfc;
+        }
+    }
+
     function loadEditData() {
         const isEditing = ["edit", "view"].includes(props.mode);
 
@@ -110,6 +168,21 @@ export function useEmployeeForm(props, emit) {
     function validateField(field) {
         if (!field) return;
 
+        if (field === "rfc") {
+            const value = (employee.rfc || "").toUpperCase();
+
+            if (!value) {
+                frontendErrors.rfc = "Este campo es obligatorio.";
+                return;
+            }
+
+            if (value.length < 12) {
+                frontendErrors.rfc =
+                    "Completa el RFC con fecha y homoclave.";
+                return;
+            }
+        }
+
         frontendErrors[field] = validateSingleField(field, employee[field]);
     }
 
@@ -137,6 +210,13 @@ export function useEmployeeForm(props, emit) {
             if (!newValue) return;
 
             employee.rfc = newValue.toUpperCase();
+        },
+    );
+
+    watch(
+        () => [employee.firstName, employee.lastName],
+        () => {
+            syncRfcPrefix();
         },
     );
 

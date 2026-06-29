@@ -1,62 +1,102 @@
 <script setup>
-import AdminLayout from "@/Layouts/AdminLayout.vue";
-import { computed, ref } from "vue";
-import { useForm } from "@inertiajs/vue3";
-import ActionIconButton from "@/Components/Forms/ActionIconButton.vue";
-import {
-  GlobalModal,
-  confirmModalAction,
-  getModalRequestOptions,
-} from "@/Components/Modales";
-import { usePermissions } from "@/Composables/usePermissions";
-import { getBranchModalConfig } from "@/config/ModalConfigs/branchModalConfig";
+import { computed, ref } from "vue"
+import { useForm } from "@inertiajs/vue3"
+
+import AdminLayout from "@/Layouts/AdminLayout.vue"
+import PageLayout from "@/Layouts/PageLayout.vue"
+import { GlobalModal, confirmModalAction, getModalRequestOptions } from "@/Components/Modales"
+import { GlobalTable } from "@/Components/Tables"
+import { GlobalToolbar } from "@/Components/Toolbars"
+import { usePermissions } from "@/Composables/usePermissions"
+import { getBranchModalConfig } from "@/config/ModalConfigs/branchModalConfig"
+import { branchTableConfig } from "@/config/TableConfigs/branchTableConfig"
+import { getBranchToolbarConfig } from "@/config/ToolbarConfigs/branchToolbarConfig"
 
 const props = defineProps({
   branches: {
     type: Array,
     default: () => [],
   },
-});
+})
 
 defineOptions({
   layout: AdminLayout,
-});
+})
 
-const { can } = usePermissions();
+const { can } = usePermissions()
 
-const selectedBranch = ref(null);
-const modalMode = ref("create");
-const showCreateModal = ref(false);
+const search = ref("")
+const selectedBranch = ref(null)
+const modalMode = ref("create")
+const showCreateModal = ref(false)
 
 const form = useForm({
   name: "",
   color: "#facc15",
-});
+})
 
-const modalConfig = computed(() => getBranchModalConfig({
-  mode: modalMode.value,
-  totalErrors: Object.keys(form.errors || {}).length,
-  processing: Boolean(form.processing),
-}));
+const toolbarConfig = computed(() =>
+  getBranchToolbarConfig({
+    canCreate: can("branches.create"),
+  }),
+)
+
+const normalizedBranches = computed(() =>
+  props.branches.map((branch) => ({
+    ...branch,
+    color: branch.color || "",
+  })),
+)
+
+const filteredBranches = computed(() => {
+  const term = search.value.trim().toLowerCase()
+
+  if (!term) {
+    return normalizedBranches.value
+  }
+
+  return normalizedBranches.value.filter((branch) => {
+    return [branch.name, branch.slug, branch.color]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(term))
+  })
+})
+
+const modalConfig = computed(() =>
+  getBranchModalConfig({
+    mode: modalMode.value,
+    totalErrors: Object.keys(form.errors || {}).length,
+    processing: Boolean(form.processing),
+  }),
+)
+
+function resetForm() {
+  form.reset()
+  form.clearErrors()
+  form.color = "#facc15"
+}
+
+function openCreateModal() {
+  selectedBranch.value = null
+  modalMode.value = "create"
+  resetForm()
+  showCreateModal.value = true
+}
 
 function viewBranch(branch) {
-  selectedBranch.value = branch;
-  modalMode.value = "view";
-
-  form.name = branch.name;
-  form.color = branch.color;
-
-  showCreateModal.value = true;
+  selectedBranch.value = branch
+  modalMode.value = "view"
+  form.name = branch.name
+  form.color = branch.color || "#facc15"
+  showCreateModal.value = true
 }
 
 function editBranch(branch) {
-  selectedBranch.value = branch;
-  modalMode.value = "edit";
-
-  form.name = branch.name;
-  form.color = branch.color;
-
-  showCreateModal.value = true;
+  selectedBranch.value = branch
+  modalMode.value = "edit"
+  form.name = branch.name
+  form.color = branch.color || "#facc15"
+  showCreateModal.value = true
 }
 
 async function deleteBranch(branch) {
@@ -66,9 +106,9 @@ async function deleteBranch(branch) {
     title: "Eliminar sucursal",
     message: `¿Deseas eliminar ${branch.name}?`,
     confirmText: "Sí, eliminar",
-  });
+  })
 
-  if (!result.isConfirmed) return;
+  if (!result.isConfirmed) return
 
   form.delete(route("branches.destroy", branch.id), getModalRequestOptions({
     mode: "delete",
@@ -76,29 +116,18 @@ async function deleteBranch(branch) {
     successTitle: "Sucursal eliminada correctamente",
     errorTitle: "Error al eliminar sucursal",
     errorMessage: "No fue posible eliminar la sucursal.",
-  }));
-}
-
-function openCreateModal() {
-  selectedBranch.value = null;
-  modalMode.value = "create";
-
-  form.reset();
-  form.clearErrors();
-  form.color = "#facc15";
-
-  showCreateModal.value = true;
+  }))
 }
 
 function closeCreateModal() {
-  showCreateModal.value = false;
-  form.clearErrors();
+  showCreateModal.value = false
+  form.clearErrors()
 }
 
 function submit() {
   if (modalMode.value === "view") {
-    closeCreateModal();
-    return;
+    closeCreateModal()
+    return
   }
 
   if (modalMode.value === "edit") {
@@ -109,9 +138,9 @@ function submit() {
       successTitle: "Sucursal actualizada correctamente",
       errorTitle: "Error al actualizar sucursal",
       errorMessage: "No fue posible actualizar la sucursal.",
-    }));
+    }))
 
-    return;
+    return
   }
 
   form.post(route("branches.store"), getModalRequestOptions({
@@ -122,114 +151,67 @@ function submit() {
     errorTitle: "Error al crear sucursal",
     errorMessage: "Revisa los datos capturados.",
     onSuccess: () => {
-      form.reset("name");
-      form.color = "#facc15";
+      form.reset("name")
+      form.color = "#facc15"
     },
-  }));
+  }))
 }
 
-function updateColor(branch, color) {
-  if (!can('branches.update')) return
+function handleToolbarAction(action) {
+  if (action === "create") {
+    openCreateModal()
+  }
+}
 
-  const updateForm = useForm({
-    name: branch.name,
-    color,
-    active: branch.active ?? true,
-  })
+function handleTableAction({ action, row }) {
+  if (action === "view" && can("branches.view")) {
+    viewBranch(row)
+  }
 
-  updateForm.put(route("branches.update", branch.id), getModalRequestOptions({
-    mode: "edit",
-    entityName: "Sucursal",
-    successTitle: "Color actualizado correctamente",
-    errorTitle: "Error al actualizar color",
-    errorMessage: "No fue posible actualizar el color de la sucursal.",
-  }))
+  if (action === "edit" && can("branches.update")) {
+    editBranch(row)
+  }
+
+  if (action === "delete" && can("branches.delete")) {
+    deleteBranch(row)
+  }
+}
+
+function handleRowClick(branch) {
+  if (can("branches.view")) {
+    viewBranch(branch)
+  }
 }
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex items-center justify-between rounded-2xl border bg-white p-5 shadow-sm md:p-8">
-      <div>
-        <h1 class="text-xl font-bold text-slate-700 md:text-3xl">
-          Registro de Sucursales
-        </h1>
+  <PageLayout>
+    <template #toolbar>
+      <GlobalToolbar
+        :title="toolbarConfig.title"
+        :subtitle="toolbarConfig.subtitle"
+        :search="search"
+        :search-placeholder="toolbarConfig.searchPlaceholder"
+        :show-search="toolbarConfig.showSearch"
+        :actions="toolbarConfig.actions"
+        :show-records-per-page="toolbarConfig.showRecordsPerPage"
+        :total-records="normalizedBranches.length"
+        :filtered-records="filteredBranches.length"
+        @update:search="search = $event"
+        @action="handleToolbarAction"
+      />
+    </template>
 
-        <p class="mt-2 text-sm text-slate-500">
-          Administra las sucursales y asigna un color de identificacion.
-        </p>
-      </div>
-
-      <button
-        v-if="can('branches.create')"
-        type="button"
-        class="rounded-2xl bg-black px-5 py-3 font-semibold text-white transition hover:bg-slate-800"
-        @click="openCreateModal"
-      >
-        + Agregar sucursal
-      </button>
-    </div>
-
-    <div class="rounded-2xl border bg-white p-5 shadow-sm md:p-6">
-      <h2 class="mb-4 text-lg font-semibold text-slate-700">
-        Sucursales registradas
-      </h2>
-
-      <div class="space-y-3">
-        <div
-          v-for="branch in branches"
-          :key="branch.id"
-          class="grid grid-cols-[1fr_auto] items-center gap-4 rounded-xl border p-4"
-        >
-          <div class="flex items-center gap-3">
-            <div
-              class="h-5 w-5 rounded-full border"
-              :style="{ backgroundColor: branch.color || '#e5e7eb' }"
-            />
-
-            <div>
-              <p class="font-semibold text-slate-700">
-                {{ branch.name }}
-              </p>
-
-              <p class="text-xs text-slate-400">
-                {{ branch.slug }}
-              </p>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-end gap-2">
-            <ActionIconButton
-              v-if="can('branches.view')"
-              icon="visibility"
-              title="Ver sucursal"
-              variant="blue"
-              @click.stop="viewBranch(branch)"
-            />
-
-            <ActionIconButton
-              v-if="can('branches.update')"
-              icon="edit"
-              title="Editar sucursal"
-              variant="amber"
-              @click.stop="editBranch(branch)"
-            />
-
-            <ActionIconButton
-              v-if="can('branches.delete')"
-              icon="delete"
-              title="Eliminar sucursal"
-              variant="red"
-              @click.stop="deleteBranch(branch)"
-            />
-          </div>
-        </div>
-
-        <div v-if="!branches.length" class="py-10 text-center text-slate-400">
-          No hay sucursales registradas.
-        </div>
-      </div>
-    </div>
+    <GlobalTable
+      :items="filteredBranches"
+      :columns="branchTableConfig.columns"
+      :actions="branchTableConfig.actions"
+      :row-key="branchTableConfig.rowKey"
+      :no-data-message="branchTableConfig.noDataMessage"
+      :mobile-card-header-field="branchTableConfig.mobileCardHeaderField"
+      @action="handleTableAction"
+      @row-click="handleRowClick"
+    />
 
     <GlobalModal
       v-if="showCreateModal"
@@ -261,14 +243,24 @@ function updateColor(branch, color) {
             Color
           </label>
 
-          <input
-            v-model="form.color"
-            :disabled="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
-            type="color"
-            class="h-12 w-24 cursor-pointer rounded-lg border"
-          >
+          <div class="flex items-center gap-3">
+            <input
+              v-model="form.color"
+              :disabled="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
+              type="color"
+              class="h-12 w-16 cursor-pointer rounded-lg border"
+            >
+
+            <span class="text-sm font-medium text-slate-500">
+              {{ form.color || "Sin color" }}
+            </span>
+          </div>
+
+          <p v-if="form.errors.color" class="mt-1 text-xs text-red-500">
+            {{ form.errors.color }}
+          </p>
         </div>
       </form>
     </GlobalModal>
-  </div>
+  </PageLayout>
 </template>

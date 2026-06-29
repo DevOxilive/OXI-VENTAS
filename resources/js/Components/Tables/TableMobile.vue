@@ -71,6 +71,13 @@ function renderCellContent(row, column) {
     }
   }
 
+  if (column.format === 'swatch') {
+    return {
+      type: 'swatch',
+      ...formatted,
+    }
+  }
+
   return {
     type: 'text',
     content: formatted,
@@ -146,6 +153,17 @@ function getActionButtonClasses(action) {
 
             <img v-else-if="column.format === 'image' && getCellValue(row, column)" :src="getCellValue(row, column)"
               :alt="column.formatOptions?.alt || 'Imagen'" class="h-10 w-10 rounded object-cover mt-1" />
+
+            <div v-else-if="column.format === 'swatch'" class="mt-1 flex items-center gap-2">
+              <span
+                class="h-4 w-4 shrink-0 rounded-full border border-slate-200"
+                :style="{ backgroundColor: renderCellContent(row, column).color }"
+              />
+
+              <p class="font-medium text-slate-700 truncate">
+                {{ renderCellContent(row, column).label }}
+              </p>
+            </div>
 
             <p v-else class="font-medium text-slate-700 truncate mt-0.5">
               {{ renderCellContent(row, column).content }}

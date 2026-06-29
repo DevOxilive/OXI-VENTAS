@@ -8,8 +8,8 @@ export const modalSizeStyles = {
 }
 
 export const modalHeightStyles = {
-    auto: { height: 'auto', maxHeight: '90vh' },
-    full: { height: '90vh', maxHeight: '90vh' },
+    auto: { height: 'auto', maxHeight: 'calc(100dvh - 2rem)' },
+    full: { height: 'min(90dvh, calc(100dvh - 2rem))', maxHeight: 'calc(100dvh - 2rem)' },
 }
 
 export const modalBackdropStyles = {
