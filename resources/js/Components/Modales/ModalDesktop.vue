@@ -102,12 +102,13 @@ function closeFromBackdrop(closeOnBackdrop) {
         />
 
         <section
-            class="relative my-4 flex w-full flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+            class="relative my-4 flex w-full flex-col overflow-hidden overscroll-contain rounded-3xl bg-white shadow-2xl"
             :class="panelClass"
             :style="getModalPanelStyle({ size, height })"
             role="dialog"
             aria-modal="true"
             :aria-label="title"
+            @click.stop
         >
             <slot name="header" :close="() => $emit('close')" :title="title">
                 <ModalHeader
@@ -120,7 +121,17 @@ function closeFromBackdrop(closeOnBackdrop) {
                 />
             </slot>
 
-            <slot name="content">
+            <main
+                v-if="$slots.content"
+                class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-white touch-pan-y"
+                @click.stop
+                @wheel.stop
+                @touchmove.stop
+            >
+                <slot name="content" />
+            </main>
+
+            <template v-else>
                 <ModalContent
                     :columns="columns"
                     :scroll-mode="scrollMode"
@@ -128,7 +139,7 @@ function closeFromBackdrop(closeOnBackdrop) {
                 >
                     <slot />
                 </ModalContent>
-            </slot>
+            </template>
 
             <slot name="footer" :save="() => $emit('save')" :close="() => $emit('close')">
                 <ModalFooter

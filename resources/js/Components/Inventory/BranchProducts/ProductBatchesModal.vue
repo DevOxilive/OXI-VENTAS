@@ -165,9 +165,9 @@ function selectBatch(batch) {
         @save="$emit('save')"
         @close="closeModal"
     >
-                <section class="flex h-full min-h-0 w-full flex-col overflow-hidden xl:block">
-                    <div class="grid h-full min-h-0 grid-cols-1 xl:grid-cols-[390px_minmax(0,1fr)]">
-                        <aside class="flex min-h-0 flex-col border-b border-slate-200 bg-slate-50 xl:border-b-0 xl:border-r">
+                <section class="flex h-full min-h-0 w-full flex-col overflow-y-auto xl:block xl:overflow-hidden">
+                    <div class="grid min-h-full grid-cols-1 xl:h-full xl:min-h-0 xl:grid-cols-[390px_minmax(0,1fr)]">
+                        <aside class="flex min-h-[260px] max-h-[42dvh] flex-col border-b border-slate-200 bg-slate-50 xl:min-h-0 xl:max-h-none xl:border-b-0 xl:border-r">
                             <div class="p-5 border-b border-slate-200 bg-white">
                                 <h3 class="font-black text-slate-900">
                                     {{ productName }}
@@ -253,7 +253,7 @@ function selectBatch(batch) {
                             </div>
                         </aside>
 
-                        <section class="flex min-h-0 flex-col bg-white">
+                        <section class="flex min-h-[520px] flex-col bg-white xl:min-h-0">
                             <div
                                 class="border-b border-slate-200 px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                 <div>

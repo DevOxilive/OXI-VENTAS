@@ -56,7 +56,7 @@ function submitConfig() {
         @save="submitConfig"
         @close="closeModal"
     >
-        <section class="w-full overflow-hidden">
+        <section class="min-h-0 w-full">
             <div class="border-b border-slate-200 px-5 py-4">
                 <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Producto

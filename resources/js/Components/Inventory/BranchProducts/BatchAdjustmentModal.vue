@@ -76,7 +76,7 @@ function closeModal() {
         @save="$emit('save')"
         @close="closeModal"
     >
-        <section class="w-full overflow-hidden">
+        <section class="min-h-0 w-full">
             <div class="border-b border-slate-200 px-5 py-4">
                 <h3 class="font-black text-slate-900">
                     {{ usesLot ? form.lot_number || 'Lote sin número' : 'Producto sin lote' }}

@@ -179,7 +179,7 @@ onMounted(() => {
     >
         <section
             v-if="entry"
-            class="w-full overflow-hidden"
+            class="min-h-0 w-full"
         >
                     <div class="border-b border-slate-200 px-5 py-4">
                         <h3 class="font-black text-slate-900">
