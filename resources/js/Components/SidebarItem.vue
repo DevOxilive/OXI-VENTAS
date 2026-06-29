@@ -1,272 +1,193 @@
 <script setup>
-import { Link } from '@inertiajs/vue3'
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from "vue"
+import { Link, usePage } from "@inertiajs/vue3"
 
 const props = defineProps({
     items: {
         type: Array,
-        default: () => []
+        default: () => [],
     },
     extended: {
         type: Boolean,
-        default: true
+        default: true,
     },
     parentColor: {
         type: String,
-        default: null
-    }
+        default: null,
+    },
 })
 
-const hoveredItem = ref(null)
+const emit = defineEmits(["expand-request"])
 
-const savedOpenItems = JSON.parse(localStorage.getItem('sidebarOpenItems') || '{}')
-const openItems = reactive(savedOpenItems)
+const page = usePage()
+const hoveredItem = ref(null)
+const openItems = reactive(
+    typeof window !== "undefined"
+        ? JSON.parse(window.localStorage.getItem("sidebarOpenItems") || "{}")
+        : {},
+)
+
+const currentPath = computed(() =>
+    normalizeUrl(page.url?.split("?")[0] || ""),
+)
 
 function saveOpenItems() {
-    localStorage.setItem('sidebarOpenItems', JSON.stringify(openItems))
+    if (typeof window === "undefined") return
+
+    window.localStorage.setItem("sidebarOpenItems", JSON.stringify(openItems))
 }
 
 function normalizeUrl(url) {
-    return url?.replace(/\/$/, '')
-}
-function getBranchKey(item) {
-    if (item.isBranch) {
-        return item.slug || item.key
-    }
-
-    const parts = item.key?.split('.') || []
-
-    if ((parts[0] === 'inventario' || parts[0] === 'inventory') && parts[1]) {
-        return parts[1]
-    }
-
-    return null
-}function toggleItem(item) {
-    const nextValue = !isOpen(item)
-    const branchKey = getBranchKey(item)
-
-    const isTopLevelSection =
-        item.children?.length &&
-        !item.isBranch &&
-        item.key !== localStorage.getItem('activeBranch')
-
-    if (isTopLevelSection) {
-        Object.keys(openItems).forEach((key) => {
-            openItems[key] = false
-        })
-    }
-
- if (item.isBranch) {
-    props.items.forEach((sibling) => {
-        if (sibling.isBranch && sibling.key !== item.key) {
-            openItems[sibling.key] = false
-        }
-    })
-
-    localStorage.setItem('activeBranch', branchKey)
-    openItems.branches = true
-    openItems[item.key] = nextValue
-    openItems[`${item.key}:manual`] = true
-
-    saveOpenItems()
-    return
+    return url?.replace(/\/$/, "") || ""
 }
 
-  openItems[item.key] = nextValue
-
-if ((item.key === 'branches' || item.key === 'sucursales') && !nextValue) {
-    props.items.forEach((child) => {
-        if (child.isBranch) {
-            openItems[child.key] = false
-            openItems[`${child.key}:manual`] = true
-        }
-    })
-}
-
-if (branchKey) {
-    localStorage.setItem('activeBranch', branchKey)
-    openItems.branches = true
-    openItems[branchKey] = true
-}
-
-    saveOpenItems()
-}
 function isActiveItem(item) {
     if (!item.url) return false
 
-    const current = normalizeUrl(window.location.pathname)
-
     const target = normalizeUrl(
-        new URL(item.url, window.location.origin).pathname
+        new URL(
+            item.url,
+            typeof window !== "undefined" ? window.location.origin : "http://localhost",
+        ).pathname,
     )
 
-    // Caso especial Dashboard
-    if (target === '/inventory/dashboard') {
-        const activeBranch = localStorage.getItem('activeBranch')
-
-        return (
-            current === target &&
-            activeBranch &&
-            item.key?.includes(activeBranch)
-        )
-    }
-
-    return current === target
+    return currentPath.value === target
 }
+
 function hasActiveChild(item) {
-    if (!item.children || !item.children.length) {
+    if (!item.children?.length) {
         return false
     }
 
-    return item.children.some(child =>
-        isActiveItem(child) || hasActiveChild(child)
+    return item.children.some((child) =>
+        isActiveItem(child) || hasActiveChild(child),
     )
 }
-function isOpen(item) {
-    const activeBranch = localStorage.getItem('activeBranch')
 
-    if (item.isBranch) {
-        const wasManuallyTouched = !!openItems[`${item.key}:manual`]
-
-        if (wasManuallyTouched) {
-            return !!openItems[item.key]
-        }
-
-        return (
-            item.key === activeBranch ||
-            item.slug === activeBranch ||
-            !!openItems[item.key]
-        )
-    }
-
- if (item.key === 'branches' || item.key === 'sucursales') {
-    return !!openItems[item.key]
+function isBranchActive(item) {
+    return Boolean(item.isBranch && hasActiveChild(item))
 }
 
+function getItemTone(item) {
+    return item.color || props.parentColor || null
+}
+
+function isOpen(item) {
     if (hasActiveChild(item)) {
         return true
     }
 
-    return !!openItems[item.key]
+    return Boolean(openItems[item.key])
 }
-function itemStyle(item) {
-    const active = isActiveItem(item)
-    const activeBranch = localStorage.getItem('activeBranch')
 
-    const isActiveBranch =
-        item.isBranch &&
-        activeBranch &&
-        (
-            item.key === activeBranch ||
-            item.slug === activeBranch
-        )
-
-    if (active) {
-        return {
-            backgroundColor: '#eff6ff',
-            color: '#2563eb',
-            fontWeight: '700'
-        }
-    }
-
-    if (isActiveBranch && item.color) {
-        return {
-            backgroundColor: `${item.color}20`,
-            color: item.color,
-            fontWeight: '700'
-        }
-    }
-
-    if (hoveredItem.value === item.key && item.color) {
-        return {
-            backgroundColor: `${item.color}20`,
-            color: item.color
-        }
-    }
-
-    return {}
-}
-function iconStyle(item) {
-    const activeBranch = localStorage.getItem('activeBranch')
-
-    const isActiveBranch =
-        item.isBranch &&
-        activeBranch &&
-        (
-            item.key === activeBranch ||
-            item.slug === activeBranch
-        )
-
-    if (isActiveItem(item)) {
-        return {
-            color: '#2563eb'
-        }
-    }
-
-    if (isActiveBranch && item.color) {
-        return {
-            color: item.color
-        }
-    }
-
-    if (item.color) {
-        return {
-            color: item.color
-        }
-    }
-
-    return {}
-}
-function saveCurrentBranch(item) {
-    const branchKey = getBranchKey(item)
-
-    if (!branchKey) {
-        openItems.branches = false
-        openItems.sucursales = false
-
-        props.items.forEach((child) => {
-            if (child.isBranch) {
-                openItems[child.key] = false
-                openItems[`${child.key}:manual`] = true
-            }
-        })
-
-        saveOpenItems()
+function toggleItem(item) {
+    if (!props.extended && item.children?.length) {
+        emit("expand-request", item)
         return
     }
 
-    localStorage.setItem('activeBranch', branchKey)
+    const nextValue = !isOpen(item)
 
-    openItems.branches = true
-    openItems[branchKey] = true
-    openItems[`${branchKey}:manual`] = false
+    if (item.isBranch) {
+        props.items.forEach((sibling) => {
+            if (sibling.isBranch && sibling.key !== item.key) {
+                openItems[sibling.key] = false
+            }
+        })
+    }
 
+    openItems[item.key] = nextValue
     saveOpenItems()
+}
+
+function itemStyle(item) {
+    const tone = getItemTone(item)
+
+    if (isActiveItem(item)) {
+        if (tone) {
+            return {
+                backgroundColor: `${tone}20`,
+                color: tone,
+                fontWeight: "700",
+            }
+        }
+
+        return {
+            backgroundColor: "#eff6ff",
+            color: "#2563eb",
+            fontWeight: "700",
+        }
+    }
+
+    if (isBranchActive(item) && tone) {
+        return {
+            backgroundColor: `${tone}20`,
+            color: tone,
+            fontWeight: "700",
+        }
+    }
+
+    if (hoveredItem.value === item.key && tone) {
+        return {
+            backgroundColor: `${tone}18`,
+            color: tone,
+        }
+    }
+
+    return {}
+}
+
+function iconStyle(item) {
+    const tone = getItemTone(item)
+
+    if (isActiveItem(item)) {
+        if (tone) {
+            return {
+                color: tone,
+            }
+        }
+
+        return {
+            color: "#2563eb",
+        }
+    }
+
+    if (isBranchActive(item) && tone) {
+        return {
+            color: tone,
+        }
+    }
+
+    if (tone) {
+        return {
+            color: tone,
+        }
+    }
+
+    return {}
 }
 </script>
 
 <template>
-    <ul class="space-y-1 max-h-full overflow-y-auto overflow-x-hidden pr-1">
+    <ul class="max-h-full space-y-1 overflow-y-auto overflow-x-hidden pr-1">
         <li v-for="item in items" :key="item.key || item.text">
             <div>
                 <Link
                     v-if="item.url"
                     :href="item.url"
-                  @click="saveCurrentBranch(item)"
+                    class="group flex items-center gap-3 rounded-xl px-3 py-3 text-slate-700 transition hover:bg-slate-100"
+                    :style="itemStyle(item)"
                     @mouseenter="hoveredItem = item.key"
                     @mouseleave="hoveredItem = null"
-                    
-                    class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-100 transition group"
-                    :style="itemStyle(item)"
                 >
                     <span
-                        class="material-symbols-outlined text-[22px] shrink-0"
+                        class="material-symbols-outlined shrink-0 text-[22px]"
                         :style="iconStyle(item)"
                     >
                         {{ item.icon }}
                     </span>
 
-                    <span v-if="extended" class="text-sm font-medium truncate">
+                    <span v-if="extended" class="truncate text-sm font-medium">
                         {{ item.text }}
                     </span>
                 </Link>
@@ -274,39 +195,44 @@ function saveCurrentBranch(item) {
                 <button
                     v-else
                     type="button"
+                    class="group flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-slate-700 transition hover:bg-slate-100"
+                    :style="itemStyle(item)"
                     @mouseenter="hoveredItem = item.key"
                     @mouseleave="hoveredItem = null"
-                    class="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-100 transition group"
-                    :style="itemStyle(item)"
                     @click="toggleItem(item)"
                 >
-                    <div class="flex items-center gap-3 min-w-0">
+                    <div class="flex min-w-0 items-center gap-3">
                         <span
-                            class="material-symbols-outlined text-[22px] shrink-0"
+                            class="material-symbols-outlined shrink-0 text-[22px]"
                             :style="iconStyle(item)"
                         >
                             {{ item.icon }}
                         </span>
 
-                        <span v-if="extended" class="text-sm font-medium truncate">
+                        <span v-if="extended" class="truncate text-sm font-medium">
                             {{ item.text }}
                         </span>
                     </div>
 
                     <span
-                        v-if="item.children && item.children.length && extended"
+                        v-if="item.children?.length && extended"
                         class="material-symbols-outlined text-[18px] text-slate-400 transition"
                     >
-                        {{ isOpen(item) ? 'expand_more' : 'chevron_right' }}
+                        {{ isOpen(item) ? "expand_more" : "chevron_right" }}
                     </span>
                 </button>
             </div>
 
             <div
-                v-if="item.children && item.children.length && isOpen(item) && extended"
+                v-if="item.children?.length && isOpen(item) && extended"
                 class="ml-6 mt-1 space-y-1 border-l border-slate-200 pl-3"
             >
-    <SidebarItem :items="item.children" :extended="extended" />
+                <SidebarItem
+                    :items="item.children"
+                    :extended="extended"
+                    :parent-color="getItemTone(item)"
+                    @expand-request="$emit('expand-request', $event)"
+                />
             </div>
         </li>
     </ul>

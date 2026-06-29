@@ -59,6 +59,22 @@ export const formatters = {
     }
   },
 
+  swatch: (value, options = {}) => {
+    const fallback = options.fallback || 'Sin color'
+
+    if (!value) {
+      return {
+        label: fallback,
+        color: options.emptyColor || '#e2e8f0',
+      }
+    }
+
+    return {
+      label: String(value),
+      color: String(value),
+    }
+  },
+
   number: (value, options = {}) => {
     if (value === null || value === undefined) return options.fallback || '0'
     const decimals = options.decimals ?? 0

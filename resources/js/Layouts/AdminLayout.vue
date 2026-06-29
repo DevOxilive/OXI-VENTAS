@@ -2,7 +2,7 @@
 import SidebarItem from '@/Components/SidebarItem.vue'
 import { Link, usePage, router } from '@inertiajs/vue3'
 import { generateMenu } from '@/config/menuConfig'
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import {
     usePermissions,
     updateLivePermissions
@@ -20,6 +20,7 @@ const menuItems = computed(() => generateMenu(
 
 const sidebarOpen = ref(false)
 const desktopSidebarCollapsed = ref(false)
+const desktopSidebarStorageKey = 'desktopSidebarCollapsed'
 
 function toggleSidebar() {
     sidebarOpen.value = !sidebarOpen.value
@@ -28,7 +29,16 @@ function toggleSidebar() {
 function toggleDesktopSidebar() {
     desktopSidebarCollapsed.value = !desktopSidebarCollapsed.value
 }
+
+function expandDesktopSidebar() {
+    desktopSidebarCollapsed.value = false
+}
 onMounted(() => {
+    if (typeof window !== 'undefined') {
+        desktopSidebarCollapsed.value =
+            window.localStorage.getItem(desktopSidebarStorageKey) === 'true'
+    }
+
     if (!window.Echo || !page.props.auth?.user?.id) return
 
     window.Echo.channel('systems')
@@ -53,6 +63,12 @@ onBeforeUnmount(() => {
     if (!window.Echo) return
 
     window.Echo.leave('systems')
+})
+
+watch(desktopSidebarCollapsed, (value) => {
+    if (typeof window === 'undefined') return
+
+    window.localStorage.setItem(desktopSidebarStorageKey, String(value))
 })
 </script>
 
@@ -98,7 +114,11 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-            <SidebarItem :items="menuItems" :extended="!desktopSidebarCollapsed" />
+            <SidebarItem
+                :items="menuItems"
+                :extended="!desktopSidebarCollapsed"
+                @expand-request="expandDesktopSidebar"
+            />
         </aside>
 
         <section class="flex-1 min-w-0 flex flex-col overflow-hidden">
