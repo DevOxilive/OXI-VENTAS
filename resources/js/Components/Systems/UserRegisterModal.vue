@@ -53,9 +53,9 @@ function closeModal() {
         @close="closeModal"
     >
         <template #content>
-            <div class="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 sm:p-5 md:overflow-hidden md:p-6">
-                <div class="grid min-h-0 grid-cols-1 gap-6 md:h-full md:grid-cols-2 md:overflow-hidden">
-                    <section class="min-h-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:overflow-y-auto sm:p-5 md:p-6">
+            <div class="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 pb-24 sm:p-5 sm:pb-28 md:overflow-hidden md:p-6">
+                <div class="grid min-h-0 content-start grid-cols-1 gap-6 md:h-full md:grid-cols-2 md:overflow-hidden">
+                    <section class="shrink-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:min-h-0 md:overflow-y-auto sm:p-5 md:p-6">
                         <h3 class="mb-4 border-b pb-3 text-base font-bold">
                             Datos de usuario
                         </h3>
@@ -143,7 +143,7 @@ function closeModal() {
                         </div>
                     </section>
 
-                    <section class="min-h-0 rounded-3xl border border-slate-200 bg-white p-4 pr-3 shadow-sm md:h-full md:overflow-y-auto sm:p-5 md:p-6">
+                    <section class="rounded-3xl border border-slate-200 bg-white p-4 pr-3 shadow-sm md:min-h-0 md:h-full md:overflow-y-auto sm:p-5 md:p-6">
                         <h3 class="mb-4 border-b pb-3 text-base font-bold">
                             Accesos
                         </h3>
