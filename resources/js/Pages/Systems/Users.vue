@@ -102,6 +102,27 @@ function getEmployeeEmail(employee) {
   return employee.email || ''
 }
 
+function buildSuggestedEmail(name) {
+  const normalized = (name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z\s]/g, ' ')
+    .trim()
+
+  if (!normalized) {
+    return ''
+  }
+
+  const parts = normalized.split(/\s+/).filter(Boolean)
+  const firstName = (parts[0] || '').toLowerCase()
+  const lastNameInitials = parts
+    .slice(1)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('')
+
+  return `${firstName}${lastNameInitials}@oxilive.com.mx`
+}
+
 const selectedRole = computed(() => {
   return roles.value.find((role) => String(role.id) === String(form.role_id))
 })
@@ -328,19 +349,14 @@ function openModal(item = null) {
 }
 
 watch(() => form.name, (newName) => {
+  if (isEditing.value) return
+
   if (!newName) {
     form.email = ''
     return
   }
 
-  const emailName = newName
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '.')
-    .replace(/[^a-z0-9.]/g, '')
-
-  form.email = `${emailName}@oxilive.com.mx`
+  form.email = buildSuggestedEmail(newName)
 })
 
 watch(() => form.role_id, () => {

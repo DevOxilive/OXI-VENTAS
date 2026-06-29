@@ -232,6 +232,7 @@ onMounted(() => {
                         @validate="validateField('nss')" />
 
                     <InputField label="RFC" field="rfc" v-model="employee.rfc" :readonly="isReadOnly"
+                        placeholder="El sistema autocompleta el prefijo; captura el resto"
                         :error="frontendErrors.rfc || employee.errors.rfc" @validate="validateField('rfc')" />
                 </div>
             </section>
