@@ -95,6 +95,8 @@ const form = useForm({
 })
 
 let systemsChannel = null
+let handleEmployeeChanged = null
+let handleUserChanged = null
 
 function getEmployeeFullName(employee) {
   return `${employee.first_name || employee.firstName || ''} ${employee.last_name || employee.lastName || ''}`.trim()
@@ -137,6 +139,25 @@ function getPermissionsByRole(roleId) {
   const role = roles.value.find((role) => String(role.id) === String(roleId))
   return role?.permissions?.map((permission) => permission.id) || []
 }
+
+function getEffectivePermissionIds(userLike) {
+  const rolePermissionIds = userLike?.role?.permissions?.map((permission) => permission.id) || []
+  const allowedPermissionIds = userLike?.permissions
+    ?.filter((permission) => (permission.pivot?.mode || 'allow') === 'allow')
+    .map((permission) => permission.id) || []
+  const deniedPermissionIds = userLike?.permissions
+    ?.filter((permission) => permission.pivot?.mode === 'deny')
+    .map((permission) => permission.id) || []
+
+  return [...new Set([
+    ...rolePermissionIds,
+    ...allowedPermissionIds,
+  ])].filter((permissionId) => !deniedPermissionIds.includes(permissionId))
+}
+
+const lockedPermissionIds = computed(() => {
+  return getPermissionsByRole(form.role_id).map((id) => Number(id))
+})
 
 function assignPermissionsByRole() {
   if (isLoadingEdit.value) return
@@ -326,9 +347,7 @@ function openModal(item = null) {
     form.email = item.email || ''
     form.role_id = item.role_id || ''
 
-    form.permissions = Array.isArray(item.permissions)
-      ? item.permissions.map((permission) => permission.id)
-      : getPermissionsByRole(item.role_id)
+    form.permissions = getEffectivePermissionIds(item)
 
     form.branch_ids = item.branches?.length
       ? item.branches.map((branch) => branch.id)
@@ -385,7 +404,10 @@ function saveUser() {
     return
   }
 
-  form.permissions = form.permissions.filter((permission) => permission)
+  form.transform((data) => ({
+    ...data,
+    permissions: form.permissions.filter((permission) => permission),
+  }))
 
   if (isEditing.value) {
     form.put(route('systems.users.update', selectedUserId.value), {
@@ -407,6 +429,10 @@ function saveUser() {
           title: 'Error al actualizar',
           message: 'No fue posible actualizar la información del usuario.',
         })
+      },
+
+      onFinish: () => {
+        form.transform((data) => data)
       },
     })
 
@@ -432,6 +458,10 @@ function saveUser() {
         title: 'Error al registrar',
         message: 'No fue posible registrar el usuario.',
       })
+    },
+
+    onFinish: () => {
+      form.transform((data) => data)
     },
   })
 }
@@ -488,38 +518,47 @@ function reloadSystem() {
 onMounted(() => {
   if (!window.Echo) return
 
+  handleEmployeeChanged = () => {
+    reloadSystem()
+  }
+
+  handleUserChanged = (event) => {
+    if (page.props.auth.user.id === event.userId) {
+      updateLivePermissions({
+        permissions: event.permissions,
+        role: event.role,
+      })
+    }
+
+    if (
+      showModal.value &&
+      selectedUserId.value === event.userId
+    ) {
+      const updatedPermissions = permissions.value
+        .filter((permission) => event.permissions.includes(permission.name))
+        .map((permission) => permission.id)
+
+      form.permissions = updatedPermissions
+    }
+
+    reloadSystem()
+  }
+
   systemsChannel = window.Echo.channel('systems')
-    .listen('.employee.changed', () => {
-      reloadSystem()
-    })
-    .listen('.UserChanged', (event) => {
-      if (page.props.auth.user.id === event.userId) {
-        updateLivePermissions({
-          permissions: event.permissions,
-          role: event.role,
-        })
-      }
-
-      if (
-        showModal.value &&
-        selectedUserId.value === event.userId
-      ) {
-        const updatedPermissions = permissions.value
-          .filter((permission) => event.permissions.includes(permission.name))
-          .map((permission) => permission.id)
-
-        form.permissions = updatedPermissions
-      }
-
-      reloadSystem()
-    })
+    .listen('.employee.changed', handleEmployeeChanged)
+    .listen('.UserChanged', handleUserChanged)
 })
 
 onBeforeUnmount(() => {
   if (!systemsChannel) return
 
-  systemsChannel.stopListening('.employee.changed')
-  systemsChannel.stopListening('.UserChanged')
+  if (handleEmployeeChanged) {
+    systemsChannel.stopListening('.employee.changed', handleEmployeeChanged)
+  }
+
+  if (handleUserChanged) {
+    systemsChannel.stopListening('.UserChanged', handleUserChanged)
+  }
 })
 </script>
 <template>
@@ -539,6 +578,7 @@ onBeforeUnmount(() => {
     <UserRegisterModal v-if="showModal" :form="form" :errors="errors" :roles="roles" :branches="branches"
       :groupedPermissions="groupedPermissions" :isEditing="isEditing"
       :canSave="isEditing ? can('users.update') : can('users.create')" :isSalesRole="isSalesRole"
+      :locked-permission-ids="lockedPermissionIds"
       :module-label="moduleLabel" :permission-label="permissionLabel" @close="closeModal" @save="saveUser"
       @toggle-permission="togglePermission" @change-role="assignPermissionsByRole" />
   </PageLayout>
