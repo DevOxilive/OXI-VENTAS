@@ -94,6 +94,8 @@ const form = useForm({
   permissions: [],
 })
 
+let systemsChannel = null
+
 function getEmployeeFullName(employee) {
   return `${employee.first_name || employee.firstName || ''} ${employee.last_name || employee.lastName || ''}`.trim()
 }
@@ -486,8 +488,8 @@ function reloadSystem() {
 onMounted(() => {
   if (!window.Echo) return
 
-  window.Echo.channel('systems')
-    .listen('.EmployeeChanged', () => {
+  systemsChannel = window.Echo.channel('systems')
+    .listen('.employee.changed', () => {
       reloadSystem()
     })
     .listen('.UserChanged', (event) => {
@@ -514,9 +516,10 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  if (!window.Echo) return
+  if (!systemsChannel) return
 
-  window.Echo.leave('systems')
+  systemsChannel.stopListening('.employee.changed')
+  systemsChannel.stopListening('.UserChanged')
 })
 </script>
 <template>

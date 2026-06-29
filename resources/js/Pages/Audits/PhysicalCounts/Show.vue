@@ -50,7 +50,7 @@ function handleToolbarAction(action) {
 
 function reloadAuditDetail() {
     router.reload({
-        only: ['scannedProduct'],
+        only: ['physicalCount', 'scannedProduct'],
         preserveScroll: true,
         preserveState: true,
     })

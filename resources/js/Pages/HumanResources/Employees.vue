@@ -34,6 +34,7 @@ const recordsPerPage = ref(props.filters.perPage || 50)
 const statusFilter = ref(props.filters.employmentStatus || '')
 const departmentFilter = ref(props.filters.department || '')
 const positionFilter = ref(props.filters.position || '')
+let systemsChannel = null
 
 const employees = computed(() => props.employeesDB?.data || [])
 const employeePaginator = computed(() => props.employeesDB || {})
@@ -62,6 +63,14 @@ const {
     closeModal,
     deleteEmployee,
 } = useEmployeeActions()
+
+const liveSelectedEmployee = computed(() => {
+    if (!selectedEmployee.value?.id) return selectedEmployee.value
+
+    return normalizedEmployees.value.find((employee) => {
+        return employee.id === selectedEmployee.value.id
+    }) ?? selectedEmployee.value
+})
 
 function reloadEmployees() {
     router.get(route('human-resources.employees.index'), {
@@ -107,13 +116,23 @@ function handleEmployeeToolbarAction(action) {
 onMounted(() => {
     if (!window.Echo) return
 
-    window.Echo.channel('systems')
+    systemsChannel = window.Echo.channel('systems')
+        .listen('.employee.changed', (event) => {
+            if (
+                event.action === 'deleted' &&
+                selectedEmployee.value?.id === event.employeeId
+            ) {
+                closeModal()
+            }
+
+            reloadEmployees()
+        })
 })
 
 onBeforeUnmount(() => {
-    if (!window.Echo) return
+    if (!systemsChannel) return
 
-    window.Echo.leave('systems')
+    systemsChannel.stopListening('.employee.changed')
 })
 </script>
 
@@ -137,6 +156,6 @@ onBeforeUnmount(() => {
                 (modalMode === 'edit' && can('employees.update')) ||
                 (modalMode === 'view' && can('employees.view'))
             )
-        " :mode="modalMode" :employeeToEdit="selectedEmployee" @close="closeModal" />
+        " :mode="modalMode" :employeeToEdit="liveSelectedEmployee" @close="closeModal" />
     </PageLayout>
 </template>

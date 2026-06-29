@@ -393,59 +393,72 @@ export function useBranchInventory(props) {
 
         window.Echo.channel(
             `inventory.branch.${currentBranch.value.id}`,
-        ).listen(".stock.updated", (event) => {
-            const branchProductId =
-                event.branch_product_id ??
-                event.branchProduct?.id ??
-                event.branch_product?.id;
+        )
+            .listen(".stock.updated", (event) => {
+                const branchProductId =
+                    event.branch_product_id ??
+                    event.branchProduct?.id ??
+                    event.branch_product?.id;
 
-            if (!branchProductId) return;
+                if (!branchProductId) return;
 
-            const currentProduct = visualProducts.value.find((product) => {
-                return product.id === branchProductId;
+                const currentProduct = visualProducts.value.find((product) => {
+                    return product.id === branchProductId;
+                });
+
+                realtimeUpdates.value = {
+                    ...realtimeUpdates.value,
+
+                    [branchProductId]: {
+                        stock: Number(
+                            event.stock ??
+                                event.branchProduct?.stock ??
+                                event.branch_product?.stock ??
+                                currentProduct?.stock ??
+                                0,
+                        ),
+
+                        updated_at: event.updated_at ?? new Date().toISOString(),
+
+                        batches: currentProduct?.batches ?? [],
+                        movements: currentProduct?.recentMovements ?? [],
+                    },
+                };
+
+                router.reload({
+                    only: ["branchProductsDB", "inventoryStats", "inventoryAlerts"],
+                    preserveScroll: true,
+                    preserveState: true,
+
+                    onSuccess: () => {
+                        if (!selectedMovementsProduct.value) return;
+
+                        const updatedProduct = visualProducts.value.find(
+                            (product) => {
+                                return (
+                                    product.id === selectedMovementsProduct.value.id
+                                );
+                            },
+                        );
+
+                        if (updatedProduct) {
+                            selectedMovementsProduct.value = updatedProduct;
+                        }
+                    },
+                });
+            })
+            .listen(".product.changed", () => {
+                router.reload({
+                    only: [
+                        "branchProductsDB",
+                        "productsDB",
+                        "inventoryStats",
+                        "inventoryAlerts",
+                    ],
+                    preserveScroll: true,
+                    preserveState: true,
+                });
             });
-
-            realtimeUpdates.value = {
-                ...realtimeUpdates.value,
-
-                [branchProductId]: {
-                    stock: Number(
-                        event.stock ??
-                            event.branchProduct?.stock ??
-                            event.branch_product?.stock ??
-                            currentProduct?.stock ??
-                            0,
-                    ),
-
-                    updated_at: event.updated_at ?? new Date().toISOString(),
-
-                    batches: currentProduct?.batches ?? [],
-                    movements: currentProduct?.recentMovements ?? [],
-                },
-            };
-
-            router.reload({
-                only: ["branchProductsDB", "inventoryStats", "inventoryAlerts"],
-                preserveScroll: true,
-                preserveState: true,
-
-                onSuccess: () => {
-                    if (!selectedMovementsProduct.value) return;
-
-                    const updatedProduct = visualProducts.value.find(
-                        (product) => {
-                            return (
-                                product.id === selectedMovementsProduct.value.id
-                            );
-                        },
-                    );
-
-                    if (updatedProduct) {
-                        selectedMovementsProduct.value = updatedProduct;
-                    }
-                },
-            });
-        });
     });
 
     onBeforeUnmount(() => {

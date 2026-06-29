@@ -1,6 +1,6 @@
 <script setup>
-import { computed, ref } from "vue"
-import { useForm } from "@inertiajs/vue3"
+import { computed, onBeforeUnmount, onMounted, ref } from "vue"
+import { router, useForm } from "@inertiajs/vue3"
 
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import PageLayout from "@/Layouts/PageLayout.vue"
@@ -29,6 +29,7 @@ const search = ref("")
 const selectedBranch = ref(null)
 const modalMode = ref("create")
 const showCreateModal = ref(false)
+let systemsChannel = null
 
 const form = useForm({
   name: "",
@@ -124,6 +125,35 @@ function closeCreateModal() {
   form.clearErrors()
 }
 
+function reloadBranches(event = null) {
+  if (
+    event?.action === "deleted" &&
+    Number(event.branchId) === Number(selectedBranch.value?.id)
+  ) {
+    closeCreateModal()
+    selectedBranch.value = null
+  }
+
+  router.reload({
+    only: ["branches"],
+    preserveScroll: true,
+    preserveState: true,
+    onSuccess: () => {
+      if (!selectedBranch.value?.id || modalMode.value === "create") return
+
+      const updatedBranch = normalizedBranches.value.find((branch) => {
+        return branch.id === selectedBranch.value.id
+      })
+
+      if (!updatedBranch) return
+
+      selectedBranch.value = updatedBranch
+      form.name = updatedBranch.name
+      form.color = updatedBranch.color || "#facc15"
+    },
+  })
+}
+
 function submit() {
   if (modalMode.value === "view") {
     closeCreateModal()
@@ -182,6 +212,19 @@ function handleRowClick(branch) {
     viewBranch(branch)
   }
 }
+
+onMounted(() => {
+  if (!window.Echo) return
+
+  systemsChannel = window.Echo.channel("systems")
+    .listen(".branch.changed", reloadBranches)
+})
+
+onBeforeUnmount(() => {
+  if (!systemsChannel) return
+
+  systemsChannel.stopListening(".branch.changed")
+})
 </script>
 
 <template>

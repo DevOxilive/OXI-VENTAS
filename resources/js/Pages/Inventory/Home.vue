@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -215,6 +215,42 @@ const {
   closeModal,
   deleteProduct,
 } = useProductActions()
+
+function shouldReloadForProductEvent(event) {
+  const branchIds = event.branchIds ?? event.branch_ids ?? []
+
+  if (!branchIds.length) return true
+
+  return branchIds.map(Number).includes(Number(branch.value.id))
+}
+
+onMounted(() => {
+  if (!window.Echo) return
+
+  const reloadOnProductChange = (event) => {
+    if (!shouldReloadForProductEvent(event)) return
+
+    if (
+      event.action === 'deleted' &&
+      selectedProduct.value?.id === event.productId
+    ) {
+      closeModal()
+    }
+
+    reloadProducts(currentPage.value)
+  }
+
+  window.Echo.channel('inventory.products')
+    .listen('.product.changed', reloadOnProductChange)
+})
+
+onBeforeUnmount(() => {
+  clearTimeout(searchTimer)
+
+  if (!window.Echo) return
+
+  window.Echo.leave('inventory.products')
+})
 </script>
 <template>
   <PageLayout>
