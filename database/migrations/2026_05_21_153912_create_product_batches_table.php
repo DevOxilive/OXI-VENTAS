@@ -14,7 +14,7 @@ return new class extends Migration {
                 ->constrained('branch_products')
                 ->cascadeOnDelete();
 
-            $table->string('lot_number')->nullable();
+            $table->string('lot_number')->nullable()->default(255);
             $table->date('expiration_date')->nullable();
 
             $table->decimal('initial_quantity', 12, 3)->default(0);

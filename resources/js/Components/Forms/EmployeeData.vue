@@ -61,10 +61,10 @@ function openGoogleMaps() {
 <template>
     <div class="space-y-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6">
         <section class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-            <h3
+            <h5
                 class="mb-6 border-b border-slate-200 pb-4 text-center text-2xl font-black tracking-tight text-[#1f1d2b] md:text-3xl">
                 Datos del empleado
-            </h3>
+            </h5>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <InputField label="Nombre(s)" field="firstName" v-model="employee.firstName" :readonly="readonly"
@@ -93,9 +93,10 @@ function openGoogleMaps() {
         </section>
 
         <section class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-            <h3 class="mb-4 border-b border-slate-200 pb-3 text-base font-bold text-slate-800">
+            <h5
+                class="mb-6 border-b border-slate-200 pb-4 text-center text-2xl font-black tracking-tight text-[#1f1d2b] md:text-3xl">
                 Domicilio
-            </h3>
+            </h5>
 
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -157,9 +158,10 @@ function openGoogleMaps() {
         </section>
 
         <section class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-            <h3 class="mb-4 border-b border-slate-200 pb-3 text-base font-bold text-slate-800">
+            <h5
+                class="mb-6 border-b border-slate-200 pb-4 text-center text-2xl font-black tracking-tight text-[#1f1d2b] md:text-3xl">
                 Laboral y fiscal
-            </h3>
+            </h5>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <InputField label="Puesto" field="position" v-model="employee.position" :readonly="readonly"
