@@ -6647,6 +6647,7 @@
         },
         {
             "name": "symfony/event-dispatcher",
+<<<<<<< HEAD
             "version": "v8.1.1",
             "source": {
                 "type": "git",
@@ -6657,6 +6658,18 @@
                 "type": "zip",
                 "url": "https://api.github.com/repos/symfony/event-dispatcher/zipball/abd6c11dc468725d1627302ad10f6cd486e9e3d0",
                 "reference": "abd6c11dc468725d1627302ad10f6cd486e9e3d0",
+=======
+            "version": "v7.4.14",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/event-dispatcher.git",
+                "reference": "51fe3d170227be8d1772214b82ae506e15ed78ff"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/event-dispatcher/zipball/51fe3d170227be8d1772214b82ae506e15ed78ff",
+                "reference": "51fe3d170227be8d1772214b82ae506e15ed78ff",
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
                 "shasum": ""
             },
             "require": {
@@ -6709,7 +6722,11 @@
             "description": "Provides tools that allow your application components to communicate with each other by dispatching events and listening to them",
             "homepage": "https://symfony.com",
             "support": {
+<<<<<<< HEAD
                 "source": "https://github.com/symfony/event-dispatcher/tree/v8.1.1"
+=======
+                "source": "https://github.com/symfony/event-dispatcher/tree/v7.4.14"
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
             },
             "funding": [
                 {
@@ -6729,7 +6746,11 @@
                     "type": "tidelift"
                 }
             ],
+<<<<<<< HEAD
             "time": "2026-06-09T12:28:30+00:00"
+=======
+            "time": "2026-06-06T11:10:32+00:00"
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
         },
         {
             "name": "symfony/event-dispatcher-contracts",
@@ -8401,6 +8422,7 @@
         },
         {
             "name": "symfony/serializer",
+<<<<<<< HEAD
             "version": "v8.1.1",
             "source": {
                 "type": "git",
@@ -8411,6 +8433,18 @@
                 "type": "zip",
                 "url": "https://api.github.com/repos/symfony/serializer/zipball/f911b744bc24658f435ea30439cfe536f0173a3a",
                 "reference": "f911b744bc24658f435ea30439cfe536f0173a3a",
+=======
+            "version": "v7.4.14",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/serializer.git",
+                "reference": "55acb01b9c8a5211dfbaf68c314d90d0ed2cc3d1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/serializer/zipball/55acb01b9c8a5211dfbaf68c314d90d0ed2cc3d1",
+                "reference": "55acb01b9c8a5211dfbaf68c314d90d0ed2cc3d1",
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
                 "shasum": ""
             },
             "require": {
@@ -8476,7 +8510,11 @@
             "description": "Handles serializing and deserializing data structures, including object graphs, into array structures or other formats like XML and JSON.",
             "homepage": "https://symfony.com",
             "support": {
+<<<<<<< HEAD
                 "source": "https://github.com/symfony/serializer/tree/v8.1.1"
+=======
+                "source": "https://github.com/symfony/serializer/tree/v7.4.14"
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
             },
             "funding": [
                 {
@@ -8496,7 +8534,11 @@
                     "type": "tidelift"
                 }
             ],
+<<<<<<< HEAD
             "time": "2026-06-27T09:05:56+00:00"
+=======
+            "time": "2026-06-27T08:31:18+00:00"
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
         },
         {
             "name": "symfony/service-contracts",
@@ -8587,6 +8629,7 @@
         },
         {
             "name": "symfony/string",
+<<<<<<< HEAD
             "version": "v8.1.0",
             "source": {
                 "type": "git",
@@ -8597,6 +8640,18 @@
                 "type": "zip",
                 "url": "https://api.github.com/repos/symfony/string/zipball/afd5944f4005862d961efb85c8bbd5c523c4e3c9",
                 "reference": "afd5944f4005862d961efb85c8bbd5c523c4e3c9",
+=======
+            "version": "v7.4.13",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/string.git",
+                "reference": "961683010db3b27ec6ebcd7308e6e1ee8fa7ffde"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/string/zipball/961683010db3b27ec6ebcd7308e6e1ee8fa7ffde",
+                "reference": "961683010db3b27ec6ebcd7308e6e1ee8fa7ffde",
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
                 "shasum": ""
             },
             "require": {
@@ -8653,7 +8708,11 @@
                 "utf8"
             ],
             "support": {
+<<<<<<< HEAD
                 "source": "https://github.com/symfony/string/tree/v8.1.0"
+=======
+                "source": "https://github.com/symfony/string/tree/v7.4.13"
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
             },
             "funding": [
                 {
@@ -8673,6 +8732,7 @@
                     "type": "tidelift"
                 }
             ],
+<<<<<<< HEAD
             "time": "2026-05-29T05:06:50+00:00"
         },
         {
@@ -8687,6 +8747,22 @@
                 "type": "zip",
                 "url": "https://api.github.com/repos/symfony/translation/zipball/342b4218630dc2cf284cedcb2080c80b13404014",
                 "reference": "342b4218630dc2cf284cedcb2080c80b13404014",
+=======
+            "time": "2026-05-23T15:23:29+00:00"
+        },
+        {
+            "name": "symfony/translation",
+            "version": "v7.4.14",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/translation.git",
+                "reference": "a1af4dacb24eb7ef4f1ca71b94da8ddbce572281"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/translation/zipball/a1af4dacb24eb7ef4f1ca71b94da8ddbce572281",
+                "reference": "a1af4dacb24eb7ef4f1ca71b94da8ddbce572281",
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
                 "shasum": ""
             },
             "require": {
@@ -8746,7 +8822,11 @@
             "description": "Provides tools to internationalize your application",
             "homepage": "https://symfony.com",
             "support": {
+<<<<<<< HEAD
                 "source": "https://github.com/symfony/translation/tree/v8.1.1"
+=======
+                "source": "https://github.com/symfony/translation/tree/v7.4.14"
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
             },
             "funding": [
                 {
@@ -8766,7 +8846,11 @@
                     "type": "tidelift"
                 }
             ],
+<<<<<<< HEAD
             "time": "2026-06-06T11:11:44+00:00"
+=======
+            "time": "2026-06-06T09:33:19+00:00"
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
         },
         {
             "name": "symfony/translation-contracts",
@@ -11998,6 +12082,7 @@
         },
         {
             "name": "symfony/yaml",
+<<<<<<< HEAD
             "version": "v8.1.1",
             "source": {
                 "type": "git",
@@ -12008,6 +12093,18 @@
                 "type": "zip",
                 "url": "https://api.github.com/repos/symfony/yaml/zipball/8e4cdd4311683516be06944f4b85244063cdb886",
                 "reference": "8e4cdd4311683516be06944f4b85244063cdb886",
+=======
+            "version": "v7.4.14",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/yaml.git",
+                "reference": "f8f328665ace2370d1e10645b807ba1646dc7dcc"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/yaml/zipball/f8f328665ace2370d1e10645b807ba1646dc7dcc",
+                "reference": "f8f328665ace2370d1e10645b807ba1646dc7dcc",
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
                 "shasum": ""
             },
             "require": {
@@ -12050,7 +12147,11 @@
             "description": "Loads and dumps YAML files",
             "homepage": "https://symfony.com",
             "support": {
+<<<<<<< HEAD
                 "source": "https://github.com/symfony/yaml/tree/v8.1.1"
+=======
+                "source": "https://github.com/symfony/yaml/tree/v7.4.14"
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
             },
             "funding": [
                 {
@@ -12070,7 +12171,11 @@
                     "type": "tidelift"
                 }
             ],
+<<<<<<< HEAD
             "time": "2026-06-09T11:06:24+00:00"
+=======
+            "time": "2026-06-08T20:24:16+00:00"
+>>>>>>> 950f9ace65d940707885df68521ee5352a0207d9
         },
         {
             "name": "theseer/tokenizer",
@@ -12132,5 +12237,5 @@
         "php": "^8.3"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }

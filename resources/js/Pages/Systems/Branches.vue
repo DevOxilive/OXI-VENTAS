@@ -7,6 +7,7 @@ import PageLayout from "@/Layouts/PageLayout.vue"
 import { GlobalModal, confirmModalAction, getModalRequestOptions } from "@/Components/Modales"
 import { GlobalTable } from "@/Components/Tables"
 import { GlobalToolbar } from "@/Components/Toolbars"
+import InputField from "@/Components/Forms/InputField.vue"
 import { usePermissions } from "@/Composables/usePermissions"
 import { getBranchModalConfig } from "@/config/ModalConfigs/branchModalConfig"
 import { branchTableConfig } from "@/config/TableConfigs/branchTableConfig"
@@ -284,23 +285,14 @@ onBeforeUnmount(() => {
       @close="closeCreateModal"
     >
       <form class="space-y-5" @submit.prevent="submit">
-        <div>
-          <label class="mb-2 block text-sm font-semibold text-slate-600">
-            Nombre de sucursal
-          </label>
-
-          <input
-            v-model="form.name"
-            :disabled="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
-            type="text"
-            class="w-full rounded-xl border-slate-300"
-            placeholder="Ej. Ajusco"
-          >
-
-          <p v-if="form.errors.name" class="mt-1 text-xs text-red-500">
-            {{ form.errors.name }}
-          </p>
-        </div>
+        <InputField
+          v-model="form.name"
+          label="Nombre de sucursal"
+          field="name"
+          :readonly="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
+          placeholder="Ej. Ajusco"
+          :error="form.errors.name"
+        />
 
         <div>
           <label class="mb-2 block text-sm font-semibold text-slate-600">

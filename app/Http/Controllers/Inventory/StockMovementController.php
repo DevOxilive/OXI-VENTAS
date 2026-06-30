@@ -7,6 +7,7 @@ use App\Models\BranchProduct;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use App\Services\StockMovementService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -105,6 +106,8 @@ class StockMovementController extends Controller
             $validated['reason']
         );
 
+        $this->authorizeMovement($request, $validated['type']);
+
         $branchProduct = BranchProduct::findOrFail($validated['branch_product_id']);
 
         try {
@@ -181,6 +184,22 @@ class StockMovementController extends Controller
             throw ValidationException::withMessages([
                 'reason' => 'El motivo seleccionado no corresponde al tipo de movimiento.',
             ]);
+        }
+    }
+
+    private function authorizeMovement(Request $request, string $type): void
+    {
+        $user = $request->user();
+
+        $requiredPermission = match ($type) {
+            StockMovement::TYPE_IN => 'inventory.branches.create',
+            StockMovement::TYPE_OUT,
+            StockMovement::TYPE_ADJUSTMENT => 'inventory.branches.update',
+            default => null,
+        };
+
+        if (!$requiredPermission || !$user?->hasPermission($requiredPermission)) {
+            throw new AuthorizationException('No tienes permisos para registrar este movimiento.');
         }
     }
 }
