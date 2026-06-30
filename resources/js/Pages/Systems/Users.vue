@@ -13,14 +13,8 @@ import {
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import UserRegisterModal from '@/Components/Systems/UserRegisterModal.vue'
 import UserDetailModal from '@/Components/Systems/UserDetailModal.vue'
-
-import {
-  UniversalActionModal,
-  ToastAlert,
-  ErrorAlert,
-  WarningAlert,
-} from '@/Components/Modales/UniversalActionModal'
-
+import { WarningAlert } from '@/Components/Modales/UniversalActionModal'
+import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 defineOptions({ layout: AdminLayout })
 
 const page = usePage()
@@ -409,92 +403,63 @@ function saveUser() {
   }))
 
   if (isEditing.value) {
-    form.put(route('systems.users.update', selectedUserId.value), {
-      preserveScroll: true,
-
+    form.put(route('systems.users.update', selectedUserId.value), getModalRequestOptions({
+      mode: 'update',
+      entityName: 'Usuario',
+      close: closeModal,
+      successTitle: 'Usuario actualizado correctamente',
+      errorTitle: 'Error al actualizar',
+      errorMessage: 'No fue posible actualizar la informaci?n del usuario.',
       onSuccess: () => {
-        ToastAlert({
-          icon: 'success',
-          title: 'Usuario actualizado correctamente',
-        })
-
         reloadUsers()
       },
-
-      onError: () => {
-        ErrorAlert({
-          title: 'Error al actualizar',
-          message: 'No fue posible actualizar la información del usuario.',
-        })
-      },
-
       onFinish: () => {
         form.transform((data) => data)
       },
-    })
+    }))
 
     return
   }
 
-  form.post(route('systems.users.store'), {
-    preserveScroll: true,
-
+  form.post(route('systems.users.store'), getModalRequestOptions({
+    mode: 'create',
+    entityName: 'Usuario',
+    close: closeModal,
+    successTitle: 'Usuario registrado correctamente',
+    errorTitle: 'Error al registrar',
+    errorMessage: 'No fue posible registrar el usuario.',
     onSuccess: () => {
-      ToastAlert({
-        icon: 'success',
-        title: 'Usuario registrado correctamente',
-      })
-
       reloadUsers()
     },
-
-    onError: () => {
-      ErrorAlert({
-        title: 'Error al registrar',
-        message: 'No fue posible registrar el usuario.',
-      })
-    },
-
     onFinish: () => {
       form.transform((data) => data)
     },
-  })
+  }))
 }
-
 function deleteUser(id) {
-  UniversalActionModal({
-    title: 'Confirmar eliminación',
-    message: '¿Deseas eliminar permanentemente este usuario?',
-    itemName: '',
-    confirmText: 'Sí, eliminar',
+  confirmModalAction({
+    mode: 'delete',
+    entityName: 'usuario',
+    title: 'Confirmar eliminaci�n',
+    message: '?Deseas eliminar permanentemente este usuario?',
+    confirmText: 'S?, eliminar',
     cancelText: 'Cancelar',
-    icon: 'warning',
     confirmButtonColor: '#ef4444',
   }).then((result) => {
     if (!result.isConfirmed) return
 
-    form.delete(route('systems.users.destroy', id), {
-      preserveScroll: true,
-
+    form.delete(route('systems.users.destroy', id), getModalRequestOptions({
+      mode: 'delete',
+      entityName: 'Usuario',
+      successTitle: 'Usuario eliminado correctamente',
+      errorTitle: 'Error al eliminar',
+      errorMessage: 'No fue posible eliminar el usuario.',
       onSuccess: () => {
-        ToastAlert({
-          icon: 'success',
-          title: 'Usuario eliminado correctamente',
-        })
-
         reloadUsers()
       },
-
-      onError: () => {
-        ErrorAlert({
-          title: 'Error al eliminar',
-          message: 'No fue posible eliminar el usuario.',
-        })
-      },
-    })
+    }))
   })
 }
-
 function reloadSystem() {
   router.reload({
     only: [

@@ -387,7 +387,7 @@ function submit() {
                 @click="removeBarcode(index)"
                 class="mt-[2px] h-[42px] min-w-[42px] rounded-xl border border-slate-300 bg-white text-black hover:bg-slate-100 transition"
               >
-                âˆ’
+                -
               </button>
             </div>
           </div>

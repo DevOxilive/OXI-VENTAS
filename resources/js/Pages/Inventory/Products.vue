@@ -11,9 +11,8 @@ import ProductRegisterModal from "@/Components/Inventory/ProductRegisterModal.vu
 import PageLayout from '@/Layouts/PageLayout.vue'
 import {
   ToastAlert,
-  UniversalActionModal,
 } from '@/Components/Modales/UniversalActionModal'
-
+import { confirmModalAction } from '@/Components/Modales/useModalConfig'
 defineOptions({
   layout: AdminLayout,
 });
@@ -295,10 +294,11 @@ function submitProduct() {
 }
 
 async function deleteProduct(selectedProduct) {
-  const result = await UniversalActionModal({
+  const result = await confirmModalAction({
+    mode: 'delete',
     title: 'Eliminar producto',
-    message: `¿Deseas eliminar ${selectedProduct.name}?`,
-    confirmText: 'Sí, eliminar',
+    message: `?Deseas eliminar ${selectedProduct.name}?`,
+    confirmText: 'S?, eliminar',
     cancelText: 'Cancelar',
     confirmButtonColor: '#ef4444',
   })

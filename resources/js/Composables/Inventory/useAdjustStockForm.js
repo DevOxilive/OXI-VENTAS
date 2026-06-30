@@ -2,9 +2,8 @@ import { computed, reactive, watch } from "vue";
 import { useForm } from "@inertiajs/vue3";
 import {
     WarningAlert,
-    ToastAlert,
-    ErrorAlert,
 } from "@/Components/Modales/UniversalActionModal";
+import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 import { validateSingleField, validateForm } from "@/Validation/schemaBuilder";
 
 const adjustmentFields = ["type", "reason", "quantity", "notes"];
@@ -316,30 +315,17 @@ export function useAdjustStockForm(props, emit) {
             return;
         }
         console.log("PAYLOAD FINAL:", form.data());
-        form.post(route("inventory.stock-movements.store"), {
-            preserveScroll: true,
-
+        form.post(route("inventory.stock-movements.store"), getModalRequestOptions({
+            mode: "create",
+            entityName: "Movimiento de stock",
+            close: () => emit("close"),
+            successTitle: "Movimiento registrado correctamente",
+            errorTitle: "Error en la operaci?n",
+            errorMessage: "No fue posible registrar el movimiento de stock",
             onSuccess: () => {
-                ToastAlert({
-                    icon: "success",
-                    title: "Movimiento registrado correctamente",
-                });
-
-                emit("close");
                 resetForm();
             },
-
-            onError: (errors) => {
-                console.log("ERRORES BACKEND:", errors);
-
-                ErrorAlert({
-                    title: "Error en la operación",
-                    message:
-                        Object.values(errors)[0] ??
-                        "No fue posible registrar el movimiento de stock",
-                });
-            },
-        });
+        }));
     }
 
     return {

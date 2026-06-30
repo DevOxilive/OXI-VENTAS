@@ -2,9 +2,8 @@ import { useForm, router } from "@inertiajs/vue3";
 import { reactive, computed, watch } from "vue";
 import {
     WarningAlert,
-    ToastAlert,
-    ErrorAlert,
 } from "@/Components/Modales/UniversalActionModal";
+import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 import { validateSingleField, validateForm } from "@/Validation/schemaBuilder";
 
 const employeeFields = [
@@ -280,16 +279,18 @@ export function useEmployeeForm(props, emit) {
             return;
         }
 
-        const config = {
+        const requestOptions = getModalRequestOptions({
+            mode: isCreating ? "create" : "update",
+            entityName: "Empleado",
+            close: () => emit("close"),
+            successTitle: isCreating
+                ? "Empleado registrado correctamente"
+                : "Empleado actualizado correctamente",
+            errorTitle: "Error en la operaci?n",
+            errorMessage: isCreating
+                ? "No fue posible registrar el empleado"
+                : "No fue posible actualizar el empleado",
             onSuccess: () => {
-                ToastAlert({
-                    icon: "success",
-                    title: isCreating
-                        ? "Empleado registrado correctamente"
-                        : "Empleado actualizado correctamente",
-                });
-
-                emit("close");
                 employee.reset();
                 clearFrontendErrors();
 
@@ -298,25 +299,15 @@ export function useEmployeeForm(props, emit) {
                     preserveScroll: true,
                 });
             },
-
-            onError: () => {
-                ErrorAlert({
-                    title: "Error en la operación",
-                    message: isCreating
-                        ? "No fue posible registrar el empleado"
-                        : "No fue posible actualizar el empleado",
-                });
-            },
-        };
+        });
 
         isCreating
-            ? employee.post(route("human-resources.employees.store"), config)
+            ? employee.post(route("human-resources.employees.store"), requestOptions)
             : employee.put(
                   route("human-resources.employees.update", props.employeeToEdit.id),
-                  config,
+                  requestOptions,
               );
     }
-
     return {
         employee,
         frontendErrors,
