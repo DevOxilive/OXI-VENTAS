@@ -1,13 +1,12 @@
 <script setup>
 import { computed, ref, watch } from "vue";
-import { router } from "@inertiajs/vue3";
+import { router, usePage } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
-import GlobalTable from '@/Components/Tables/GlobalTable.vue'
+import ProductTable from '@/Components/Inventory/ProductTable.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import { usePermissions } from '@/Composables/usePermissions'
 import { getProductToolbarConfig } from "@/config/ToolbarConfigs/productToolbarConfig";
-import { productTableConfig } from '@/config/TableConfigs/productTableConfig'
 import ProductRegisterModal from "@/Components/Inventory/ProductRegisterModal.vue";
 import PageLayout from '@/Layouts/PageLayout.vue'
 import {
@@ -20,6 +19,7 @@ defineOptions({
 });
 
 const { can } = usePermissions()
+const page = usePage()
 
 const props = defineProps({
   productsDB: {
@@ -51,6 +51,7 @@ const branchFilter = ref("");
 const categoryFilter = ref("");
 const stockFilter = ref("");
 const recordsToShow = ref(Number(props.filters?.per_page ?? 50));
+const branches = computed(() => page.props.branches || [])
 
 const localProducts = ref([]);
 
@@ -189,6 +190,7 @@ function resetProduct() {
     supplier: "",
     responsible: "",
     notes: "",
+    branch_ids: props.branch?.id ? [props.branch.id] : [],
     errors: {},
   };
 
@@ -322,10 +324,11 @@ async function deleteProduct(selectedProduct) {
         @action="handleProductToolbarAction" />
     </template>
 
-    <GlobalTable :items="filteredProducts" v-bind="productTableConfig" :pagination="productsDB"
-      @page-change="reloadProducts" @action="handleProductTableAction" />
+    <ProductTable :items="filteredProducts" :pagination="productsDB" @page-change="reloadProducts"
+      @action="handleProductTableAction" />
 
     <ProductRegisterModal v-if="showModal" :modo="modalMode" :product="product" :frontend-errors="frontendErrors"
+      :branch="branch" :branches="branches"
       @close="closeModal" @save="submitProduct" @validate="validateField" />
   </PageLayout>
 </template>

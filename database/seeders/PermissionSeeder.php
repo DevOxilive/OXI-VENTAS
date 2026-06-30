@@ -17,11 +17,6 @@ class PermissionSeeder extends Seeder
 
             'files.export',
 
-            'roles.view',
-            'roles.create',
-            'roles.update',
-            'roles.delete',
-
             'users.view',
             'users.create',
             'users.update',

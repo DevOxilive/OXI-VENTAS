@@ -1,6 +1,7 @@
 <script setup>
 import { useToolbarConfig } from './useToolbarConfig'
 import { getToolbarActionClasses } from './toolbarClasses'
+import { sanitizeToolbarFilter, sanitizeToolbarSearch } from './toolbarInputSanitizer'
 
 const props = defineProps({
     backButton: {
@@ -75,6 +76,20 @@ function optionToneClasses(option, active) {
 
     return tones[option?.tone] ?? tones.slate
 }
+
+function handleSearchInput(event) {
+    const value = sanitizeToolbarSearch(event.target.value)
+
+    event.target.value = value
+    return value
+}
+
+function handleTextFilterInput(event, filter) {
+    const value = sanitizeToolbarFilter(event.target.value, filter)
+
+    event.target.value = value
+    return value
+}
 </script>
 
 <template>
@@ -135,7 +150,7 @@ function optionToneClasses(option, active) {
         <div v-if="hasSearch || hasRecordsPerPage" class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 items-center">
             <input v-if="hasSearch" :value="search" type="text" :placeholder="searchPlaceholder"
                 class="h-11 w-full border border-slate-300 rounded-xl px-4 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-                @input="$emit('update:search', $event.target.value)" />
+                @input="$emit('update:search', handleSearchInput($event))" />
 
             <div v-if="hasRecordsPerPage"
                 class="h-11 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3">
@@ -211,7 +226,7 @@ function optionToneClasses(option, active) {
                         class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                         @input="$emit('update:filter', {
                             key: filter.key,
-                            value: $event.target.value
+                            value: handleTextFilterInput($event, filter)
                         })" />
 
                     <select v-else :value="filter.value ?? ''"

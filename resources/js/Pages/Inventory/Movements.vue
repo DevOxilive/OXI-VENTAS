@@ -3,6 +3,9 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { computed, ref } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import InputField from '@/Components/Forms/InputField.vue'
+import SelectField from '@/Components/Forms/SelectField.vue'
+import TextareaField from '@/Components/Forms/TextareaField.vue'
 import { getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { getInventoryMovementModalConfig } from '@/config/ModalConfigs/inventoryMovementModalConfig'
 
@@ -210,92 +213,53 @@ function submit() {
         >
             <form class="grid grid-cols-1 md:grid-cols-2 gap-5" @submit.prevent="submit">
                 <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-slate-700 mb-2">
-                        Producto / Sucursal
-                    </label>
-
-                    <select
+                    <SelectField
                         v-model="form.branch_product_id"
-                        class="w-full rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]"
-                    >
-                        <option value="">
-                            Selecciona un producto
-                        </option>
-
-                        <option
-                            v-for="item in branchProducts"
-                            :key="item.id"
-                            :value="item.id"
-                        >
-                            {{ item.product?.name }} - {{ item.branch?.name }}
-                        </option>
-                    </select>
+                        label="Producto / Sucursal"
+                        field="branch_product_id"
+                        placeholder="Selecciona un producto"
+                        :options="branchProducts.map(item => ({
+                            label: `${item.product?.name} - ${item.branch?.name}`,
+                            value: item.id,
+                        }))"
+                        :error="form.errors.branch_product_id"
+                    />
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">
-                        Tipo
-                    </label>
+                <SelectField
+                    v-model="form.type"
+                    label="Tipo"
+                    field="type"
+                    :options="typeOptions"
+                    :error="form.errors.type"
+                />
 
-                    <select
-                        v-model="form.type"
-                        class="w-full rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]"
-                    >
-                        <option
-                            v-for="option in typeOptions"
-                            :key="option.value"
-                            :value="option.value"
-                        >
-                            {{ option.label }}
-                        </option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">
-                        Motivo
-                    </label>
-
-                    <select
-                        v-model="form.reason"
-                        class="w-full rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]"
-                    >
-                        <option value="">
-                            Selecciona un motivo
-                        </option>
-
-                        <option
-                            v-for="option in reasonOptions"
-                            :key="option.value"
-                            :value="option.value"
-                        >
-                            {{ option.label }}
-                        </option>
-                    </select>
-                </div>
+                <SelectField
+                    v-model="form.reason"
+                    label="Motivo"
+                    field="reason"
+                    placeholder="Selecciona un motivo"
+                    :options="reasonOptions"
+                    :error="form.errors.reason"
+                />
 
                 <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-slate-700 mb-2">
-                        Cantidad
-                    </label>
-
-                    <input
+                    <InputField
                         v-model="form.quantity"
+                        label="Cantidad"
+                        field="quantity"
                         type="number"
-                        min="1"
-                        class="w-full rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]"
-                    >
+                        :error="form.errors.quantity"
+                    />
                 </div>
 
                 <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-slate-700 mb-2">
-                        Observaciones
-                    </label>
-
-                    <textarea
+                    <TextareaField
                         v-model="form.notes"
-                        rows="4"
-                        class="w-full rounded-xl border-slate-300 focus:ring-[#1f1d2b] focus:border-[#1f1d2b]"
+                        label="Observaciones"
+                        field="notes"
+                        :rows="4"
+                        :error="form.errors.notes"
                     />
                 </div>
             </form>

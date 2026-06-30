@@ -126,6 +126,7 @@ export const fieldRegistry = {
         type: "text",
         required: false,
         max: 255,
+        preserveCase: true,
         message: "URL inválida.",
     },
 
@@ -353,6 +354,35 @@ export const fieldRegistry = {
         type: "numeric",
         message: "Selecciona una subcategoría válida.",
     },
+
+    category_name: {
+        required: true,
+        type: "text",
+        min: 2,
+        max: 80,
+        titleCase: true,
+        preventSpam: true,
+        spamLevel: "soft",
+        message: "Nombre de categorÃ­a invÃ¡lido.",
+        spamMessage: "Nombre de categorÃ­a no vÃ¡lido.",
+    },
+
+    toolbar_search: {
+        required: false,
+        type: "text",
+        max: 120,
+        preserveCase: true,
+        message: "Busqueda invÃ¡lida.",
+    },
+
+    toolbar_filter_text: {
+        required: false,
+        type: "text",
+        max: 120,
+        preserveCase: true,
+        message: "Filtro invÃ¡lido.",
+    },
+
     lot_number: {
         required: false,
         type: "alphanumeric",

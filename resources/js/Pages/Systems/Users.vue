@@ -269,24 +269,23 @@ watch(viewMode, () => {
   reloadUsers()
 })
 
-function handleUsersTableAction({ action, row }) {
-  if (action === 'create-user' && can('users.create')) {
-    openModal(row)
-  }
-
-  if (action === 'edit' && can('users.update')) {
-    openModal(row)
-  }
-
-  if (action === 'delete' && can('users.delete')) {
-    deleteUser(row.id)
-  }
-}
-
-function handleUsersRowClick(row) {
-  if (viewMode.value === 'users' && can('users.view')) {
+const userTableActionHandlers = {
+  view: (row) => {
+    if (!can('users.view')) return
     openUserDetail(row)
-  }
+  },
+  createUser: (row) => {
+    if (!can('users.create')) return
+    openModal(row)
+  },
+  edit: (row) => {
+    if (!can('users.update')) return
+    openModal(row)
+  },
+  delete: (row) => {
+    if (!can('users.delete')) return
+    deleteUser(row.id)
+  },
 }
 
 function openUserDetail(user) {
@@ -414,8 +413,6 @@ function saveUser() {
       preserveScroll: true,
 
       onSuccess: () => {
-        closeModal()
-
         ToastAlert({
           icon: 'success',
           title: 'Usuario actualizado correctamente',
@@ -443,8 +440,6 @@ function saveUser() {
     preserveScroll: true,
 
     onSuccess: () => {
-      closeModal()
-
       ToastAlert({
         icon: 'success',
         title: 'Usuario registrado correctamente',
@@ -571,9 +566,10 @@ onBeforeUnmount(() => {
     </template>
 
     <UserTable :items="normalizedList" :pagination="activePaginator" :view-mode="viewMode" :can="can"
-      @page-change="handlePageChange" @action="handleUsersTableAction" @row-click="handleUsersRowClick" />
+      :action-handlers="userTableActionHandlers" @page-change="handlePageChange" />
 
-    <UserDetailModal v-if="showUserDetail && can('users.view')" :user="selectedUser" @close="closeUserDetail" />
+    <UserDetailModal v-if="showUserDetail && can('users.view')" :user="selectedUser" :permissions="permissions"
+      @close="closeUserDetail" />
 
     <UserRegisterModal v-if="showModal" :form="form" :errors="errors" :roles="roles" :branches="branches"
       :groupedPermissions="groupedPermissions" :isEditing="isEditing"

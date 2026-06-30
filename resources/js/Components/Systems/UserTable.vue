@@ -19,6 +19,10 @@ const props = defineProps({
         type: Function,
         required: true,
     },
+    actionHandlers: {
+        type: Object,
+        default: () => ({}),
+    },
 })
 
 defineEmits([
@@ -32,6 +36,10 @@ defineEmits([
     <GlobalTable :items="items" v-bind="getUsersTableConfig({
         viewMode: props.viewMode,
         can: props.can,
+        onViewUser: props.actionHandlers.view,
+        onCreateUser: props.actionHandlers.createUser,
+        onEditUser: props.actionHandlers.edit,
+        onDeleteUser: props.actionHandlers.delete,
     })" :pagination="pagination" @page-change="$emit('page-change', $event)" @action="$emit('action', $event)"
         @row-click="$emit('row-click', $event)" />
 </template>

@@ -18,6 +18,7 @@ return new class extends Migration {
                 ->constrained('products')
                 ->cascadeOnDelete();
 
+            $table->string('barcode')->nullable();
             $table->decimal('stock', 12, 3)->default(0);
             $table->decimal('min_stock', 12, 3)->default(0);
 

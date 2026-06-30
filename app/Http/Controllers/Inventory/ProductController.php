@@ -17,6 +17,9 @@ use Inertia\Inertia;
 
 class ProductController extends Controller
 {
+    private const PRODUCT_IMAGE_PRIVATE_DISK = 'local';
+    private const PRODUCT_IMAGE_LEGACY_DISK = 'public';
+
     public function index(Request $request, Branch $branch)
     {
         $perPage = $request->integer('per_page', 10);
@@ -60,6 +63,9 @@ class ProductController extends Controller
 
         $productsDB->getCollection()->transform(function ($item) {
             $product = $item->product;
+            $imageUrl = $product?->image
+                ? route('inventory.products.image', ['product' => $product->id])
+                : null;
 
             return [
                 'id' => $product?->id,
@@ -76,8 +82,10 @@ class ProductController extends Controller
                 'barcode' => $product?->barcodes?->first()?->code ?? 'Sin código',
                 'unit' => $product?->unit ?? '',
                 'name' => $product?->name ?? 'Producto sin nombre',
-                'image' => $product?->image,
+                'image' => $imageUrl,
+                'image_path' => $product?->image,
                 'category_id' => $product?->category_id,
+                'category_name' => $product?->category?->name ?? 'Sin categorÃ­a',
                 'category' => $product?->category?->name ?? 'Sin categoría',
 
                 'min_stock' => $item->min_stock ?? 0,
@@ -121,6 +129,21 @@ class ProductController extends Controller
         ]);
     }
 
+    public function image(Product $product)
+    {
+        if (!$product->image) {
+            abort(404);
+        }
+
+        $disk = $this->resolveImageDisk($product->image);
+
+        if (!$disk) {
+            abort(404);
+        }
+
+        return Storage::disk($disk)->response($product->image);
+    }
+
     public function store(Request $request, Branch $branch)
     {
         $data = $request->validate([
@@ -147,7 +170,7 @@ class ProductController extends Controller
         $imagePath = null;
 
         if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('products', 'public');
+            $imagePath = $request->file('image')->store('products', self::PRODUCT_IMAGE_PRIVATE_DISK);
         }
 
         [$product, $branchIds] = DB::transaction(function () use ($data, $branch, $imagePath, $barcodes) {
@@ -244,10 +267,10 @@ class ProductController extends Controller
 
             if ($request->hasFile('image')) {
                 if ($product->image) {
-                    Storage::disk('public')->delete($product->image);
+                    $this->deleteProductImage($product->image);
                 }
 
-                $imagePath = $request->file('image')->store('products', 'public');
+                $imagePath = $request->file('image')->store('products', self::PRODUCT_IMAGE_PRIVATE_DISK);
             }
 
             $product->update([
@@ -342,7 +365,7 @@ class ProductController extends Controller
                 $product->barcodes()->delete();
 
                 if ($product->image) {
-                    Storage::disk('public')->delete($product->image);
+                    $this->deleteProductImage($product->image);
                 }
 
                 $product->delete();
@@ -353,5 +376,29 @@ class ProductController extends Controller
         event(RealtimeActivityLogged::message('eliminó', 'el producto', $productName, 'Inventario', 'deleted'));
 
         return back()->with('success', 'Producto eliminado correctamente');
+    }
+
+    private function resolveImageDisk(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        foreach ([self::PRODUCT_IMAGE_PRIVATE_DISK, self::PRODUCT_IMAGE_LEGACY_DISK] as $disk) {
+            if (Storage::disk($disk)->exists($path)) {
+                return $disk;
+            }
+        }
+
+        return null;
+    }
+
+    private function deleteProductImage(?string $path): void
+    {
+        $disk = $this->resolveImageDisk($path);
+
+        if ($disk) {
+            Storage::disk($disk)->delete($path);
+        }
     }
 }

@@ -17,6 +17,12 @@ use Inertia\Inertia;
 
 class UserController extends Controller
 {
+    private function visiblePermissionsQuery()
+    {
+        return Permission::query()
+            ->where('name', 'not like', 'roles.%');
+    }
+
     private function syncUserPermissionOverrides(User $user, Role $role, array $finalPermissionIds = []): void
     {
         $rolePermissionIds = $role->permissions()
@@ -105,8 +111,8 @@ class UserController extends Controller
         $view = $request->input('view', 'users');
 
         $usersDB = User::with([
-            'role.permissions',
-            'permissions',
+            'role.permissions' => fn ($query) => $query->where('name', 'not like', 'roles.%'),
+            'permissions' => fn ($query) => $query->where('name', 'not like', 'roles.%'),
             'branches',
         ])
             ->select([
@@ -152,10 +158,13 @@ class UserController extends Controller
             'usersDB' => $usersDB,
 
             'roles' => Role::with('permissions')
+                ->with(['permissions' => fn ($query) => $query->where('name', 'not like', 'roles.%')])
                 ->orderBy('name')
                 ->get(),
 
-            'permissions' => Permission::orderBy('name')->get(),
+            'permissions' => $this->visiblePermissionsQuery()
+                ->orderBy('name')
+                ->get(),
 
             'branches' => Branch::where('active', true)
                 ->orderBy('name')

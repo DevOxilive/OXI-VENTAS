@@ -13,7 +13,7 @@ export function getProductToolbarConfig({
             ? `Administración de productos de la sucursal ${branch.name}`
             : "Administración de productos",
 
-        searchPlaceholder: "Buscar producto",
+        searchPlaceholder: "Buscar producto, código o código alterno...",
 
         recordsPerPageOptions: [10, 20, 50, 100, 200],
 

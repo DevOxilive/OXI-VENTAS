@@ -1,15 +1,66 @@
 <script setup>
+import { computed } from 'vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { userDetailModalConfig } from '@/config/ModalConfigs/userDetailModalConfig'
+import { usePermissionLabels } from '@/Composables/usePermissionLabels'
 
-defineProps({
+const props = defineProps({
     user: {
         type: Object,
         required: true,
     },
+    permissions: {
+        type: Array,
+        default: () => [],
+    },
 })
 
 const emit = defineEmits(['close'])
+const permissionSource = computed(() => props.permissions ?? [])
+const { permissionLabel, moduleLabel } = usePermissionLabels(permissionSource)
+
+const effectivePermissions = computed(() => {
+    const rolePermissions = props.user?.role?.permissions || []
+    const allowedPermissions = (props.user?.permissions || []).filter(
+        (permission) => (permission.pivot?.mode || 'allow') === 'allow'
+    )
+    const deniedPermissionIds = new Set(
+        (props.user?.permissions || [])
+            .filter((permission) => permission.pivot?.mode === 'deny')
+            .map((permission) => Number(permission.id))
+    )
+
+    return [...rolePermissions, ...allowedPermissions]
+        .filter((permission, index, permissions) => {
+            const permissionId = Number(permission.id)
+
+            return (
+                !deniedPermissionIds.has(permissionId) &&
+                permissions.findIndex((item) => Number(item.id) === permissionId) === index
+            )
+        })
+})
+
+const groupedEffectivePermissions = computed(() => {
+    return effectivePermissions.value.reduce((groups, permission) => {
+        const permissionName = permission.name || ''
+        const module = permissionName.startsWith('inventory.products.')
+            ? 'inventory.products'
+            : permissionName.startsWith('inventory.branches.')
+                ? 'inventory.branches'
+                : permissionName.startsWith('inventory.purchase-reports.')
+                    ? 'inventory.purchase-reports'
+                    : permissionName.split('.')[0]?.toLowerCase() || 'general'
+
+        if (!groups[module]) {
+            groups[module] = []
+        }
+
+        groups[module].push(permission)
+
+        return groups
+    }, {})
+})
 
 function closeModal() {
     emit('close')
@@ -77,14 +128,32 @@ function closeModal() {
                 Permisos activados
             </h3>
 
-            <div v-if="user.permissions?.length" class="flex flex-wrap gap-2">
-                <span
-                    v-for="permission in user.permissions"
-                    :key="permission.id"
-                    class="rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-xs text-slate-700"
+            <div v-if="effectivePermissions.length" class="space-y-4">
+                <div
+                    v-for="(permissionsGroup, module) in groupedEffectivePermissions"
+                    :key="module"
+                    class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
                 >
-                    {{ permission.name }}
-                </span>
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <h4 class="text-sm font-semibold text-slate-800">
+                            {{ moduleLabel(module) }}
+                        </h4>
+
+                        <span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                            {{ permissionsGroup.length }} permiso(s)
+                        </span>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        <span
+                            v-for="permission in permissionsGroup"
+                            :key="permission.id"
+                            class="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700"
+                        >
+                            {{ permissionLabel(permission.name) }}
+                        </span>
+                    </div>
+                </div>
             </div>
 
             <p v-else class="text-sm text-gray-500">

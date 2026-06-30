@@ -166,6 +166,12 @@ Route::middleware([
             )
             ->name('branches.products.index');
 
+        Route::get('/products/{product}/image', [ProductController::class, 'image'])
+            ->middleware(
+                'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete'
+            )
+            ->name('products.image');
+
         Route::post('/branches/{branch:slug}/products', [ProductController::class, 'store'])
             ->middleware('permission:inventory.products.create')
             ->name('branches.products.store');
@@ -209,7 +215,7 @@ Route::middleware([
             ->name('stock-movements.index');
 
         Route::post('/stock-movements', [StockMovementController::class, 'store'])
-            ->middleware('permission:inventory.branches.update')
+            ->middleware('permission:inventory.branches.create,inventory.branches.update')
             ->name('stock-movements.store');
 
         Route::get('/movements', [StockMovementController::class, 'index'])

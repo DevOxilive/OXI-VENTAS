@@ -6,6 +6,7 @@ import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
 import { getProductModalConfig } from "@/config/ModalConfigs/productModalConfig";
 import { modalPresets } from "@/config/ModalConfigs/modalPresets";
+import { sanitizeField } from "@/Validation/sanitizers";
 import {
   ToastAlert,
   ErrorAlert,
@@ -150,6 +151,14 @@ function closeCategoryDropdown() {
     showCategoryDropdown.value = false;
   }, 150);
 }
+
+function sanitizeCategorySearch(event) {
+  categorySearch.value = sanitizeField(event.target.value, {
+    type: "text",
+    titleCase: true,
+    max: 80,
+  });
+}
 const imagePreview = computed(() => {
   if (!form.image) return null;
 
@@ -157,7 +166,17 @@ const imagePreview = computed(() => {
     return URL.createObjectURL(form.image);
   }
 
-  return form.image;
+  if (
+    form.image.startsWith("blob:") ||
+    form.image.startsWith("data:") ||
+    form.image.startsWith("http://") ||
+    form.image.startsWith("https://") ||
+    form.image.startsWith("/")
+  ) {
+    return form.image;
+  }
+
+  return `/storage/${form.image.replace(/^\/+/, "")}`;
 });
 const invalidPrice = computed(() => {
   const cost = Number(form.cost || 0);
@@ -176,6 +195,26 @@ function removeBarcode(index) {
   if (form.barcodes.length === 1) return;
   form.barcodes.splice(index, 1);
 }
+
+function setCreateDefaults() {
+  form.barcodes = [""];
+  form.branch_ids = [];
+  ensureCurrentBranchSelected();
+  categorySearch.value = "";
+  form.unit = "";
+  form.name = "";
+  form.min_stock = 0;
+  form.category_id = "";
+  form.cost = "";
+  form.sale_price = "";
+  form.entry_date = new Date().toISOString().slice(0, 10);
+  form.active = true;
+  form.image = null;
+  form.quantity = null;
+  form.kilos = null;
+  form.liters = null;
+}
+
 function ensureCurrentBranchSelected() {
   const currentBranchId = props.branch?.id;
 
@@ -189,6 +228,16 @@ function ensureCurrentBranchSelected() {
     form.branch_ids.push(currentBranchId);
   }
 }
+
+watch(
+  () => [props.mode, props.branch?.id],
+  ([mode]) => {
+    if (mode !== "create") return;
+    setCreateDefaults();
+  },
+  { immediate: true }
+);
+
 function submit() {
   const branchSlug = props.branch?.slug;
 
@@ -408,14 +457,19 @@ function submit() {
         </div>
         <!-- SUCURSALES -->
         <div v-if="mode !== 'view'" class="md:col-span-2">
-          <div class="flex items-center justify-between mb-2">
-            <label class="block text-sm font-semibold text-slate-600">
+          <div class="mb-3 flex flex-col gap-3 rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/70 p-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700">
               Sucursales donde se agregará
-            </label>
+              </label>
+              <p class="mt-1 text-xs text-slate-500">
+                La sucursal actual queda seleccionada y protegida automáticamente.
+              </p>
+            </div>
 
             <button
               type="button"
-              class="text-sm font-semibold text-slate-700 hover:text-black"
+              class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:border-slate-300 hover:bg-slate-100"
               @click="
                 form.branch_ids.length === branchesDB.length
                   ? (form.branch_ids = [props.branch?.id].filter(Boolean))
@@ -431,28 +485,75 @@ function submit() {
           </div>
 
           <div
-            class="max-h-[130px] overflow-y-auto border border-slate-200 rounded-2xl p-3 bg-slate-50"
+            class="max-h-[220px] overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-3 shadow-inner shadow-slate-100"
           >
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               <label
                 v-for="branchItem in branchesDB"
                 :key="branchItem.id"
-                class="flex items-center gap-3 border rounded-xl px-4 py-3 bg-white cursor-pointer hover:bg-slate-100"
+                class="group relative flex items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 transition"
+                :class="
+                  isCurrentBranch(branchItem.id)
+                    ? 'cursor-not-allowed border-blue-200 bg-blue-50 shadow-sm shadow-blue-100/80'
+                    : form.branch_ids.includes(branchItem.id)
+                      ? 'cursor-pointer border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-300/50'
+                      : 'cursor-pointer border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                "
               >
                 <input
                   type="checkbox"
                   :value="branchItem.id"
                   v-model="form.branch_ids"
                   :disabled="isCurrentBranch(branchItem.id)"
-                  class="rounded border-slate-300 disabled:opacity-60"
+                  class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 disabled:opacity-70"
                 />
 
-                {{ branchItem.name }}
+                <div class="min-w-0">
+                  <p
+                    class="truncate text-sm font-semibold"
+                    :class="
+                      isCurrentBranch(branchItem.id)
+                        ? 'text-blue-900'
+                        : form.branch_ids.includes(branchItem.id)
+                          ? 'text-white'
+                          : 'text-slate-800'
+                    "
+                  >
+                    {{ branchItem.name }}
+                  </p>
+
+                  <p
+                    class="mt-1 text-xs"
+                    :class="
+                      isCurrentBranch(branchItem.id)
+                        ? 'text-blue-700'
+                        : form.branch_ids.includes(branchItem.id)
+                          ? 'text-slate-200'
+                          : 'text-slate-500'
+                    "
+                  >
+                    {{
+                      isCurrentBranch(branchItem.id)
+                        ? 'Sucursal actual'
+                        : form.branch_ids.includes(branchItem.id)
+                          ? 'Producto disponible aquí'
+                          : 'Marcar para habilitar'
+                    }}
+                  </p>
+                </div>
+
                 <span
                   v-if="isCurrentBranch(branchItem.id)"
-                  class="text-xs text-slate-400 ml-1"
+                  class="ml-auto inline-flex shrink-0 items-center rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-blue-700"
                 >
-                  actual
+                  Fija
+                </span>
+
+                <span
+                  v-else-if="form.branch_ids.includes(branchItem.id)"
+                  class="ml-auto inline-flex shrink-0 items-center rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white"
+                >
+                  Activa
                 </span>
               </label>
             </div>
@@ -481,6 +582,7 @@ function submit() {
 
           <input
             v-model="categorySearch"
+            @input="sanitizeCategorySearch"
             @focus="showCategoryDropdown = true"
             @blur="closeCategoryDropdown"
             type="text"
