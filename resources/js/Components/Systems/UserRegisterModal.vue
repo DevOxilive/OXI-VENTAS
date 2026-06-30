@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import InputField from '@/Components/Forms/InputField.vue'
+import SelectField from '@/Components/Forms/SelectField.vue'
 import { getUserModalConfig } from '@/config/ModalConfigs/userModalConfig'
 
 const props = defineProps({
@@ -65,85 +67,50 @@ function closeModal() {
                         </h3>
 
                         <div class="grid grid-cols-1 gap-4">
-                            <div>
-                                <input
-                                    v-model="form.name"
-                                    maxlength="50"
-                                    minlength="1"
-                                    placeholder="Nombre completo"
-                                    class="w-full rounded-xl border px-4 py-3"
-                                >
+                            <InputField
+                                v-model="form.name"
+                                label="Nombre completo"
+                                field="name"
+                                placeholder="Nombre completo"
+                                :error="errors.name"
+                            />
 
-                                <p v-if="errors.name" class="mt-1 text-xs text-red-500">
-                                    {{ errors.name }}
-                                </p>
-                            </div>
+                            <InputField
+                                v-model="form.email"
+                                label="Correo electrónico"
+                                field="email"
+                                type="email"
+                                placeholder="Correo electrónico"
+                                :error="errors.email"
+                            />
 
-                            <div>
-                                <input
-                                    v-model="form.email"
-                                    placeholder="Correo electronico"
-                                    class="w-full rounded-xl border bg-gray-100 px-4 py-3"
-                                >
+                            <SelectField
+                                v-model="form.role_id"
+                                label="Rol"
+                                field="role_id"
+                                placeholder="Seleccionar rol"
+                                :options="roles.map(role => ({ label: role.name, value: role.id }))"
+                                :error="errors.role_id"
+                                @change="$emit('change-role')"
+                            />
 
-                                <p v-if="errors.email" class="mt-1 text-xs text-red-500">
-                                    {{ errors.email }}
-                                </p>
-                            </div>
+                            <InputField
+                                v-model="form.password"
+                                label="Contraseña"
+                                field="password"
+                                type="password"
+                                placeholder="Contraseña"
+                                :error="errors.password"
+                            />
 
-                            <div>
-                                <select
-                                    v-model="form.role_id"
-                                    class="w-full rounded-xl border bg-white px-4 py-3"
-                                    @change="$emit('change-role')"
-                                >
-                                    <option value="">
-                                        Seleccionar rol
-                                    </option>
-
-                                    <option
-                                        v-for="role in roles"
-                                        :key="role.id"
-                                        :value="role.id"
-                                    >
-                                        {{ role.name }}
-                                    </option>
-                                </select>
-
-                                <p v-if="errors.role_id" class="mt-1 text-xs text-red-500">
-                                    {{ errors.role_id }}
-                                </p>
-                            </div>
-
-                            <div>
-                                <input
-                                    v-model="form.password"
-                                    type="password"
-                                    maxlength="15"
-                                    minlength="7"
-                                    placeholder="Contrasena"
-                                    class="w-full rounded-xl border px-4 py-3"
-                                >
-
-                                <p v-if="errors.password" class="mt-1 text-xs text-red-500">
-                                    {{ errors.password }}
-                                </p>
-                            </div>
-
-                            <div>
-                                <input
-                                    v-model="form.password_confirmation"
-                                    type="password"
-                                    maxlength="15"
-                                    minlength="7"
-                                    placeholder="Confirmar contrasena"
-                                    class="w-full rounded-xl border px-4 py-3"
-                                >
-
-                                <p v-if="errors.password_confirmation" class="mt-1 text-xs text-red-500">
-                                    {{ errors.password_confirmation }}
-                                </p>
-                            </div>
+                            <InputField
+                                v-model="form.password_confirmation"
+                                label="Confirmar contraseña"
+                                field="password_confirmation"
+                                type="password"
+                                placeholder="Confirmar contraseña"
+                                :error="errors.password_confirmation"
+                            />
                         </div>
                     </section>
 

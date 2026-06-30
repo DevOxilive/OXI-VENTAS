@@ -4,7 +4,7 @@ export function getEmployeeToolbarConfig({ canCreate, canExport }) {
     return {
         showSearch: false,
         showRecordsPerPage: true,
-        searchPlaceholder: "Buscar empleado...",
+        searchPlaceholder: "Buscar empleado por nombre, correo o puesto...",
 
         actions: [
             {

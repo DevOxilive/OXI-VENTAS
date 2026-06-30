@@ -4,7 +4,7 @@ import { router } from '@inertiajs/vue3'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ProductModal from '@/Components/Inventory/ProductModal.vue'
-import GlobalTable from '@/Components/Tables/GlobalTable.vue'
+import ProductTable from '@/Components/Inventory/ProductTable.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import { useProductActions } from '@/Composables/Inventory/useProductActions'
@@ -53,7 +53,6 @@ const recordsToShow = ref(Number(props.filters.per_page ?? 50))
 
 const products = computed(() => props.productsDB?.data ?? [])
 const currentPage = computed(() => props.productsDB?.current_page ?? 1)
-const totalPages = computed(() => props.productsDB?.last_page ?? 1)
 
 const productToolbarConfig = computed(() =>
   getProductToolbarConfig({
@@ -63,84 +62,6 @@ const productToolbarConfig = computed(() =>
     canCreate: can('inventory.products.create'),
   })
 )
-
-const productColumns = [
-  {
-    key: 'barcode',
-    label: 'Código barras',
-    format: 'text',
-    fallback: 'Sin código',
-    mobileLabel: 'Código',
-  },
-  {
-    key: 'name',
-    label: 'Producto',
-    format: 'text',
-    subKey: 'presentation',
-    mobileSecondary: true,
-  },
-  {
-    key: 'category_name',
-    label: 'Categoría',
-    format: 'badge',
-    fallback: 'Sin categoría',
-    mobileBadge: true,
-  },
-  {
-    key: 'unit',
-    label: 'Unidad',
-    format: 'text',
-    fallback: 'Sin unidad',
-    mobileDisplay: false,
-  },
-  {
-    key: 'cost',
-    label: 'Precio inicial',
-    format: 'currency',
-    formatOptions: {
-      decimals: 2,
-      fallback: '$0.00',
-    },
-    mobileDisplay: false,
-  },
-  {
-    key: 'price',
-    label: 'Precio venta',
-    format: 'currency',
-    formatOptions: {
-      decimals: 2,
-      fallback: '$0.00',
-    },
-    mobileLabel: 'Precio',
-  },
-]
-
-const productActions = computed(() => [
-  {
-    id: 'view',
-    label: 'Ver',
-    icon: 'visibility',
-    variant: 'blue',
-    hidden: () => !can('inventory.products.view'),
-    mobile: 'button',
-  },
-  {
-    id: 'edit',
-    label: 'Editar',
-    icon: 'edit',
-    variant: 'amber',
-    hidden: () => !can('inventory.products.update'),
-    mobile: 'button',
-  },
-  {
-    id: 'delete',
-    label: 'Eliminar',
-    icon: 'delete',
-    variant: 'red',
-    hidden: () => !can('inventory.products.delete'),
-    mobile: 'button',
-  },
-])
 
 function handleProductToolbarFilter({ key, value }) {
   if (key === 'categoryFilter') {
@@ -191,6 +112,7 @@ function reloadProducts(pageOrUrl = 1) {
     }
   )
 }
+
 let searchTimer = null
 
 watch(search, () => {
@@ -231,6 +153,13 @@ onMounted(() => {
     if (!shouldReloadForProductEvent(event)) return
 
     if (
+      showModal.value &&
+      ['created', 'updated'].includes(event.action)
+    ) {
+      closeModal()
+    }
+
+    if (
       event.action === 'deleted' &&
       selectedProduct.value?.id === event.productId
     ) {
@@ -252,6 +181,7 @@ onBeforeUnmount(() => {
   window.Echo.leave('inventory.products')
 })
 </script>
+
 <template>
   <PageLayout>
     <template #toolbar>
@@ -261,9 +191,8 @@ onBeforeUnmount(() => {
         @update:records-per-page="recordsToShow = $event" @action="handleProductToolbarAction" />
     </template>
 
-    <GlobalTable :items="products" :columns="productColumns" :actions="productActions" row-key="id"
-      mobile-card-header-field="name" no-data-message="No se encontraron productos" :pagination="productsDB"
-      @page-change="reloadProducts" @action="handleProductAction" />
+    <ProductTable :items="products" :pagination="productsDB" @page-change="reloadProducts"
+      @action="handleProductAction" />
 
     <ProductModal v-if="
       showModal &&

@@ -3,6 +3,8 @@ import { computed, watch } from 'vue'
 import { useForm, router } from '@inertiajs/vue3'
 
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import InputField from '@/Components/Forms/InputField.vue'
+import TextareaField from '@/Components/Forms/TextareaField.vue'
 import {
     confirmModalAction,
     getModalRequestOptions,
@@ -189,66 +191,52 @@ watch(
                 </h3>
 
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div>
-                        <label class="text-xs font-medium text-slate-500">Cantidad contada</label>
-                        <input
-                            v-model="form.counted_quantity"
-                            type="number"
-                            min="0"
-                            :readonly="isReadOnly || isDeleteMode"
-                            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
-                        >
-                        <p v-if="form.errors.counted_quantity" class="mt-1 text-xs text-red-600">
-                            {{ form.errors.counted_quantity }}
-                        </p>
-                    </div>
+                    <InputField
+                        v-model="form.counted_quantity"
+                        label="Cantidad contada"
+                        field="quantity"
+                        type="number"
+                        :readonly="isReadOnly || isDeleteMode"
+                        :error="form.errors.counted_quantity"
+                    />
 
-                    <div>
-                        <label class="text-xs font-medium text-slate-500">Cantidad danada</label>
-                        <input
-                            v-model="form.damaged_quantity"
-                            type="number"
-                            min="0"
-                            :readonly="isReadOnly || isDeleteMode"
-                            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
-                        >
-                        <p v-if="form.errors.damaged_quantity" class="mt-1 text-xs text-red-600">
-                            {{ form.errors.damaged_quantity }}
-                        </p>
-                    </div>
+                    <InputField
+                        v-model="form.damaged_quantity"
+                        label="Cantidad dañada"
+                        field="quantity"
+                        type="number"
+                        :readonly="isReadOnly || isDeleteMode"
+                        :error="form.errors.damaged_quantity"
+                    />
 
-                    <div>
-                        <label class="text-xs font-medium text-slate-500">Cantidad caducada</label>
-                        <input
-                            v-model="form.expired_quantity"
-                            type="number"
-                            min="0"
-                            :readonly="isReadOnly || isDeleteMode"
-                            class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
-                        >
-                        <p v-if="form.errors.expired_quantity" class="mt-1 text-xs text-red-600">
-                            {{ form.errors.expired_quantity }}
-                        </p>
-                    </div>
+                    <InputField
+                        v-model="form.expired_quantity"
+                        label="Cantidad caducada"
+                        field="quantity"
+                        type="number"
+                        :readonly="isReadOnly || isDeleteMode"
+                        :error="form.errors.expired_quantity"
+                    />
                 </div>
 
                 <div class="mt-4">
-                    <label class="text-xs font-medium text-slate-500">Caducidad</label>
-                    <input
+                    <InputField
                         v-model="form.expiration_date"
+                        label="Caducidad"
+                        field="expiration_date"
                         type="date"
                         :readonly="isReadOnly || isDeleteMode"
-                        class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                    >
+                    />
                 </div>
 
                 <div class="mt-4">
-                    <label class="text-xs font-medium text-slate-500">Observaciones</label>
-                    <textarea
+                    <TextareaField
                         v-model="form.notes"
-                        rows="4"
+                        label="Observaciones"
+                        field="notes"
+                        :rows="4"
                         :readonly="isReadOnly || isDeleteMode"
-                        class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        :error="form.errors.notes"
                     />
                 </div>
             </div>

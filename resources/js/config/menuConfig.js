@@ -43,10 +43,6 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("users.create") ||
         can("users.update") ||
         can("users.delete") ||
-        can("roles.view") ||
-        can("roles.create") ||
-        can("roles.update") ||
-        can("roles.delete") ||
         can("branches.view") ||
         can("branches.create") ||
         can("branches.update") ||

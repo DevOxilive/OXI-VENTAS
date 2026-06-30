@@ -6,23 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-  public function up(): void
-{
-    Schema::create('permission_user', function (Blueprint $table) {
-        $table->id();
-        $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-        $table->foreignId('permission_id')->constrained()->cascadeOnDelete();
-        $table->timestamps();
-    });
-}
-    
+    public function up(): void
+    {
+        Schema::create('permission_user', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('permission_id')->constrained()->cascadeOnDelete();
+            $table->string('mode', 10)->default('allow');
+            $table->timestamps();
 
-    /**
-     * Reverse the migrations.
-     */
+            $table->unique(['user_id', 'permission_id']);
+        });
+    }
+
     public function down(): void
     {
         Schema::dropIfExists('permission_user');

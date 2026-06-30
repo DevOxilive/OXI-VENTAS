@@ -1,6 +1,6 @@
 /**
  * Configuración para ProductTable
- * Usada en: Pages/Inventory/Products.vue
+ * Usada en: Components/Inventory/ProductTable.vue
  */
 
 export const productTableConfig = {
@@ -15,22 +15,6 @@ export const productTableConfig = {
             fallback: "Sin código",
         },
         {
-            key: "image",
-            label: "Imagen",
-            format: "badge",
-            formatOptions: {
-                statusMap: {
-                    [true]: "Con imagen",
-                    [false]: "Sin imagen",
-                },
-                colorMap: {
-                    true: "green",
-                    false: "slate",
-                },
-            },
-            mobileDisplay: false,
-        },
-        {
             key: "name",
             label: "Producto",
             format: "text",
@@ -40,6 +24,7 @@ export const productTableConfig = {
             subKey: "presentation",
             mobileLabel: "Producto",
             mobileSecondary: true,
+            fallback: "Producto sin nombre",
         },
         {
             key: "category",
@@ -47,12 +32,14 @@ export const productTableConfig = {
             format: "badge",
             mobileLabel: "Cat.",
             mobileDisplay: false,
+            fallback: "Sin categorÃ­a",
         },
         {
             key: "unit",
             label: "Unidad de medida",
             format: "text",
             mobileDisplay: false,
+            fallback: "Sin unidad",
         },
         {
             key: "cost",
@@ -83,24 +70,28 @@ export const productTableConfig = {
             label: "Ver",
             icon: "visibility",
             variant: "blue",
-            permission: "inventory.view",
+            permission: "inventory.products.view",
+            mobile: "button",
         },
         {
             id: "edit",
             label: "Editar",
             icon: "edit",
             variant: "amber",
-            permission: "inventory.update",
+            permission: "inventory.products.update",
+            mobile: "button",
         },
         {
             id: "delete",
             label: "Eliminar",
             icon: "delete",
             variant: "red",
-            permission: "inventory.delete",
+            permission: "inventory.products.delete",
+            mobile: "button",
         },
     ],
 
     mobileCardHeaderField: "name",
     noDataMessage: "No se encontraron productos",
+    rowKey: "id",
 };

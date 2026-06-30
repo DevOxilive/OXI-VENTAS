@@ -3,6 +3,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import InputField from '@/Components/Forms/InputField.vue'
 import { getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { getCreatePhysicalCountModalConfig } from '@/config/ModalConfigs/createPhysicalCountModalConfig'
 
@@ -81,25 +82,13 @@ function submit() {
             @submit.prevent="submit"
         >
             <!-- Nombre del conteo -->
-            <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700">
-                    Nombre del conteo
-                </label>
-
-                <input
-                    v-model="form.name"
-                    type="text"
-                    class="w-full rounded-lg border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="Ej. Conteo 15/06/2026"
-                >
-
-                <p
-                    v-if="form.errors.name"
-                    class="mt-1 text-sm text-red-600"
-                >
-                    {{ form.errors.name }}
-                </p>
-            </div>
+            <InputField
+                v-model="form.name"
+                label="Nombre del conteo"
+                field="name"
+                placeholder="Ej. Conteo 15/06/2026"
+                :error="form.errors.name"
+            />
 
             <!-- Participantes -->
             <div>

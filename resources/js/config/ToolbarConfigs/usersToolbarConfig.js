@@ -5,6 +5,8 @@ export function getUsersToolbarConfig({ viewMode }) {
         showSearch: true,
         showRecordsPerPage: true,
         searchPlaceholder:
-            viewMode === "users" ? "Buscar usuario..." : "Buscar empleado...",
+            viewMode === "users"
+                ? "Buscar usuario por nombre, correo o rol..."
+                : "Buscar empleado por nombre, correo o puesto...",
     };
 }

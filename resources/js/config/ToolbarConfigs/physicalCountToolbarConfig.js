@@ -2,7 +2,7 @@ export function getPhysicalCountToolbarConfig({ branch, canCreate }) {
     return {
         title: 'Conteo fisico',
         subtitle: `Sucursal: ${branch?.name ?? 'No seleccionada'}`,
-        searchPlaceholder: 'Buscar conteo, folio o estado',
+        searchPlaceholder: 'Buscar conteo, folio, usuario o estado...',
         showRecordsPerPage: false,
         filters: [
             {

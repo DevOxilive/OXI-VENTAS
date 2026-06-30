@@ -3,6 +3,8 @@ import { computed } from 'vue'
 
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import InputField from '@/Components/Forms/InputField.vue'
+import SelectField from '@/Components/Forms/SelectField.vue'
+import TextareaField from '@/Components/Forms/TextareaField.vue'
 import { getBatchAdjustmentModalConfig } from '@/config/ModalConfigs/batchAdjustmentModalConfig'
 
 const emit = defineEmits(['close', 'save'])
@@ -63,6 +65,12 @@ const modalConfig = computed(() => getBatchAdjustmentModalConfig({
     processing: props.processing,
 }))
 
+const batchStatusOptions = [
+    { label: 'Activo', value: 'ACTIVE' },
+    { label: 'Inactivo', value: 'INACTIVE' },
+    { label: 'Temporada', value: 'SEASONAL' },
+]
+
 function closeModal() {
     if (props.processing) return
 
@@ -79,23 +87,23 @@ function closeModal() {
         <section class="min-h-0 w-full">
             <div class="border-b border-slate-200 px-5 py-4">
                 <h3 class="font-black text-slate-900">
-                    {{ usesLot ? form.lot_number || 'Lote sin número' : 'Producto sin lote' }}
+                    {{ usesLot ? form.lot_number || 'Lote sin numero' : 'Producto sin lote' }}
                 </h3>
 
-                <p class="text-sm text-slate-500 mt-1">
-                    Actualiza los datos del lote, su configuración y el ajuste de cantidad.
+                <p class="mt-1 text-sm text-slate-500">
+                    Actualiza los datos del lote, su configuracion y el ajuste de cantidad.
                 </p>
             </div>
 
             <div class="p-5">
-                <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+                <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
                     <section class="space-y-4">
                         <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                             <p class="text-sm font-black text-slate-800">
-                                Información del lote
+                                Informacion del lote
                             </p>
 
-                            <p class="text-xs text-slate-500 mt-1">
+                            <p class="mt-1 text-xs text-slate-500">
                                 Datos generales del lote o producto sin lote.
                             </p>
 
@@ -107,15 +115,15 @@ function closeModal() {
                                                 Tiene lote?
                                             </p>
 
-                                            <p class="text-xs text-slate-500 mt-0.5">
-                                                Actívalo si este registro debe manejar número de lote.
+                                            <p class="mt-0.5 text-xs text-slate-500">
+                                                Activalo si este registro debe manejar numero de lote.
                                             </p>
                                         </div>
 
                                         <button
                                             type="button"
                                             :disabled="processing"
-                                            class="relative inline-flex h-8 w-16 items-center rounded-full transition disabled:opacity-50 shrink-0"
+                                            class="relative inline-flex h-8 w-16 shrink-0 items-center rounded-full transition disabled:opacity-50"
                                             :class="usesLot ? 'bg-[#1f1d2b]' : 'bg-slate-300'"
                                             @click="toggleLot"
                                         >
@@ -176,36 +184,20 @@ function closeModal() {
                                 />
 
                                 <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                    <label class="block text-sm font-black text-slate-800 mb-1">
-                                        Nota del ajuste
-                                    </label>
-
-                                    <p class="text-xs text-slate-500 mb-3">
-                                        Esta nota quedará registrada en el historial de movimientos.
+                                    <p class="mb-3 text-xs text-slate-500">
+                                        Esta nota quedara registrada en el historial de movimientos.
                                     </p>
 
-                                    <textarea
+                                    <TextareaField
                                         v-model="form.notes"
+                                        label="Nota del ajuste"
+                                        field="notes"
+                                        placeholder="Ej. Correccion por error de captura, revision fisica del lote, ajuste solicitado por contabilidad..."
+                                        :rows="4"
                                         :readonly="processing"
-                                        rows="4"
-                                        maxlength="500"
-                                        placeholder="Ej. Corrección por error de captura, revisión física del lote, ajuste solicitado por contabilidad..."
-                                        class="w-full resize-none rounded-2xl border-slate-300 text-sm font-semibold focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
-                                        @input="validateField('notes')"
-                                    ></textarea>
-
-                                    <div class="flex items-center justify-between mt-1">
-                                        <p
-                                            v-if="frontendErrors.notes"
-                                            class="text-xs font-semibold text-red-600"
-                                        >
-                                            {{ frontendErrors.notes }}
-                                        </p>
-
-                                        <p class="ml-auto text-[11px] font-bold text-slate-400">
-                                            {{ form.notes.length }}/500
-                                        </p>
-                                    </div>
+                                        :error="frontendErrors.notes"
+                                        @validate="validateField"
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -214,36 +206,24 @@ function closeModal() {
                     <section class="space-y-4">
                         <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                             <p class="text-sm font-black text-slate-800">
-                                Configuración del lote
+                                Configuracion del lote
                             </p>
 
-                            <p class="text-xs text-slate-500 mt-1">
+                            <p class="mt-1 text-xs text-slate-500">
                                 Define si este lote esta activo, inactivo o si pertenece a una temporada.
                             </p>
 
                             <div class="mt-4 space-y-4">
                                 <div>
-                                    <label class="block text-sm font-bold text-slate-700 mb-2">
-                                        Estado del lote
-                                    </label>
-
-                                    <select
+                                    <SelectField
                                         v-model="form.status"
+                                        label="Estado del lote"
+                                        field="status"
                                         :disabled="processing"
-                                        class="w-full rounded-2xl border-slate-300 text-sm font-semibold focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
-                                        @change="validateField('status')"
-                                    >
-                                        <option value="ACTIVE">Activo</option>
-                                        <option value="INACTIVE">Inactivo</option>
-                                        <option value="SEASONAL">Temporada</option>
-                                    </select>
-
-                                    <p
-                                        v-if="frontendErrors.status"
-                                        class="text-xs font-semibold text-red-600 mt-1"
-                                    >
-                                        {{ frontendErrors.status }}
-                                    </p>
+                                        :options="batchStatusOptions"
+                                        :error="frontendErrors.status"
+                                        @validate="validateField"
+                                    />
                                 </div>
 
                                 <div
@@ -255,7 +235,7 @@ function closeModal() {
                                             Temporada del lote
                                         </p>
 
-                                        <p class="text-xs text-amber-700 mt-1">
+                                        <p class="mt-1 text-xs text-amber-700">
                                             Estas fechas solo aplican cuando el estado del lote es temporada.
                                         </p>
                                     </div>
@@ -289,7 +269,7 @@ function closeModal() {
                                         Temporada
                                     </p>
 
-                                    <p class="text-sm font-semibold text-slate-700 mt-1">
+                                    <p class="mt-1 text-sm font-semibold text-slate-700">
                                         Selecciona Temporada para habilitar las fechas.
                                     </p>
                                 </div>
@@ -303,7 +283,7 @@ function closeModal() {
                                 Ajuste de cantidad
                             </p>
 
-                            <p class="text-xs text-slate-500 mt-1">
+                            <p class="mt-1 text-xs text-slate-500">
                                 Selecciona si vas a agregar o eliminar unidades. La cantidad siempre se captura en positivo.
                             </p>
 
@@ -345,7 +325,7 @@ function closeModal() {
                                     @validate="validateField('adjustment_amount')"
                                 />
 
-                                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3">
+                                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1">
                                     <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                                         <p class="text-xs text-slate-500">
                                             Cantidad actual
@@ -358,7 +338,7 @@ function closeModal() {
 
                                     <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                                         <p class="text-xs text-slate-500">
-                                            Total después del ajuste
+                                            Total despues del ajuste
                                         </p>
 
                                         <p

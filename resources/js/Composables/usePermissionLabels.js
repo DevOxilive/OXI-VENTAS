@@ -3,7 +3,6 @@ import { computed } from 'vue'
 const permissionModules = {
   employees: 'Empleados',
   users: 'Usuarios',
-  roles: 'Roles',
   branches: 'Sucursales',
   'inventory.products': 'Productos',
   'inventory.branches': 'Inventario por sucursal',
@@ -23,11 +22,6 @@ const permissionLabels = {
   'users.create': 'Crear usuarios',
   'users.update': 'Editar usuarios',
   'users.delete': 'Eliminar usuarios',
-
-  'roles.view': 'Ver roles',
-  'roles.create': 'Crear roles',
-  'roles.update': 'Editar roles',
-  'roles.delete': 'Eliminar roles',
 
   'branches.view': 'Ver sucursales',
   'branches.create': 'Crear sucursales',
@@ -78,7 +72,6 @@ export function usePermissionLabels(permissions) {
     const groups = {
       employees: [],
       users: [],
-      roles: [],
       branches: [],
       'inventory.products': [],
       'inventory.branches': [],

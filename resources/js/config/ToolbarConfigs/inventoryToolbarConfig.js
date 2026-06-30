@@ -14,13 +14,13 @@ export function getInventoryToolbarConfig({
     return {
         title: branch?.name ? `Inventario - ${branch.name}` : "Inventario",
         subtitle: "Consulta y movimientos por sucursal",
-        searchPlaceholder: "Buscar producto o código",
+        searchPlaceholder: "Buscar producto, codigo, lote o barcode...",
 
         filters: [
             {
                 key: "categoryFilter",
-                label: "Categoría",
-                placeholder: "Categoría",
+                label: "Categoria",
+                placeholder: "Categoria",
                 value: categoryFilter,
                 options: categories,
                 optionLabel: "name",
@@ -28,8 +28,8 @@ export function getInventoryToolbarConfig({
             },
             {
                 key: "subcategoryFilter",
-                label: "Subcategoría",
-                placeholder: "Subcategoría",
+                label: "Subcategoria",
+                placeholder: "Subcategoria",
                 value: subcategoryFilter,
                 options: subcategories,
                 optionLabel: "name",

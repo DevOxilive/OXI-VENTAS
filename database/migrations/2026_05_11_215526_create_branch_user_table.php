@@ -20,6 +20,8 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             $table->timestamps();
+
+            $table->unique(['branch_id', 'user_id']);
         });
     }
 

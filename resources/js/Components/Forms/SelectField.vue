@@ -22,13 +22,14 @@ const props = defineProps({
     disabled: Boolean
 })
 
-const emit = defineEmits(['update:modelValue', 'validate'])
+const emit = defineEmits(['update:modelValue', 'validate', 'change'])
 
 const fieldConfig = computed(() => fieldRegistry[props.field])
 
 function handleChange(e) {
     emit('update:modelValue', e.target.value)
     emit('validate', props.field)
+    emit('change', e.target.value)
 }
 
 function handleBlur() {

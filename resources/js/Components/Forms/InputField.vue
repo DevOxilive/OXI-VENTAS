@@ -27,9 +27,24 @@ const inputId = computed(() =>
 )
 
 const fieldConfig = computed(() => fieldRegistry[props.field])
+const normalizedFieldConfig = computed(() => {
+    const config = fieldConfig.value ?? {}
+    const effectiveType = config.type ?? props.type
+    const shouldAutoTitleCase =
+        effectiveType === 'text' &&
+        !config.uppercase &&
+        !config.preserveCase &&
+        config.titleCase !== false
+
+    return {
+        ...config,
+        type: effectiveType,
+        titleCase: shouldAutoTitleCase || config.titleCase === true,
+    }
+})
 
 const isDateField = computed(() =>
-    props.type === 'date' || fieldConfig.value?.type === 'date'
+    props.type === 'date' || normalizedFieldConfig.value?.type === 'date'
 
 )
 const hasLeftAddon = computed(() => props.icon || props.prefix)
@@ -44,7 +59,7 @@ function preventNumberWheel(e) {
 }
 
 function handleInput(e) {
-    const config = fieldConfig.value
+    const config = normalizedFieldConfig.value
 
     if (isDateField.value) {
         emit('update:modelValue', e.target.value)
@@ -52,9 +67,7 @@ function handleInput(e) {
         return
     }
 
-    const value = config
-        ? sanitizeField(e.target.value, config)
-        : e.target.value
+    const value = sanitizeField(e.target.value, config)
 
     e.target.value = value
 
@@ -67,7 +80,7 @@ function blockExtraInput(e) {
         return
     }
 
-    const config = fieldConfig.value
+    const config = normalizedFieldConfig.value
     if (!config) return
 
     const allowedKeys = [
@@ -127,8 +140,8 @@ function blockExtraInput(e) {
                 {{ error }}
             </p>
 
-            <p v-if="fieldConfig?.max" class="text-[11px] text-slate-400 ml-auto">
-                {{ (modelValue || '').toString().length }}/{{ fieldConfig.max }}
+            <p v-if="normalizedFieldConfig?.max" class="text-[11px] text-slate-400 ml-auto">
+                {{ (modelValue || '').toString().length }}/{{ normalizedFieldConfig.max }}
             </p>
         </div>
     </div>
