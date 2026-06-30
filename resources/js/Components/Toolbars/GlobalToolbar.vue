@@ -28,6 +28,10 @@ defineProps({
         type: Boolean,
         default: true,
     },
+    compactFilters: {
+        type: Boolean,
+        default: false,
+    },
 
     filters: {
         type: Array,
@@ -89,6 +93,7 @@ defineEmits([
         <ToolbarDesktop :title="title" :subtitle="subtitle" :back-button="backButton" :back-label="backLabel"
             :search="search" :search-placeholder="searchPlaceholder" :show-search="showSearch" :filters="filters"
             :actions="actions" :tabs="tabs" :active-tab="activeTab" :records-per-page="recordsPerPage"
+            :compact-filters="compactFilters"
             :records-per-page-options="recordsPerPageOptions" :show-records-per-page="showRecordsPerPage"
             :total-records="totalRecords" :filtered-records="filteredRecords" :show-counter="showCounter"
             @back="$emit('back')" @update:search="$emit('update:search', $event)"
@@ -99,6 +104,7 @@ defineEmits([
         <ToolbarMobile :title="title" :subtitle="subtitle" :back-button="backButton" :back-label="backLabel"
             :search="search" :search-placeholder="searchPlaceholder" :show-search="showSearch" :filters="filters"
             :actions="actions" :tabs="tabs" :active-tab="activeTab" :records-per-page="recordsPerPage"
+            :compact-filters="compactFilters"
             :records-per-page-options="recordsPerPageOptions" :show-records-per-page="showRecordsPerPage"
             :total-records="totalRecords" :filtered-records="filteredRecords" :show-counter="showCounter"
             @back="$emit('back')" @update:search="$emit('update:search', $event)"

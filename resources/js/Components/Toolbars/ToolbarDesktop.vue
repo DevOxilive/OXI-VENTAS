@@ -18,6 +18,10 @@ const props = defineProps({
     search: String,
     searchPlaceholder: String,
     showSearch: Boolean,
+    compactFilters: {
+        type: Boolean,
+        default: false,
+    },
     filters: Array,
     actions: Array,
     tabs: {
@@ -56,9 +60,11 @@ const {
 } = useToolbarConfig(props)
 
 function filterWrapperClasses(filter) {
-    if (!filter.fullWidth) return ''
+    if (filter.type === 'button-group') {
+        return 'min-w-full flex-[1_1_100%]'
+    }
 
-    return 'sm:col-span-2 lg:col-span-3 xl:col-span-5'
+    return 'min-w-[220px] max-w-[320px] flex-[1_1_240px]'
 }
 
 function optionToneClasses(option, active) {
@@ -147,38 +153,12 @@ function handleTextFilterInput(event, filter) {
             </div>
         </div>
 
-        <div v-if="hasSearch || hasRecordsPerPage" class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 items-center">
+        <div v-if="hasSearch || hasRecordsPerPage || visibleFilters.length"
+            class="flex flex-wrap items-end gap-3">
             <input v-if="hasSearch" :value="search" type="text" :placeholder="searchPlaceholder"
-                class="h-11 w-full border border-slate-300 rounded-xl px-4 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                class="h-11 w-full min-w-[280px] flex-[2_1_360px] border border-slate-300 rounded-xl px-4 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
                 @input="$emit('update:search', handleSearchInput($event))" />
 
-            <div v-if="hasRecordsPerPage"
-                class="h-11 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3">
-                <span class="text-sm text-slate-500 whitespace-nowrap">
-                    Mostrar
-                </span>
-
-                <select :value="recordsPerPage" class="bg-transparent text-sm font-semibold text-slate-700 outline-none"
-                    @change="$emit('update:records-per-page', Number($event.target.value))">
-                    <option v-for="option in recordsPerPageOptions" :key="option" :value="option">
-                        {{ option }}
-                    </option>
-                </select>
-
-                <span class="text-sm text-slate-500 whitespace-nowrap">
-                    filas
-                </span>
-            </div>
-        </div>
-
-        <div v-if="visibleFilters.length" class="grid grid-cols-1 gap-3" :class="{
-            'sm:grid-cols-1': visibleFilters.length === 1,
-            'sm:grid-cols-2': visibleFilters.length === 2,
-            'sm:grid-cols-3': visibleFilters.length === 3,
-            'sm:grid-cols-2 lg:grid-cols-4': visibleFilters.length === 4,
-            'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5': visibleFilters.length === 5,
-            'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6': visibleFilters.length >= 6,
-        }">
             <div v-for="filter in visibleFilters" :key="filter.key" :class="filterWrapperClasses(filter)">
                 <div v-if="filter.type === 'button-group'">
                     <p v-if="filter.label" class="mb-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
@@ -245,6 +225,24 @@ function handleTextFilterInput(event, filter) {
                         </option>
                     </select>
                 </label>
+            </div>
+
+            <div v-if="hasRecordsPerPage"
+                class="h-11 flex items-center gap-2 shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-3">
+                <span class="text-sm text-slate-500 whitespace-nowrap">
+                    Mostrar
+                </span>
+
+                <select :value="recordsPerPage" class="bg-transparent text-sm font-semibold text-slate-700 outline-none"
+                    @change="$emit('update:records-per-page', Number($event.target.value))">
+                    <option v-for="option in recordsPerPageOptions" :key="option" :value="option">
+                        {{ option }}
+                    </option>
+                </select>
+
+                <span class="text-sm text-slate-500 whitespace-nowrap">
+                    filas
+                </span>
             </div>
         </div>
 

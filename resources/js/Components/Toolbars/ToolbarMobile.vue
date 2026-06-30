@@ -19,6 +19,10 @@ const props = defineProps({
     search: String,
     searchPlaceholder: String,
     showSearch: Boolean,
+    compactFilters: {
+        type: Boolean,
+        default: false,
+    },
     filters: Array,
     actions: Array,
     tabs: {
