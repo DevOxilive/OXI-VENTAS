@@ -14,6 +14,7 @@ class StockMovement extends Model
     public const REASON_SALE = 'SALE';
     public const REASON_DAMAGED = 'DAMAGED';
     public const REASON_EXPIRED = 'EXPIRED';
+    public const REASON_OTHER = 'OTHER';
     public const REASON_INVENTORY_DIFFERENCE = 'INVENTORY_DIFFERENCE';
 
     protected $fillable = [

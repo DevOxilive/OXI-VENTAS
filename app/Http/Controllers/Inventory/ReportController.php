@@ -235,6 +235,7 @@ class ReportController extends Controller
             ['id' => 'SALE', 'label' => 'Venta'],
             ['id' => 'DAMAGED', 'label' => 'Danado'],
             ['id' => 'EXPIRED', 'label' => 'Caducado'],
+            ['id' => 'OTHER', 'label' => 'Otros'],
             ['id' => 'INVENTORY_DIFFERENCE', 'label' => 'Ajuste manual'],
         ];
     }

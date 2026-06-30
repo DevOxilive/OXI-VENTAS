@@ -34,6 +34,7 @@ const reasonOptions = [
     { label: 'Producto danado', value: 'DAMAGED' },
     { label: 'Producto robado', value: 'STOLEN' },
     { label: 'Producto caducado', value: 'EXPIRED' },
+    { label: 'Otros...', value: 'OTHER' },
     { label: 'Transferencia', value: 'TRANSFER' },
     { label: 'Ajuste manual', value: 'MANUAL' },
 ]
@@ -44,6 +45,7 @@ const movementLabels = {
     DAMAGED: 'Producto danado',
     STOLEN: 'Producto robado',
     EXPIRED: 'Producto caducado',
+    OTHER: 'Otros',
     TRANSFER: 'Transferencia',
     MANUAL: 'Ajuste manual',
     IN: 'Entrada',
@@ -175,7 +177,7 @@ function submit() {
                             </td>
 
                             <td class="px-5 py-4 text-slate-600">
-                                {{ movement.reason }}
+                                {{ translateMovement(movement.reason) }}
                             </td>
 
                             <td class="px-5 py-4 text-slate-600">

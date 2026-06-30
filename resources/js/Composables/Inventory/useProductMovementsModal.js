@@ -46,6 +46,15 @@ export function useProductMovementsModal(props, emit) {
             }),
         },
         {
+            key: "others",
+            title: "Otros",
+            icon: "more_horiz",
+            empty: "Sin salidas registradas como otros.",
+            items: movements.value.filter((movement) => {
+                return movement.reason === "OTHER";
+            }),
+        },
+        {
             key: "adjustments",
             title: "Ajustes",
             icon: "tune",
@@ -62,6 +71,7 @@ export function useProductMovementsModal(props, emit) {
                 purchases: "border-green-200 bg-green-50",
                 damaged: "border-red-200 bg-red-50",
                 expired: "border-amber-200 bg-amber-50",
+                others: "border-sky-200 bg-sky-50",
                 adjustments: "border-slate-200 bg-slate-50",
             }[key] ?? "border-slate-200 bg-slate-50"
         );
@@ -73,6 +83,7 @@ export function useProductMovementsModal(props, emit) {
                 purchases: "text-green-600 bg-green-100",
                 damaged: "text-red-600 bg-red-100",
                 expired: "text-amber-600 bg-amber-100",
+                others: "text-sky-600 bg-sky-100",
                 adjustments: "text-slate-600 bg-slate-200",
             }[key] ?? "text-slate-600 bg-slate-200"
         );
@@ -116,6 +127,7 @@ export function useProductMovementsModal(props, emit) {
                 SALE: "Venta",
                 DAMAGED: "Producto dañado",
                 EXPIRED: "Producto caducado",
+                OTHER: "Otros",
                 INVENTORY_DIFFERENCE: "Diferencia de inventario",
             }[reason] ?? "Movimiento"
         );

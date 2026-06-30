@@ -39,6 +39,7 @@ export function useAdjustStockForm(props, emit) {
                 { label: "Venta", value: "SALE" },
                 { label: "Producto dañado", value: "DAMAGED" },
                 { label: "Producto caducado", value: "EXPIRED" },
+                { label: "Otros...", value: "OTHER" },
             ];
         }
 
