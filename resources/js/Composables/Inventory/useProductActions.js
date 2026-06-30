@@ -1,11 +1,6 @@
 import { ref } from "vue";
 import { router } from "@inertiajs/vue3";
-import {
-    UniversalActionModal,
-    ToastAlert,
-    ErrorAlert,
-} from "@/Components/Modales/UniversalActionModal";
-
+import { confirmModalAction, getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 export function useProductActions() {
     const showModal = ref(false);
     const modalMode = ref("create");
@@ -35,40 +30,30 @@ export function useProductActions() {
     }
 
     async function deleteProduct(product) {
-        const result = await UniversalActionModal({
+        const result = await confirmModalAction({
+            mode: "delete",
+            entityName: "producto",
             title: "Eliminar producto",
-            message: "¿Deseas eliminar",
-            itemName: product.name,
-            confirmText: "Sí, eliminar",
-            icon: "warning",
+            message: `?Deseas eliminar ${product.name}?`,
+            confirmText: "S?, eliminar",
         });
 
         if (!result.isConfirmed) return;
 
         router.delete(
-         route("inventory.branches.products.destroy", {
-    branch: product.branch_slug ?? product.branch?.slug,
-    product: product.id,
-}),
-            {
-                preserveScroll: true,
-
-                onSuccess: () => {
-                    ToastAlert({
-                        title: "Producto eliminado correctamente",
-                    });
-                },
-
-                onError: () => {
-                    ErrorAlert({
-                        title: "Error al eliminar",
-                        message: "No fue posible eliminar el producto.",
-                    });
-                },
-            },
+            route("inventory.branches.products.destroy", {
+                branch: product.branch_slug ?? product.branch?.slug,
+                product: product.id,
+            }),
+            getModalRequestOptions({
+                mode: "delete",
+                entityName: "Producto",
+                successTitle: "Producto eliminado correctamente",
+                errorTitle: "Error al eliminar",
+                errorMessage: "No fue posible eliminar el producto.",
+            }),
         );
     }
-
     return {
         showModal,
         modalMode,

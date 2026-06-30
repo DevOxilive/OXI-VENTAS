@@ -1,10 +1,6 @@
 import { computed, reactive, ref, watch } from "vue";
 import { router } from "@inertiajs/vue3";
-import {
-    SuccessAlert,
-    ErrorAlert,
-} from "@/Components/Modales/UniversalActionModal";
-
+import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 export function useBatchAdjustmentModal(products) {
     const showBatchAdjustmentModal = ref(false);
     const selectedBatchId = ref(null);
@@ -309,33 +305,27 @@ export function useBatchAdjustmentModal(products) {
                 notes: form.notes || null,
             },
             {
-                preserveScroll: true,
-
-                onSuccess: () => {
-                    SuccessAlert({
-                        title: "Lote actualizado",
-                        message:
-                            "La información del lote se actualizó correctamente.",
-                    });
-
-                    closeBatchAdjustmentModal();
-                },
-
-                onError: () => {
-                    ErrorAlert({
-                        title: "No se pudo actualizar",
-                        message:
-                            "Revisa la información del lote e intenta nuevamente.",
-                    });
-                },
-
+                ...getModalRequestOptions({
+                    mode: "update",
+                    entityName: "Lote",
+                    close: () => {
+                        showBatchAdjustmentModal.value = false;
+                        selectedBatchId.value = null;
+                    },
+                    successTitle: "Lote actualizado",
+                    errorTitle: "No se pudo actualizar",
+                    errorMessage:
+                        "Revisa la informaci?n del lote e intenta nuevamente.",
+                    onSuccess: () => {
+                        emit("created", form.lot_number);
+                    },
+                }),
                 onFinish: () => {
                     processing.value = false;
                 },
             },
         );
     }
-
     return {
         showBatchAdjustmentModal,
         liveSelectedBatch,

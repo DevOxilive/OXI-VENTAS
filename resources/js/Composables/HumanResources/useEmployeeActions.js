@@ -1,12 +1,7 @@
 import { ref } from "vue";
 import { router } from "@inertiajs/vue3";
 import { usePermissions } from "@/Composables/usePermissions";
-import {
-    UniversalActionModal,
-    ToastAlert,
-    ErrorAlert,
-} from "@/Components/Modales/UniversalActionModal";
-
+import { confirmModalAction, getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 export function useEmployeeActions() {
     const { can } = usePermissions();
 
@@ -43,37 +38,29 @@ export function useEmployeeActions() {
     }
 
     function deleteEmployee(employee) {
-        if (!can("employees.delete") && !can("employees.delete")) return;
+        if (!can("employees.delete")) return;
 
-        UniversalActionModal({
-            title: "Confirmar eliminación",
-            message: "¿Deseas eliminar permanentemente a",
-            itemName: `${employee.firstName} ${employee.lastName}`,
-            confirmText: "Sí, eliminar",
+        confirmModalAction({
+            mode: "delete",
+            entityName: "empleado",
+            title: "Confirmar eliminaci�n",
+            message: `?Deseas eliminar permanentemente a ${employee.firstName} ${employee.lastName}?`,
+            confirmText: "S?, eliminar",
         }).then((result) => {
             if (!result.isConfirmed) return;
 
             router.delete(
                 route("human-resources.employees.destroy", employee.id),
-                {
-                    onSuccess: () => {
-                        ToastAlert({
-                            icon: "success",
-                            title: "Empleado eliminado correctamente",
-                        });
-                    },
-
-                    onError: () => {
-                        ErrorAlert({
-                            title: "Error al eliminar",
-                            message: "No fue posible eliminar el empleado",
-                        });
-                    },
-                },
+                getModalRequestOptions({
+                    mode: "delete",
+                    entityName: "Empleado",
+                    successTitle: "Empleado eliminado correctamente",
+                    errorTitle: "Error al eliminar",
+                    errorMessage: "No fue posible eliminar el empleado",
+                }),
             );
         });
     }
-
     return {
         showModal,
         modalMode,
