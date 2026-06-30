@@ -1,12 +1,10 @@
 ﻿<script setup>
-import { useForm, router } from "@inertiajs/vue3";
+import { useForm } from "@inertiajs/vue3";
 import { watch, computed, ref } from "vue";
 import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
 import { getProductModalConfig } from "@/config/ModalConfigs/productModalConfig";
-import { modalPresets } from "@/config/ModalConfigs/modalPresets";
-import { sanitizeField } from "@/Validation/sanitizers";
 import {
   ToastAlert,
   ErrorAlert,
@@ -35,6 +33,7 @@ const form = useForm({
   name: "",
   min_stock: 0,
   category_id: "",
+  category_name: "",
   cost: "",
   sale_price: "",
   entry_date: new Date().toISOString().slice(0, 10),
@@ -44,25 +43,13 @@ const form = useForm({
   kilos: null,
   grams: null,
 });
-const categorySearch = ref("");
-const showCategoryDropdown = ref(false);
-
-const filteredCategories = computed(() => {
-  const q = categorySearch.value.toLowerCase().trim();
-
-  if (!q) {
-    return props.categoriesDB;
-  }
-
-  return props.categoriesDB.filter((category) =>
-    category.name.toLowerCase().includes(q)
-  );
-});
+const categoryInputMode = ref("select");
 
 watch(
   () => props.product,
   (product) => {
     form.reset();
+    categoryInputMode.value = "select";
 
     if (!product) return;
 
@@ -79,8 +66,7 @@ watch(
 
     form.min_stock = product.min_stock ?? 0;
     form.category_id = product.category_id ?? "";
-    categorySearch.value =
-      props.categoriesDB.find((c) => c.id == form.category_id)?.name ?? "";
+    form.category_name = "";
     form.cost = product.cost ?? "";
     form.sale_price = product.price ?? "";
     form.entry_date =
@@ -102,11 +88,6 @@ const units = [
   { label: "Gramo", value: "g" },
   { label: "Litro", value: "l" },
 ];
-const showCategoryModal = ref(false);
-
-const categoryForm = useForm({
-  name: "",
-});
 
 const modalConfig = computed(() =>
   getProductModalConfig({
@@ -116,48 +97,17 @@ const modalConfig = computed(() =>
   })
 );
 
-const categoryModalConfig = computed(() => ({
-  ...modalPresets.compact,
-  mode: "create",
-  title: "Nueva categoría",
-  subtitle: "Registra una categoría para productos.",
-  totalErrors: Object.keys(categoryForm.errors || {}).length,
-  processing: categoryForm.processing,
-  saveButtonText: "Guardar",
-  closeButtonText: "Cancelar",
-}));
+function toggleCategoryInputMode() {
+  if (categoryInputMode.value === "select") {
+    categoryInputMode.value = "text";
+    form.category_id = "";
+    form.clearErrors("category_id");
+    return;
+  }
 
-function createCategory() {
-  categoryForm.post(route("inventory.categories.store"), {
-    preserveScroll: true,
-    onSuccess: () => {
-      categoryForm.reset();
-      showCategoryModal.value = false;
-
-      router.reload({
-        only: ["categoriesDB"],
-        preserveScroll: true,
-      });
-    },
-  });
-}
-function selectCategory(category) {
-  form.category_id = Number(category.id);
-  categorySearch.value = category.name;
-  showCategoryDropdown.value = false;
-}
-function closeCategoryDropdown() {
-  setTimeout(() => {
-    showCategoryDropdown.value = false;
-  }, 150);
-}
-
-function sanitizeCategorySearch(event) {
-  categorySearch.value = sanitizeField(event.target.value, {
-    type: "text",
-    titleCase: true,
-    max: 80,
-  });
+  categoryInputMode.value = "select";
+  form.category_name = "";
+  form.clearErrors("category_name");
 }
 const imagePreview = computed(() => {
   if (!form.image) return null;
@@ -200,11 +150,12 @@ function setCreateDefaults() {
   form.barcodes = [""];
   form.branch_ids = [];
   ensureCurrentBranchSelected();
-  categorySearch.value = "";
+  categoryInputMode.value = "select";
   form.unit = "";
   form.name = "";
   form.min_stock = 0;
   form.category_id = "";
+  form.category_name = "";
   form.cost = "";
   form.sale_price = "";
   form.entry_date = new Date().toISOString().slice(0, 10);
@@ -255,6 +206,11 @@ function submit() {
     return;
   }
   ensureCurrentBranchSelected();
+  if (categoryInputMode.value === "text") {
+    form.category_id = "";
+  } else {
+    form.category_name = "";
+  }
   if (props.mode === "create") {
     form.post(
       route("inventory.branches.products.store", {
@@ -337,6 +293,7 @@ function submit() {
               message:
                 errors.name ||
                 errors.category_id ||
+                errors.category_name ||
                 errors.unit ||
                 errors.cost ||
                 errors.sale_price ||
@@ -573,45 +530,39 @@ function submit() {
             <button
               v-if="mode !== 'view'"
               type="button"
-              @click="showCategoryModal = true"
+              @click="toggleCategoryInputMode"
               class="text-xs px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200"
             >
-              + Nueva Categoría
+              {{
+                categoryInputMode === "select"
+                  ? "+ Nueva categoría"
+                  : "Usar categoría existente"
+              }}
             </button>
           </div>
 
-          <input
-            v-model="categorySearch"
-            @input="sanitizeCategorySearch"
-            @focus="showCategoryDropdown = true"
-            @blur="closeCategoryDropdown"
-            type="text"
-            placeholder="Buscar categoría..."
-            class="w-full rounded-xl border-slate-300"
-          />
+          <template v-if="categoryInputMode === 'select'">
+            <SelectField
+              label=""
+              field="category_id"
+              v-model="form.category_id"
+              :options="categoriesDB"
+              placeholder="Selecciona una categoría"
+              :disabled="mode === 'view'"
+              :error="form.errors.category_id"
+            />
+          </template>
 
-          <div
-            v-if="
-              filteredCategories.length &&
-              showCategoryDropdown &&
-              mode !== 'view'
-            "
-            class="absolute z-[10001] mt-1 w-full bg-white border rounded-xl shadow-lg max-h-48 overflow-y-auto"
-          >
-            <button
-              v-for="category in filteredCategories"
-              :key="category.id"
-              type="button"
-              @mousedown.prevent.stop="selectCategory(category)"
-              class="w-full text-left px-4 py-2 hover:bg-slate-100"
-            >
-              {{ category.name }}
-            </button>
-          </div>
-
-          <p v-if="form.errors.category_id" class="text-red-500 text-xs mt-1">
-            {{ form.errors.category_id }}
-          </p>
+          <template v-else>
+            <InputField
+              label=""
+              field="category_name"
+              v-model="form.category_name"
+              placeholder="Escribe el nombre de la categoría"
+              :error="form.errors.category_name"
+              :readonly="mode === 'view'"
+            />
+          </template>
         </div>
 
         <InputField
@@ -668,17 +619,4 @@ function submit() {
 
     </div>
   </GlobalModal>
-    <GlobalModal
-      v-if="showCategoryModal"
-      v-bind="categoryModalConfig"
-      @save="createCategory"
-      @close="showCategoryModal = false"
-    >
-      <InputField
-        label="Nombre de categoría"
-        field="category_name"
-        v-model="categoryForm.name"
-        :error="categoryForm.errors.name"
-      />
-    </GlobalModal>
 </template>

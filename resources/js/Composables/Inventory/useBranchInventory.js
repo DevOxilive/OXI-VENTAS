@@ -89,6 +89,7 @@ export function useBranchInventory(props) {
                     item.product?.barcodes?.[0]?.code ??
                     item.barcode ??
                     `BP-${item.id}`,
+                category_name: item.product?.category?.name ?? "Sin categoría",
                 category: item.product?.category?.name ?? "Sin categoría",
                 branch:
                     item.branch?.name ??
