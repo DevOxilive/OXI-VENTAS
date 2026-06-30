@@ -91,7 +91,7 @@ watch(
     >
         <div class="space-y-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6">
             <section class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                <h3 class="mb-6 border-b border-slate-200 pb-4 text-center text-2xl font-black tracking-tight text-[#1f1d2b] md:text-3xl">
+                <h3 class="mb-6 border-b border-slate-200 pb-4 text-center text-2xl font-black tracking-tight text-[#1f1d2b]">
                     Datos del empleado
                 </h3>
 
@@ -120,7 +120,7 @@ watch(
             </section>
 
             <section class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                <h3 class="mb-4 border-b border-slate-200 pb-3 text-base font-bold text-slate-800">
+                <h3 class="mb-4 border-b border-slate-200 pb-3 text-center text-2xl font-black tracking-tight text-[#1f1d2b]">
                     Domicilio
                 </h3>
 
@@ -158,8 +158,10 @@ watch(
                     </div>
 
                     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                        <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                            <p class="text-sm font-bold text-slate-700">Ubicacion</p>
+                        <div class="flex flex-col items-center gap-2 border-b border-slate-200 px-4 py-3 text-center">
+                            <p class="text-2xl font-black tracking-tight text-[#1f1d2b]">
+                                Ubicacion
+                            </p>
 
                             <button type="button"
                                 class="text-xs font-bold text-[#1f1d2b] disabled:cursor-not-allowed disabled:opacity-40"
@@ -182,7 +184,7 @@ watch(
             </section>
 
             <section class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                <h3 class="mb-4 border-b border-slate-200 pb-3 text-base font-bold text-slate-800">
+                <h3 class="mb-4 border-b border-slate-200 pb-3 text-center text-2xl font-black tracking-tight text-[#1f1d2b]">
                     Laboral y fiscal
                 </h3>
 

@@ -18,7 +18,7 @@ export function useStockExitModal(props, emit) {
 
     const selectedSourceKey = ref(null);
 
-    const allowedReasons = ["DAMAGED", "EXPIRED"];
+    const allowedReasons = ["DAMAGED", "EXPIRED", "OTHER"];
 
     const productName = computed(() => {
         return (
@@ -31,6 +31,7 @@ export function useStockExitModal(props, emit) {
     const reasonOptions = [
         { label: "Producto dañado", value: "DAMAGED" },
         { label: "Producto caducado", value: "EXPIRED" },
+        { label: "Otros...", value: "OTHER" },
     ];
 
     const activeBatches = computed(() => {

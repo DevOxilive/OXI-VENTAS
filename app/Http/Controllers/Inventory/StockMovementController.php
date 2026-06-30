@@ -44,6 +44,7 @@ class StockMovementController extends Controller
                     StockMovement::REASON_SALE,
                     StockMovement::REASON_DAMAGED,
                     StockMovement::REASON_EXPIRED,
+                    StockMovement::REASON_OTHER,
                     StockMovement::REASON_INVENTORY_DIFFERENCE,
                 ]),
             ],
@@ -171,6 +172,7 @@ class StockMovementController extends Controller
                 StockMovement::REASON_SALE,
                 StockMovement::REASON_DAMAGED,
                 StockMovement::REASON_EXPIRED,
+                StockMovement::REASON_OTHER,
             ],
 
             StockMovement::TYPE_ADJUSTMENT => [

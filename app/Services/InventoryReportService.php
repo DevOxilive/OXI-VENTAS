@@ -167,6 +167,7 @@ class InventoryReportService
                         WHEN "SALE" THEN "Venta"
                         WHEN "DAMAGED" THEN "Danado"
                         WHEN "EXPIRED" THEN "Caducado"
+                        WHEN "OTHER" THEN "Otros"
                         WHEN "INVENTORY_DIFFERENCE" THEN "Ajuste manual"
                         ELSE stock_movements.reason
                     END as movement_reason_label
