@@ -154,7 +154,8 @@ class ProductController extends Controller
             'image' => ['nullable', 'image', 'max:2048'],
 
             'min_stock' => ['nullable', 'numeric', 'min:0'],
-            'category_id' => ['required', 'exists:categories,id'],
+            'category_id' => ['nullable', 'required_without:category_name', 'exists:categories,id'],
+            'category_name' => ['nullable', 'required_without:category_id', 'string', 'max:255'],
             'cost' => ['required', 'numeric', 'min:0'],
             'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
             'entry_date' => ['required', 'date'],
@@ -162,6 +163,16 @@ class ProductController extends Controller
             'branch_ids' => ['nullable', 'array'],
             'branch_ids.*' => ['exists:branches,id'],
         ]);
+
+        if (blank($data['category_id'] ?? null) && filled($data['category_name'] ?? null)) {
+            $categoryName = trim($data['category_name']);
+
+            $category = Category::firstOrCreate([
+                'name' => $categoryName,
+            ]);
+
+            $data['category_id'] = $category->id;
+        }
 
         $barcodes = collect($data['barcodes'] ?? [])
             ->filter(fn($code) => filled($code))
@@ -233,7 +244,8 @@ class ProductController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'image' => ['nullable', 'image', 'max:2048'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],
-            'category_id' => ['required', 'exists:categories,id'],
+            'category_id' => ['nullable', 'required_without:category_name', 'exists:categories,id'],
+            'category_name' => ['nullable', 'required_without:category_id', 'string', 'max:255'],
             'cost' => ['required', 'numeric', 'min:0'],
             'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
             'entry_date' => ['required', 'date'],
@@ -241,6 +253,16 @@ class ProductController extends Controller
             'branch_ids' => ['nullable', 'array'],
             'branch_ids.*' => ['exists:branches,id'],
         ]);
+
+        if (blank($data['category_id'] ?? null) && filled($data['category_name'] ?? null)) {
+            $categoryName = trim($data['category_name']);
+
+            $category = Category::firstOrCreate([
+                'name' => $categoryName,
+            ]);
+
+            $data['category_id'] = $category->id;
+        }
 
         $barcodes = collect($data['barcodes'] ?? [])
             ->filter(fn($code) => filled($code))

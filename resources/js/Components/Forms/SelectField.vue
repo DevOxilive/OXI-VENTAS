@@ -26,6 +26,22 @@ const emit = defineEmits(['update:modelValue', 'validate', 'change'])
 
 const fieldConfig = computed(() => fieldRegistry[props.field])
 
+function getOptionValue(item) {
+    if (item && typeof item === 'object') {
+        return item.value ?? item.id ?? item.name ?? ''
+    }
+
+    return item
+}
+
+function getOptionLabel(item) {
+    if (item && typeof item === 'object') {
+        return item.label ?? item.name ?? item.value ?? item.id ?? ''
+    }
+
+    return item
+}
+
 function handleChange(e) {
     emit('update:modelValue', e.target.value)
     emit('validate', props.field)
@@ -53,9 +69,9 @@ function handleBlur() {
                 {{ placeholder }}
             </option>
 
-            <option v-for="item in options" :key="typeof item === 'object' ? item.value : item"
-                :value="typeof item === 'object' ? item.value : item">
-                {{ typeof item === 'object' ? item.label : item }}
+            <option v-for="item in options" :key="getOptionValue(item)"
+                :value="getOptionValue(item)">
+                {{ getOptionLabel(item) }}
             </option>
         </select>
 
