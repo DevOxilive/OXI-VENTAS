@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { fieldRegistry } from '@/Validation/fieldRegistry'
 import { sanitizeField } from '@/Validation/sanitizers'
 
@@ -20,7 +20,8 @@ const props = defineProps({
     placeholder: String,
 })
 
-const emit = defineEmits(['update:modelValue', 'validate'])
+const emit = defineEmits(['update:modelValue', 'validate', 'keydown'])
+const inputEl = ref(null)
 
 const inputId = computed(() =>
     props.field || props.label?.toLowerCase().replace(/\s+/g, '-')
@@ -75,6 +76,10 @@ function handleInput(e) {
     emit('validate', props.field)
 }
 
+defineExpose({
+    focus: () => inputEl.value?.focus(),
+})
+
 function blockExtraInput(e) {
     if (isDateField.value) {
         return
@@ -122,8 +127,8 @@ function blockExtraInput(e) {
                 {{ icon }}
             </span>
         </span>
-        <input :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
-            :readonly="readonly" @keydown="blockExtraInput"
+        <input ref="inputEl" :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
+            :readonly="readonly" @keydown="(e) => { blockExtraInput(e); emit('keydown', e) }"
             @wheel="preventNumberWheel" @input="handleInput" @blur="emit('validate', field)" :class="[
                 'w-full py-3 rounded-xl border outline-none transition text-sm',
                 hasLeftAddon ? 'pl-11 pr-4' : 'px-4',

@@ -101,6 +101,35 @@ export function WarningAlert({
 /* ===========================
    TOAST FLOTANTE
 =========================== */
+export function BlockingWarningAlert({
+    title = "Advertencia",
+    message = "Revisa esta accion antes de continuar",
+    confirmText = "OK",
+} = {}) {
+    return Swal.fire({
+        icon: "warning",
+        title: title,
+        html: message,
+        confirmButtonText: confirmText,
+        confirmButtonColor: "#f59e0b",
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        allowEnterKey: true,
+        showCloseButton: false,
+        customClass: {
+            popup: "rounded-2xl",
+            confirmButton: "px-5 py-2 rounded-full",
+        },
+        didOpen: () => {
+            const container = document.querySelector(".swal2-container")
+
+            if (container) {
+                container.style.zIndex = "999999"
+            }
+        },
+    });
+}
+
 export function ToastAlert({
     icon = "success",
     title = "Operación realizada",

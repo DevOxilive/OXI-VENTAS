@@ -18,6 +18,40 @@ use Inertia\Inertia;
 
 class UserController extends Controller
 {
+    private function refreshAuthenticatedSession(Request $request, User $user): void
+    {
+        if ((int) Auth::id() !== (int) $user->id) {
+            return;
+        }
+
+        $guard = Auth::guard('web');
+        $freshUser = $user->fresh(['role.permissions', 'permissions', 'branches']);
+
+        if (!$freshUser) {
+            return;
+        }
+
+        $guard->setUser($freshUser);
+
+        $request->session()->put([
+            'password_hash_web' => method_exists($guard, 'hashPasswordForCookie')
+                ? $guard->hashPasswordForCookie($freshUser->getAuthPassword())
+                : $freshUser->getAuthPassword(),
+        ]);
+    }
+
+    private function requiresSalesBranchesByPermissionIds(array $permissionIds = []): bool
+    {
+        if (empty($permissionIds)) {
+            return false;
+        }
+
+        return Permission::query()
+            ->whereIn('id', $permissionIds)
+            ->where('name', 'like', 'sales.%')
+            ->exists();
+    }
+
     private function visiblePermissionsQuery()
     {
         return Permission::query()
@@ -191,10 +225,13 @@ class UserController extends Controller
         ]);
 
         $role = Role::findOrFail($validated['role_id']);
+        $finalPermissionIds = $validated['permissions'] ?? [];
+        $requiresSalesBranches = $role->name === 'Ventas'
+            || $this->requiresSalesBranchesByPermissionIds($finalPermissionIds);
 
-        if ($role->name === 'Ventas' && empty($validated['branch_ids'])) {
+        if ($requiresSalesBranches && empty($validated['branch_ids'])) {
             return back()->withErrors([
-                'branch_ids' => 'Debes seleccionar al menos una sucursal para el vendedor.',
+                'branch_ids' => 'Debes seleccionar al menos una sucursal para este usuario de ventas.',
             ])->withInput();
         }
 
@@ -209,11 +246,11 @@ class UserController extends Controller
         $this->syncUserPermissionOverrides(
             $user,
             $role,
-            $validated['permissions'] ?? [],
+            $finalPermissionIds,
         );
 
         $user->branches()->sync(
-            $role->name === 'Ventas'
+            $requiresSalesBranches
             ? ($validated['branch_ids'] ?? [])
             : []
         );
@@ -244,10 +281,13 @@ class UserController extends Controller
         ]);
 
         $role = Role::findOrFail($validated['role_id']);
+        $finalPermissionIds = $validated['permissions'] ?? [];
+        $requiresSalesBranches = $role->name === 'Ventas'
+            || $this->requiresSalesBranchesByPermissionIds($finalPermissionIds);
 
-        if ($role->name === 'Ventas' && empty($validated['branch_ids'])) {
+        if ($requiresSalesBranches && empty($validated['branch_ids'])) {
             return back()->withErrors([
-                'branch_ids' => 'Debes seleccionar al menos una sucursal para el vendedor.',
+                'branch_ids' => 'Debes seleccionar al menos una sucursal para este usuario de ventas.',
             ])->withInput();
         }
 
@@ -266,14 +306,16 @@ class UserController extends Controller
         $this->syncUserPermissionOverrides(
             $user,
             $role,
-            $validated['permissions'] ?? [],
+            $finalPermissionIds,
         );
 
         $user->branches()->sync(
-            $role->name === 'Ventas'
+            $requiresSalesBranches
             ? ($validated['branch_ids'] ?? [])
             : []
         );
+
+        $this->refreshAuthenticatedSession($request, $user);
 
         $user->load(['role', 'permissions', 'branches']);
 

@@ -298,6 +298,14 @@ export const fieldRegistry = {
             "El precio de venta debe ser un número válido con máximo 2 decimales.",
     },
 
+    margin_percentage: {
+        required: false,
+        type: "decimal",
+        max: 6,
+        message:
+            "El porcentaje debe ser un número válido con máximo 2 decimales.",
+    },
+
     barcode: {
         required: false,
         type: "numeric",

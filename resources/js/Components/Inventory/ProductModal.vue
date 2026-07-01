@@ -44,6 +44,81 @@ const form = useForm({
   grams: null,
 });
 const categoryInputMode = ref("select");
+const marginPercentage = ref("");
+const pricingDriver = ref("percentage");
+const syncingPricing = ref(false);
+
+function parseDecimal(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatDecimal(value) {
+  if (!Number.isFinite(value)) return "";
+
+  const rounded = Math.round(value * 100) / 100;
+
+  return rounded.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function syncSalePriceFromPercentage() {
+  const cost = parseDecimal(form.cost);
+  const percentage = parseDecimal(marginPercentage.value);
+
+  if (cost === null || percentage === null) return;
+
+  syncingPricing.value = true;
+  form.sale_price = formatDecimal(cost * (1 + percentage / 100));
+  syncingPricing.value = false;
+}
+
+function syncPercentageFromSalePrice() {
+  const cost = parseDecimal(form.cost);
+  const salePrice = parseDecimal(form.sale_price);
+
+  if (cost === null || salePrice === null || cost <= 0) {
+    syncingPricing.value = true;
+    marginPercentage.value = "";
+    syncingPricing.value = false;
+    return;
+  }
+
+  syncingPricing.value = true;
+  marginPercentage.value = formatDecimal(((salePrice - cost) / cost) * 100);
+  syncingPricing.value = false;
+}
+
+function initializePricingFields(costValue, salePriceValue) {
+  syncingPricing.value = true;
+
+  const cost = parseDecimal(costValue);
+  const salePrice = parseDecimal(salePriceValue);
+  const storedMargin = parseDecimal(props.product?.margin_percentage);
+
+  if (storedMargin !== null) {
+    marginPercentage.value = formatDecimal(storedMargin);
+  } else if (cost !== null && salePrice !== null && cost > 0) {
+    marginPercentage.value = formatDecimal(((salePrice - cost) / cost) * 100);
+  } else {
+    marginPercentage.value = "";
+  }
+
+  pricingDriver.value = "sale_price";
+  syncingPricing.value = false;
+}
+
+function handleMarginPercentageChange(value) {
+  pricingDriver.value = "percentage";
+  marginPercentage.value = value;
+}
+
+function handleSalePriceChange(value) {
+  pricingDriver.value = "sale_price";
+  form.sale_price = value;
+}
 
 watch(
   () => props.product,
@@ -77,6 +152,7 @@ watch(
     form.quantity = product.quantity ?? null;
     form.kilos = product.kilos ?? null;
     form.liters = product.liters ?? null;
+    initializePricingFields(form.cost, form.sale_price);
   },
   { immediate: true }
 );
@@ -164,6 +240,7 @@ function setCreateDefaults() {
   form.quantity = null;
   form.kilos = null;
   form.liters = null;
+  initializePricingFields(form.cost, form.sale_price);
 }
 
 function ensureCurrentBranchSelected() {
@@ -187,6 +264,33 @@ watch(
     setCreateDefaults();
   },
   { immediate: true }
+);
+
+watch(
+  () => form.cost,
+  () => {
+    if (syncingPricing.value) return;
+
+    if (pricingDriver.value === "sale_price") {
+      syncPercentageFromSalePrice();
+      return;
+    }
+
+    syncSalePriceFromPercentage();
+  }
+);
+
+watch(marginPercentage, () => {
+  if (syncingPricing.value || pricingDriver.value !== "percentage") return;
+  syncSalePriceFromPercentage();
+});
+
+watch(
+  () => form.sale_price,
+  () => {
+    if (syncingPricing.value || pricingDriver.value !== "sale_price") return;
+    syncPercentageFromSalePrice();
+  }
 );
 
 function submit() {
@@ -590,31 +694,47 @@ function submit() {
           :readonly="mode === 'view'"
         />
 
-        <InputField
-          label="Precio mínimo"
-          field="cost"
-          v-model="form.cost"
-          prefix="$"
-          :error="form.errors.cost"
-          type="text"
-          step="0.01"
-          :readonly="mode === 'view'"
-        />
+        <div class="md:col-span-2 grid grid-cols-1 gap-5 md:grid-cols-2">
+          <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <InputField
+              label="Precio compra"
+              field="cost"
+              v-model="form.cost"
+              prefix="$"
+              :error="form.errors.cost"
+              type="text"
+              step="0.01"
+              :readonly="mode === 'view'"
+            />
 
-        <InputField
-          label="Precio venta"
-          field="sale_price"
-          v-model="form.sale_price"
-          prefix="$"
-          :error="
-            invalidPrice
-              ? 'El precio de venta no puede ser menor al precio inicial'
-              : form.errors.sale_price
-          "
-          type="text"
-          step="0.01"
-          :readonly="mode === 'view'"
-        />
+            <InputField
+              label="Porcentaje"
+              field="margin_percentage"
+              :model-value="marginPercentage"
+              @update:modelValue="handleMarginPercentageChange"
+              suffix="%"
+              type="text"
+              step="0.01"
+              :readonly="mode === 'view'"
+            />
+          </div>
+
+          <InputField
+            label="Precio venta"
+            field="sale_price"
+            :model-value="form.sale_price"
+            @update:modelValue="handleSalePriceChange"
+            prefix="$"
+            :error="
+              invalidPrice
+                ? 'El precio de venta no puede ser menor al precio inicial'
+                : form.errors.sale_price
+            "
+            type="text"
+            step="0.01"
+            :readonly="mode === 'view'"
+          />
+        </div>
       </div>
 
     </div>

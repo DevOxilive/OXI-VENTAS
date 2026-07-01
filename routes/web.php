@@ -15,6 +15,7 @@ use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\Inventory\PurchaseReportController;
 use App\Http\Controllers\Inventory\BranchInventoryController;
 use App\Http\Controllers\Inventory\CategoryController;
+use App\Http\Controllers\Ventas\SalesController;
 
 /*
 |--------------------------------------------------------------------------
@@ -141,12 +142,20 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(['role:Ventas,Administrador'])
-        ->prefix('ventas')
+    Route::prefix('ventas')
         ->name('ventas.')
         ->group(function () {
-            Route::get('/', fn() => Inertia::render('Ventas/Home'))
+            Route::get('/', [SalesController::class, 'index'])
+                ->middleware('permission:sales.view,sales.create,sales.update,sales.delete,sales.reports')
                 ->name('home');
+
+            Route::post('/', [SalesController::class, 'store'])
+                ->middleware('permission:sales.create')
+                ->name('store');
+
+            Route::get('/{sale}/ticket', [SalesController::class, 'ticket'])
+                ->middleware('permission:sales.view,sales.create,sales.update,sales.delete,sales.reports')
+                ->name('ticket');
         });
 
     /*

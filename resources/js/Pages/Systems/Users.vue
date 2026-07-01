@@ -131,6 +131,18 @@ const isSalesRole = computed(() => {
   return selectedRole.value?.name === 'Ventas'
 })
 
+const selectedPermissionNames = computed(() => {
+  const selectedPermissionIds = form.permissions.map((permissionId) => Number(permissionId))
+
+  return permissions.value
+    .filter((permission) => selectedPermissionIds.includes(Number(permission.id)))
+    .map((permission) => permission.name)
+})
+
+const requiresSalesBranches = computed(() => {
+  return isSalesRole.value || selectedPermissionNames.value.some((permission) => permission.startsWith('sales.'))
+})
+
 function getPermissionsByRole(roleId) {
   const role = roles.value.find((role) => String(role.id) === String(roleId))
   return role?.permissions?.map((permission) => permission.id) || []
@@ -160,7 +172,7 @@ function assignPermissionsByRole() {
 
   form.permissions = getPermissionsByRole(form.role_id)
 
-  if (!isSalesRole.value) {
+  if (!requiresSalesBranches.value) {
     form.branch_ids = []
   }
 }
@@ -180,8 +192,8 @@ function validateForm() {
     errors.value.role_id = 'Debes seleccionar un rol'
   }
 
-  if (isSalesRole.value && form.branch_ids.length === 0) {
-    errors.value.branch_ids = 'Selecciona al menos una sucursal para el vendedor'
+  if (requiresSalesBranches.value && form.branch_ids.length === 0) {
+    errors.value.branch_ids = 'Selecciona al menos una sucursal para este usuario de ventas'
   }
 
   if (!isEditing.value || form.password) {
@@ -371,6 +383,12 @@ watch(() => form.role_id, () => {
   assignPermissionsByRole()
 })
 
+watch(requiresSalesBranches, (value) => {
+  if (value) return
+
+  form.branch_ids = []
+})
+
 function closeModal() {
   showModal.value = false
   isEditing.value = false
@@ -530,10 +548,9 @@ onBeforeUnmount(() => {
 
     <UserRegisterModal v-if="showModal" :form="form" :errors="errors" :roles="roles" :branches="branches"
       :groupedPermissions="groupedPermissions" :isEditing="isEditing"
-      :canSave="isEditing ? can('users.update') : can('users.create')" :isSalesRole="isSalesRole"
+      :canSave="isEditing ? can('users.update') : can('users.create')" :requiresSalesBranches="requiresSalesBranches"
       :locked-permission-ids="lockedPermissionIds"
       :module-label="moduleLabel" :permission-label="permissionLabel" @close="closeModal" @save="saveUser"
       @toggle-permission="togglePermission" @change-role="assignPermissionsByRole" />
   </PageLayout>
 </template>
-

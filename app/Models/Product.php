@@ -12,10 +12,18 @@ class Product extends Model
         'image',
         'cost',
         'sale_price',
+        'margin_percentage',
         'unit',
         'category_id',
         'subcategory_id',
         'active',
+    ];
+
+    protected $casts = [
+        'cost' => 'decimal:2',
+        'sale_price' => 'decimal:2',
+        'margin_percentage' => 'decimal:2',
+        'active' => 'boolean',
     ];
 
     public function category()

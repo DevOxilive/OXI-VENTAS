@@ -14,7 +14,7 @@ const props = defineProps({
     groupedPermissions: Object,
     isEditing: Boolean,
     canSave: Boolean,
-    isSalesRole: Boolean,
+    requiresSalesBranches: Boolean,
     lockedPermissionIds: {
         type: Array,
         default: () => [],
@@ -119,7 +119,7 @@ function closeModal() {
                             Accesos
                         </h3>
 
-                        <div v-if="isSalesRole" class="mb-6">
+                        <div v-if="requiresSalesBranches" class="mb-6">
                             <p class="mb-3 text-sm font-semibold text-slate-700">
                                 Sucursales permitidas para este vendedor
                             </p>
