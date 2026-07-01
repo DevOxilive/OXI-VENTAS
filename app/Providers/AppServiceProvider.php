@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Vite;
 use Inertia\Inertia;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Vite::createAssetPathsUsing(fn (string $path) => "/{$path}");
+
         Inertia::share([
             'auth.user' => function () {
                 $user = Auth::user();

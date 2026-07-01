@@ -9,6 +9,7 @@ use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\Product;
+use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Support\FlexibleSearch;
@@ -22,7 +23,7 @@ class ProductController extends Controller
 
     public function index(Request $request, Branch $branch)
     {
-        $perPage = $request->integer('per_page', 10);
+        $perPage = TablePagination::resolvePerPage($request, 10);
 
         $query = BranchProduct::query()
             ->with([
@@ -60,8 +61,23 @@ class ProductController extends Controller
         }
 
         $productsDB = $query->paginate($perPage)->withQueryString();
+        $productIds = $productsDB->getCollection()
+            ->pluck('product_id')
+            ->filter()
+            ->unique()
+            ->values();
 
-        $productsDB->getCollection()->transform(function ($item) {
+        $branchIdsByProduct = BranchProduct::query()
+            ->whereIn('product_id', $productIds)
+            ->where('status', BranchProduct::STATUS_ACTIVE)
+            ->get(['product_id', 'branch_id'])
+            ->groupBy('product_id')
+            ->map(fn ($items) => $items
+                ->pluck('branch_id')
+                ->map(fn ($id) => (int) $id)
+                ->values());
+
+        $productsDB->getCollection()->transform(function ($item) use ($branchIdsByProduct) {
             $product = $item->product;
             $imageUrl = $product?->image
                 ? route('inventory.products.image', ['product' => $product->id])
@@ -73,11 +89,7 @@ class ProductController extends Controller
                 'branch_id' => $item->branch_id,
                 'branch_slug' => $item->branch?->slug,
 
-                'branch_ids' => BranchProduct::where('product_id', $product?->id)
-                    ->where('status', BranchProduct::STATUS_ACTIVE)
-                    ->pluck('branch_id')
-                    ->map(fn($id) => (int) $id)
-                    ->values(),
+                'branch_ids' => $branchIdsByProduct->get($product?->id, collect())->values(),
                 'barcodes' => $product?->barcodes?->pluck('code')->values() ?? [],
                 'barcode' => $product?->barcodes?->first()?->code ?? 'Sin código',
                 'unit' => $product?->unit ?? '',

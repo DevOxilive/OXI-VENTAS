@@ -9,6 +9,7 @@ use App\Events\EmployeeChanged;
 use App\Events\RealtimeActivityLogged;
 use App\Exports\EmployeeExport;
 use App\Support\FlexibleSearch;
+use App\Support\TablePagination;
 use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
@@ -16,11 +17,7 @@ class EmployeeController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
-        $perPage = (int) $request->input('per_page', 50);
-
-        if (!in_array($perPage, [10, 25, 50, 100])) {
-            $perPage = 50;
-        }
+        $perPage = TablePagination::resolvePerPage($request, 50);
 
         $employmentStatus = $request->input('employmentStatus');
         $department = $request->input('department');

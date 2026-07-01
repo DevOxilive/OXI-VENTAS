@@ -11,6 +11,8 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductBatch;
 use App\Models\Subcategory;
+use App\Support\TablePagination;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Support\FlexibleSearch;
 use Inertia\Inertia;
@@ -32,22 +34,23 @@ class BranchInventoryController extends Controller
     {
         $today = now()->toDateString();
         $nearExpirationLimit = now()->addDays(30)->toDateString();
+        $perPage = TablePagination::resolvePerPage($request, 50);
 
         $query = BranchProduct::query()
             ->select([
-                'id',
-                'branch_id',
-                'product_id',
-                'barcode',
-                'stock',
-                'min_stock',
-                'status',
-                'season_start_date',
-                'season_end_date',
-                'last_restocked_at',
-                'inactive_candidate_after_days',
-                'tracks_batches',
-                'tracks_expiration',
+                'branch_products.id',
+                'branch_products.branch_id',
+                'branch_products.product_id',
+                'branch_products.barcode',
+                'branch_products.stock',
+                'branch_products.min_stock',
+                'branch_products.status',
+                'branch_products.season_start_date',
+                'branch_products.season_end_date',
+                'branch_products.last_restocked_at',
+                'branch_products.inactive_candidate_after_days',
+                'branch_products.tracks_batches',
+                'branch_products.tracks_expiration',
             ])
             ->when($branch, fn($query) => $query->where('branch_id', $branch->id))
             ->when($request->filled('search'), function ($query) use ($request) {
@@ -114,36 +117,8 @@ class BranchInventoryController extends Controller
                 'product.category:id,name',
                 'product.subcategory:id,name,category_id',
                 'product.barcodes:id,product_id,code',
-
-                'batches' => fn($query) => $query
-                    ->select([
-                        'id',
-                        'branch_product_id',
-                        'lot_number',
-                        'expiration_date',
-                        'initial_quantity',
-                        'quantity',
-                        'supplier',
-                        'received_at',
-                        'status',
-                        'season_start_date',
-                        'season_end_date',
-                    ])
-                    ->where('quantity', '>', 0)
-                    ->orderByRaw('expiration_date IS NULL')
-                    ->orderBy('expiration_date')
-                    ->orderBy('id'),
-
-                'movements' => fn($query) => $query
-                    ->with([
-                        'user:id,name',
-                        'batches.productBatch:id,lot_number',
-                    ])
-                    ->latest()
             ])
-
             ->join('products', 'products.id', '=', 'branch_products.product_id')
-            ->select('branch_products.*')
             ->withCount([
                 'activeBatches as active_batches_count',
             ])
@@ -279,7 +254,7 @@ class BranchInventoryController extends Controller
             'currentBranch' => $branch,
 
             'branchProductsDB' => $query
-                ->paginate((int) $request->input('per_page', 50))
+                ->paginate($perPage)
                 ->withQueryString(),
 
             'inventoryStats' => [
@@ -362,9 +337,59 @@ class BranchInventoryController extends Controller
                 'stock' => $request->stock,
                 'expiration_status' => $request->expiration_status,
                 'inactive_candidate' => $request->inactive_candidate,
-                'per_page' => (int) $request->input('per_page', 50),
+                'per_page' => $perPage,
             ],
         ]);
+    }
+
+    public function details(BranchProduct $branchProduct): JsonResponse
+    {
+        $branchProduct->load([
+            'branch:id,name,slug',
+            'product:id,name,category_id,subcategory_id,sale_price,cost,unit',
+            'product.category:id,name',
+            'product.subcategory:id,name,category_id',
+            'product.barcodes:id,product_id,code',
+            'batches' => fn($query) => $query
+                ->select([
+                    'id',
+                    'branch_product_id',
+                    'lot_number',
+                    'expiration_date',
+                    'initial_quantity',
+                    'quantity',
+                    'supplier',
+                    'received_at',
+                    'status',
+                    'season_start_date',
+                    'season_end_date',
+                ])
+                ->where('quantity', '>', 0)
+                ->orderByRaw('expiration_date IS NULL')
+                ->orderBy('expiration_date')
+                ->orderBy('id'),
+            'movements' => fn($query) => $query
+                ->select([
+                    'id',
+                    'branch_product_id',
+                    'user_id',
+                    'type',
+                    'reason',
+                    'quantity',
+                    'previous_stock',
+                    'new_stock',
+                    'notes',
+                    'created_at',
+                ])
+                ->with([
+                    'user:id,name',
+                    'batches:id,stock_movement_id,product_batch_id,quantity',
+                    'batches.productBatch:id,lot_number',
+                ])
+                ->latest(),
+        ]);
+
+        return response()->json($branchProduct);
     }
 
     public function store(Request $request)

@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use App\Support\FlexibleSearch;
 use Illuminate\Support\Facades\Auth;
@@ -103,11 +104,7 @@ class UserController extends Controller
         ]);
 
         $search = $request->input('search');
-        $perPage = (int) $request->input('per_page', 50);
-
-        if (!in_array($perPage, [10, 25, 50, 100])) {
-            $perPage = 50;
-        }
+        $perPage = TablePagination::resolvePerPage($request, 50);
         $view = $request->input('view', 'users');
 
         $usersDB = User::with([

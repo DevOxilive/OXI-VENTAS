@@ -5,7 +5,11 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "dev:full": "concurrently \"php artisan serve\" \"php artisan reverb:start\" \"npm run dev\""
+        "dev:serve": "php artisan serve --host=127.0.0.1 --port=8000",
+        "dev:reverb": "php artisan reverb:start",
+        "dev:watch": "vite build --watch",
+        "dev:tunnel": "node scripts/run-cloudflared.mjs",
+        "dev:full": "node scripts/dev-full.mjs"
     },
     "devDependencies": {
         "@inertiajs/vue3": "^2.0",

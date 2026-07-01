@@ -14,7 +14,7 @@ export function getPhysicalCountReportsToolbarConfig({
         backButton: true,
         backLabel: 'Centro de reportes',
         showSearch: false,
-        showRecordsPerPage: false,
+        showRecordsPerPage: true,
         showCounter: false,
         filters: [
             {

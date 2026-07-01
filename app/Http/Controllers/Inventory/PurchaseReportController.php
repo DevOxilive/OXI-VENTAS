@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\PurchaseReport;
+use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use App\Support\FlexibleSearch;
 use Inertia\Inertia;
@@ -14,12 +15,14 @@ class PurchaseReportController extends Controller
 {
     public function create(Request $request, Branch $branch)
     {
+        $perPage = TablePagination::resolvePerPage($request, 50);
+
         $filters = [
             'search' => $request->input('search', ''),
             'category' => $request->input('category', ''),
             'subcategory' => $request->input('subcategory', ''),
             'stock' => $request->input('stock', ''),
-            'per_page' => (int) $request->input('per_page', 50),
+            'per_page' => $perPage,
         ];
 
         $products = BranchProduct::query()
@@ -161,12 +164,14 @@ class PurchaseReportController extends Controller
 
     public function index(Request $request, Branch $branch)
     {
+        $perPage = TablePagination::resolvePerPage($request, 50);
+
         $filters = [
             'search' => $request->input('search', ''),
             'category' => $request->input('category', ''),
             'subcategory' => $request->input('subcategory', ''),
             'stock' => $request->input('stock', ''),
-            'per_page' => (int) $request->input('per_page', 50),
+            'per_page' => $perPage,
         ];
 
         $products = BranchProduct::query()

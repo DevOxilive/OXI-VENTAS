@@ -12,6 +12,7 @@ use App\Models\PhysicalCountEntry;
 use App\Models\User;
 use App\Services\PhysicalCountSnapshotService;
 use App\Support\FlexibleSearch;
+use App\Support\TablePagination;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -548,7 +549,7 @@ class PhysicalCountReportController extends Controller
             'search' => trim((string) $request->input('search', '')),
             'report_type' => $request->input('report_type', 'summary'),
             'page' => max(1, (int) $request->input('page', 1)),
-            'per_page' => min(100, max(10, (int) $request->input('per_page', 25))),
+            'per_page' => TablePagination::resolvePerPage($request, 25),
         ];
     }
 

@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 
@@ -7,6 +7,7 @@ import { router } from '@inertiajs/vue3'
 
 import { useEmployeeActions } from '@/Composables/HumanResources/useEmployeeActions'
 import { useEmployeeExport } from '@/Composables/HumanResources/useEmployeeExport'
+import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { usePermissions } from '@/Composables/usePermissions'
 
 import EmployeeToolbar from '@/Components/HumanResourses/EmployeeToolbar.vue'
@@ -30,6 +31,7 @@ const props = defineProps({
 
 const search = ref(props.filters.search || '')
 const recordsPerPage = ref(props.filters.perPage || 50)
+const { handlePageChange } = useGlobalTablePagination()
 
 const statusFilter = ref(props.filters.employmentStatus || '')
 const departmentFilter = ref(props.filters.department || '')
@@ -91,16 +93,6 @@ function refreshEmployeesRealtime() {
         only: ['employeesDB'],
         preserveScroll: true,
         preserveState: true,
-    })
-}
-
-function handlePageChange(url) {
-    if (!url) return
-
-    router.get(url, {}, {
-        preserveScroll: true,
-        preserveState: true,
-        replace: true,
     })
 }
 
@@ -167,3 +159,4 @@ onBeforeUnmount(() => {
         " :mode="modalMode" :employeeToEdit="liveSelectedEmployee" @close="closeModal" />
     </PageLayout>
 </template>
+

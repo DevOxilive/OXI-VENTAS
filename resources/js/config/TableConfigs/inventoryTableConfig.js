@@ -70,7 +70,8 @@ export const inventoryTableConfig = {
             icon: "inventory_2",
             variant: "blue",
             permission: "inventory.branches.update",
-            hidden: (row) => !row.batches?.length,
+            hidden: (row) =>
+                Number(row.activeBatchesCount ?? row.batches?.length ?? 0) <= 0,
         },
         {
             id: "movements",

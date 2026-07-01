@@ -11,18 +11,18 @@ use Illuminate\Support\Facades\DB;
 
 class InventoryReportService
 {
-    public function rows(Branch $branch, array $filters)
+    public function rows(Branch $branch, array $filters, bool $paginate = false)
     {
         if (in_array($filters['status'] ?? null, ['low_stock', 'out_of_stock'], true)) {
-            return $this->attentionProducts($branch, $filters);
+            return $this->attentionProducts($branch, $filters, $paginate);
         }
 
         return match ($filters['report'] ?? 'dashboard') {
-            'movements' => $this->movements($branch, $filters),
-            'expirations' => $this->inventoryLots($branch, $filters),
-            'rotation' => $this->rotation($branch, $filters),
-            'attention' => $this->attentionProducts($branch, $filters),
-            default => $this->inventoryLots($branch, $filters),
+            'movements' => $this->movements($branch, $filters, $paginate),
+            'expirations' => $this->inventoryLots($branch, $filters, $paginate),
+            'rotation' => $this->rotation($branch, $filters, $paginate),
+            'attention' => $this->attentionProducts($branch, $filters, $paginate),
+            default => $this->inventoryLots($branch, $filters, $paginate),
         };
     }
 
@@ -58,7 +58,7 @@ class InventoryReportService
         ];
     }
 
-    public function inventoryLots(Branch $branch, array $filters)
+    public function inventoryLots(Branch $branch, array $filters, bool $paginate = false)
     {
         $lastInSubquery = StockMovement::query()
             ->select('branch_product_id', DB::raw('MAX(created_at) as last_entry_at'))
@@ -122,10 +122,10 @@ class InventoryReportService
             default => null,
         };
 
-        return $query->limit(300)->get();
+        return $this->resolveTableResult($query, $filters, $paginate);
     }
 
-    public function movements(Branch $branch, array $filters)
+    public function movements(Branch $branch, array $filters, bool $paginate = false)
     {
         $query = StockMovement::query()
             ->join('branch_products', 'branch_products.id', '=', 'stock_movements.branch_product_id')
@@ -218,7 +218,7 @@ class InventoryReportService
             $query->where('stock_movements.reason', $filters['movement_reason']);
         }
 
-        return $query->limit(300)->get();
+        return $this->resolveTableResult($query, $filters, $paginate);
     }
 
     public function expirations(Branch $branch, array $filters)
@@ -226,7 +226,7 @@ class InventoryReportService
         return $this->inventoryLots($branch, $filters);
     }
 
-    public function rotation(Branch $branch, array $filters)
+    public function rotation(Branch $branch, array $filters, bool $paginate = false)
     {
         $periodMovementSubquery = StockMovement::query()
             ->select('branch_product_id', DB::raw('SUM(quantity) as total_out'))
@@ -299,10 +299,10 @@ class InventoryReportService
             'categories.name',
         ]);
 
-        return $query->limit(300)->get();
+        return $this->resolveTableResult($query, $filters, $paginate);
     }
 
-    public function attentionProducts(Branch $branch, array $filters = [])
+    public function attentionProducts(Branch $branch, array $filters = [], bool $paginate = false)
     {
         $lastMovementSubquery = StockMovement::query()
             ->select('branch_product_id', DB::raw('MAX(created_at) as last_out_at'))
@@ -404,7 +404,20 @@ class InventoryReportService
             default => null,
         };
 
-        return $query->limit(300)->get();
+        return $this->resolveTableResult($query, $filters, $paginate);
+    }
+
+    private function resolveTableResult($query, array $filters, bool $paginate)
+    {
+        if (! $paginate) {
+            return $query->get();
+        }
+
+        $perPage = max(10, min(100, (int) ($filters['per_page'] ?? 25)));
+
+        return $query
+            ->paginate($perPage)
+            ->appends(collect($filters)->except('paginate')->all());
     }
 
     private function applyProductFilters($query, array $filters): void

@@ -1,5 +1,6 @@
 import { computed, reactive, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
+import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
 import {
     INVENTORY_REPORT_STATUS_FILTERS,
@@ -7,6 +8,7 @@ import {
 } from '@/config/ToolbarConfigs/inventoryReportToolbarConfig'
 
 export function useInventoryReport(props) {
+    const { handlePageChange } = useGlobalTablePagination()
     const filtersState = reactive({
         reportType: props.activeReport ?? 'dashboard',
         status: props.filters?.status ?? '',
@@ -15,6 +17,7 @@ export function useInventoryReport(props) {
         dateFrom: props.filters?.date_from ?? '',
         dateTo: props.filters?.date_to ?? '',
         search: props.filters?.search ?? '',
+        perPage: Number(props.filters?.per_page ?? 25),
     })
 
     let refreshTimeout = null
@@ -61,6 +64,7 @@ export function useInventoryReport(props) {
         filtersState.dateFrom = ''
         filtersState.dateTo = ''
         filtersState.search = ''
+        filtersState.perPage = 25
     }
 
     function updateSearch(value) {
@@ -88,6 +92,7 @@ export function useInventoryReport(props) {
             search: filtersState.search || undefined,
             date_from: filtersState.dateFrom || undefined,
             date_to: filtersState.dateTo || undefined,
+            per_page: filtersState.perPage || 25,
         }
     }
 
@@ -160,6 +165,7 @@ export function useInventoryReport(props) {
         backToReportsCenter,
         updateSearch,
         updateFilter,
+        handlePageChange,
         reloadReport,
         handleToolbarAction,
     }

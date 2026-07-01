@@ -8,6 +8,7 @@ import ProductTable from '@/Components/Inventory/ProductTable.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import { useProductActions } from '@/Composables/Inventory/useProductActions'
+import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { usePermissions } from '@/Composables/usePermissions'
 import { getProductToolbarConfig } from '@/config/ToolbarConfigs/productToolbarConfig'
 
@@ -50,6 +51,9 @@ const branchesDB = computed(() => props.branchesDB ?? [])
 const search = ref(props.filters.search ?? '')
 const categoryFilter = ref(props.filters.category_id ?? 'Todas')
 const recordsToShow = ref(Number(props.filters.per_page ?? 50))
+const { handlePageChange } = useGlobalTablePagination({
+  only: ['productsDB', 'filters'],
+})
 
 const products = computed(() => props.productsDB?.data ?? [])
 const currentPage = computed(() => props.productsDB?.current_page ?? 1)
@@ -91,19 +95,23 @@ function handleProductAction({ action, row }) {
 
 function reloadProducts(pageOrUrl = 1) {
   const isUrl = typeof pageOrUrl === 'string'
-
-  router.get(
-    isUrl
-      ? pageOrUrl
-      : route('inventory.branches.products.index', {
-        branch: branch.value.slug,
-      }),
-    {
+  const requestUrl = isUrl
+    ? pageOrUrl
+    : route('inventory.branches.products.index', {
+      branch: branch.value.slug,
+    })
+  const requestData = isUrl
+    ? {}
+    : {
       search: search.value,
       category_id: categoryFilter.value === 'Todas' ? null : categoryFilter.value,
       per_page: recordsToShow.value,
-      page: isUrl ? undefined : pageOrUrl,
-    },
+      page: pageOrUrl,
+    }
+
+  router.get(
+    requestUrl,
+    requestData,
     {
       preserveState: true,
       preserveScroll: true,
@@ -191,7 +199,7 @@ onBeforeUnmount(() => {
         @update:records-per-page="recordsToShow = $event" @action="handleProductToolbarAction" />
     </template>
 
-    <ProductTable :items="products" :pagination="productsDB" @page-change="reloadProducts"
+    <ProductTable :items="products" :pagination="productsDB" @page-change="handlePageChange"
       @action="handleProductAction" />
 
     <ProductModal v-if="

@@ -17,6 +17,7 @@ use App\Models\StockMovementBatch;
 use App\Models\User;
 use App\Services\PhysicalCountSnapshotService;
 use App\Support\FlexibleSearch;
+use App\Support\TablePagination;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -36,9 +37,26 @@ class PhysicalCountController extends Controller
     {
         $branch = $this->resolveBranch($request->query('branch'));
         $user = $request->user();
+        $perPage = TablePagination::resolvePerPage($request, 25);
+        $search = trim((string) $request->input('search', ''));
+        $status = $request->input('status');
 
         $physicalCountsQuery = PhysicalCount::with(['branch', 'creator', 'participants:id,name'])
             ->where('branch_id', $branch->id)
+            ->when($status, fn ($query, $value) => $query->where('status', $value))
+            ->when($search, function ($query, $value) {
+                FlexibleSearch::apply($query, $value, function ($subQuery, $phrase, $terms) {
+                    FlexibleSearch::orWhereColumns($subQuery, [
+                        'name',
+                        'folio',
+                        'status',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'participants', [
+                        'name',
+                    ], $phrase, $terms);
+                });
+            })
             ->latest();
 
         if (! $this->canManageAudits($user)) {
@@ -53,9 +71,16 @@ class PhysicalCountController extends Controller
                 ->select('id', 'name', 'slug', 'color')
                 ->orderBy('name')
                 ->get(),
-            'physicalCounts' => $physicalCountsQuery->get(),
+            'physicalCounts' => $physicalCountsQuery
+                ->paginate($perPage)
+                ->withQueryString(),
             'users' => $this->availableAuditUsers(),
             'canViewReports' => $this->canViewReports($request),
+            'filters' => [
+                'search' => $search,
+                'status' => $status,
+                'per_page' => $perPage,
+            ],
         ]);
     }
 
