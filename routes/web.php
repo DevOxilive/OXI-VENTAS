@@ -206,6 +206,10 @@ Route::middleware([
             ->middleware('permission:inventory.branches.update')
             ->name('branch-inventory.update-config');
 
+        Route::get('/branch-inventory/{branchProduct}/details', [BranchInventoryController::class, 'details'])
+            ->middleware('permission:inventory.branches.view,inventory.branches.update')
+            ->name('branch-inventory.details');
+
         Route::put('/product-batches/{productBatch}', [ProductBatchController::class, 'update'])
             ->middleware('permission:inventory.branches.update')
             ->name('product-batches.update');

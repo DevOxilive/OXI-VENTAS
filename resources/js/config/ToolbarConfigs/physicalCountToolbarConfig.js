@@ -1,15 +1,15 @@
-export function getPhysicalCountToolbarConfig({ branch, canCreate }) {
+export function getPhysicalCountToolbarConfig({ branch, canCreate, status = '' }) {
     return {
         title: 'Conteo fisico',
         subtitle: `Sucursal: ${branch?.name ?? 'No seleccionada'}`,
         searchPlaceholder: 'Buscar conteo, folio, usuario o estado...',
-        showRecordsPerPage: false,
+        showRecordsPerPage: true,
         filters: [
             {
                 key: 'statusFilter',
                 label: 'Estado',
                 placeholder: 'Estado',
-                value: '',
+                value: status,
                 options: [
                     { label: 'Abierto', value: 'open' },
                     { label: 'Cerrado', value: 'closed' },

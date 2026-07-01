@@ -65,6 +65,7 @@ const {
                 @back="backToReportsCenter"
                 @update:search="updateSearch"
                 @update:filter="updateFilter"
+                @update:records-per-page="filtersState.perPage = $event"
                 @action="handleToolbarAction"
             />
         </template>

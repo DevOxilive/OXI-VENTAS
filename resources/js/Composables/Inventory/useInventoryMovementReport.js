@@ -13,6 +13,7 @@ export function useInventoryMovementReport(props) {
         dateFrom: props.filters?.date_from ?? '',
         dateTo: props.filters?.date_to ?? '',
         search: props.filters?.search ?? '',
+        perPage: Number(props.filters?.per_page ?? 25),
     })
 
     let refreshTimeout = null
@@ -45,6 +46,7 @@ export function useInventoryMovementReport(props) {
         filtersState.dateFrom = ''
         filtersState.dateTo = ''
         filtersState.search = ''
+        filtersState.perPage = 25
     }
 
     function updateSearch(value) {
@@ -65,6 +67,7 @@ export function useInventoryMovementReport(props) {
             search: filtersState.search || undefined,
             date_from: filtersState.dateFrom || undefined,
             date_to: filtersState.dateTo || undefined,
+            per_page: filtersState.perPage || 25,
         }
     }
 

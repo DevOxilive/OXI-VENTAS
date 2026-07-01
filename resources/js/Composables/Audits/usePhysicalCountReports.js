@@ -145,6 +145,7 @@ export function usePhysicalCountReports(props) {
         form.status = ''
         form.search = ''
         form.report_type = 'summary'
+        form.per_page = 25
         syncingFromServer.value = false
 
         router.get(route('audits.physical-counts.reports'), { branch: form.branch }, {
@@ -210,6 +211,7 @@ export function usePhysicalCountReports(props) {
             form.status,
             form.search,
             form.report_type,
+            form.per_page,
         ],
         () => scheduleFilterReload(250)
     )

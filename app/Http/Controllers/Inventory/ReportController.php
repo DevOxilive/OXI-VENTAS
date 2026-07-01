@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\InventoryReportService;
+use App\Support\TablePagination;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -39,7 +40,7 @@ class ReportController extends Controller
             'attentionProducts' => [],
         ];
 
-        $reports[$this->reportDataKey($activeReport)] = $reportService->rows($branch, $filters);
+        $reports[$this->reportDataKey($activeReport)] = $reportService->rows($branch, $filters, true);
 
         return Inertia::render('Inventory/Reports/InventoryReports', [
             'currentBranch' => $branch,
@@ -71,7 +72,7 @@ class ReportController extends Controller
                 'movementTypes' => $this->movementTypes(),
                 'movementReasons' => $this->movementReasons(),
             ],
-            'movements' => $reportService->rows($branch, $filters),
+            'movements' => $reportService->rows($branch, $filters, true),
         ]);
     }
 
@@ -149,6 +150,7 @@ class ReportController extends Controller
             'movement_type' => $request->input('movement_type'),
             'movement_reason' => $request->input('movement_reason'),
             'search' => $request->input('search'),
+            'per_page' => TablePagination::resolvePerPage($request, 25),
         ];
     }
 

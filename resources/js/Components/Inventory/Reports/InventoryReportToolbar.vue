@@ -27,6 +27,7 @@ defineEmits([
     'back',
     'update:search',
     'update:filter',
+    'update:records-per-page',
     'action',
 ])
 
@@ -44,9 +45,11 @@ const toolbarConfig = computed(() =>
     <GlobalToolbar
         v-bind="toolbarConfig"
         :search="filters.search"
+        :records-per-page="filters.perPage"
         @back="$emit('back')"
         @update:search="$emit('update:search', $event)"
         @update:filter="$emit('update:filter', $event)"
+        @update:records-per-page="$emit('update:records-per-page', $event)"
         @action="$emit('action', $event)"
     />
 </template>

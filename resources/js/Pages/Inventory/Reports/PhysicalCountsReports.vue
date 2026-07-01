@@ -47,9 +47,11 @@ const {
             <GlobalToolbar
                 v-bind="toolbarConfig"
                 :active-tab="form.report_type"
+                :records-per-page="form.per_page"
                 @back="backToReportsCenter"
                 @update:search="updateSearch"
                 @update:filter="updateFilter"
+                @update:records-per-page="form.per_page = $event"
                 @update:active-tab="form.report_type = $event"
                 @action="handleToolbarAction"
             />
