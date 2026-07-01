@@ -2,10 +2,6 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-    stats: {
-        type: Object,
-        required: true,
-    },
     alerts: {
         type: Object,
         default: () => ({
@@ -23,26 +19,12 @@ const emit = defineEmits([
 
 const cards = computed(() => [
     {
-        key: 'total',
-        label: 'Productos',
-        value: props.stats.total,
-        icon: 'inventory_2',
-        tone: 'slate',
-    },
-    {
-        key: 'totalStock',
-        label: 'Unidades',
-        value: props.stats.totalStock,
-        icon: 'warehouse',
-        tone: 'slate',
-    },
-    {
-        key: 'lowStockProducts',
-        label: 'Stock bajo',
-        value: props.alerts.lowStockProducts,
-        icon: 'warning',
-        tone: 'amber',
-        alertType: 'lowStock',
+        key: 'nearExpirationBatches',
+        label: 'Por vencer',
+        value: props.alerts.nearExpirationBatches,
+        icon: 'event_busy',
+        tone: 'orange',
+        alertType: 'nearExpiration',
     },
     {
         key: 'expiredBatches',
@@ -53,16 +35,16 @@ const cards = computed(() => [
         alertType: 'expired',
     },
     {
-        key: 'nearExpirationBatches',
-        label: 'Por vencer',
-        value: props.alerts.nearExpirationBatches,
-        icon: 'event_busy',
-        tone: 'orange',
-        alertType: 'nearExpiration',
+        key: 'lowStockProducts',
+        label: 'Stock bajo',
+        value: props.alerts.lowStockProducts,
+        icon: 'warning',
+        tone: 'amber',
+        alertType: 'lowStock',
     },
     {
         key: 'inactiveCandidateProducts',
-        label: 'Sin surtir',
+        label: 'Productos sin rotacion',
         value: props.alerts.inactiveCandidateProducts,
         icon: 'inventory',
         tone: 'purple',
@@ -72,7 +54,6 @@ const cards = computed(() => [
 
 function toneClass(tone) {
     return {
-        slate: 'bg-white border-slate-200 text-slate-700',
         red: 'bg-red-50 border-red-200 text-red-700',
         orange: 'bg-orange-50 border-orange-200 text-orange-700',
         amber: 'bg-amber-50 border-amber-200 text-amber-700',
@@ -89,16 +70,16 @@ function openCard(card) {
 
 <template>
     <div>
-        <p class="text-sm font-black text-slate-700 mb-3">
-            Estado rápido del inventario
+        <p class="mb-3 text-sm font-black text-slate-700">
+            Alertas clave del inventario
         </p>
 
-        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <button v-for="card in cards" :key="card.key" type="button"
-                class="rounded-2xl border px-4 py-3 shadow-sm text-left transition" :class="[
+                class="rounded-2xl border px-4 py-3 text-left shadow-sm transition" :class="[
                     toneClass(card.tone),
                     card.alertType && Number(card.value) > 0
-                        ? 'hover:scale-[1.01] cursor-pointer'
+                        ? 'cursor-pointer hover:scale-[1.01]'
                         : 'cursor-default'
                 ]" @click="openCard(card)">
                 <div class="flex items-center justify-between gap-2">
@@ -107,7 +88,7 @@ function openCard(card) {
                             {{ card.label }}
                         </p>
 
-                        <p class="text-xl font-black leading-tight mt-1">
+                        <p class="mt-1 text-xl font-black leading-tight">
                             {{ card.value }}
                         </p>
                     </div>

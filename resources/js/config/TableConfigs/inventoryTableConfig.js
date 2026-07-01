@@ -42,7 +42,7 @@ export const inventoryTableConfig = {
                     Disponible: "green",
                     "Stock bajo": "amber",
                     Agotado: "red",
-                    "Sin surtir": "purple",
+                    "Producto sin rotacion": "purple",
                 },
             },
             mobileBadge: true,

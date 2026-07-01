@@ -3,6 +3,44 @@ import { useBatchAdjustmentModal } from "@/Composables/Inventory/useBatchAdjustm
 import { useGlobalTablePagination } from "@/Composables/useGlobalTablePagination";
 import { router } from "@inertiajs/vue3";
 
+function normalizeSearchValue(value) {
+    return String(value ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+}
+
+function buildProductSearchText(product) {
+    const batches = Array.isArray(product.batches) ? product.batches : [];
+    const batchText = batches
+        .flatMap((batch) => [
+            batch?.lot_number,
+            batch?.formatted_expiration_date,
+            batch?.expiration_date,
+        ])
+        .filter(Boolean)
+        .join(" ");
+
+    return normalizeSearchValue(
+        [
+            product.name,
+            product.code,
+            product.category_name,
+            product.category,
+            product.branch,
+            product.status,
+            product.administrativeStatus,
+            product.stockLabel,
+            product.minStockLabel,
+            product.unit,
+            product.expirationDate,
+            product.lastRestockedAt,
+            batchText,
+        ].join(" "),
+    );
+}
+
 export function useBranchInventory(props) {
     const { handlePageChange } = useGlobalTablePagination();
     const showCreateModal = ref(false);
@@ -209,20 +247,16 @@ export function useBranchInventory(props) {
         );
     });
 
-    const filteredProducts = computed(() => visualProducts.value);
+    const filteredProducts = computed(() => {
+        const searchValue = normalizeSearchValue(search.value);
 
-    const stats = computed(() => {
-        const inventoryStats = props.inventoryStats ?? {};
+        if (!searchValue) {
+            return visualProducts.value;
+        }
 
-        return {
-            total: Number(inventoryStats.total_products ?? 0),
-            totalStock: Number(inventoryStats.total_stock ?? 0),
-            inventoryValue: Number(inventoryStats.inventory_value ?? 0),
-            lowStock: Number(inventoryStats.low_stock ?? 0),
-            outOfStock: Number(inventoryStats.out_of_stock ?? 0),
-            expiringSoon: Number(inventoryStats.expiring_soon ?? 0),
-            inactiveCandidates: Number(inventoryStats.inactive_candidates ?? 0),
-        };
+        return visualProducts.value.filter((product) =>
+            buildProductSearchText(product).includes(searchValue),
+        );
     });
 
     const expiredBatchesList = computed(() => {
@@ -270,7 +304,7 @@ export function useBranchInventory(props) {
                 expired: "Lotes vencidos",
                 nearExpiration: "Lotes próximos a vencer",
                 lowStock: "Productos con stock bajo",
-                inactiveCandidates: "Productos candidatos a inactivar",
+                inactiveCandidates: "Productos sin rotacion",
             }[selectedAlertType.value] || ""
         );
     });
@@ -560,7 +594,6 @@ export function useBranchInventory(props) {
         visualProducts,
         filteredProducts,
 
-        stats,
         alerts,
 
         selectedAlertType,

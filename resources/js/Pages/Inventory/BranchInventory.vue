@@ -120,7 +120,6 @@ const {
     hasPagination,
     visualProducts,
     filteredProducts,
-    stats,
     alerts,
 
     selectedAlertType,
@@ -204,13 +203,15 @@ function handleInventoryAction({ action, row }) {
 </script>
 <template>
     <PageLayout>
-        <InventoryStatsCards :stats="stats" :alerts="alerts" class="mb-5" @open-alert="openAlertModal" />
-
         <template #toolbar>
-            <GlobalToolbar v-bind="inventoryToolbarConfig" :search="search" :records-per-page="recordsToShow"
-                :filtered-records="filteredProducts.length" :total-records="visualProducts.length"
-                @update:search="search = $event" @update:filter="handleInventoryToolbarFilter"
-                @update:records-per-page="recordsToShow = $event" />
+            <div class="space-y-5">
+                <InventoryStatsCards :alerts="alerts" @open-alert="openAlertModal" />
+
+                <GlobalToolbar v-bind="inventoryToolbarConfig" :search="search" :records-per-page="recordsToShow"
+                    :filtered-records="filteredProducts.length" :total-records="visualProducts.length"
+                    @update:search="search = $event" @update:filter="handleInventoryToolbarFilter"
+                    @update:records-per-page="recordsToShow = $event" />
+            </div>
         </template>
 
         <GlobalTable :items="filteredProducts" v-bind="inventoryTableConfig" :pagination="branchProductsDB"

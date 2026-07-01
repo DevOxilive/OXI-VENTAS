@@ -71,10 +71,10 @@ export function getInventoryToolbarConfig({
             },
             {
                 key: "inactiveCandidateFilter",
-                label: "Sin surtir",
-                placeholder: "Sin surtir",
+                label: "Sin rotacion",
+                placeholder: "Sin rotacion",
                 value: inactiveCandidateFilter,
-                options: [{ label: "Candidatos", value: "1" }],
+                options: [{ label: "Productos sin rotacion", value: "1" }],
             },
         ],
     };
