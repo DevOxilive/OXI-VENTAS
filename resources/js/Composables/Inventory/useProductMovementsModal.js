@@ -1,9 +1,24 @@
-import { computed, onBeforeUnmount, onMounted } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive } from "vue";
+
+function parseDateValue(value) {
+    if (!value) return null;
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 export function useProductMovementsModal(props, emit) {
     const productName = computed(() => props.product?.name ?? "Producto");
+    const productCode = computed(() => props.product?.code ?? "Sin codigo");
     const unit = computed(() => props.product?.unit ?? "pieza");
     const currentStock = computed(() => Number(props.product?.stock ?? 0));
+
+    const filters = reactive({
+        userName: "",
+        dateFrom: "",
+        dateTo: "",
+        movementGroup: "all",
+    });
 
     const movements = computed(() => props.product?.recentMovements ?? []);
     const totalMovements = computed(() => movements.value.length);
@@ -17,121 +32,64 @@ export function useProductMovementsModal(props, emit) {
         );
     }
 
-    const movementGroups = computed(() => [
-        {
-            key: "purchases",
-            title: "Compras",
-            icon: "add_circle",
-            empty: "Sin compras recientes.",
-            items: movements.value.filter((movement) => {
-                return movement.type === "IN" || movement.reason === "PURCHASE";
-            }),
-        },
-        {
-            key: "damaged",
-            title: "Dañados",
-            icon: "production_quantity_limits",
-            empty: "Sin salidas por daño.",
-            items: movements.value.filter((movement) => {
-                return movement.reason === "DAMAGED";
-            }),
-        },
-        {
-            key: "expired",
-            title: "Caducados",
-            icon: "event_busy",
-            empty: "Sin salidas por caducidad.",
-            items: movements.value.filter((movement) => {
-                return movement.reason === "EXPIRED";
-            }),
-        },
-        {
-            key: "others",
-            title: "Otros",
-            icon: "more_horiz",
-            empty: "Sin salidas registradas como otros.",
-            items: movements.value.filter((movement) => {
-                return movement.reason === "OTHER";
-            }),
-        },
-        {
-            key: "adjustments",
-            title: "Ajustes",
-            icon: "tune",
-            empty: "Sin ajustes manuales.",
-            items: movements.value.filter((movement) => {
-                return movement.type === "ADJUSTMENT";
-            }),
-        },
+    function resolveGroupKey(movement) {
+        if (movement.reason === "DAMAGED") {
+            return "damaged";
+        }
+
+        if (movement.reason === "EXPIRED") {
+            return "expired";
+        }
+
+        if (isAuditMovement(movement)) {
+            return "audits";
+        }
+
+        if (movement.type === "ADJUSTMENT") {
+            return "adjustments";
+        }
+
+        return "others";
+    }
+
+    function isAuditMovement(movement) {
+        const notes = String(movement.notes ?? "").toLowerCase();
+
+        return (
+            movement.reason === "INVENTORY_DIFFERENCE" &&
+            (
+                notes.includes("auditoria") ||
+                notes.includes("auditoría") ||
+                notes.includes("conteo fisico") ||
+                notes.includes("conteo físico")
+            )
+        );
+    }
+
+    const movementGroupOptions = computed(() => [
+        { value: "all", label: "Todos" },
+        { value: "audits", label: "Auditorias" },
+        { value: "adjustments", label: "Ajustes manuales" },
+        { value: "damaged", label: "Danados" },
+        { value: "expired", label: "Caducados" },
+        { value: "others", label: "Otros" },
     ]);
 
-    function groupClass(key) {
-        return (
-            {
-                purchases: "border-green-200 bg-green-50",
-                damaged: "border-red-200 bg-red-50",
-                expired: "border-amber-200 bg-amber-50",
-                others: "border-sky-200 bg-sky-50",
-                adjustments: "border-slate-200 bg-slate-50",
-            }[key] ?? "border-slate-200 bg-slate-50"
-        );
-    }
+    const userOptions = computed(() => {
+        const users = new Map([["", "Todos"]]);
 
-    function groupIconClass(key) {
-        return (
-            {
-                purchases: "text-green-600 bg-green-100",
-                damaged: "text-red-600 bg-red-100",
-                expired: "text-amber-600 bg-amber-100",
-                others: "text-sky-600 bg-sky-100",
-                adjustments: "text-slate-600 bg-slate-200",
-            }[key] ?? "text-slate-600 bg-slate-200"
-        );
-    }
+        movements.value.forEach((movement) => {
+            const name = userLabel(movement);
 
-    function quantityLabel(movement) {
-        if (isAdministrativeAdjustment(movement)) {
-            return "Cambio administrativo";
-        }
+            if (!name || users.has(name)) return;
+            users.set(name, name);
+        });
 
-        const quantity = formatNumber(movement.quantity ?? 0);
-
-        if (movement.type === "IN") return `+${quantity} ${unit.value}`;
-        if (movement.type === "OUT") return `-${quantity} ${unit.value}`;
-
-        const previousStock = Number(movement.previous_stock ?? 0);
-        const newStock = Number(movement.new_stock ?? 0);
-
-        if (newStock > previousStock) return `+${quantity} ${unit.value}`;
-        if (newStock < previousStock) return `-${quantity} ${unit.value}`;
-
-        return `${quantity} ${unit.value}`;
-    }
-
-    function quantityClass(movement) {
-        if (isAdministrativeAdjustment(movement)) return "text-indigo-700";
-        if (movement.type === "IN") return "text-green-700";
-        if (movement.type === "OUT") return "text-red-700";
-
-        return "text-slate-700";
-    }
-
-    function reasonLabel(reason, movement = null) {
-        if (movement && isAdministrativeAdjustment(movement)) {
-            return "Actualización de datos del lote";
-        }
-
-        return (
-            {
-                PURCHASE: "Compra",
-                SALE: "Venta",
-                DAMAGED: "Producto dañado",
-                EXPIRED: "Producto caducado",
-                OTHER: "Otros",
-                INVENTORY_DIFFERENCE: "Diferencia de inventario",
-            }[reason] ?? "Movimiento"
-        );
-    }
+        return Array.from(users.entries()).map(([value, label]) => ({
+            value,
+            label,
+        }));
+    });
 
     function formatNumber(value) {
         return new Intl.NumberFormat("es-MX", {
@@ -142,19 +100,58 @@ export function useProductMovementsModal(props, emit) {
     function formatDateTime(date) {
         if (!date) return "Sin fecha";
 
-        const parsedDate = new Date(date);
+        const parsedDate = parseDateValue(date);
 
-        if (Number.isNaN(parsedDate.getTime())) {
-            return "Fecha inválida";
+        if (!parsedDate) {
+            return "Fecha invalida";
         }
 
         return new Intl.DateTimeFormat("es-MX", {
             day: "2-digit",
-            month: "2-digit",
+            month: "short",
             year: "numeric",
             hour: "2-digit",
             minute: "2-digit",
         }).format(parsedDate);
+    }
+
+    function reasonLabel(reason, movement = null) {
+        if (movement && isAdministrativeAdjustment(movement)) {
+            return "Actualizacion de datos";
+        }
+
+        if (movement && isAuditMovement(movement)) {
+            return "Auditoria";
+        }
+
+        if (movement?.type === "ADJUSTMENT" && reason === "INVENTORY_DIFFERENCE") {
+            return "Ajuste manual";
+        }
+
+        return (
+            {
+                PURCHASE: "Compra",
+                SALE: "Venta",
+                DAMAGED: "Danado",
+                EXPIRED: "Caducado",
+                OTHER: "Otro",
+                INVENTORY_DIFFERENCE: "Ajuste manual",
+            }[reason] ?? "Movimiento"
+        );
+    }
+
+    function typeLabel(type, movement = null) {
+        if (movement && isAdministrativeAdjustment(movement)) {
+            return "Administrativo";
+        }
+
+        return (
+            {
+                IN: "Entrada",
+                OUT: "Salida",
+                ADJUSTMENT: "Ajuste",
+            }[type] ?? "Movimiento"
+        );
     }
 
     function userLabel(movement) {
@@ -163,10 +160,6 @@ export function useProductMovementsModal(props, emit) {
             movement.user?.full_name ??
             "Usuario no disponible"
         );
-    }
-
-    function hasNotes(movement) {
-        return Boolean(String(movement.notes ?? "").trim());
     }
 
     function movementBatches(movement) {
@@ -183,17 +176,39 @@ export function useProductMovementsModal(props, emit) {
         );
     }
 
-    function batchQuantityLabel(batchMovement, movement) {
+    function batchSummary(movement) {
+        const batches = movementBatches(movement);
+
+        if (!batches.length) return "Sin lote";
+
+        return batches.map((batch) => batchName(batch)).join(", ");
+    }
+
+    function quantityLabel(movement) {
         if (isAdministrativeAdjustment(movement)) {
-            return "Sin cambio de cantidad";
+            return "Sin cambio";
         }
 
-        const quantity = formatNumber(batchMovement.quantity ?? 0);
+        const quantity = formatNumber(movement.quantity ?? 0);
 
-        if (movement.type === "IN") return `+${quantity} ${unit.value}`;
-        if (movement.type === "OUT") return `-${quantity} ${unit.value}`;
+        if (movement.type === "IN") return `+${quantity}`;
+        if (movement.type === "OUT") return `-${quantity}`;
 
-        return `${quantity} ${unit.value}`;
+        const previousStock = Number(movement.previous_stock ?? 0);
+        const newStock = Number(movement.new_stock ?? 0);
+
+        if (newStock > previousStock) return `+${quantity}`;
+        if (newStock < previousStock) return `-${quantity}`;
+
+        return quantity;
+    }
+
+    function quantityClass(movement) {
+        if (isAdministrativeAdjustment(movement)) return "text-violet-700";
+        if (movement.type === "IN") return "text-emerald-700";
+        if (movement.type === "OUT") return "text-rose-700";
+
+        return "text-slate-700";
     }
 
     function stockTransition(movement) {
@@ -203,16 +218,76 @@ export function useProductMovementsModal(props, emit) {
             movement.new_stock === null ||
             movement.new_stock === undefined
         ) {
-            return null;
+            return "Sin registro";
         }
 
         if (isAdministrativeAdjustment(movement)) {
-            return "Sin cambio de stock";
+            return "Sin cambio";
         }
 
-        return `${formatNumber(movement.previous_stock)} → ${formatNumber(
+        return `${formatNumber(movement.previous_stock)} -> ${formatNumber(
             movement.new_stock,
-        )} ${unit.value}`;
+        )}`;
+    }
+
+    const filteredMovements = computed(() => {
+        const fromDate = filters.dateFrom ? parseDateValue(filters.dateFrom) : null;
+        const toDate = filters.dateTo ? parseDateValue(filters.dateTo) : null;
+
+        return movements.value.filter((movement) => {
+            if (
+                filters.movementGroup &&
+                filters.movementGroup !== "all" &&
+                resolveGroupKey(movement) !== filters.movementGroup
+            ) {
+                return false;
+            }
+
+            if (filters.userName && userLabel(movement) !== filters.userName) {
+                return false;
+            }
+
+            const movementDate = parseDateValue(movement.created_at);
+
+            if (fromDate && movementDate && movementDate < fromDate) {
+                return false;
+            }
+
+            if (toDate && movementDate) {
+                const inclusiveToDate = new Date(toDate);
+                inclusiveToDate.setHours(23, 59, 59, 999);
+
+                if (movementDate > inclusiveToDate) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    });
+
+    const totalFilteredMovements = computed(() => filteredMovements.value.length);
+
+    const tableRows = computed(() =>
+        filteredMovements.value.map((movement) => ({
+            ...movement,
+            groupKey: resolveGroupKey(movement),
+            displayDate: formatDateTime(movement.created_at),
+            displayReason: reasonLabel(movement.reason, movement),
+            displayType: typeLabel(movement.type, movement),
+            displayUser: userLabel(movement),
+            displayQuantity: quantityLabel(movement),
+            displayBatches: batchSummary(movement),
+            displayStock: stockTransition(movement),
+            notesText: String(movement.notes ?? "").trim(),
+        })),
+    );
+
+    function resetFilters() {
+        filters.userName = "";
+        filters.dateFrom = "";
+        filters.dateTo = "";
+        filters.movementGroup = "all";
     }
 
     function closeModal() {
@@ -233,25 +308,18 @@ export function useProductMovementsModal(props, emit) {
 
     return {
         productName,
+        productCode,
         unit,
         currentStock,
         totalMovements,
-        movementGroups,
-
-        groupClass,
-        groupIconClass,
-        quantityLabel,
+        totalFilteredMovements,
+        filters,
+        movementGroupOptions,
+        userOptions,
+        tableRows,
         quantityClass,
-        reasonLabel,
         formatNumber,
-        formatDateTime,
-        userLabel,
-        hasNotes,
-        movementBatches,
-        batchName,
-        batchQuantityLabel,
-        stockTransition,
-
+        resetFilters,
         closeModal,
     };
 }

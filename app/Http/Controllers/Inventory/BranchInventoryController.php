@@ -66,6 +66,10 @@ class BranchInventoryController extends Controller
                     FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
                         'code',
                     ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($searchQuery, 'activeBatches', [
+                        'lot_number',
+                    ], $phrase, $terms);
                 });
             })
             ->when($request->filled('category'), function ($query) use ($request) {
@@ -207,7 +211,7 @@ class BranchInventoryController extends Controller
 
         $mapInactiveCandidateProduct = function ($branchProduct) use ($mapLowStockProduct) {
             return array_merge($mapLowStockProduct($branchProduct), [
-                'status' => 'Sin surtir recientemente',
+                'status' => 'Producto sin rotacion',
                 'last_restocked_at' => $branchProduct->last_restocked_at,
                 'inactive_candidate_after_days' => $branchProduct->inactive_candidate_after_days,
             ]);

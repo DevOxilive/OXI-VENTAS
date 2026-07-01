@@ -22,6 +22,7 @@ class InventoryReportSeeder extends Seeder
     private const PRODUCT_COUNT = 100;
     private const PRODUCT_PREFIX = 'Demo Reporte Inventario';
     private const BARCODE_PREFIX = 'RPTINV';
+    private const EXTRA_HISTORY_ROUNDS = 3;
 
     public function run(): void
     {
@@ -100,6 +101,14 @@ class InventoryReportSeeder extends Seeder
             if ($index % 7 === 0) {
                 $this->createSaleMovement($stockService, $branchProduct, $users, $index);
             }
+
+            $this->createOperationalTrail(
+                stockService: $stockService,
+                branchProduct: $branchProduct,
+                users: $users,
+                index: $index,
+                entryDate: $entryDate,
+            );
         }
     }
 
@@ -403,6 +412,148 @@ class InventoryReportSeeder extends Seeder
         );
 
         $this->dateMovement($movement, now()->subDays(6 + ($index % 50))->setTime(16, 0));
+    }
+
+    private function createOperationalTrail(
+        StockMovementService $stockService,
+        BranchProduct $branchProduct,
+        $users,
+        int $index,
+        $entryDate
+    ): void {
+        for ($round = 1; $round <= self::EXTRA_HISTORY_ROUNDS; $round++) {
+            if ($index % 9 === 0 && $round === self::EXTRA_HISTORY_ROUNDS) {
+                $this->createFollowUpPurchase(
+                    stockService: $stockService,
+                    branchProduct: $branchProduct,
+                    users: $users,
+                    index: $index,
+                    round: $round,
+                    entryDate: $entryDate,
+                );
+            }
+
+            $batch = $this->firstAvailableBatch($branchProduct);
+
+            if (!$batch) {
+                return;
+            }
+
+            $availableQuantity = (float) $batch->quantity;
+
+            if ($availableQuantity <= 0) {
+                continue;
+            }
+
+            $movementType = ($index + $round) % 4;
+            $quantity = min(
+                1 + (($index + $round) % 3),
+                max(1.0, $availableQuantity)
+            );
+
+            if ($quantity <= 0) {
+                continue;
+            }
+
+            if ($movementType === 0) {
+                $movement = $stockService->move(
+                    branchProduct: $branchProduct->fresh(),
+                    type: StockMovement::TYPE_OUT,
+                    reason: StockMovement::REASON_SALE,
+                    quantity: (float) $quantity,
+                    notes: "Seeder reportes: venta operativa ronda {$round}.",
+                    userId: $users[4]->id,
+                    manualBatches: [[
+                        'id' => $batch->id,
+                        'quantity' => (float) $quantity,
+                    ]],
+                );
+
+                $this->dateMovement($movement, now()->subDays(1 + (($index + ($round * 3)) % 28))->setTime(10 + $round, 15));
+                continue;
+            }
+
+            if ($movementType === 1) {
+                $movement = $stockService->move(
+                    branchProduct: $branchProduct->fresh(),
+                    type: StockMovement::TYPE_OUT,
+                    reason: StockMovement::REASON_DAMAGED,
+                    quantity: (float) $quantity,
+                    notes: "Seeder reportes: baja operativa por dano ronda {$round}.",
+                    userId: $users[1]->id,
+                    manualBatches: [[
+                        'id' => $batch->id,
+                        'quantity' => (float) $quantity,
+                    ]],
+                );
+
+                $this->dateMovement($movement, now()->subDays(2 + (($index + ($round * 5)) % 36))->setTime(11 + $round, 30));
+                continue;
+            }
+
+            if ($movementType === 2) {
+                $adjustmentQuantity = min(1.0, $availableQuantity);
+
+                $movement = $stockService->move(
+                    branchProduct: $branchProduct->fresh(),
+                    type: StockMovement::TYPE_ADJUSTMENT,
+                    reason: StockMovement::REASON_INVENTORY_DIFFERENCE,
+                    quantity: -1 * (float) $adjustmentQuantity,
+                    notes: "Seeder reportes: ajuste ciclico de inventario ronda {$round}.",
+                    userId: $users[2]->id,
+                    manualBatches: [[
+                        'id' => $batch->id,
+                        'quantity' => (float) $adjustmentQuantity,
+                    ]],
+                );
+
+                $this->dateMovement($movement, now()->subDays(3 + (($index + ($round * 7)) % 42))->setTime(9 + $round, 45));
+                continue;
+            }
+
+            $this->createFollowUpPurchase(
+                stockService: $stockService,
+                branchProduct: $branchProduct,
+                users: $users,
+                index: $index,
+                round: $round,
+                entryDate: $entryDate,
+            );
+        }
+    }
+
+    private function createFollowUpPurchase(
+        StockMovementService $stockService,
+        BranchProduct $branchProduct,
+        $users,
+        int $index,
+        int $round,
+        $entryDate
+    ): void {
+        $restockDate = $entryDate->copy()->addDays(18 + ($round * 7) + ($index % 9))->setTime(8 + $round, 20);
+        $lotNumber = 'RPT-' . str_pad((string) $index, 3, '0', STR_PAD_LEFT) . '-R' . $round;
+        $quantity = 4 + (($index + $round) % 6);
+
+        $batch = [[
+            'lot_number' => $lotNumber,
+            'expiration_date' => now()->addMonths(6 + $round)->addDays($index % 20)->toDateString(),
+            'received_at' => $restockDate->toDateString(),
+            'quantity' => (float) $quantity,
+            'supplier' => 'Proveedor demo reportes reposicion ' . (($round % 3) + 1),
+        ]];
+
+        $movement = $stockService->move(
+            branchProduct: $branchProduct->fresh(),
+            type: StockMovement::TYPE_IN,
+            reason: StockMovement::REASON_PURCHASE,
+            quantity: (float) $quantity,
+            notes: "Seeder reportes: reabastecimiento operativo ronda {$round}.",
+            userId: $users[3]->id,
+            batches: $batch,
+        );
+
+        $this->dateMovement($movement, $restockDate);
+        $this->dateBatches($branchProduct->fresh(), $batch, $restockDate);
     }
 
     private function availableManualBatches(BranchProduct $branchProduct)
