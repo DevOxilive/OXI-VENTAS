@@ -6,6 +6,7 @@ import AdminLayout from "@/Layouts/AdminLayout.vue";
 import ProductTable from '@/Components/Inventory/ProductTable.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import { usePermissions } from '@/Composables/usePermissions'
+import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { getProductToolbarConfig } from "@/config/ToolbarConfigs/productToolbarConfig";
 import ProductRegisterModal from "@/Components/Inventory/ProductRegisterModal.vue";
 import PageLayout from '@/Layouts/PageLayout.vue'
@@ -50,6 +51,7 @@ const branchFilter = ref("");
 const categoryFilter = ref("");
 const stockFilter = ref("");
 const recordsToShow = ref(Number(props.filters?.per_page ?? 50));
+const { handlePageChange } = useGlobalTablePagination()
 const branches = computed(() => page.props.branches || [])
 
 const localProducts = ref([]);
@@ -156,13 +158,16 @@ watch(recordsToShow, () => {
 
 function reloadProducts(pageUrl = null) {
   const request = pageUrl ?? window.location.pathname
+  const requestData = pageUrl
+    ? {}
+    : {
+      search: search.value || undefined,
+      per_page: recordsToShow.value,
+    }
 
   router.get(
     request,
-    {
-      search: search.value || undefined,
-      per_page: recordsToShow.value,
-    },
+    requestData,
     {
       preserveState: true,
       preserveScroll: true,
@@ -324,7 +329,7 @@ async function deleteProduct(selectedProduct) {
         @action="handleProductToolbarAction" />
     </template>
 
-    <ProductTable :items="filteredProducts" :pagination="productsDB" @page-change="reloadProducts"
+    <ProductTable :items="filteredProducts" :pagination="productsDB" @page-change="handlePageChange"
       @action="handleProductTableAction" />
 
     <ProductRegisterModal v-if="showModal" :modo="modalMode" :product="product" :frontend-errors="frontendErrors"

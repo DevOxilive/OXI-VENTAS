@@ -46,6 +46,7 @@ const {
     backToReportsCenter,
     updateSearch,
     updateFilter,
+    handlePageChange,
     reloadReport,
     handleToolbarAction,
 } = useInventoryReport(props)
@@ -73,7 +74,7 @@ const {
                 :rows="tableRows"
                 :report-type="filtersState.reportType"
                 :pagination="tablePagination"
-                @page-change="reloadReport"
+                @page-change="handlePageChange"
             />
         </section>
     </PageLayout>

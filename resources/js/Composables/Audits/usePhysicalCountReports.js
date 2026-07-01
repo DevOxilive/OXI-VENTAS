@@ -1,9 +1,22 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
+import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
 import { getPhysicalCountReportsToolbarConfig } from '@/config/ToolbarConfigs/physicalCountReportsToolbarConfig'
 
 export function usePhysicalCountReports(props) {
+    const { handlePageChange } = useGlobalTablePagination({
+        only: [
+            'summary',
+            'reportRows',
+            'reportPagination',
+            'audits',
+            'filters',
+            'userSummary',
+            'categorySummary',
+            'topDifferences',
+        ],
+    })
     const form = reactive({
         branch: props.filters.branch || props.branch?.slug || '',
         physical_count_id: props.filters.physical_count_id || '',
@@ -167,23 +180,6 @@ export function usePhysicalCountReports(props) {
         if (actionId === 'pdf') {
             window.location.href = route('audits.physical-counts.reports.export-pdf', buildQuery())
         }
-    }
-
-    function handlePageChange(url) {
-        router.visit(url, {
-            preserveScroll: true,
-            preserveState: true,
-            only: [
-                'summary',
-                'reportRows',
-                'reportPagination',
-                'audits',
-                'filters',
-                'userSummary',
-                'categorySummary',
-                'topDifferences',
-            ],
-        })
     }
 
     function reloadReports() {

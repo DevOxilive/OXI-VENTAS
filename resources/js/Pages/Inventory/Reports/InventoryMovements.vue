@@ -41,6 +41,7 @@ const {
     backToReportsCenter,
     updateSearch,
     updateFilter,
+    handlePageChange,
     reloadReport,
     handleToolbarAction,
 } = useInventoryMovementReport(props)
@@ -69,7 +70,7 @@ const {
         <MovementReportTable
             :rows="tableRows"
             :pagination="tablePagination"
-            @page-change="reloadReport"
+            @page-change="handlePageChange"
         />
     </PageLayout>
 </template>

@@ -1,8 +1,10 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useBatchAdjustmentModal } from "@/Composables/Inventory/useBatchAdjustmentModal";
+import { useGlobalTablePagination } from "@/Composables/useGlobalTablePagination";
 import { router } from "@inertiajs/vue3";
 
 export function useBranchInventory(props) {
+    const { handlePageChange } = useGlobalTablePagination();
     const showCreateModal = ref(false);
     const showEntryModal = ref(false);
     const showExitModal = ref(false);
@@ -295,15 +297,7 @@ export function useBranchInventory(props) {
         );
     };
 
-    const goToPage = (url) => {
-        if (!url) return;
-
-        router.visit(url, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
-    };
+    const goToPage = handlePageChange;
 
     const openCreateModal = () => {
         showCreateModal.value = true;

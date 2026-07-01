@@ -1,7 +1,9 @@
 import { computed, reactive, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
+import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
 export function useInventoryMovementReport(props) {
+    const { handlePageChange } = useGlobalTablePagination()
     const filtersState = reactive({
         categoryId: props.filters?.category_id ?? '',
         productId: props.filters?.product_id ?? '',
@@ -138,6 +140,7 @@ export function useInventoryMovementReport(props) {
         backToReportsCenter,
         updateSearch,
         updateFilter,
+        handlePageChange,
         reloadReport,
         handleToolbarAction,
     }

@@ -1,5 +1,6 @@
 import { computed, reactive, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
+import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
 import {
     INVENTORY_REPORT_STATUS_FILTERS,
@@ -7,6 +8,7 @@ import {
 } from '@/config/ToolbarConfigs/inventoryReportToolbarConfig'
 
 export function useInventoryReport(props) {
+    const { handlePageChange } = useGlobalTablePagination()
     const filtersState = reactive({
         reportType: props.activeReport ?? 'dashboard',
         status: props.filters?.status ?? '',
@@ -160,6 +162,7 @@ export function useInventoryReport(props) {
         backToReportsCenter,
         updateSearch,
         updateFilter,
+        handlePageChange,
         reloadReport,
         handleToolbarAction,
     }
