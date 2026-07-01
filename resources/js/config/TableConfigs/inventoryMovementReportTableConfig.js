@@ -97,5 +97,4 @@ export const inventoryMovementReportTableConfig = {
     rowKey: "id",
     striped: true,
     hoverEffect: true,
-    showPagination: false,
 };
