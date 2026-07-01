@@ -29,10 +29,19 @@ npm run dev:full
 
 ## Que hace `npm run dev:full`
 
-El comando prepara el entorno y luego levanta todo lo necesario para desarrollo compartido:
+El comando prepara el entorno y luego levanta el flujo normal de desarrollo:
 
 - crea `.env` desde `.env.example` si no existe
 - genera `APP_KEY` si falta
+- levanta Laravel en `127.0.0.1:8000`
+- levanta Reverb
+- levanta Vite en modo desarrollo
+
+## Que hace `npm run dev:pwa`
+
+Este modo se usa solo para pruebas instalables y para compartir la app por tunnel:
+
+- prepara el entorno igual que `dev:full`
 - levanta Laravel en `127.0.0.1:8000`
 - levanta Reverb
 - compila Vite en modo `build --watch`
@@ -42,4 +51,4 @@ El comando prepara el entorno y luego levanta todo lo necesario para desarrollo 
 
 - `.env.example` asume MySQL local en `127.0.0.1:3306`, base `oxiVentas`, usuario `root` y password vacio
 - si alguien en el equipo usa otra configuracion de MySQL, entonces si necesitara ajustar su `.env`
-- para compartir la app en telefono o tablet, usa la URL `https://...trycloudflare.com` que aparece al correr `npm run dev:full`
+- para compartir la app en telefono o tablet, usa la URL `https://...trycloudflare.com` que aparece al correr `npm run dev:pwa`
