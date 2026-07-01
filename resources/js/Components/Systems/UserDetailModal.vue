@@ -62,6 +62,14 @@ const groupedEffectivePermissions = computed(() => {
     }, {})
 })
 
+const showsSalesBranches = computed(() => {
+    if (props.user?.role?.name === 'Ventas') {
+        return true
+    }
+
+    return effectivePermissions.value.some((permission) => (permission.name || '').startsWith('sales.'))
+})
+
 function closeModal() {
     emit('close')
 }
@@ -103,7 +111,7 @@ function closeModal() {
                     {{ user.role?.name || 'Sin rol' }}
                 </p>
 
-                <div v-if="user.role?.name === 'Ventas'" class="sm:col-span-2">
+                <div v-if="showsSalesBranches" class="sm:col-span-2">
                     <strong>Sucursales:</strong>
 
                     <div v-if="user.branches?.length" class="mt-2 flex flex-wrap gap-2">

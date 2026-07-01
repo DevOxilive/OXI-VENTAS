@@ -225,5 +225,21 @@ export function generateMenu(role, permissions = [], branches = []) {
         });
     }
 
+    if (
+        isAdmin ||
+        can("sales.view") ||
+        can("sales.create") ||
+        can("sales.update") ||
+        can("sales.delete") ||
+        can("sales.reports")
+    ) {
+        menu.push({
+            text: "Ventas",
+            key: "sales",
+            icon: "point_of_sale",
+            url: route("ventas.home"),
+        });
+    }
+
     return menu;
 }

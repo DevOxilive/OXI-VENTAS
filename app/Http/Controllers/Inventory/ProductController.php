@@ -21,6 +21,18 @@ class ProductController extends Controller
     private const PRODUCT_IMAGE_PRIVATE_DISK = 'local';
     private const PRODUCT_IMAGE_LEGACY_DISK = 'public';
 
+    private function calculateMarginPercentage($cost, $salePrice): ?float
+    {
+        $cost = (float) $cost;
+        $salePrice = (float) $salePrice;
+
+        if ($cost <= 0) {
+            return null;
+        }
+
+        return round((($salePrice - $cost) / $cost) * 100, 2);
+    }
+
     public function index(Request $request, Branch $branch)
     {
         $perPage = TablePagination::resolvePerPage($request, 10);
@@ -28,7 +40,7 @@ class ProductController extends Controller
         $query = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
-                'product:id,name,image,description,category_id,cost,sale_price,unit,active,created_at',
+                'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,active,created_at',
                 'product.category:id,name',
                 'product.barcodes:id,product_id,code',
             ])
@@ -105,6 +117,8 @@ class ProductController extends Controller
                 'price' => $product?->sale_price ?? 0,
                 'sale_price' => $product?->sale_price ?? 0,
                 'salePrice' => $product?->sale_price ?? 0,
+                'margin_percentage' => $product?->margin_percentage
+                    ?? $this->calculateMarginPercentage($product?->cost ?? 0, $product?->sale_price ?? 0),
                 'profit' => number_format(
                     ((float) ($product?->sale_price ?? 0)) - ((float) ($product?->cost ?? 0)),
                     2
@@ -203,6 +217,7 @@ class ProductController extends Controller
                 'image' => $imagePath,
                 'cost' => $data['cost'],
                 'sale_price' => $data['sale_price'],
+                'margin_percentage' => $this->calculateMarginPercentage($data['cost'], $data['sale_price']),
                 'unit' => $data['unit'],
                 'category_id' => $data['category_id'],
                 'active' => $data['active'] ?? true,
@@ -313,6 +328,7 @@ class ProductController extends Controller
                 'category_id' => $data['category_id'],
                 'cost' => $data['cost'],
                 'sale_price' => $data['sale_price'],
+                'margin_percentage' => $this->calculateMarginPercentage($data['cost'], $data['sale_price']),
                 'unit' => $data['unit'],
                 'active' => $data['active'] ?? true,
             ]);

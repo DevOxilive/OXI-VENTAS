@@ -22,6 +22,12 @@ class PermissionSeeder extends Seeder
             'users.update',
             'users.delete',
 
+            'sales.view',
+            'sales.create',
+            'sales.update',
+            'sales.delete',
+            'sales.reports',
+
             'inventory.view',
             'inventory.create',
             'inventory.update',
@@ -37,16 +43,14 @@ class PermissionSeeder extends Seeder
             'inventory.products.delete',
 
             'inventory.branches.view',
+            'inventory.branches.create',
+            'inventory.branches.update',
+            'inventory.branches.delete',
+
             'inventory.purchase-reports.view',
             'inventory.purchase-reports.create',
-
-            'inventory.purchase-reports.create',
-'inventory.purchase-reports.update',
-'inventory.purchase-reports.delete',
-
-'inventory.branches.create',
-'inventory.branches.update',
-'inventory.branches.delete',
+            'inventory.purchase-reports.update',
+            'inventory.purchase-reports.delete',
 
             'audits.physical-counts.view',
             'audits.physical-counts.count',
