@@ -104,5 +104,4 @@ export const inventoryReportTableConfig = {
     rowKey: "id",
     striped: true,
     hoverEffect: true,
-    showPagination: false,
 };
