@@ -36,7 +36,6 @@ const props = defineProps({
     type: String,
     required: true,
   },
-
   pagination: {
     type: [Object, Array],
     default: null,
@@ -56,18 +55,40 @@ const emit = defineEmits([
 ])
 
 const hasPagination = computed(() => {
+  if (!props.showPagination || !props.pagination || Array.isArray(props.pagination)) {
+    return false
+  }
+
+  if (Array.isArray(props.pagination.links) && props.pagination.links.length > 0) {
+    return true
+  }
+
   return (
-    props.showPagination &&
-    props.pagination &&
-    !Array.isArray(props.pagination) &&
-    Array.isArray(props.pagination.links) &&
-    props.pagination.links.length > 0
+    Number(props.pagination.current_page ?? 0) > 0 &&
+    Number(props.pagination.last_page ?? 0) > 1
   )
 })
 
 const paginationLinks = computed(() => {
   if (!hasPagination.value) return []
-  return props.pagination.links
+
+  if (Array.isArray(props.pagination?.links) && props.pagination.links.length > 0) {
+    return props.pagination.links
+  }
+
+  const last = Number(props.pagination?.last_page ?? 1)
+  const current = Number(props.pagination?.current_page ?? 1)
+
+  return Array.from({ length: last }, (_, index) => {
+    const page = index + 1
+
+    return {
+      url: buildPageUrl(page),
+      label: String(page),
+      page,
+      active: page === current,
+    }
+  })
 })
 
 const pageNumberLinks = computed(() => {
@@ -100,6 +121,28 @@ function goToPage(link) {
   emit('page-change', link.url)
 }
 
+function buildPageUrl(page) {
+  const baseUrl =
+    props.pagination?.first_page_url ||
+    props.pagination?.path ||
+    (typeof window !== 'undefined' ? window.location.href : null)
+
+  if (!baseUrl) return null
+
+  try {
+    const url = new URL(baseUrl, typeof window !== 'undefined' ? window.location.origin : undefined)
+    url.searchParams.set('page', String(page))
+
+    if (props.pagination?.per_page) {
+      url.searchParams.set('per_page', String(props.pagination.per_page))
+    }
+
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
 function normalizePaginationLabel(label) {
   return String(label ?? '')
     .replace(/&laquo;|&raquo;/g, '')
@@ -112,21 +155,43 @@ function normalizePaginationLabel(label) {
 <template>
   <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
     <div class="max-h-[560px] overflow-y-auto">
-      <TableDesktop :items="items" :columns="columns" :actions="actions" :row-key="rowKey"
-        :no-data-message="noDataMessage" :loading="loading" :hover-effect="hoverEffect" :striped="striped"
-        :selectable="selectable" :selected-items="selectedItems" @action="$emit('action', $event)"
-        @row-click="$emit('row-click', $event)" @selection-change="$emit('selection-change', $event)"
-        @update:selectedItems="$emit('update:selectedItems', $event)" />
+      <TableDesktop
+        :items="items"
+        :columns="columns"
+        :actions="actions"
+        :row-key="rowKey"
+        :no-data-message="noDataMessage"
+        :loading="loading"
+        :hover-effect="hoverEffect"
+        :striped="striped"
+        :selectable="selectable"
+        :selected-items="selectedItems"
+        @action="$emit('action', $event)"
+        @row-click="$emit('row-click', $event)"
+        @selection-change="$emit('selection-change', $event)"
+        @update:selectedItems="$emit('update:selectedItems', $event)"
+      />
 
-      <TableMobile :items="items" :columns="columns" :actions="actions" :row-key="rowKey"
-        :no-data-message="noDataMessage" :loading="loading" :mobile-card-header-field="mobileCardHeaderField"
-        @action="$emit('action', $event)" @row-click="$emit('row-click', $event)" />
+      <TableMobile
+        :items="items"
+        :columns="columns"
+        :actions="actions"
+        :row-key="rowKey"
+        :no-data-message="noDataMessage"
+        :loading="loading"
+        :mobile-card-header-field="mobileCardHeaderField"
+        @action="$emit('action', $event)"
+        @row-click="$emit('row-click', $event)"
+      />
     </div>
-    <footer v-if="hasPagination"
-      class="border-t border-slate-200 bg-slate-50 px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+
+    <footer
+      v-if="hasPagination"
+      class="border-t border-slate-200 bg-slate-50 px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+    >
       <p class="text-sm text-slate-500 text-center md:text-left">
-        Página {{ currentPage }} de {{ lastPage }}
-        <span class="hidden md:inline"> · </span>
+        Pagina {{ currentPage }} de {{ lastPage }}
+        <span class="hidden md:inline"> - </span>
         <span class="block md:inline">Total: {{ totalRecords }} registros</span>
       </p>
 
