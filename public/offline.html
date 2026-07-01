@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#15803d">
+    <title>OXI-VENTAS offline</title>
+    <style>
+        :root {
+            color-scheme: light;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: linear-gradient(135deg, #ecfdf5 0%, #f8fafc 55%, #dcfce7 100%);
+            color: #0f172a;
+        }
+
+        .card {
+            width: min(92vw, 28rem);
+            border-radius: 1.5rem;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(16, 185, 129, 0.16);
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 4rem;
+            height: 4rem;
+            border-radius: 1.2rem;
+            background: #15803d;
+            color: white;
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            margin: 0 0 0.5rem;
+            font-size: 1.5rem;
+        }
+
+        p {
+            margin: 0.25rem 0;
+            color: #475569;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="badge">OX</div>
+        <h1>Sin conexion</h1>
+        <p>OXI-VENTAS no pudo cargar la red en este momento.</p>
+        <p>Cuando regreses al internet, vuelve a abrir la app para seguir trabajando.</p>
+    </div>
+</body>
+</html>
