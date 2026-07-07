@@ -148,18 +148,30 @@ class InventoryReportSeeder extends Seeder
         $categoryNames = $categories->keys()->values();
         $category = $categories[$categoryNames[($index - 1) % $categoryNames->count()]];
         $name = self::PRODUCT_PREFIX . ' ' . str_pad((string) $index, 3, '0', STR_PAD_LEFT);
+        $cost = 25 + ($index * 3.75);
+        $salePrice = 55 + ($index * 5.50);
 
         return Product::updateOrCreate(
             ['name' => $name],
             [
                 'description' => 'Producto demo nutrido para reportes de inventario.',
-                'cost' => 25 + ($index * 3.75),
-                'sale_price' => 55 + ($index * 5.50),
+                'cost' => $cost,
+                'sale_price' => $salePrice,
+                'margin_percentage' => $this->calculateMarginPercentage($cost, $salePrice),
                 'unit' => 'pieza',
                 'category_id' => $category->id,
                 'active' => true,
             ]
         );
+    }
+
+    private function calculateMarginPercentage(float $cost, float $salePrice): ?float
+    {
+        if ($cost <= 0) {
+            return null;
+        }
+
+        return round((($salePrice - $cost) / $cost) * 100, 2);
     }
 
     private function branchProduct(Branch $branch, Product $product, int $index): BranchProduct
