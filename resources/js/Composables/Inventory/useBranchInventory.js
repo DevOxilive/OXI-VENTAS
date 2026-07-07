@@ -342,8 +342,33 @@ export function useBranchInventory(props) {
 
     const goToPage = handlePageChange;
 
-    async function ensureProductDetails(product) {
+    function clearProductDetailCache(productId) {
+        if (!productId || !detailCache.value[productId]) return;
+
+        const nextCache = { ...detailCache.value };
+        delete nextCache[productId];
+        detailCache.value = nextCache;
+    }
+
+    function shouldRefreshRealtimeDetails(productId) {
+        if (!productId) return false;
+
+        return Boolean(
+            detailCache.value[productId] ||
+                selectedMovementProduct.value?.id === productId ||
+                selectedMovementsProduct.value?.id === productId ||
+                selectedConfigProduct.value?.id === productId ||
+                selectedBatchesProductId.value === productId,
+        );
+    }
+
+    async function ensureProductDetails(product, options = {}) {
         if (!product?.id) return product;
+        const { forceRefresh = false } = options;
+
+        if (forceRefresh) {
+            clearProductDetailCache(product.id);
+        }
 
         if (detailCache.value[product.id]) {
             return (
@@ -388,6 +413,20 @@ export function useBranchInventory(props) {
             visualProducts.value.find((item) => item.id === product.id) ??
             product
         );
+    }
+
+    async function refreshProductDetails(productId) {
+        if (!productId) return null;
+
+        const product =
+            visualProducts.value.find((item) => item.id === productId) ??
+            selectedMovementsProduct.value ??
+            selectedMovementProduct.value ??
+            selectedConfigProduct.value ??
+            liveSelectedBatchesProduct.value ??
+            { id: productId };
+
+        return ensureProductDetails(product, { forceRefresh: true });
     }
 
     const openCreateModal = () => {
@@ -510,12 +549,19 @@ export function useBranchInventory(props) {
                     },
                 };
 
+                const shouldRefreshDetails =
+                    shouldRefreshRealtimeDetails(branchProductId);
+
                 router.reload({
                     only: ["branchProductsDB", "inventoryStats", "inventoryAlerts"],
                     preserveScroll: true,
                     preserveState: true,
 
-                    onSuccess: () => {
+                    onSuccess: async () => {
+                        if (shouldRefreshDetails) {
+                            await refreshProductDetails(branchProductId);
+                        }
+
                         if (!selectedMovementsProduct.value) return;
 
                         const updatedProduct = visualProducts.value.find(
