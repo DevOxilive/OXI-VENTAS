@@ -14,7 +14,6 @@ import {
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import UserRegisterModal from '@/Components/Systems/UserRegisterModal.vue'
 import UserDetailModal from '@/Components/Systems/UserDetailModal.vue'
-import { WarningAlert } from '@/Components/Modales/UniversalActionModal'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 defineOptions({ layout: AdminLayout })
 
@@ -23,11 +22,8 @@ const { can } = usePermissions()
 
 const isLoadingEdit = ref(false)
 
-const employeesDB = computed(() => page.props.employeesDB || {})
-const usersDB = computed(() => page.props.usersDB || {})
-
-const employees = computed(() => employeesDB.value.data || [])
-const users = computed(() => usersDB.value.data || [])
+const recordsDB = computed(() => page.props.recordsDB || {})
+const records = computed(() => recordsDB.value.data || [])
 
 const roles = computed(() => page.props.roles || [])
 const branches = computed(() => page.props.branches || [])
@@ -36,6 +32,9 @@ const filters = computed(() => page.props.filters || {})
 
 const search = ref(filters.value.search || '')
 const recordsPerPage = ref(filters.value.perPage || 50)
+const userStatusFilter = ref(filters.value.userStatus || '')
+const statusFilter = ref(filters.value.status || '')
+const roleFilter = ref(filters.value.role || '')
 const { handlePageChange } = useGlobalTablePagination()
 
 const {
@@ -44,35 +43,9 @@ const {
   moduleLabel,
 } = usePermissionLabels(permissions)
 
-const canSeeUsersTab = computed(() =>
-  can('users.view') ||
-  can('users.update') ||
-  can('users.delete')
-)
-
-const canSeeEmployeesTab = computed(() =>
-  can('users.create')
-)
-
-const viewMode = ref(
-  filters.value.view ||
-  (
-    canSeeUsersTab.value
-      ? 'users'
-      : canSeeEmployeesTab.value
-        ? 'employees'
-        : 'users'
-  )
-)
-
-function changeViewMode(mode) {
-  viewMode.value = mode
-}
-
 const showModal = ref(false)
 const isEditing = ref(false)
 const selectedUserId = ref(null)
-const activeModule = ref(null)
 
 const showUserDetail = ref(false)
 const selectedUser = ref(null)
@@ -100,6 +73,26 @@ function getEmployeeFullName(employee) {
 
 function getEmployeeEmail(employee) {
   return employee.email || ''
+}
+
+function getUserEmployeeName(user) {
+  return getEmployeeFullName(user.employee || {})
+}
+
+function isUserRecord(item) {
+  return Boolean(item?.has_user)
+}
+
+function getUserVisualStatus(item) {
+  if (isUserRecord(item)) {
+    return item.is_active === false || item.employee?.employment_status === 'Inactivo'
+      ? 'Inactivo'
+      : 'Activo'
+  }
+
+  return item.employment_status === 'Inactivo'
+    ? 'Inactivo'
+    : 'Activo'
 }
 
 function buildSuggestedEmail(name) {
@@ -214,17 +207,15 @@ function validateForm() {
 }
 
 const normalizedList = computed(() => {
-  const data = viewMode.value === 'users'
-    ? users.value
-    : employees.value
-
-  return data.map((item) => {
-    if (viewMode.value === 'users') {
+  return records.value.map((item) => {
+    if (isUserRecord(item)) {
       return {
         ...item,
-        displayName: item.name || 'â€”',
-        displayEmail: item.email || 'â€”',
+        displayName: getUserEmployeeName(item) || item.name || 'Sin nombre registrado',
+        displayEmail: item.email || '-',
+        displayUsername: item.name || 'Sin usuario',
         displayRole: item.role?.name || 'Sin rol',
+        displayStatus: getUserVisualStatus(item),
       }
     }
 
@@ -232,22 +223,24 @@ const normalizedList = computed(() => {
       ...item,
       displayName: getEmployeeFullName(item) || 'Sin nombre registrado',
       displayEmail: getEmployeeEmail(item) || 'Sin correo registrado',
-      displayRole: 'Sin usuario registrado',
+      displayUsername: 'Sin usuario',
+      displayRole: 'Sin rol',
+      displayStatus: getUserVisualStatus(item),
     }
   })
 })
 
 const activePaginator = computed(() => {
-  return viewMode.value === 'users'
-    ? usersDB.value
-    : employeesDB.value
+  return recordsDB.value
 })
 
 function reloadUsers() {
   router.get(route('systems.users.index'), {
     search: search.value,
     per_page: recordsPerPage.value,
-    view: viewMode.value,
+    user_status: userStatusFilter.value,
+    status: statusFilter.value,
+    role: roleFilter.value,
   }, {
     preserveState: true,
     preserveScroll: true,
@@ -263,9 +256,33 @@ watch(recordsPerPage, () => {
   reloadUsers()
 })
 
-watch(viewMode, () => {
+watch(userStatusFilter, () => {
   reloadUsers()
 })
+
+watch(statusFilter, () => {
+  reloadUsers()
+})
+
+watch(roleFilter, () => {
+  reloadUsers()
+})
+
+function handleToolbarFilter({ key, value }) {
+  if (key === 'user_status') {
+    userStatusFilter.value = value
+    return
+  }
+
+  if (key === 'role') {
+    roleFilter.value = value
+    return
+  }
+
+  if (key === 'status') {
+    statusFilter.value = value
+  }
+}
 
 const userTableActionHandlers = {
   view: (row) => {
@@ -287,7 +304,7 @@ const userTableActionHandlers = {
 }
 
 function openUserDetail(user) {
-  if (viewMode.value !== 'users') return
+  if (!isUserRecord(user)) return
 
   selectedUser.value = user
   showUserDetail.value = true
@@ -296,10 +313,6 @@ function openUserDetail(user) {
 function closeUserDetail() {
   showUserDetail.value = false
   selectedUser.value = null
-}
-
-function toggleModule(module) {
-  activeModule.value = activeModule.value === module ? null : module
 }
 
 function togglePermission(id) {
@@ -334,7 +347,7 @@ function openModal(item = null) {
   errors.value = {}
   showModal.value = true
 
-  if (item && viewMode.value === 'users') {
+  if (item && isUserRecord(item)) {
     isLoadingEdit.value = true
     isEditing.value = true
     selectedUserId.value = item.id
@@ -363,6 +376,7 @@ function openModal(item = null) {
   if (item) {
     form.employee_id = item.id
     form.name = getEmployeeFullName(item)
+    form.email = getEmployeeEmail(item)
   }
 }
 
@@ -399,11 +413,6 @@ function closeModal() {
 
 function saveUser() {
   if (!validateForm()) {
-    WarningAlert({
-      title: 'Formulario incompleto',
-      message: 'Revisa los campos marcados antes de continuar.',
-    })
-
     return
   }
 
@@ -473,8 +482,7 @@ function deleteUser(id) {
 function reloadSystem() {
   router.reload({
     only: [
-      'employeesDB',
-      'usersDB',
+      'recordsDB',
       'roles',
       'permissions',
       'branches',
@@ -534,13 +542,13 @@ onBeforeUnmount(() => {
 <template>
   <PageLayout>
     <template #toolbar>
-      <UserToolbar :view-mode="viewMode" :search="search" :records-per-page="recordsPerPage"
+      <UserToolbar :search="search" :records-per-page="recordsPerPage" :roles="roles"
+        :active-filters="{ userStatus: userStatusFilter, status: statusFilter, role: roleFilter }"
         :filtered-records="normalizedList.length" :total-records="activePaginator?.total || 0"
-        @update:active-tab="changeViewMode" @update:search="search = $event"
-        @update:records-per-page="recordsPerPage = $event" />
+        @update:search="search = $event" @update:filter="handleToolbarFilter" @update:records-per-page="recordsPerPage = $event" />
     </template>
 
-    <UserTable :items="normalizedList" :pagination="activePaginator" :view-mode="viewMode" :can="can"
+    <UserTable :items="normalizedList" :pagination="activePaginator" :can="can"
       :action-handlers="userTableActionHandlers" @page-change="handlePageChange" />
 
     <UserDetailModal v-if="showUserDetail && can('users.view')" :user="selectedUser" :permissions="permissions"
@@ -551,6 +559,7 @@ onBeforeUnmount(() => {
       :canSave="isEditing ? can('users.update') : can('users.create')" :requiresSalesBranches="requiresSalesBranches"
       :locked-permission-ids="lockedPermissionIds"
       :module-label="moduleLabel" :permission-label="permissionLabel" @close="closeModal" @save="saveUser"
-      @toggle-permission="togglePermission" @change-role="assignPermissionsByRole" />
+      @toggle-permission="togglePermission" @change-role="assignPermissionsByRole"
+      @enable-module="enableModule" @disable-module="disableModule" />
   </PageLayout>
 </template>

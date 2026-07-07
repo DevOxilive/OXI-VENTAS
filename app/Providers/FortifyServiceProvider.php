@@ -51,13 +51,19 @@ class FortifyServiceProvider extends ServiceProvider
                 'branch_id' => ['nullable', 'exists:branches,id'],
             ]);
 
-            $user = User::with('role')
+            $user = User::with(['role', 'employee'])
                 ->where('email', $request->email)
                 ->first();
 
             if (! $user || ! Hash::check($request->password, $user->password)) {
                 throw ValidationException::withMessages([
                     'email' => __('auth.failed'),
+                ]);
+            }
+
+            if (! $user->is_active || $user->employee?->employment_status === 'Inactivo') {
+                throw ValidationException::withMessages([
+                    'email' => 'Tu usuario se encuentra inactivo. Solicita apoyo a un administrador.',
                 ]);
             }
 

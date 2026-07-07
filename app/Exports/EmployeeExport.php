@@ -28,13 +28,19 @@ class EmployeeExport implements
 {
     protected $employmentStatus;
     protected $department;
+    protected $position;
     protected $search;
+    protected $startDateFrom;
+    protected $startDateTo;
 
-    public function __construct($employmentStatus = null, $department = null, $search = null)
+    public function __construct($employmentStatus = null, $department = null, $position = null, $search = null, $startDateFrom = null, $startDateTo = null)
     {
         $this->employmentStatus = $employmentStatus;
         $this->department = $department;
+        $this->position = $position;
         $this->search = $search;
+        $this->startDateFrom = $startDateFrom;
+        $this->startDateTo = $startDateTo;
     }
 
     public function collection()
@@ -47,6 +53,18 @@ class EmployeeExport implements
 
         if ($this->department) {
             $query->where('department', $this->department);
+        }
+
+        if ($this->position) {
+            $query->where('position', 'like', '%' . $this->position . '%');
+        }
+
+        if ($this->startDateFrom) {
+            $query->whereDate('start_date', '>=', $this->startDateFrom);
+        }
+
+        if ($this->startDateTo) {
+            $query->whereDate('start_date', '<=', $this->startDateTo);
         }
 
         if ($this->search) {
