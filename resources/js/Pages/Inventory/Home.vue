@@ -25,10 +25,6 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  subcategoriesDB: {
-    type: Array,
-    default: () => [],
-  },
   branchesDB: {
     type: Array,
     default: () => [],
@@ -45,7 +41,6 @@ const props = defineProps({
 
 const branch = computed(() => props.branch ?? {})
 const categoriesDB = computed(() => props.categoriesDB ?? [])
-const subcategoriesDB = computed(() => props.subcategoriesDB ?? [])
 const branchesDB = computed(() => props.branchesDB ?? [])
 
 const search = ref(props.filters.search ?? '')
@@ -209,7 +204,7 @@ onBeforeUnmount(() => {
         (modalMode === 'edit' && can('inventory.products.update')) ||
         (modalMode === 'view' && can('inventory.products.view'))
       )
-    " :mode="modalMode" :product="selectedProduct" :categoriesDB="categoriesDB" :subcategoriesDB="subcategoriesDB"
+    " :mode="modalMode" :product="selectedProduct" :categoriesDB="categoriesDB"
       :branchesDB="branchesDB" :branch="branch" @close="closeModal" />
   </PageLayout>
 </template>

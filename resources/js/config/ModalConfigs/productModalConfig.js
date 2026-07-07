@@ -20,6 +20,8 @@ export function getProductModalConfig({
             : 'Guardar producto',
         closeButtonText: 'Cancelar',
         ...modalPresets.workspace,
+        size: 'full',
+        height: 'auto',
         alerts: {
             entityName: 'Producto',
             create: {

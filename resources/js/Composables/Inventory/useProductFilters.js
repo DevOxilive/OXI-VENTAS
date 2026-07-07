@@ -3,7 +3,6 @@ import { ref, computed, watch } from "vue";
 export function useProductFilters(productsDB) {
     const search = ref("");
     const categoryFilter = ref("Todas");
-    const subcategoryFilter = ref("Todas");
 
     const recordsToShow = ref(50);
     const currentPage = ref(1);
@@ -28,7 +27,6 @@ export function useProductFilters(productsDB) {
     ${(product.barcodes ?? []).join(" ")}
     ${product.presentation ?? ""}
     ${product.category_name ?? ""}
-    ${product.subcategory_name ?? ""}
 `.toLowerCase();
 
             const matchesSearch =
@@ -38,12 +36,7 @@ export function useProductFilters(productsDB) {
                 categoryFilter.value === "Todas" ||
                 String(product.category_id) === String(categoryFilter.value);
 
-            const matchesSubcategory =
-                subcategoryFilter.value === "Todas" ||
-                String(product.subcategory_id) ===
-                    String(subcategoryFilter.value);
-
-            return matchesSearch && matchesCategory && matchesSubcategory;
+            return matchesSearch && matchesCategory;
         });
     });
 
@@ -67,14 +60,13 @@ export function useProductFilters(productsDB) {
         );
     });
 
-    watch([search, categoryFilter, subcategoryFilter, recordsToShow], () => {
+    watch([search, categoryFilter, recordsToShow], () => {
         currentPage.value = 1;
     });
 
     return {
         search,
         categoryFilter,
-        subcategoryFilter,
         filteredProducts,
         paginatedProducts,
         recordsToShow,

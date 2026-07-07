@@ -48,16 +48,16 @@ function stockTone(product) {
                         Producto
                     </th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                        Código / Barcode
+                        Codigo / Barcode
                     </th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                        Categoría
+                        Categoria
                     </th>
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">
                         Stock
                     </th>
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Mínimo
+                        Minimo
                     </th>
                 </tr>
             </thead>
@@ -81,7 +81,7 @@ function stockTone(product) {
 
                     <td class="px-4 py-3">
                         <p class="text-sm font-medium text-slate-700">
-                            {{ product.code || 'Sin código' }}
+                            {{ product.code || 'Sin codigo' }}
                         </p>
                         <p class="text-xs text-slate-500">
                             {{ product.main_barcode || 'Sin barcode' }}
@@ -91,9 +91,6 @@ function stockTone(product) {
                     <td class="px-4 py-3">
                         <p class="text-sm text-slate-700">
                             {{ product.category }}
-                        </p>
-                        <p class="text-xs text-slate-500">
-                            {{ product.subcategory }}
                         </p>
                     </td>
 
@@ -124,7 +121,7 @@ function stockTone(product) {
                                 {{ product.name }}
                             </p>
                             <p class="text-xs text-slate-500">
-                                {{ product.category }} · {{ product.subcategory }}
+                                {{ product.category }}
                             </p>
                         </div>
 
@@ -135,7 +132,7 @@ function stockTone(product) {
                     </div>
 
                     <p class="mt-2 text-xs text-slate-500">
-                        Código: {{ product.code || 'Sin código' }}
+                        Codigo: {{ product.code || 'Sin codigo' }}
                     </p>
 
                     <p class="text-xs text-slate-500">
@@ -143,7 +140,7 @@ function stockTone(product) {
                     </p>
 
                     <p class="mt-2 text-sm text-slate-600">
-                        Mínimo: <b>{{ product.minStockLabel ?? product.min_stock }}</b>
+                        Minimo: <b>{{ product.minStockLabel ?? product.min_stock }}</b>
                     </p>
                 </div>
             </label>
@@ -154,7 +151,7 @@ function stockTone(product) {
                 No se encontraron productos.
             </p>
             <p class="mt-1 text-xs text-slate-500">
-                Ajusta los filtros para ampliar la búsqueda.
+                Ajusta los filtros para ampliar la busqueda.
             </p>
         </div>
     </div>

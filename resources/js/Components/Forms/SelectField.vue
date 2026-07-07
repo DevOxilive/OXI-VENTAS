@@ -11,6 +11,7 @@ const props = defineProps({
     field: String,
     modelValue: [String, Number],
     error: String,
+    hideLabel: Boolean,
     options: {
         type: Array,
         default: () => []
@@ -55,7 +56,7 @@ function handleBlur() {
 
 <template>
     <div>
-        <label :for="selectId" class="block text-sm font-semibold mb-1 text-slate-700">
+        <label v-if="!hideLabel" :for="selectId" class="block text-sm font-semibold mb-1 text-slate-700">
             {{ label }}
         </label>
 

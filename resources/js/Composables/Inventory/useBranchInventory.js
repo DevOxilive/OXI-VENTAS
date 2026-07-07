@@ -56,7 +56,6 @@ export function useBranchInventory(props) {
 
     const search = ref(props.filters?.search ?? "");
     const categoryFilter = ref(props.filters?.category ?? "");
-    const subcategoryFilter = ref(props.filters?.subcategory ?? "");
     const stockFilter = ref(props.filters?.stock ?? "");
     const statusFilter = ref(props.filters?.status ?? "");
     const expirationStatusFilter = ref(props.filters?.expiration_status ?? "");
@@ -73,7 +72,6 @@ export function useBranchInventory(props) {
     const products = computed(() => props.productsDB ?? []);
     const branches = computed(() => props.branchesDB ?? []);
     const categories = computed(() => props.categoriesDB ?? []);
-    const subcategories = computed(() => props.subcategoriesDB ?? []);
     const currentBranch = computed(() => props.currentBranch ?? null);
 
     const inventoryAlerts = computed(() => props.inventoryAlerts ?? {});
@@ -132,8 +130,8 @@ export function useBranchInventory(props) {
                     item.product?.barcodes?.[0]?.code ??
                     item.barcode ??
                     `BP-${item.id}`,
-                category_name: item.product?.category?.name ?? "Sin categoría",
-                category: item.product?.category?.name ?? "Sin categoría",
+                category_name: item.product?.category?.name ?? "Sin categoria",
+                category: item.product?.category?.name ?? "Sin categoria",
                 branch:
                     item.branch?.name ??
                     currentBranch.value?.name ??
@@ -302,7 +300,7 @@ export function useBranchInventory(props) {
         return (
             {
                 expired: "Lotes vencidos",
-                nearExpiration: "Lotes próximos a vencer",
+                nearExpiration: "Lotes proximos a vencer",
                 lowStock: "Productos con stock bajo",
                 inactiveCandidates: "Productos sin rotacion",
             }[selectedAlertType.value] || ""
@@ -327,7 +325,6 @@ export function useBranchInventory(props) {
             window.location.pathname,
             {
                 search: search.value || undefined,
-                subcategory: subcategoryFilter.value || undefined,
                 category: categoryFilter.value || undefined,
                 stock: stockFilter.value || undefined,
                 status: statusFilter.value || undefined,
@@ -471,7 +468,6 @@ export function useBranchInventory(props) {
 
     watch(recordsToShow, reloadInventory);
     watch(categoryFilter, reloadInventory);
-    watch(subcategoryFilter, reloadInventory);
     watch(stockFilter, reloadInventory);
     watch(statusFilter, reloadInventory);
     watch(expirationStatusFilter, reloadInventory);
@@ -562,7 +558,6 @@ export function useBranchInventory(props) {
         products,
         branches,
         categories,
-        subcategories,
         currentBranch,
 
         showCreateModal,
@@ -581,7 +576,6 @@ export function useBranchInventory(props) {
 
         search,
         categoryFilter,
-        subcategoryFilter,
         stockFilter,
         statusFilter,
         expirationStatusFilter,

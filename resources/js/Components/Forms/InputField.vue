@@ -8,6 +8,7 @@ const props = defineProps({
     field: String,
     modelValue: [String, Number],
     error: String,
+    hideLabel: Boolean,
     type: {
         type: String,
         default: 'text'
@@ -114,7 +115,7 @@ function blockExtraInput(e) {
 
 <template>
     <div class="relative">
-        <label :for="inputId" class="block text-sm font-semibold mb-1 text-slate-700">
+        <label v-if="!hideLabel" :for="inputId" class="block text-sm font-semibold mb-1 text-slate-700">
             {{ label }}
         </label>
         <span v-if="hasLeftAddon"

@@ -8,10 +8,6 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
-    subcategories: {
-        type: Array,
-        default: () => [],
-    },
 })
 
 const emit = defineEmits(['apply'])
@@ -19,7 +15,6 @@ const emit = defineEmits(['apply'])
 function clearFilters() {
     props.filters.search = ''
     props.filters.category = ''
-    props.filters.subcategory = ''
     props.filters.stock = ''
     props.filters.per_page = 50
 
@@ -34,35 +29,26 @@ function clearFilters() {
                 Filtros de inventario
             </h2>
             <p class="text-xs text-slate-500">
-                Busca por nombre, código interno o código de barras.
+                Busca por nombre, codigo interno o codigo de barras.
             </p>
         </div>
 
         <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
-            <input v-model="filters.search" type="text" placeholder="Buscar producto, código o barcode..."
+            <input v-model="filters.search" type="text" placeholder="Buscar producto, codigo o barcode..."
                 class="lg:col-span-4 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-slate-900 focus:ring-slate-900"
                 @keyup.enter="emit('apply')">
 
             <select v-model="filters.category"
-                class="lg:col-span-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-slate-900 focus:ring-slate-900"
+                class="lg:col-span-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-slate-900 focus:ring-slate-900"
                 @change="emit('apply')">
-                <option value="">Categorías</option>
+                <option value="">Categorias</option>
                 <option v-for="category in categories" :key="category" :value="category">
                     {{ category }}
                 </option>
             </select>
 
-            <select v-model="filters.subcategory"
-                class="lg:col-span-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-slate-900 focus:ring-slate-900"
-                @change="emit('apply')">
-                <option value="">Subcategorías</option>
-                <option v-for="subcategory in subcategories" :key="subcategory" :value="subcategory">
-                    {{ subcategory }}
-                </option>
-            </select>
-
             <select v-model="filters.stock"
-                class="lg:col-span-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-slate-900 focus:ring-slate-900"
+                class="lg:col-span-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-slate-900 focus:ring-slate-900"
                 @change="emit('apply')">
                 <option value="">Todo el stock</option>
                 <option value="LOW">Stock bajo</option>

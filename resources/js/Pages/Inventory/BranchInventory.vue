@@ -43,10 +43,6 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
-    subcategoriesDB: {
-        type: Array,
-        default: () => [],
-    },
     inventoryStats: {
         type: Object,
         default: () => ({
@@ -64,7 +60,6 @@ const props = defineProps({
         default: () => ({
             search: '',
             category: '',
-            subcategory: '',
             stock: '',
             status: '',
             expiration_status: '',
@@ -91,7 +86,6 @@ const { can } = usePermissions()
 
 const {
     categories,
-    subcategories,
     currentBranch,
 
     showEntryModal,
@@ -109,7 +103,6 @@ const {
 
     search,
     categoryFilter,
-    subcategoryFilter,
     stockFilter,
     statusFilter,
     expirationStatusFilter,
@@ -164,9 +157,7 @@ const inventoryToolbarConfig = computed(() =>
     getInventoryToolbarConfig({
         branch: currentBranch.value,
         categories: categories.value,
-        subcategories: subcategories.value,
         categoryFilter: categoryFilter.value,
-        subcategoryFilter: subcategoryFilter.value,
         stockFilter: stockFilter.value,
         statusFilter: statusFilter.value,
         expirationStatusFilter: expirationStatusFilter.value,
@@ -176,7 +167,6 @@ const inventoryToolbarConfig = computed(() =>
 
 function handleInventoryToolbarFilter({ key, value }) {
     if (key === 'categoryFilter') categoryFilter.value = value
-    if (key === 'subcategoryFilter') subcategoryFilter.value = value
     if (key === 'stockFilter') stockFilter.value = value
     if (key === 'statusFilter') statusFilter.value = value
     if (key === 'expirationStatusFilter') expirationStatusFilter.value = value
