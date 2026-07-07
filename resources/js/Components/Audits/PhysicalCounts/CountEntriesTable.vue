@@ -215,7 +215,7 @@ function handleTableAction({ action, row }) {
         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
       />
       <p class="mt-2 text-xs text-gray-500">
-        La busqueda revisa todos los productos contados de esta auditoria.
+        La búsqueda revisa todos los productos contados de esta auditoría.
       </p>
     </div>
 

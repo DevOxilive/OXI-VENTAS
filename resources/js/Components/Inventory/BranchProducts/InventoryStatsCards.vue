@@ -44,7 +44,7 @@ const cards = computed(() => [
     },
     {
         key: 'inactiveCandidateProducts',
-        label: 'Productos sin rotacion',
+        label: 'Productos sin rotación',
         value: props.alerts.inactiveCandidateProducts,
         icon: 'inventory',
         tone: 'purple',

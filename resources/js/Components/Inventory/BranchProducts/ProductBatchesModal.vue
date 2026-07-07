@@ -306,7 +306,7 @@ function selectBatch(batch) {
                                                     </p>
 
                                                     <p class="mt-0.5 text-xs text-slate-500">
-                                                        Activalo si este registro debe manejar numero de lote.
+                                                        Actívalo si este registro debe manejar número de lote.
                                                     </p>
                                                 </div>
 
@@ -375,7 +375,7 @@ function selectBatch(batch) {
 
                                         <div class="rounded-2xl border border-slate-200 bg-white p-4">
                                             <p class="mb-3 text-xs text-slate-500">
-                                                Esta nota quedara registrada en el historial de movimientos.
+                                                Esta nota quedará registrada en el historial de movimientos.
                                             </p>
 
                                             <TextareaField
@@ -396,7 +396,7 @@ function selectBatch(batch) {
                             <section class="space-y-4">
                                 <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                                     <p class="text-sm font-black text-slate-800">
-                                        Configuracion del lote
+                                        Configuración del lote
                                     </p>
 
                                     <div class="mt-4 space-y-4">
@@ -530,7 +530,7 @@ function selectBatch(batch) {
                                 </p>
 
                                 <p class="mt-2 text-sm text-slate-500">
-                                    Elige un lote de la lista izquierda para consultar sus datos, ajustar cantidad o cambiar su configuracion.
+                                    Elige un lote de la lista izquierda para consultar sus datos, ajustar cantidad o cambiar su configuración.
                                 </p>
                             </div>
                         </div>

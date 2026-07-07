@@ -48,10 +48,10 @@ function stockTone(product) {
                         Producto
                     </th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                        Codigo / Barcode
+                        Código / Barcode
                     </th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                        Categoria
+                        Categoría
                     </th>
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">
                         Stock
@@ -81,7 +81,7 @@ function stockTone(product) {
 
                     <td class="px-4 py-3">
                         <p class="text-sm font-medium text-slate-700">
-                            {{ product.code || 'Sin codigo' }}
+                            {{ product.code || 'Sin código' }}
                         </p>
                         <p class="text-xs text-slate-500">
                             {{ product.main_barcode || 'Sin barcode' }}
@@ -132,7 +132,7 @@ function stockTone(product) {
                     </div>
 
                     <p class="mt-2 text-xs text-slate-500">
-                        Codigo: {{ product.code || 'Sin codigo' }}
+                        Código: {{ product.code || 'Sin código' }}
                     </p>
 
                     <p class="text-xs text-slate-500">
@@ -151,7 +151,7 @@ function stockTone(product) {
                 No se encontraron productos.
             </p>
             <p class="mt-1 text-xs text-slate-500">
-                Ajusta los filtros para ampliar la busqueda.
+                Ajusta los filtros para ampliar la búsqueda.
             </p>
         </div>
     </div>

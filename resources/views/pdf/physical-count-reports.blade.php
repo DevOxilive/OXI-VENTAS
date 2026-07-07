@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Reporte de auditoria</title>
+    <title>Reporte de auditoría</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; font-size: 10px; color: #111827; }
         h1 { font-size: 18px; margin-bottom: 4px; }
@@ -14,7 +14,7 @@
     </style>
 </head>
 <body>
-    <h1>Reporte de auditoria</h1>
+    <h1>Reporte de auditoría</h1>
 
     <p class="muted">
         Sucursal: {{ $branch->name ?? 'Sin sucursal' }}<br>
@@ -25,7 +25,7 @@
     <h2>Resumen general</h2>
     <table>
         <tr>
-            <th>Auditorias</th>
+            <th>Auditorías</th>
             <td>{{ $summary['audits'] ?? 0 }}</td>
             <th>Registros</th>
             <td>{{ $summary['records'] ?? 0 }}</td>
@@ -53,21 +53,21 @@
     <h2>Filtros aplicados</h2>
     <table>
         <tr>
-            <th>Auditoria</th>
+            <th>Auditoría</th>
             <td>{{ $filterLabels['audit'] ?? 'Todas' }}</td>
             <th>Usuario</th>
             <td>{{ $filterLabels['user'] ?? 'Todos' }}</td>
         </tr>
         <tr>
-            <th>Categoria</th>
+            <th>Categoría</th>
             <td>{{ $filterLabels['category'] ?? 'Todas' }}</td>
             <th>Resultado</th>
             <td>{{ $filterLabels['status'] ?? 'Todos' }}</td>
         </tr>
         <tr>
             <th>Periodo</th>
-            <td>{{ $filterLabels['report_date'] ?? 'Sin fecha' }} ({{ $filterLabels['date_scope'] ?? 'Por dia' }})</td>
-            <th>Busqueda</th>
+            <td>{{ $filterLabels['report_date'] ?? 'Sin fecha' }} ({{ $filterLabels['date_scope'] ?? 'Por día' }})</td>
+            <th>Búsqueda</th>
             <td>{{ $filterLabels['search'] ?? 'Sin filtro' }}</td>
         </tr>
     </table>

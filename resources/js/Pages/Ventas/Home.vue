@@ -332,7 +332,7 @@ function handleSearchKeydown(event) {
 
   ErrorAlert({
     title: "Producto no encontrado",
-    message: "Escanea el codigo o escribe el nombre del producto para buscarlo rapido.",
+    message: "Escanea el código o escribe el nombre del producto para buscarlo rápido.",
   });
 }
 
@@ -435,7 +435,7 @@ function showExpirationAlert(alerts) {
     .join("");
 
   BlockingWarningAlert({
-    title: "Lotes proximos a vencer",
+    title: "Lotes próximos a vencer",
     message: `${summary}<p style="margin:12px 0 0 0;">Frontealos para mover primero esas piezas.</p>`,
   });
 }
@@ -556,7 +556,7 @@ function submitSale() {
                 {{ branch.name }}
               </h2>
               <p class="mt-2 text-sm text-slate-500">
-                Entra al punto de venta de esta sucursal y registra la operacion con su stock real.
+                Entra al punto de venta de esta sucursal y registra la operación con su stock real.
               </p>
             </div>
           </button>
@@ -620,7 +620,7 @@ function submitSale() {
                   field="sales_search"
                   v-model="search"
                   icon="barcode_scanner"
-                  placeholder="Codigo de barras o nombre del producto"
+                  placeholder="Código de barras o nombre del producto"
                   @keydown="handleSearchKeydown"
                 />
 
@@ -644,7 +644,7 @@ function submitSale() {
                         class="truncate text-xs"
                         :class="index === highlightedSuggestionIndex ? 'text-slate-200' : 'text-slate-500'"
                       >
-                        {{ product.barcode || "Sin codigo" }}
+                        {{ product.barcode || "Sin código" }}
                       </p>
                     </div>
 
@@ -695,7 +695,7 @@ function submitSale() {
                       {{ product.name }}
                     </p>
                     <p class="mt-1 truncate text-xs text-slate-500">
-                      {{ product.barcode || "Sin codigo" }}
+                      {{ product.barcode || "Sin código" }}
                     </p>
                   </div>
 
@@ -706,7 +706,7 @@ function submitSale() {
 
                 <div class="mt-auto flex items-center justify-between text-xs text-slate-500">
                   <span>Stock: {{ Number(product.stock).toFixed(0) }}</span>
-                  <span class="font-medium text-slate-700">{{ product.category || "Sin categoria" }}</span>
+                  <span class="font-medium text-slate-700">{{ product.category || "Sin categoría" }}</span>
                 </div>
 
                 <div class="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-center text-sm font-semibold text-slate-800 transition group-hover:bg-slate-900 group-hover:text-white">
@@ -719,7 +719,7 @@ function submitSale() {
               v-if="filteredProducts.length === 0"
               class="col-span-full flex min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500"
             >
-              No hay productos que coincidan con la busqueda.
+              No hay productos que coincidan con la búsqueda.
             </div>
           </div>
         </section>
@@ -770,7 +770,7 @@ function submitSale() {
                     {{ item.name }}
                   </p>
                   <p class="truncate text-xs text-slate-500">
-                    {{ item.barcode || "Sin codigo" }}
+                    {{ item.barcode || "Sin código" }}
                   </p>
                   <p class="mt-1 text-sm font-semibold text-slate-900">
                     {{ formatMoney(cartItemUnitPrice(item)) }}
@@ -824,7 +824,7 @@ function submitSale() {
                       Descuento
                     </p>
                     <p class="text-xs text-slate-500">
-                      Activalo solo si este producto lleva rebaja.
+                      Actívalo solo si este producto lleva rebaja.
                     </p>
                   </div>
 

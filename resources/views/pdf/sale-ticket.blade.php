@@ -30,7 +30,7 @@
     <div class="divider"></div>
 
     <p><strong>Fecha:</strong> {{ optional($sale->date)->format('d/m/Y H:i') }}</p>
-    <p><strong>Pago:</strong> {{ $sale->paymentMethod?->name ?? 'Sin metodo' }}</p>
+    <p><strong>Pago:</strong> {{ $sale->paymentMethod?->name ?? 'Sin método' }}</p>
     <p>
         <strong>Atendio:</strong>
         {{ trim(($sale->employee?->first_name ?? '') . ' ' . ($sale->employee?->last_name ?? '')) ?: 'Sin empleado' }}

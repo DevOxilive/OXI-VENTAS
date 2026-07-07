@@ -109,7 +109,7 @@ onMounted(() => {
         </h2>
 
         <p class="mt-1 text-sm text-gray-500">
-            Escanea un codigo o escribe el nombre del producto.
+            Escanea un código o escribe el nombre del producto.
         </p>
 
         <form class="mt-4 flex gap-3" @submit.prevent="scan">
@@ -118,7 +118,7 @@ onMounted(() => {
                     ref="searchInput"
                     v-model="form.code"
                     type="text"
-                    placeholder="Escanea codigo o escribe el nombre del producto"
+                    placeholder="Escanea código o escribe el nombre del producto"
                     class="w-full rounded-lg border-gray-300 text-sm"
                     autocomplete="off"
                 >
@@ -139,7 +139,7 @@ onMounted(() => {
                         </p>
 
                         <p class="mt-1 text-xs text-slate-500">
-                            Codigo: {{ product.barcode ?? 'Sin codigo' }}
+                            Código: {{ product.barcode ?? 'Sin código' }}
                         </p>
                     </button>
                 </div>

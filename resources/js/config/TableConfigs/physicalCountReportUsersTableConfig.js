@@ -6,7 +6,7 @@ export const physicalCountReportUsersTableConfig = {
         { key: 'records', label: 'Registros', format: 'number' },
         { key: 'products', label: 'Productos', format: 'number' },
         { key: 'counted_stock', label: 'Contado', format: 'number' },
-        { key: 'damaged_stock', label: 'Danado', format: 'number' },
+        { key: 'damaged_stock', label: 'Dañado', format: 'number' },
         { key: 'expired_stock', label: 'Caducado', format: 'number' },
     ],
     actions: [],

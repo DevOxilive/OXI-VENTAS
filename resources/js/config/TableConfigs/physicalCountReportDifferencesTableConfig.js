@@ -3,8 +3,8 @@ export const physicalCountReportDifferencesTableConfig = {
     noDataMessage: 'Sin diferencias relevantes.',
     columns: [
         { key: 'product_name', label: 'Producto' },
-        { key: 'category_name', label: 'Categoria' },
-        { key: 'scanned_code', label: 'Codigo' },
+        { key: 'category_name', label: 'Categoría' },
+        { key: 'scanned_code', label: 'Código' },
         { key: 'system_stock', label: 'Sistema', format: 'number' },
         { key: 'counted_stock', label: 'Conteo', format: 'number' },
         { key: 'differenceLabel', label: 'Diferencia' },

@@ -178,7 +178,7 @@ function validateForm() {
   if (!form.email) {
     errors.value.email = 'Correo requerido'
   } else if (!/^\S+@\S+\.\S+$/.test(form.email)) {
-    errors.value.email = 'Correo invÃ¡lido'
+    errors.value.email = 'Correo inválido'
   }
 
   if (!form.role_id) {
@@ -191,11 +191,11 @@ function validateForm() {
 
   if (!isEditing.value || form.password) {
     if (!form.password) {
-      errors.value.password = 'ContraseÃ±a requerida'
+      errors.value.password = 'Contraseña requerida'
     } else if (form.password.length < 7) {
-      errors.value.password = 'MÃ­nimo 7 caracteres'
+      errors.value.password = 'Mínimo 7 caracteres'
     } else if (form.password.length > 15) {
-      errors.value.password = 'MÃ¡ximo 15 caracteres'
+      errors.value.password = 'Máximo 15 caracteres'
     }
 
     if (form.password !== form.password_confirmation) {
@@ -428,7 +428,7 @@ function saveUser() {
       close: closeModal,
       successTitle: 'Usuario actualizado correctamente',
       errorTitle: 'Error al actualizar',
-      errorMessage: 'No fue posible actualizar la informaci?n del usuario.',
+      errorMessage: 'No fue posible actualizar la información del usuario.',
       onSuccess: () => {
         reloadUsers()
       },

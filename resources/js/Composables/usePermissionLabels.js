@@ -9,7 +9,7 @@ const permissionModules = {
   'inventory.branches': 'Inventario por sucursal',
   'inventory.purchase-reports': 'Reportes de compra',
   inventory: 'Inventario general',
-  audits: 'Auditorias',
+  audits: 'Auditorías',
   files: 'Archivos',
 }
 
@@ -55,13 +55,13 @@ const permissionLabels = {
   'inventory.purchase-reports.update': 'Editar reportes de compra',
   'inventory.purchase-reports.delete': 'Eliminar reportes de compra',
 
-  'audits.physical-counts.view': 'Ver auditorias',
-  'audits.physical-counts.count': 'Capturar conteos de auditoria',
-  'audits.physical-counts.reports': 'Ver reportes de auditoria',
-  'audits.physical-counts.view-stock': 'Ver stock en auditorias',
-  'audits.physical-counts.create': 'Crear auditorias',
-  'audits.physical-counts.update': 'Editar auditorias',
-  'audits.physical-counts.delete': 'Eliminar auditorias',
+  'audits.physical-counts.view': 'Ver auditorías',
+  'audits.physical-counts.count': 'Capturar conteos de auditoría',
+  'audits.physical-counts.reports': 'Ver reportes de auditoría',
+  'audits.physical-counts.view-stock': 'Ver stock en auditorías',
+  'audits.physical-counts.create': 'Crear auditorías',
+  'audits.physical-counts.update': 'Editar auditorías',
+  'audits.physical-counts.delete': 'Eliminar auditorías',
 
   'files.export': 'Exportar archivos',
 }

@@ -87,11 +87,11 @@ function closeModal() {
         <section class="min-h-0 w-full">
             <div class="border-b border-slate-200 px-5 py-4">
                 <h3 class="font-black text-slate-900">
-                    {{ usesLot ? form.lot_number || 'Lote sin numero' : 'Producto sin lote' }}
+                    {{ usesLot ? form.lot_number || 'Lote sin número' : 'Producto sin lote' }}
                 </h3>
 
                 <p class="mt-1 text-sm text-slate-500">
-                    Actualiza los datos del lote, su configuracion y el ajuste de cantidad.
+                    Actualiza los datos del lote, su configuración y el ajuste de cantidad.
                 </p>
             </div>
 
@@ -116,7 +116,7 @@ function closeModal() {
                                             </p>
 
                                             <p class="mt-0.5 text-xs text-slate-500">
-                                                Activalo si este registro debe manejar numero de lote.
+                                                Actívalo si este registro debe manejar número de lote.
                                             </p>
                                         </div>
 
@@ -185,14 +185,14 @@ function closeModal() {
 
                                 <div class="rounded-2xl border border-slate-200 bg-white p-4">
                                     <p class="mb-3 text-xs text-slate-500">
-                                        Esta nota quedara registrada en el historial de movimientos.
+                                        Esta nota quedará registrada en el historial de movimientos.
                                     </p>
 
                                     <TextareaField
                                         v-model="form.notes"
                                         label="Nota del ajuste"
                                         field="notes"
-                                        placeholder="Ej. Correccion por error de captura, revision fisica del lote, ajuste solicitado por contabilidad..."
+                                        placeholder="Ej. Corrección por error de captura, revisión física del lote, ajuste solicitado por contabilidad..."
                                         :rows="4"
                                         :readonly="processing"
                                         :error="frontendErrors.notes"
@@ -206,11 +206,11 @@ function closeModal() {
                     <section class="space-y-4">
                         <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                             <p class="text-sm font-black text-slate-800">
-                                Configuracion del lote
+                                Configuración del lote
                             </p>
 
                             <p class="mt-1 text-xs text-slate-500">
-                                Define si este lote esta activo, inactivo o si pertenece a una temporada.
+                                Define si este lote está activo, inactivo o si pertenece a una temporada.
                             </p>
 
                             <div class="mt-4 space-y-4">

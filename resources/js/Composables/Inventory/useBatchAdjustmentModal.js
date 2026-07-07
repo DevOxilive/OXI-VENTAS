@@ -315,7 +315,7 @@ export function useBatchAdjustmentModal(products) {
                     successTitle: "Lote actualizado",
                     errorTitle: "No se pudo actualizar",
                     errorMessage:
-                        "Revisa la informaci?n del lote e intenta nuevamente.",
+                        "Revisa la información del lote e intenta nuevamente.",
                     onSuccess: () => {
                         emit("created", form.lot_number);
                     },

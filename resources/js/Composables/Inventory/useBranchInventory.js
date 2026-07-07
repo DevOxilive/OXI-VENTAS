@@ -130,8 +130,8 @@ export function useBranchInventory(props) {
                     item.product?.barcodes?.[0]?.code ??
                     item.barcode ??
                     `BP-${item.id}`,
-                category_name: item.product?.category?.name ?? "Sin categoria",
-                category: item.product?.category?.name ?? "Sin categoria",
+                category_name: item.product?.category?.name ?? "Sin categoría",
+                category: item.product?.category?.name ?? "Sin categoría",
                 branch:
                     item.branch?.name ??
                     currentBranch.value?.name ??
@@ -300,9 +300,9 @@ export function useBranchInventory(props) {
         return (
             {
                 expired: "Lotes vencidos",
-                nearExpiration: "Lotes proximos a vencer",
+                nearExpiration: "Lotes próximos a vencer",
                 lowStock: "Productos con stock bajo",
-                inactiveCandidates: "Productos sin rotacion",
+                inactiveCandidates: "Productos sin rotación",
             }[selectedAlertType.value] || ""
         );
     });

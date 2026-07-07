@@ -7,7 +7,7 @@ export function getBatchAdjustmentModalConfig({
     return {
         mode: 'edit',
         title: 'Ajustar lote',
-        subtitle: 'Corrige la informacion registrada del lote.',
+        subtitle: 'Corrige la información registrada del lote.',
         totalErrors,
         processing,
         saveButtonText: 'Guardar cambios',

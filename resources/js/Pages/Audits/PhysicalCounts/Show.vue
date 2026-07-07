@@ -89,14 +89,14 @@ onBeforeUnmount(() => {
                 v-if="physicalCount.status === 'closed'"
                 class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
             >
-                Esta auditoria ya fue finalizada. La captura esta bloqueada.
+                Esta auditoría ya fue finalizada. La captura está bloqueada.
             </div>
 
             <div
                 v-if="physicalCount.status === 'applied'"
                 class="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
             >
-                Esta auditoria ya fue aplicada al inventario.
+                Esta auditoría ya fue aplicada al inventario.
             </div>
 
             <div class="space-y-6">
@@ -127,7 +127,7 @@ onBeforeUnmount(() => {
                     v-else
                     class="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600"
                 >
-                    Esta auditoria esta cerrada. Solo puede consultarse desde reportes.
+                    Esta auditoría está cerrada. Solo puede consultarse desde reportes.
                 </div>
             </div>
         </div>

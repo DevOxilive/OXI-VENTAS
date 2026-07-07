@@ -43,7 +43,7 @@ const {
                     </h3>
 
                     <p class="mt-1 text-sm text-slate-500">
-                        Codigo escaneado: {{ product.scanned_code || product.barcode || 'Sin codigo' }}
+                        Código escaneado: {{ product.scanned_code || product.barcode || 'Sin código' }}
                     </p>
                 </div>
 

@@ -222,7 +222,7 @@ watch(
                     <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
                         <div class="flex items-center justify-between gap-3">
                             <div>
-                                <p class="text-sm font-semibold text-slate-700">Esta dado de alta en IMSS?</p>
+                                <p class="text-sm font-semibold text-slate-700">¿Está dado de alta en IMSS?</p>
                                 <p class="text-xs text-slate-500">Activa el NSS solo cuando aplique</p>
                             </div>
 
