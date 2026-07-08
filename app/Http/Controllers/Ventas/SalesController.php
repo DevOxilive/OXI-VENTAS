@@ -11,8 +11,8 @@ use App\Models\Sale;
 use App\Models\SaleDetail;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
+use App\Models\TicketTemplate;
 use App\Services\StockMovementService;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Http\Request;
@@ -66,6 +66,8 @@ class SalesController extends Controller
                 ->values()
             : collect();
 
+        $ticketTemplate = TicketTemplate::salesTemplate();
+
         return Inertia::render('Ventas/Home', [
             'selectorMode' => $selectorMode,
             'currentBranch' => $branch ? [
@@ -83,7 +85,13 @@ class SalesController extends Controller
             'defaultPaymentMethodId' => $this->defaultPaymentMethodId(),
             'nearExpirationAlerts' => $selectorMode
                 ? []
-                : $this->buildNearExpirationAlerts($products)->take(6)->values(),
+                : $this->buildNearExpirationAlerts($products)->take(12)->values(),
+            'ticketTemplate' => [
+                'id' => $ticketTemplate->id,
+                'name' => $ticketTemplate->name,
+                'slug' => $ticketTemplate->slug,
+                'settings' => TicketTemplate::sanitizeSettings($ticketTemplate->settings ?? []),
+            ],
         ]);
     }
 
@@ -258,28 +266,9 @@ class SalesController extends Controller
         return back()->with([
             'success' => 'Venta registrada correctamente.',
             'sale_folio' => $sale->folio,
-            'ticket_url' => route('ventas.ticket', ['sale' => $sale->id]),
+            'print_job' => $this->buildPrintJobPayload($sale),
             'expiration_alerts' => $expirationAlerts,
         ]);
-    }
-
-    public function ticket(Request $request, Sale $sale)
-    {
-        $user = $request->user()->loadMissing(['branches', 'role']);
-        $this->authorizeSaleAccess($sale, $user);
-
-        $sale->load([
-            'branch:id,name,slug',
-            'employee:id,first_name,last_name',
-            'paymentMethod:id,name',
-            'details.product:id,name',
-        ]);
-
-        $pdf = Pdf::loadView('pdf.sale-ticket', [
-            'sale' => $sale,
-        ])->setPaper([0, 0, 226.77, 600], 'portrait');
-
-        return $pdf->stream('ticket-' . ($sale->folio ?? $sale->id) . '.pdf');
     }
 
     private function mapBranchProduct(BranchProduct $branchProduct): array
@@ -465,11 +454,6 @@ class SalesController extends Controller
 
     private function buildRemainingNearExpirationAlertsAfterSale(Sale $sale): array
     {
-        $branchProductIds = BranchProduct::query()
-            ->where('branch_id', $sale->branch_id)
-            ->whereIn('product_id', $sale->details()->pluck('product_id'))
-            ->pluck('id');
-
         $branchProducts = BranchProduct::query()
             ->with([
                 'product:id,name',
@@ -486,29 +470,49 @@ class SalesController extends Controller
                     ->orderBy('received_at')
                     ->orderBy('id'),
             ])
-            ->whereIn('id', $branchProductIds)
+            ->where('branch_id', $sale->branch_id)
+            ->where('status', BranchProduct::STATUS_ACTIVE)
+            ->whereHas('product', fn ($query) => $query->where('active', true))
             ->get();
 
         return $this->buildNearExpirationAlerts($branchProducts)
-            ->take(4)
+            ->take(12)
             ->values()
             ->all();
     }
 
-    private function authorizeSaleAccess(Sale $sale, $user): void
+    private function buildPrintJobPayload(Sale $sale): array
     {
-        if ($user->role?->name === 'Administrador') {
-            return;
-        }
+        $sale->loadMissing([
+            'branch:id,name',
+            'employee:id,first_name,last_name',
+            'paymentMethod:id,name',
+            'details.product:id,name',
+        ]);
 
-        $allowedBranchIds = $user->branches->pluck('id')
-            ->push($user->branch_id)
-            ->filter()
-            ->unique()
-            ->values();
-
-        if (!$allowedBranchIds->contains((int) $sale->branch_id)) {
-            throw new AuthorizationException('No tienes permiso para ver este ticket.');
-        }
+        return [
+            'sale_id' => $sale->id,
+            'folio' => $sale->folio,
+            'date' => optional($sale->date)->format('d/m/Y H:i'),
+            'branch_name' => $sale->branch?->name ?? 'Sucursal',
+            'payment_method' => $sale->paymentMethod?->name ?? 'Sin metodo',
+            'employee_name' => trim(
+                ($sale->employee?->first_name ?? '') . ' ' . ($sale->employee?->last_name ?? '')
+            ) ?: 'Sin empleado',
+            'user_name' => auth()->user()?->name ?? null,
+            'total' => (float) $sale->total,
+            'cash_received' => (float) $sale->cash_received,
+            'change_due' => (float) $sale->change_due,
+            'items' => $sale->details->map(function (SaleDetail $detail) {
+                return [
+                    'product_name' => $detail->product?->name ?? 'Producto',
+                    'quantity' => (float) $detail->quantity,
+                    'unit_price' => (float) $detail->unit_price,
+                    'subtotal' => (float) $detail->subtotal,
+                    'discount_percentage' => (float) ($detail->discount_percentage ?? 0),
+                    'discount_amount' => (float) ($detail->discount_amount ?? 0),
+                ];
+            })->values()->all(),
+        ];
     }
 }
