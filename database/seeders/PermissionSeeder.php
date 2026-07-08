@@ -21,6 +21,8 @@ class PermissionSeeder extends Seeder
             'users.create',
             'users.update',
             'users.delete',
+            'systems.tickets.view',
+            'systems.tickets.update',
 
             'sales.view',
             'sales.create',
