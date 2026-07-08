@@ -46,6 +46,7 @@ class RoleSeeder extends Seeder
         foreach ($permissions as $permission) {
             if (
                 str_starts_with($permission->name, 'users.')
+                || str_starts_with($permission->name, 'systems.tickets.')
             ) {
                 DB::table('role_permission')->updateOrInsert([
                     'role_id' => $systemsRole->id,

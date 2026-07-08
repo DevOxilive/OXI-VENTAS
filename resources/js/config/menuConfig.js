@@ -241,5 +241,26 @@ export function generateMenu(role, permissions = [], branches = []) {
         });
     }
 
+    if (
+        isAdmin ||
+        can("systems.tickets.view") ||
+        can("systems.tickets.update")
+    ) {
+        menu.push({
+            text: "Impresoras",
+            key: "printers",
+            icon: "print",
+            isOpen: false,
+            children: [
+                {
+                    text: "Tickets",
+                    key: "printers.tickets",
+                    icon: "receipt_long",
+                    url: route("printers.tickets.index"),
+                },
+            ],
+        });
+    }
+
     return menu;
 }

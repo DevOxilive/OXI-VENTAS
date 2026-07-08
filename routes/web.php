@@ -4,8 +4,10 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\QzTrayController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\TicketTemplateController;
 use App\Http\Controllers\Audits\PhysicalCountController;
 use App\Http\Controllers\Audits\PhysicalCountReportController;
 use App\Http\Controllers\Inventory\ReportController;
@@ -62,6 +64,12 @@ Route::middleware([
         return Inertia::render('Dashboard');
     })->name('dashboard');
 
+    Route::get('/qz/certificate', [QzTrayController::class, 'certificate'])
+        ->name('qz.certificate');
+
+    Route::post('/qz/sign', [QzTrayController::class, 'sign'])
+        ->name('qz.sign');
+
     /*
     |--------------------------------------------------------------------------
     | SISTEMAS - USUARIOS
@@ -84,6 +92,16 @@ Route::middleware([
         Route::delete('/users/{user}', [UserController::class, 'destroy'])
             ->middleware('permission:users.delete')
             ->name('users.destroy');
+
+        Route::get('/tickets', function () {
+            return redirect()->route('printers.tickets.index');
+        })
+            ->middleware('permission:systems.tickets.view,systems.tickets.update')
+            ->name('tickets.index');
+
+        Route::put('/tickets/{ticketTemplate}', [TicketTemplateController::class, 'update'])
+            ->middleware('permission:systems.tickets.update')
+            ->name('tickets.update');
     });
 
     /*
@@ -152,11 +170,23 @@ Route::middleware([
             Route::post('/', [SalesController::class, 'store'])
                 ->middleware('permission:sales.create')
                 ->name('store');
-
-            Route::get('/{sale}/ticket', [SalesController::class, 'ticket'])
-                ->middleware('permission:sales.view,sales.create,sales.update,sales.delete,sales.reports')
-                ->name('ticket');
         });
+
+    /*
+    |--------------------------------------------------------------------------
+    | IMPRESORAS - TICKETS
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('printers')->name('printers.')->group(function () {
+        Route::get('/tickets', [TicketTemplateController::class, 'index'])
+            ->middleware('permission:systems.tickets.view,systems.tickets.update')
+            ->name('tickets.index');
+
+        Route::put('/tickets/{ticketTemplate}', [TicketTemplateController::class, 'update'])
+            ->middleware('permission:systems.tickets.update')
+            ->name('tickets.update');
+    });
 
     /*
     |--------------------------------------------------------------------------
