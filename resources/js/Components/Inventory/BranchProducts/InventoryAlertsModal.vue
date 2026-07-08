@@ -38,14 +38,14 @@ const hasItems = computed(() => props.batches.length > 0)
 
 const subtitle = computed(() => {
     if (isLowStock.value) {
-        return 'Productos que requieren reposicion para mantener inventario sano.'
+        return 'Productos que requieren reposición para mantener inventario sano.'
     }
 
     if (isInactiveCandidates.value) {
-        return 'Productos con baja rotacion para revisar demanda, resurtido o permanencia.'
+        return 'Productos con baja rotación para revisar demanda, resurtido o permanencia.'
     }
 
-    return 'Lotes que requieren revision prioritaria.'
+    return 'Lotes que requieren revisión prioritaria.'
 })
 
 const modalConfig = computed(() => getInventoryAlertsModalConfig({
@@ -59,7 +59,7 @@ const emptyText = computed(() => {
     }
 
     if (isInactiveCandidates.value) {
-        return 'No hay productos sin rotacion para mostrar.'
+        return 'No hay productos sin rotación para mostrar.'
     }
 
     return 'No hay lotes para mostrar.'
@@ -257,7 +257,7 @@ function productMinStock(item) {
 
 function productStatus(item) {
     if (isInactiveCandidates.value) {
-        return item.status || 'Producto sin rotacion'
+        return item.status || 'Producto sin rotación'
     }
 
     return item.status || 'Stock bajo'
@@ -268,7 +268,7 @@ function productLastRestockedAt(item) {
 }
 
 function productInactiveDays(item) {
-    return `${item.inactive_candidate_after_days ?? 90} dias`
+    return `${item.inactive_candidate_after_days ?? 90} días`
 }
 
 function batchLotNumber(batch) {
@@ -277,7 +277,7 @@ function batchLotNumber(batch) {
         batch.lot_number === undefined ||
         batch.lot_number === ''
     ) {
-        return 'Sin numero de lote'
+        return 'Sin número de lote'
     }
 
     return batch.lot_number
@@ -298,7 +298,7 @@ function batchStatus(batch) {
     return batch.expiration_human_text
         || batch.expiration_status
         || batch.status
-        || 'Sin informacion'
+        || 'Sin información'
 }
 </script>
 
@@ -324,7 +324,7 @@ function batchStatus(batch) {
 
                                 <div class="min-w-0 px-1 py-1">
                                     <p class="text-[10px] font-bold uppercase tracking-[0.14em]" :class="detailLabelClass">
-                                        Codigo
+                                        Código
                                     </p>
 
                                     <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
@@ -392,7 +392,7 @@ function batchStatus(batch) {
 
                                 <div class="min-w-0 px-1 py-1">
                                     <p class="text-[10px] font-bold uppercase tracking-[0.14em]" :class="detailLabelClass">
-                                        Codigo
+                                        Código
                                     </p>
 
                                     <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">

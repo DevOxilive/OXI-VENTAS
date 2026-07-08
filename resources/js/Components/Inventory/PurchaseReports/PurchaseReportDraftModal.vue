@@ -85,7 +85,7 @@ function closeModal() {
                                     {{ item.branch_product?.product?.name || 'Producto sin nombre' }}
                                 </p>
                                 <p class="text-xs text-slate-500">
-                                    {{ item.branch_product?.product?.code || 'Sin codigo' }}
+                                    {{ item.branch_product?.product?.code || 'Sin código' }}
                                     |
                                     {{ item.branch_product?.product?.barcodes?.[0]?.barcode || 'Sin barcode' }}
                                 </p>
@@ -113,7 +113,7 @@ function closeModal() {
                         </p>
 
                         <p class="text-xs text-slate-500">
-                            {{ item.branch_product?.product?.code || 'Sin codigo' }}
+                            {{ item.branch_product?.product?.code || 'Sin código' }}
                             |
                             {{ item.branch_product?.product?.barcodes?.[0]?.barcode || 'Sin barcode' }}
                         </p>

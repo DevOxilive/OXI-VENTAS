@@ -3,9 +3,7 @@
 export function getInventoryToolbarConfig({
     branch,
     categories,
-    subcategories,
     categoryFilter,
-    subcategoryFilter,
     stockFilter,
     statusFilter,
     expirationStatusFilter,
@@ -14,24 +12,15 @@ export function getInventoryToolbarConfig({
     return {
         title: branch?.name ? `Inventario - ${branch.name}` : "Inventario",
         subtitle: "Consulta y movimientos por sucursal",
-        searchPlaceholder: "Buscar producto, codigo, lote o barcode...",
+        searchPlaceholder: "Buscar producto, código, lote o barcode...",
 
         filters: [
             {
                 key: "categoryFilter",
-                label: "Categoria",
-                placeholder: "Categoria",
+                label: "Categoría",
+                placeholder: "Categoría",
                 value: categoryFilter,
                 options: categories,
-                optionLabel: "name",
-                optionValue: "id",
-            },
-            {
-                key: "subcategoryFilter",
-                label: "Subcategoria",
-                placeholder: "Subcategoria",
-                value: subcategoryFilter,
-                options: subcategories,
                 optionLabel: "name",
                 optionValue: "id",
             },
@@ -71,10 +60,10 @@ export function getInventoryToolbarConfig({
             },
             {
                 key: "inactiveCandidateFilter",
-                label: "Sin rotacion",
-                placeholder: "Sin rotacion",
+                label: "Sin rotación",
+                placeholder: "Sin rotación",
                 value: inactiveCandidateFilter,
-                options: [{ label: "Productos sin rotacion", value: "1" }],
+                options: [{ label: "Productos sin rotación", value: "1" }],
             },
         ],
     };

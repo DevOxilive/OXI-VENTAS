@@ -101,9 +101,9 @@ async function handleTableAction({ action, row }) {
     if (action === 'close') {
         const result = await confirmModalAction({
             mode: 'update',
-            title: 'Cerrar auditoria',
-            message: 'Deseas cerrar esta auditoria? Ya no se podra capturar hasta reabrirla.',
-            confirmText: 'Si, cerrar',
+            title: 'Cerrar auditoría',
+            message: '¿Deseas cerrar esta auditoría? Ya no se podrá capturar hasta reabrirla.',
+            confirmText: 'Sí, cerrar',
             cancelText: 'Cancelar',
             confirmButtonColor: '#f59e0b',
         })
@@ -112,10 +112,10 @@ async function handleTableAction({ action, row }) {
 
         router.patch(route('audits.physical-counts.close', row.id), {}, getModalRequestOptions({
             mode: 'update',
-            entityName: 'Auditoria',
-            successTitle: 'Auditoria cerrada correctamente',
-            errorTitle: 'Error al cerrar auditoria',
-            errorMessage: 'No fue posible cerrar la auditoria.',
+            entityName: 'Auditoría',
+            successTitle: 'Auditoría cerrada correctamente',
+            errorTitle: 'Error al cerrar auditoría',
+            errorMessage: 'No fue posible cerrar la auditoría.',
             onSuccess: () => {
                 reloadPhysicalCounts()
             },
@@ -127,9 +127,9 @@ async function handleTableAction({ action, row }) {
     if (action === 'reopen') {
         const result = await confirmModalAction({
             mode: 'update',
-            title: 'Reabrir auditoria',
-            message: 'Deseas reabrir esta auditoria? Se permitira capturar nuevamente.',
-            confirmText: 'Si, reabrir',
+            title: 'Reabrir auditoría',
+            message: '¿Deseas reabrir esta auditoría? Se permitirá capturar nuevamente.',
+            confirmText: 'Sí, reabrir',
             cancelText: 'Cancelar',
             confirmButtonColor: '#2563eb',
         })
@@ -138,10 +138,10 @@ async function handleTableAction({ action, row }) {
 
         router.patch(route('audits.physical-counts.reopen', row.id), {}, getModalRequestOptions({
             mode: 'update',
-            entityName: 'Auditoria',
-            successTitle: 'Auditoria reabierta correctamente',
-            errorTitle: 'Error al reabrir auditoria',
-            errorMessage: 'No fue posible reabrir la auditoria.',
+            entityName: 'Auditoría',
+            successTitle: 'Auditoría reabierta correctamente',
+            errorTitle: 'Error al reabrir auditoría',
+            errorMessage: 'No fue posible reabrir la auditoría.',
             onSuccess: () => {
                 reloadPhysicalCounts()
             },
@@ -154,8 +154,8 @@ async function handleTableAction({ action, row }) {
         const result = await confirmModalAction({
             mode: 'update',
             title: 'Aplicar ajustes',
-            message: 'Deseas aplicar los ajustes de esta auditoria? El stock se actualizara con base en el conteo fisico.',
-            confirmText: 'Si, aplicar',
+            message: '¿Deseas aplicar los ajustes de esta auditoría? El stock se actualizará con base en el conteo físico.',
+            confirmText: 'Sí, aplicar',
             cancelText: 'Cancelar',
             confirmButtonColor: '#16a34a',
         })
@@ -164,7 +164,7 @@ async function handleTableAction({ action, row }) {
 
         router.patch(route('audits.physical-counts.apply-adjustments', row.id), {}, getModalRequestOptions({
             mode: 'update',
-            entityName: 'Auditoria',
+            entityName: 'Auditoría',
             successTitle: 'Ajustes aplicados correctamente',
             errorTitle: 'Error al aplicar ajustes',
             errorMessage: 'No fue posible aplicar los ajustes.',
@@ -179,9 +179,9 @@ async function handleTableAction({ action, row }) {
     if (action === 'delete') {
         const result = await confirmModalAction({
             mode: 'delete',
-            title: 'Eliminar auditoria',
-            message: 'Deseas eliminar esta auditoria? Esta accion no se puede deshacer.',
-            confirmText: 'Si, eliminar',
+            title: 'Eliminar auditoría',
+            message: '¿Deseas eliminar esta auditoría? Esta acción no se puede deshacer.',
+            confirmText: 'Sí, eliminar',
             cancelText: 'Cancelar',
             confirmButtonColor: '#ef4444',
         })
@@ -190,10 +190,10 @@ async function handleTableAction({ action, row }) {
 
         router.delete(route('audits.physical-counts.destroy', row.id), getModalRequestOptions({
             mode: 'delete',
-            entityName: 'Auditoria',
-            successTitle: 'Auditoria eliminada correctamente',
-            errorTitle: 'Error al eliminar auditoria',
-            errorMessage: 'No fue posible eliminar la auditoria.',
+            entityName: 'Auditoría',
+            successTitle: 'Auditoría eliminada correctamente',
+            errorTitle: 'Error al eliminar auditoría',
+            errorMessage: 'No fue posible eliminar la auditoría.',
             onSuccess: () => {
                 reloadPhysicalCounts()
             },

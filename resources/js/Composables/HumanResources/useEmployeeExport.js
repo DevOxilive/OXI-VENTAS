@@ -3,6 +3,8 @@ export function useEmployeeExport(
     departmentFilter,
     positionFilter,
     search,
+    startDateFromFilter,
+    startDateToFilter,
 ) {
     function exportExcel() {
         const params = new URLSearchParams();
@@ -21,6 +23,14 @@ export function useEmployeeExport(
 
         if (search.value) {
             params.append("search", search.value);
+        }
+
+        if (startDateFromFilter.value) {
+            params.append("startDateFrom", startDateFromFilter.value);
+        }
+
+        if (startDateToFilter.value) {
+            params.append("startDateTo", startDateToFilter.value);
         }
 
         const url =

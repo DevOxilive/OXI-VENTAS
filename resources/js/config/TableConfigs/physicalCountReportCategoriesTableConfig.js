@@ -1,8 +1,8 @@
 export const physicalCountReportCategoriesTableConfig = {
     mobileCardHeaderField: 'category_name',
-    noDataMessage: 'Sin resumen por categoria.',
+    noDataMessage: 'Sin resumen por categoría.',
     columns: [
-        { key: 'category_name', label: 'Categoria' },
+        { key: 'category_name', label: 'Categoría' },
         { key: 'products', label: 'Productos', format: 'number' },
         { key: 'counted_products', label: 'Contados', format: 'number' },
         { key: 'pending_products', label: 'Pendientes', format: 'number' },

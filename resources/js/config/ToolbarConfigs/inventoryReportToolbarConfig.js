@@ -9,13 +9,13 @@ export const INVENTORY_REPORT_TYPES = [
         id: 'expirations',
         name: 'Caducidades',
         dataKey: 'expirations',
-        description: 'Lotes caducados o proximos a vencer.',
+        description: 'Lotes caducados o próximos a vencer.',
     },
     {
         id: 'attention',
         name: 'Stock critico',
         dataKey: 'attentionProducts',
-        description: 'Productos agotados, bajos o que necesitan revision.',
+        description: 'Productos agotados, bajos o que necesitan revisión.',
     },
     {
         id: 'movements',
@@ -25,9 +25,9 @@ export const INVENTORY_REPORT_TYPES = [
     },
     {
         id: 'rotation',
-        name: 'Rotacion',
+        name: 'Rotación',
         dataKey: 'rotation',
-        description: 'Productos con alta, baja o nula rotacion.',
+        description: 'Productos con alta, baja o nula rotación.',
     },
 ]
 
@@ -62,7 +62,7 @@ export const INVENTORY_REPORT_STATUS_FILTERS = [
         report: 'attention',
         icon: 'inventory',
         tone: 'blue',
-        description: 'Debajo del minimo.',
+        description: 'Debajo del mínimo.',
     },
     {
         id: 'out_of_stock',
@@ -110,8 +110,8 @@ export function getInventoryReportToolbarConfig({
             },
             {
                 key: 'categoryId',
-                label: 'Categoria',
-                placeholder: 'Todas las categorias',
+                label: 'Categoría',
+                placeholder: 'Todas las categorías',
                 value: filters?.categoryId ?? '',
                 options: categories,
                 optionLabel: 'name',
@@ -140,9 +140,9 @@ export function getInventoryReportToolbarConfig({
             },
             {
                 key: 'search',
-                label: 'Busqueda',
+                label: 'Búsqueda',
                 type: 'text',
-                placeholder: 'Producto, lote o categoria',
+                placeholder: 'Producto, lote o categoría',
                 value: filters?.search ?? '',
             },
         ],

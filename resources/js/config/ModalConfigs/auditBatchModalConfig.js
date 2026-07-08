@@ -20,7 +20,7 @@ export function getAuditBatchModalConfig({
             create: {
                 successTitle: 'Lote creado correctamente',
                 errorTitle: 'Error al crear lote',
-                errorMessage: 'No fue posible registrar el lote de auditoria.',
+                errorMessage: 'No fue posible registrar el lote de auditoría.',
             },
         },
     }

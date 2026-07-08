@@ -11,10 +11,6 @@ const props = defineProps({
         type: Object,
         default: () => ({}),
     },
-    viewMode: {
-        type: String,
-        required: true,
-    },
     can: {
         type: Function,
         required: true,
@@ -34,7 +30,6 @@ defineEmits([
 
 <template>
     <GlobalTable :items="items" v-bind="getUsersTableConfig({
-        viewMode: props.viewMode,
         can: props.can,
         onViewUser: props.actionHandlers.view,
         onCreateUser: props.actionHandlers.createUser,

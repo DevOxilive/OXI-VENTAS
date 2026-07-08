@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\PurchaseReport;
+use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
 use Illuminate\Http\Request;
-use App\Support\FlexibleSearch;
 use Inertia\Inertia;
 
 class PurchaseReportController extends Controller
@@ -20,7 +20,6 @@ class PurchaseReportController extends Controller
         $filters = [
             'search' => $request->input('search', ''),
             'category' => $request->input('category', ''),
-            'subcategory' => $request->input('subcategory', ''),
             'stock' => $request->input('stock', ''),
             'per_page' => $perPage,
         ];
@@ -28,7 +27,6 @@ class PurchaseReportController extends Controller
         $products = BranchProduct::query()
             ->with([
                 'product.category',
-                'product.subcategory',
                 'product.barcodes',
             ])
             ->where('branch_id', $branch->id)
@@ -51,9 +49,6 @@ class PurchaseReportController extends Controller
             ->when($filters['category'], function ($query, $category) {
                 $query->whereHas('product.category', fn($q) => $q->where('name', $category));
             })
-            ->when($filters['subcategory'], function ($query, $subcategory) {
-                $query->whereHas('product.subcategory', fn($q) => $q->where('name', $subcategory));
-            })
             ->when($filters['stock'] === 'LOW', function ($query) {
                 $query->whereColumn('stock', '<=', 'min_stock')
                     ->where('stock', '>', 0);
@@ -71,20 +66,18 @@ class PurchaseReportController extends Controller
                 'code' => $item->product?->code ?? '',
                 'main_barcode' => $item->product?->barcodes?->first()?->code ?? '',
                 'barcodes' => $item->product?->barcodes?->pluck('code')->values() ?? [],
-                'category' => $item->product?->category?->name ?? 'Sin categoría',
-                'subcategory' => $item->product?->subcategory?->name ?? 'Sin subcategoría',
+                'category' => $item->product?->category?->name ?? 'Sin categoria',
                 'stock' => (float) $item->stock,
                 'min_stock' => (float) $item->min_stock,
                 'price' => (float) $item->price,
             ]);
 
         $filterOptions = BranchProduct::query()
-            ->with(['product.category', 'product.subcategory'])
+            ->with(['product.category'])
             ->where('branch_id', $branch->id)
             ->get()
             ->map(fn($item) => [
                 'category' => $item->product?->category?->name,
-                'subcategory' => $item->product?->subcategory?->name,
             ]);
 
         return redirect()->route('inventario.branches.purchase-reports.index', [
@@ -96,7 +89,6 @@ class PurchaseReportController extends Controller
             'productsDB' => $products,
             'filters' => $filters,
             'categoriesDB' => $filterOptions->pluck('category')->filter()->unique()->values(),
-            'subcategoriesDB' => $filterOptions->pluck('subcategory')->filter()->unique()->values(),
         ]);
     }
 
@@ -118,7 +110,6 @@ class PurchaseReportController extends Controller
         ]);
 
         foreach ($validated['items'] as $item) {
-
             $product = BranchProduct::findOrFail(
                 $item['branch_product_id']
             );
@@ -169,7 +160,6 @@ class PurchaseReportController extends Controller
         $filters = [
             'search' => $request->input('search', ''),
             'category' => $request->input('category', ''),
-            'subcategory' => $request->input('subcategory', ''),
             'stock' => $request->input('stock', ''),
             'per_page' => $perPage,
         ];
@@ -177,7 +167,6 @@ class PurchaseReportController extends Controller
         $products = BranchProduct::query()
             ->with([
                 'product.category',
-                'product.subcategory',
                 'product.barcodes',
             ])
             ->where('branch_id', $branch->id)
@@ -198,7 +187,6 @@ class PurchaseReportController extends Controller
                 });
             })
             ->when($filters['category'], fn($query, $category) => $query->whereHas('product.category', fn($q) => $q->where('name', $category)))
-            ->when($filters['subcategory'], fn($query, $subcategory) => $query->whereHas('product.subcategory', fn($q) => $q->where('name', $subcategory)))
             ->when($filters['stock'] === 'LOW', fn($query) => $query->whereColumn('stock', '<=', 'min_stock')->where('stock', '>', 0))
             ->when($filters['stock'] === 'OUT', fn($query) => $query->where('stock', '<=', 0))
             ->orderBy('stock')
@@ -211,27 +199,24 @@ class PurchaseReportController extends Controller
                 'code' => $item->product?->code ?? '',
                 'main_barcode' => $item->product?->barcodes?->first()?->code ?? '',
                 'barcodes' => $item->product?->barcodes?->pluck('code')->values() ?? [],
-                'category' => $item->product?->category?->name ?? 'Sin categoría',
-                'subcategory' => $item->product?->subcategory?->name ?? 'Sin subcategoría',
+                'category' => $item->product?->category?->name ?? 'Sin categoria',
                 'stock' => (float) $item->stock,
                 'min_stock' => (float) $item->min_stock,
                 'price' => (float) $item->price,
             ]);
 
         $filterOptions = BranchProduct::query()
-            ->with(['product.category', 'product.subcategory'])
+            ->with(['product.category'])
             ->where('branch_id', $branch->id)
             ->get()
             ->map(fn($item) => [
                 'category' => $item->product?->category?->name,
-                'subcategory' => $item->product?->subcategory?->name,
             ]);
 
         $reports = PurchaseReport::query()
             ->with([
                 'items.branchProduct.product.barcodes',
                 'items.branchProduct.product.category',
-                'items.branchProduct.product.subcategory',
             ])
             ->withCount('items')
             ->where('branch_id', $branch->id)
@@ -244,7 +229,6 @@ class PurchaseReportController extends Controller
             'reportsDB' => $reports,
             'filters' => $filters,
             'categoriesDB' => $filterOptions->pluck('category')->filter()->unique()->values(),
-            'subcategoriesDB' => $filterOptions->pluck('subcategory')->filter()->unique()->values(),
         ]);
     }
 
@@ -256,7 +240,6 @@ class PurchaseReportController extends Controller
             'user',
             'items.branchProduct.product.barcodes',
             'items.branchProduct.product.category',
-            'items.branchProduct.product.subcategory',
         ]);
 
         return Inertia::render('Inventory/PurchaseReportShow', [

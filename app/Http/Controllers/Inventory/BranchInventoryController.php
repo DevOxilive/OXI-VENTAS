@@ -10,13 +10,11 @@ use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductBatch;
-use App\Models\Subcategory;
+use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Support\FlexibleSearch;
 use Inertia\Inertia;
-
 
 class BranchInventoryController extends Controller
 {
@@ -77,11 +75,6 @@ class BranchInventoryController extends Controller
                     $query->where('category_id', $request->category);
                 });
             })
-            ->when($request->filled('subcategory'), function ($query) use ($request) {
-                $query->whereHas('product', function ($query) use ($request) {
-                    $query->where('subcategory_id', $request->subcategory);
-                });
-            })
             ->when($request->filled('status'), function ($query) use ($request) {
                 $query->where('status', $request->status);
             })
@@ -117,9 +110,8 @@ class BranchInventoryController extends Controller
             })
             ->with([
                 'branch:id,name',
-                'product:id,name,category_id,subcategory_id,sale_price,cost,unit',
+                'product:id,name,category_id,sale_price,cost,unit',
                 'product.category:id,name',
-                'product.subcategory:id,name,category_id',
                 'product.barcodes:id,product_id,code',
             ])
             ->join('products', 'products.id', '=', 'branch_products.product_id')
@@ -311,7 +303,7 @@ class BranchInventoryController extends Controller
             ],
 
             'productsDB' => Product::query()
-                ->select(['id', 'name', 'sale_price', 'cost', 'unit', 'category_id', 'subcategory_id'])
+                ->select(['id', 'name', 'sale_price', 'cost', 'unit', 'category_id'])
                 ->where('active', true)
                 ->orderBy('name')
                 ->limit(300)
@@ -328,15 +320,9 @@ class BranchInventoryController extends Controller
                 ->orderBy('name')
                 ->get(),
 
-            'subcategoriesDB' => Subcategory::query()
-                ->select(['id', 'name', 'category_id'])
-                ->orderBy('name')
-                ->get(),
-
             'filters' => [
                 'search' => $request->search,
                 'category' => $request->category,
-                'subcategory' => $request->subcategory,
                 'status' => $request->status,
                 'stock' => $request->stock,
                 'expiration_status' => $request->expiration_status,
@@ -350,9 +336,8 @@ class BranchInventoryController extends Controller
     {
         $branchProduct->load([
             'branch:id,name,slug',
-            'product:id,name,category_id,subcategory_id,sale_price,cost,unit',
+            'product:id,name,category_id,sale_price,cost,unit',
             'product.category:id,name',
-            'product.subcategory:id,name,category_id',
             'product.barcodes:id,product_id,code',
             'batches' => fn($query) => $query
                 ->select([
@@ -418,7 +403,7 @@ class BranchInventoryController extends Controller
 
         event(new InventoryStockUpdated($branchProduct));
         event(RealtimeActivityLogged::message(
-            'asignó',
+            'asigno',
             'el producto a una sucursal',
             $branchProduct->product?->name,
             'Inventario',
@@ -427,6 +412,7 @@ class BranchInventoryController extends Controller
 
         return back()->with('success', 'Producto asignado a sucursal correctamente.');
     }
+
     public function updateConfig(Request $request, BranchProduct $branchProduct)
     {
         $validated = $request->validate([
@@ -450,13 +436,13 @@ class BranchInventoryController extends Controller
 
         event(new InventoryStockUpdated($branchProduct));
         event(RealtimeActivityLogged::message(
-            'actualizó',
-            'la configuración de inventario del producto',
+            'actualizo',
+            'la configuracion de inventario del producto',
             $branchProduct->product?->name,
             'Inventario',
             'configured',
         ));
 
-        return back()->with('success', 'Configuración del producto actualizada correctamente.');
+        return back()->with('success', 'Configuracion del producto actualizada correctamente.');
     }
 }

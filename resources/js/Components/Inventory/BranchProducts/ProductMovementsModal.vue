@@ -44,7 +44,7 @@ const modalConfig = getProductMovementsModalConfig()
 
                         <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
                             <p class="min-w-0">
-                                <span class="font-semibold text-violet-700">Codigo:</span>
+                                <span class="font-semibold text-violet-700">Código:</span>
                                 {{ productCode }}
                             </p>
 

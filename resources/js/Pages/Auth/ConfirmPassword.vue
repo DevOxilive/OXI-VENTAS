@@ -1,12 +1,10 @@
 <script setup>
 import { ref } from 'vue';
 import { Head, useForm } from '@inertiajs/vue3';
-import AuthenticationCard from '@/Components/AuthenticationCard.vue';
-import AuthenticationCardLogo from '@/Components/AuthenticationCardLogo.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import AppButton from '@/Components/Buttons/AppButton.vue';
+import AuthenticationCard from '@/Components/Login/AuthenticationCard.vue';
+import AuthenticationCardLogo from '@/Components/Login/AuthenticationCardLogo.vue';
+import InputField from '@/Components/Forms/InputField.vue';
 
 const form = useForm({
     password: '',
@@ -39,24 +37,23 @@ const submit = () => {
 
         <form @submit.prevent="submit">
             <div>
-                <InputLabel for="password" value="Password" />
-                <TextInput
-                    id="password"
+                <InputField
                     ref="passwordInput"
                     v-model="form.password"
+                    label="Password"
+                    field="password"
                     type="password"
-                    class="mt-1 block w-full"
+                    :error="form.errors.password"
                     required
                     autocomplete="current-password"
                     autofocus
                 />
-                <InputError class="mt-2" :message="form.errors.password" />
             </div>
 
             <div class="flex justify-end mt-4">
-                <PrimaryButton class="ms-4" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                <AppButton variant="primary" class="ms-4" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
                     Confirm
-                </PrimaryButton>
+                </AppButton>
             </div>
         </form>
     </AuthenticationCard>

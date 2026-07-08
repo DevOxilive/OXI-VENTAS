@@ -1,13 +1,10 @@
 <script setup>
 import { ref } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import ActionMessage from '@/Components/ActionMessage.vue';
-import FormSection from '@/Components/FormSection.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import AppButton from '@/Components/Buttons/AppButton.vue';
+import FormSection from '@/Components/Cards/FormSection.vue';
+import InputField from '@/Components/Forms/InputField.vue';
+import { SuccessAlert } from '@/Components/Modales/UniversalActionModal';
 
 const props = defineProps({
     user: Object,
@@ -32,7 +29,13 @@ const updateProfileInformation = () => {
     form.post(route('user-profile-information.update'), {
         errorBag: 'updateProfileInformation',
         preserveScroll: true,
-        onSuccess: () => clearPhotoFileInput(),
+        onSuccess: () => {
+            clearPhotoFileInput();
+            SuccessAlert({
+                title: 'Perfil actualizado',
+                message: 'La información del perfil se actualizó correctamente.',
+            });
+        },
     });
 };
 
@@ -97,7 +100,9 @@ const clearPhotoFileInput = () => {
                     @change="updatePhotoPreview"
                 >
 
-                <InputLabel for="photo" value="Photo" />
+                <label for="photo" class="mb-1 block text-sm font-semibold text-slate-700">
+                    Photo
+                </label>
 
                 <!-- Current Profile Photo -->
                 <div v-show="! photoPreview" class="mt-2">
@@ -112,48 +117,49 @@ const clearPhotoFileInput = () => {
                     />
                 </div>
 
-                <SecondaryButton class="mt-2 me-2" type="button" @click.prevent="selectNewPhoto">
+                <AppButton class="mt-2 me-2" variant="secondary" type="button" @click.prevent="selectNewPhoto">
                     Select A New Photo
-                </SecondaryButton>
+                </AppButton>
 
-                <SecondaryButton
+                <AppButton
                     v-if="user.profile_photo_path"
+                    variant="secondary"
                     type="button"
                     class="mt-2"
                     @click.prevent="deletePhoto"
                 >
                     Remove Photo
-                </SecondaryButton>
+                </AppButton>
 
-                <InputError :message="form.errors.photo" class="mt-2" />
+                <p v-if="form.errors.photo" class="mt-2 text-xs text-red-500">
+                    {{ form.errors.photo }}
+                </p>
             </div>
 
             <!-- Name -->
             <div class="col-span-6 sm:col-span-4">
-                <InputLabel for="name" value="Name" />
-                <TextInput
-                    id="name"
+                <InputField
                     v-model="form.name"
+                    label="Name"
+                    field="name"
                     type="text"
-                    class="mt-1 block w-full"
+                    :error="form.errors.name"
                     required
                     autocomplete="name"
                 />
-                <InputError :message="form.errors.name" class="mt-2" />
             </div>
 
             <!-- Email -->
             <div class="col-span-6 sm:col-span-4">
-                <InputLabel for="email" value="Email" />
-                <TextInput
-                    id="email"
+                <InputField
                     v-model="form.email"
+                    label="Email"
+                    field="email"
                     type="email"
-                    class="mt-1 block w-full"
+                    :error="form.errors.email"
                     required
                     autocomplete="username"
                 />
-                <InputError :message="form.errors.email" class="mt-2" />
 
                 <div v-if="$page.props.jetstream.hasEmailVerification && user.email_verified_at === null">
                     <p class="text-sm mt-2">
@@ -178,13 +184,9 @@ const clearPhotoFileInput = () => {
         </template>
 
         <template #actions>
-            <ActionMessage :on="form.recentlySuccessful" class="me-3">
-                Saved.
-            </ActionMessage>
-
-            <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+            <AppButton variant="primary" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
                 Save
-            </PrimaryButton>
+            </AppButton>
         </template>
     </FormSection>
 </template>

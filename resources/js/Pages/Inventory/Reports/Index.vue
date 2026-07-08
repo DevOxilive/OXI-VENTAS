@@ -21,7 +21,7 @@ const reportGroups = [
     {
         key: 'audits',
         title: 'Reportes de auditoría',
-        description: 'Conteos fisicos, diferencias, incidencias y validaciones internas.',
+        description: 'Conteos físicos, diferencias, incidencias y validaciones internas.',
         icon: 'fact_check',
         disabled: false,
         routeName: 'inventory.branches.reports.audits',
@@ -36,7 +36,7 @@ const reportGroups = [
     {
         key: 'inventory',
         title: 'Reportes de inventario',
-        description: 'Caducidades, stock bajo, rotacion e inventario general.',
+        description: 'Caducidades, stock bajo, rotación e inventario general.',
         icon: 'inventory_2',
         disabled: false,
         routeName: 'inventory.branches.reports.inventory',
@@ -53,7 +53,7 @@ const reportGroups = [
 
 const toolbarConfig = computed(() => ({
     title: 'Centro de reportes',
-    subtitle: 'Consulta informacion estrategica y operativa del sistema.',
+    subtitle: 'Consulta información estratégica y operativa del sistema.',
     showSearch: false,
     showRecordsPerPage: false,
     showCounter: false,

@@ -19,7 +19,7 @@ const scannedCodeLabel = computed(() => {
         return props.product.scanned_code
     }
 
-    return props.product.barcode || 'Sin codigo'
+    return props.product.barcode || 'Sin código'
 })
 </script>
 
@@ -56,16 +56,16 @@ const scannedCodeLabel = computed(() => {
             </div>
 
             <div class="rounded-lg bg-slate-50 p-3">
-                <p class="text-xs font-medium text-slate-500">Codigo escaneado</p>
+                <p class="text-xs font-medium text-slate-500">Código escaneado</p>
                 <p class="mt-1 font-semibold text-slate-900">
                     {{ scannedCodeLabel }}
                 </p>
             </div>
 
             <div class="rounded-lg bg-slate-50 p-3">
-                <p class="text-xs font-medium text-slate-500">Codigo principal</p>
+                <p class="text-xs font-medium text-slate-500">Código principal</p>
                 <p class="mt-1 font-semibold text-slate-900">
-                    {{ product.barcode || 'Sin codigo' }}
+                    {{ product.barcode || 'Sin código' }}
                 </p>
             </div>
 
@@ -106,7 +106,7 @@ const scannedCodeLabel = computed(() => {
             v-else-if="!product"
             class="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500"
         >
-            Escanea un codigo para visualizar aqui el producto que se va a capturar.
+            Escanea un código para visualizar aquí el producto que se va a capturar.
         </p>
     </div>
 </template>

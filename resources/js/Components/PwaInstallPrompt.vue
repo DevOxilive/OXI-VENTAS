@@ -108,7 +108,7 @@ onBeforeUnmount(() => {
                     </p>
 
                     <p class="mt-1 text-sm text-slate-600">
-                        Abrelo como app, con acceso mas rapido y pantalla completa.
+                        Ábrelo como app, con acceso más rápido y pantalla completa.
                     </p>
 
                     <div class="mt-4 flex flex-wrap gap-2">

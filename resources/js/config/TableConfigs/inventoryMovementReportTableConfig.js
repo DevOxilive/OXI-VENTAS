@@ -17,7 +17,7 @@ export const inventoryMovementReportTableConfig = {
         },
         {
             key: "category",
-            label: "Categoria",
+            label: "Categoría",
             format: "text",
         },
         {

@@ -1,6 +1,6 @@
 export function getPhysicalCountToolbarConfig({ branch, canCreate, status = '' }) {
     return {
-        title: 'Conteo fisico',
+        title: 'Conteo físico',
         subtitle: `Sucursal: ${branch?.name ?? 'No seleccionada'}`,
         searchPlaceholder: 'Buscar conteo, folio, usuario o estado...',
         showRecordsPerPage: true,
@@ -22,7 +22,7 @@ export function getPhysicalCountToolbarConfig({ branch, canCreate, status = '' }
                 ? [
                       {
                           id: 'create',
-                          label: 'Nueva auditoria',
+                          label: 'Nueva auditoría',
                           icon: 'add',
                           variant: 'slate',
                       },

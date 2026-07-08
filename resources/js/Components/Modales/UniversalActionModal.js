@@ -103,7 +103,7 @@ export function WarningAlert({
 =========================== */
 export function BlockingWarningAlert({
     title = "Advertencia",
-    message = "Revisa esta accion antes de continuar",
+    message = "Revisa esta acción antes de continuar",
     confirmText = "OK",
 } = {}) {
     return Swal.fire({

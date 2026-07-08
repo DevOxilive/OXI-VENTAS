@@ -111,6 +111,11 @@ function closeModal() {
                     {{ user.role?.name || 'Sin rol' }}
                 </p>
 
+                <p>
+                    <strong>Estado:</strong>
+                    {{ user.is_active === false || user.employee?.employment_status === 'Inactivo' ? 'Inactivo' : 'Activo' }}
+                </p>
+
                 <div v-if="showsSalesBranches" class="sm:col-span-2">
                     <strong>Sucursales:</strong>
 

@@ -2,26 +2,81 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\UserChanged;
 use Inertia\Inertia;
 use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Http\Request;
 use App\Events\EmployeeChanged;
 use App\Events\RealtimeActivityLogged;
 use App\Exports\EmployeeExport;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
 {
+    private function syncLinkedUserStatus(Employee $employee): void
+    {
+        $user = $employee->user;
+
+        if (!$user) {
+            return;
+        }
+
+        $isActive = $employee->employment_status !== 'Inactivo';
+
+        $user->forceFill([
+            'is_active' => $isActive,
+        ])->save();
+
+        if (!$isActive) {
+            DB::table('sessions')
+                ->where('user_id', $user->id)
+                ->delete();
+        }
+
+        broadcast(new UserChanged($user, 'updated'))->toOthers();
+    }
+
+    private function deleteLinkedUser(Employee $employee): void
+    {
+        $user = $employee->user;
+
+        if (!$user) {
+            return;
+        }
+
+        $user->load(['role', 'permissions', 'branches']);
+
+        try {
+            broadcast(new UserChanged($user, 'deleted'))->toOthers();
+            event(RealtimeActivityLogged::message('elimino', 'el usuario', $user->email, 'Sistemas', 'deleted'));
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        DB::table('sessions')
+            ->where('user_id', $user->id)
+            ->delete();
+
+        $user->permissions()->detach();
+        $user->branches()->detach();
+        $user->assignedPhysicalCounts()->detach();
+        $user->delete();
+    }
+
     public function index(Request $request)
     {
-        $search = $request->input('search');
+        $search = trim((string) $request->input('search', ''));
         $perPage = TablePagination::resolvePerPage($request, 50);
 
-        $employmentStatus = $request->input('employmentStatus');
-        $department = $request->input('department');
-        $position = $request->input('position');
+        $employmentStatus = trim((string) $request->input('employmentStatus', ''));
+        $department = trim((string) $request->input('department', ''));
+        $position = trim((string) $request->input('position', ''));
+        $startDateFrom = trim((string) $request->input('startDateFrom', ''));
+        $startDateTo = trim((string) $request->input('startDateTo', ''));
 
         $employeesDB = Employee::query()
             ->when($search, function ($query) use ($search) {
@@ -46,6 +101,12 @@ class EmployeeController extends Controller
             })
             ->when($position, function ($query) use ($position) {
                 $query->where('position', 'like', "%{$position}%");
+            })
+            ->when($startDateFrom, function ($query) use ($startDateFrom) {
+                $query->whereDate('start_date', '>=', $startDateFrom);
+            })
+            ->when($startDateTo, function ($query) use ($startDateTo) {
+                $query->whereDate('start_date', '<=', $startDateTo);
             })
             ->orderBy('id', 'desc')
             ->paginate($perPage)
@@ -83,12 +144,49 @@ class EmployeeController extends Controller
 
         return Inertia::render('HumanResources/Employees', [
             'employeesDB' => $employeesDB,
+            'filterOptions' => [
+                'positions' => Employee::query()
+                    ->whereNotNull('position')
+                    ->where('position', '!=', '')
+                    ->distinct()
+                    ->orderBy('position')
+                    ->pluck('position')
+                    ->map(fn ($position) => [
+                        'value' => $position,
+                        'label' => $position,
+                    ])
+                    ->values(),
+                'departments' => Employee::query()
+                    ->whereNotNull('department')
+                    ->where('department', '!=', '')
+                    ->distinct()
+                    ->orderBy('department')
+                    ->pluck('department')
+                    ->map(fn ($department) => [
+                        'value' => $department,
+                        'label' => $department,
+                    ])
+                    ->values(),
+                'statuses' => Employee::query()
+                    ->whereNotNull('employment_status')
+                    ->where('employment_status', '!=', '')
+                    ->distinct()
+                    ->orderBy('employment_status')
+                    ->pluck('employment_status')
+                    ->map(fn ($status) => [
+                        'value' => $status,
+                        'label' => $status,
+                    ])
+                    ->values(),
+            ],
             'filters' => [
                 'search' => $search,
                 'perPage' => $perPage,
                 'employmentStatus' => $employmentStatus,
                 'department' => $department,
                 'position' => $position,
+                'startDateFrom' => $startDateFrom,
+                'startDateTo' => $startDateTo,
             ],
         ]);
     }
@@ -176,6 +274,9 @@ class EmployeeController extends Controller
             'rfc' => $request->rfc,
         ]);
 
+        $employee->load('user');
+        $this->syncLinkedUserStatus($employee);
+
         broadcast(new EmployeeChanged('updated', $employee->id))->toOthers();
         event(RealtimeActivityLogged::message('actualizó', 'el empleado', trim("{$employee->first_name} {$employee->last_name}"), 'Recursos humanos', 'updated'));
 
@@ -184,10 +285,11 @@ class EmployeeController extends Controller
 
     public function destroy($id)
     {
-        $employee = Employee::findOrFail($id);
+        $employee = Employee::with('user')->findOrFail($id);
         $employeeId = $employee->id;
         $employeeName = trim("{$employee->first_name} {$employee->last_name}");
 
+        $this->deleteLinkedUser($employee);
         $employee->delete();
 
         broadcast(new EmployeeChanged('deleted', $employeeId))->toOthers();
@@ -200,12 +302,15 @@ class EmployeeController extends Controller
     {
         $employmentStatus = $request->employmentStatus;
         $department = $request->department;
+        $position = $request->position;
         $search = $request->search;
+        $startDateFrom = $request->startDateFrom;
+        $startDateTo = $request->startDateTo;
 
         $fileName = 'employees_' . now()->format('d_m_Y_H_i_s') . '.xlsx';
 
         return Excel::download(
-            new EmployeeExport($employmentStatus, $department, $search),
+            new EmployeeExport($employmentStatus, $department, $position, $search, $startDateFrom, $startDateTo),
             $fileName
         );
     }

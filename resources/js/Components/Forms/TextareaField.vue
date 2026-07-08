@@ -1,7 +1,11 @@
 <script setup>
-import { computed, nextTick } from 'vue'
+import { computed, nextTick, useAttrs } from 'vue'
 import { fieldRegistry } from '@/Validation/fieldRegistry'
 import { sanitizeField } from '@/Validation/sanitizers'
+
+defineOptions({
+    inheritAttrs: false,
+})
 
 const props = defineProps({
     label: String,
@@ -24,6 +28,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue', 'validate'])
+const attrs = useAttrs()
 
 const textareaId = computed(() =>
     props.field || props.label?.toLowerCase().replace(/\s+/g, '-')
@@ -96,7 +101,7 @@ function blockExtraInput(e) {
             {{ label }}
         </label>
 
-        <textarea :id="textareaId" :name="field" :value="modelValue" :rows="rows" :readonly="readonly"
+        <textarea v-bind="attrs" :id="textareaId" :name="field" :value="modelValue" :rows="rows" :readonly="readonly"
             :style="{ maxHeight: textareaMaxHeight }" @keydown="blockExtraInput" @input="handleInput"
             @blur="emit('validate', field)" :class="[
                 'w-full px-4 py-3 rounded-xl border outline-none transition text-sm resize-none',

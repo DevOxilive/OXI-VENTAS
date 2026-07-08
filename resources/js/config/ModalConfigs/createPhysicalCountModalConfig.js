@@ -6,19 +6,19 @@ export function getCreatePhysicalCountModalConfig({
 } = {}) {
     return {
         mode: 'create',
-        title: 'Nuevo conteo fisico',
-        subtitle: 'Crea una nueva sesion para la sucursal seleccionada.',
+        title: 'Nuevo conteo físico',
+        subtitle: 'Crea una nueva sesión para la sucursal seleccionada.',
         totalErrors,
         processing,
         saveButtonText: 'Crear conteo',
         closeButtonText: 'Cancelar',
         ...modalPresets.compact,
         alerts: {
-            entityName: 'Conteo fisico',
+            entityName: 'Conteo físico',
             create: {
                 successTitle: 'Conteo creado correctamente',
                 errorTitle: 'Error al crear conteo',
-                errorMessage: 'No fue posible registrar el conteo fisico.',
+                errorMessage: 'No fue posible registrar el conteo físico.',
             },
         },
     }

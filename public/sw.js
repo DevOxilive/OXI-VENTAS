@@ -1,4 +1,4 @@
-const VERSION = 'oxi-ventas-pwa-v3';
+const VERSION = 'oxi-ventas-pwa-v5';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -8,6 +8,7 @@ const PRECACHE_URLS = [
     '/favicon.ico',
     '/icons/icon-192.png',
     '/icons/icon-512.png',
+    '/icons/maskable-192.png',
     '/icons/maskable-512.png',
     '/icons/apple-touch-icon.png',
 ];

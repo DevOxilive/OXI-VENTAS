@@ -7,10 +7,10 @@ export function getPhysicalCountReportsToolbarConfig({
     categories = [],
 } = {}) {
     return {
-        title: 'Reportes de auditoria',
+        title: 'Reportes de auditoría',
         subtitle: branch?.name
             ? `Sucursal ${branch.name}`
-            : 'Consulta los resultados operativos de auditoria.',
+            : 'Consulta los resultados operativos de auditoría.',
         backButton: true,
         backLabel: 'Centro de reportes',
         showSearch: false,
@@ -28,8 +28,8 @@ export function getPhysicalCountReportsToolbarConfig({
             },
             {
                 key: 'physical_count_id',
-                label: 'Auditoria',
-                placeholder: 'Todas las auditorias',
+                label: 'Auditoría',
+                placeholder: 'Todas las auditorías',
                 value: form.physical_count_id,
                 options: audits.map((audit) => ({
                     label: `${audit.name} - ${audit.folio}`,
@@ -47,8 +47,8 @@ export function getPhysicalCountReportsToolbarConfig({
             },
             {
                 key: 'category_id',
-                label: 'Categoria',
-                placeholder: 'Todas las categorias',
+                label: 'Categoría',
+                placeholder: 'Todas las categorías',
                 value: form.category_id,
                 options: categories,
                 optionLabel: 'name',
@@ -75,9 +75,9 @@ export function getPhysicalCountReportsToolbarConfig({
                 placeholder: 'Tipo de fecha',
                 value: form.date_scope,
                 options: [
-                    { label: 'Por dia', value: 'day' },
+                    { label: 'Por día', value: 'day' },
                     { label: 'Por mes', value: 'month' },
-                    { label: 'Por ano', value: 'year' },
+                    { label: 'Por año', value: 'year' },
                 ],
             },
             {
@@ -88,10 +88,10 @@ export function getPhysicalCountReportsToolbarConfig({
             },
             {
                 key: 'search',
-                label: 'Busqueda',
+                label: 'Búsqueda',
                 type: 'text',
                 field: 'toolbar_search',
-                placeholder: 'Codigo, producto, categoria, folio o usuario...',
+                placeholder: 'Código, producto, categoría, folio o usuario...',
                 value: form.search ?? '',
                 fullWidth: true,
             },
@@ -120,7 +120,7 @@ export function getPhysicalCountReportsToolbarConfig({
             { key: 'summary', label: 'Resumen', icon: 'dashboard' },
             { key: 'detail', label: 'Detalle', icon: 'list_alt' },
             { key: 'users', label: 'Usuarios', icon: 'group' },
-            { key: 'categories', label: 'Categorias', icon: 'category' },
+            { key: 'categories', label: 'Categorías', icon: 'category' },
             { key: 'differences', label: 'Diferencias', icon: 'analytics' },
         ],
     }

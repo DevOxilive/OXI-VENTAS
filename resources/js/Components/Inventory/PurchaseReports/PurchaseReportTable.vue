@@ -57,7 +57,7 @@ function stockTone(product) {
                         Stock
                     </th>
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Mínimo
+                        Minimo
                     </th>
                 </tr>
             </thead>
@@ -92,9 +92,6 @@ function stockTone(product) {
                         <p class="text-sm text-slate-700">
                             {{ product.category }}
                         </p>
-                        <p class="text-xs text-slate-500">
-                            {{ product.subcategory }}
-                        </p>
                     </td>
 
                     <td class="px-4 py-3 text-right">
@@ -124,7 +121,7 @@ function stockTone(product) {
                                 {{ product.name }}
                             </p>
                             <p class="text-xs text-slate-500">
-                                {{ product.category }} · {{ product.subcategory }}
+                                {{ product.category }}
                             </p>
                         </div>
 
@@ -143,7 +140,7 @@ function stockTone(product) {
                     </p>
 
                     <p class="mt-2 text-sm text-slate-600">
-                        Mínimo: <b>{{ product.minStockLabel ?? product.min_stock }}</b>
+                        Minimo: <b>{{ product.minStockLabel ?? product.min_stock }}</b>
                     </p>
                 </div>
             </label>

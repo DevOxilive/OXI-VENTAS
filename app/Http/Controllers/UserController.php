@@ -12,12 +12,28 @@ use App\Models\User;
 use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use App\Support\FlexibleSearch;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 
 class UserController extends Controller
 {
+    private function resolveUserActiveState(?int $employeeId, bool $default = true): bool
+    {
+        if (!$employeeId) {
+            return $default;
+        }
+
+        $employee = Employee::find($employeeId);
+
+        if (!$employee) {
+            return $default;
+        }
+
+        return $employee->employment_status !== 'Inactivo';
+    }
+
     private function refreshAuthenticatedSession(Request $request, User $user): void
     {
         if ((int) Auth::id() !== (int) $user->id) {
@@ -137,11 +153,14 @@ class UserController extends Controller
             'users.delete',
         ]);
 
-        $search = $request->input('search');
+        $search = trim((string) $request->input('search', ''));
         $perPage = TablePagination::resolvePerPage($request, 50);
-        $view = $request->input('view', 'users');
+        $userStatus = trim((string) $request->input('user_status', ''));
+        $statusFilter = trim((string) $request->input('status', ''));
+        $roleFilter = trim((string) $request->input('role', ''));
 
-        $usersDB = User::with([
+        $users = User::with([
+            'employee:id,first_name,last_name,email,employment_status',
             'role.permissions' => fn ($query) => $query->where('name', 'not like', 'roles.%'),
             'permissions' => fn ($query) => $query->where('name', 'not like', 'roles.%'),
             'branches',
@@ -152,6 +171,7 @@ class UserController extends Controller
                 'name',
                 'email',
                 'role_id',
+                'is_active',
             ])
             ->when($search, function ($query) use ($search) {
                 FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
@@ -159,13 +179,44 @@ class UserController extends Controller
                         'name',
                         'email',
                     ], $phrase, $terms);
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'role', [
+                        'name',
+                    ], $phrase, $terms);
                 });
             })
-            ->orderBy('id', 'desc')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->when($userStatus === 'without_user', function ($query) {
+                $query->whereRaw('1 = 0');
+            })
+            ->when($statusFilter === 'active', function ($query) {
+                $query->where('is_active', true)
+                    ->where(function ($statusQuery) {
+                        $statusQuery->whereNull('employee_id')
+                            ->orWhereHas('employee', function ($employeeQuery) {
+                                $employeeQuery->where('employment_status', '!=', 'Inactivo');
+                            });
+                    });
+            })
+            ->when($statusFilter === 'inactive', function ($query) {
+                $query->where(function ($statusQuery) {
+                    $statusQuery->where('is_active', false)
+                        ->orWhereHas('employee', function ($employeeQuery) {
+                            $employeeQuery->where('employment_status', 'Inactivo');
+                        });
+                });
+            })
+            ->when($roleFilter !== '', function ($query) use ($roleFilter) {
+                if ($roleFilter === 'without_role') {
+                    $query->whereNull('role_id');
 
-        $employeesDB = Employee::doesntHave('user')
+                    return;
+                }
+
+                $query->where('role_id', $roleFilter);
+            })
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $employees = Employee::doesntHave('user')
             ->when($search, function ($query) use ($search) {
                 FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
                     FlexibleSearch::orWhereColumns($subQuery, [
@@ -180,13 +231,76 @@ class UserController extends Controller
                     ], $phrase, $terms);
                 });
             })
+            ->when($userStatus === 'with_user', function ($query) {
+                $query->whereRaw('1 = 0');
+            })
+            ->when($statusFilter === 'active', function ($query) {
+                $query->where('employment_status', '!=', 'Inactivo');
+            })
+            ->when($statusFilter === 'inactive', function ($query) {
+                $query->where('employment_status', 'Inactivo');
+            })
+            ->when($roleFilter !== '', function ($query) use ($roleFilter) {
+                if ($roleFilter !== 'without_role') {
+                    $query->whereRaw('1 = 0');
+                }
+            })
             ->orderBy('id', 'desc')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->get();
+
+        $combinedRows = $users
+            ->map(function (User $user) {
+                $user->setAttribute('row_id', 'user-' . $user->id);
+                $user->setAttribute('entity_type', 'user');
+                $user->setAttribute('has_user', true);
+                $user->setAttribute('sort_group', 0);
+                $user->setAttribute('sort_name', mb_strtolower(trim(implode(' ', array_filter([
+                    data_get($user, 'employee.first_name'),
+                    data_get($user, 'employee.last_name'),
+                    $user->name,
+                ])))));
+
+                return $user;
+            })
+            ->concat(
+                $employees->map(function (Employee $employee) {
+                    $employee->setAttribute('row_id', 'employee-' . $employee->id);
+                    $employee->setAttribute('entity_type', 'employee');
+                    $employee->setAttribute('has_user', false);
+                    $employee->setAttribute('sort_group', 1);
+                    $employee->setAttribute('sort_name', mb_strtolower(trim(implode(' ', array_filter([
+                        $employee->first_name,
+                        $employee->last_name,
+                    ])))));
+
+                    return $employee;
+                })
+            )
+            ->sortBy([
+                ['sort_group', 'asc'],
+                ['sort_name', 'asc'],
+                ['id', 'asc'],
+            ])
+            ->values();
+
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $items = $combinedRows->forPage($currentPage, $perPage)->values();
+
+        $recordsPaginator = new LengthAwarePaginator(
+            $items,
+            $combinedRows->count(),
+            $perPage,
+            $currentPage,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
+
+        $recordsDB = $recordsPaginator->toArray();
 
         return Inertia::render('Systems/Users', [
-            'employeesDB' => $employeesDB,
-            'usersDB' => $usersDB,
+            'recordsDB' => $recordsDB,
 
             'roles' => Role::with('permissions')
                 ->with(['permissions' => fn ($query) => $query->where('name', 'not like', 'roles.%')])
@@ -204,7 +318,9 @@ class UserController extends Controller
             'filters' => [
                 'search' => $search,
                 'perPage' => $perPage,
-                'view' => $view,
+                'userStatus' => $userStatus,
+                'status' => $statusFilter,
+                'role' => $roleFilter,
             ],
         ]);
     }
@@ -241,6 +357,7 @@ class UserController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role_id' => $validated['role_id'],
+            'is_active' => $this->resolveUserActiveState($validated['employee_id'] ?? null),
         ]);
 
         $this->syncUserPermissionOverrides(
@@ -295,6 +412,7 @@ class UserController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'role_id' => $validated['role_id'],
+            'is_active' => $this->resolveUserActiveState($user->employee_id, $user->is_active ?? true),
         ];
 
         if (!empty($validated['password'])) {

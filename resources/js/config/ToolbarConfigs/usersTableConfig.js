@@ -1,7 +1,6 @@
 // resources/js/config/TableConfigs/usersTableConfig.js
 
 export function getUsersTableConfig({
-    viewMode,
     can,
     onViewUser,
     onCreateUser,
@@ -20,13 +19,31 @@ export function getUsersTableConfig({
                 key: "displayEmail",
                 label: "Correo",
                 format: "text",
-                fallback: "—",
+                fallback: "-",
+            },
+            {
+                key: "displayUsername",
+                label: "Usuario",
+                format: "badge",
+                fallback: "Sin usuario",
             },
             {
                 key: "displayRole",
                 label: "Rol",
                 format: "badge",
                 fallback: "Sin rol",
+            },
+            {
+                key: "displayStatus",
+                label: "Estado",
+                format: "badge",
+                fallback: "Activo",
+                formatOptions: {
+                    colorMap: {
+                        Activo: "green",
+                        Inactivo: "red",
+                    },
+                },
                 mobileBadge: true,
             },
         ],
@@ -38,7 +55,7 @@ export function getUsersTableConfig({
                 icon: "visibility",
                 variant: "slate",
                 handler: onViewUser,
-                hidden: () => viewMode !== "users" || !can("users.view"),
+                hidden: (row) => !row?.has_user || !can("users.view"),
                 mobile: "button",
             },
             {
@@ -47,7 +64,7 @@ export function getUsersTableConfig({
                 icon: "person_add",
                 variant: "blue",
                 handler: onCreateUser,
-                hidden: () => viewMode !== "employees" || !can("users.create"),
+                hidden: (row) => row?.has_user || row?.displayStatus === "Inactivo" || !can("users.create"),
                 mobile: "button",
             },
             {
@@ -56,7 +73,7 @@ export function getUsersTableConfig({
                 icon: "edit",
                 variant: "amber",
                 handler: onEditUser,
-                hidden: () => viewMode !== "users" || !can("users.update"),
+                hidden: (row) => !row?.has_user || !can("users.update"),
                 mobile: "button",
             },
             {
@@ -65,13 +82,13 @@ export function getUsersTableConfig({
                 icon: "delete",
                 variant: "red",
                 handler: onDeleteUser,
-                hidden: () => viewMode !== "users" || !can("users.delete"),
+                hidden: (row) => !row?.has_user || !can("users.delete"),
                 mobile: "button",
             },
         ],
 
         mobileCardHeaderField: "displayName",
         noDataMessage: "No se encontraron registros.",
-        rowKey: "id",
+        rowKey: "row_id",
     };
 }

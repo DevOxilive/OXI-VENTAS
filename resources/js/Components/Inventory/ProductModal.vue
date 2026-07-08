@@ -1,9 +1,10 @@
 ﻿<script setup>
 import { useForm } from "@inertiajs/vue3";
-import { watch, computed, ref } from "vue";
+import { watch, computed, ref, onBeforeUnmount } from "vue";
 import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
+import ActionIconButton from "@/Components/Forms/ActionIconButton.vue";
 import { getProductModalConfig } from "@/config/ModalConfigs/productModalConfig";
 import {
   ToastAlert,
@@ -47,6 +48,9 @@ const categoryInputMode = ref("select");
 const marginPercentage = ref("");
 const pricingDriver = ref("percentage");
 const syncingPricing = ref(false);
+const fileInput = ref(null);
+const isDragActive = ref(false);
+const filePreviewUrl = ref(null);
 
 function parseDecimal(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -186,11 +190,8 @@ function toggleCategoryInputMode() {
   form.clearErrors("category_name");
 }
 const imagePreview = computed(() => {
-  if (!form.image) return null;
-
-  if (form.image instanceof File) {
-    return URL.createObjectURL(form.image);
-  }
+  if (filePreviewUrl.value) return filePreviewUrl.value;
+  if (!form.image || form.image instanceof File) return null;
 
   if (
     form.image.startsWith("blob:") ||
@@ -204,6 +205,58 @@ const imagePreview = computed(() => {
 
   return `/storage/${form.image.replace(/^\/+/, "")}`;
 });
+
+function revokeFilePreview() {
+  if (!filePreviewUrl.value) return;
+
+  URL.revokeObjectURL(filePreviewUrl.value);
+  filePreviewUrl.value = null;
+}
+
+function assignImageFile(file) {
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    ErrorAlert({
+      title: "Archivo no válido",
+      message: "Solo se permiten imágenes JPG, PNG o WEBP.",
+    });
+    return;
+  }
+
+  revokeFilePreview();
+  filePreviewUrl.value = URL.createObjectURL(file);
+  form.image = file;
+  form.clearErrors("image");
+}
+
+function openFilePicker() {
+  if (props.mode === "view") return;
+  fileInput.value?.click();
+}
+
+function handleFileChange(event) {
+  const [file] = event.target.files || [];
+  assignImageFile(file);
+  event.target.value = "";
+}
+
+function handleDragOver() {
+  if (props.mode === "view") return;
+  isDragActive.value = true;
+}
+
+function handleDragLeave() {
+  isDragActive.value = false;
+}
+
+function handleDrop(event) {
+  if (props.mode === "view") return;
+  isDragActive.value = false;
+  const [file] = event.dataTransfer?.files || [];
+  assignImageFile(file);
+}
+
 const invalidPrice = computed(() => {
   const cost = Number(form.cost || 0);
   const salePrice = Number(form.sale_price || 0);
@@ -292,6 +345,19 @@ watch(
     syncPercentageFromSalePrice();
   }
 );
+
+watch(
+  () => form.image,
+  (value) => {
+    if (!(value instanceof File)) {
+      revokeFilePreview();
+    }
+  }
+);
+
+onBeforeUnmount(() => {
+  revokeFilePreview();
+});
 
 function submit() {
   const branchSlug = props.branch?.slug;
@@ -417,285 +483,254 @@ function submit() {
     @save="submit"
     @close="$emit('close')"
   >
-    <div>
-      <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-        <!-- CÓDIGOS -->
-        <div>
-          <label class="block text-sm font-semibold text-slate-600 mb-2">
-            Códigos de barras
-          </label>
+    <div class="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.35)] md:p-5 xl:p-6">
+      <input
+        ref="fileInput"
+        type="file"
+        accept="image/*"
+        class="hidden"
+        @change="handleFileChange"
+      />
 
-          <div class="space-y-3 max-h-[145px] overflow-y-auto pr-1">
-            <div
-              v-for="(barcode, index) in form.barcodes"
-              :key="index"
-              class="flex items-start gap-2"
-            >
-              <div class="flex-1">
-                <InputField
-                  label=""
-                  field="barcode"
-                  v-model="form.barcodes[index]"
-                  icon="barcode_scanner"
-                  :error="null"
-                  :readonly="mode === 'view'"
-                />
-              </div>
-
-              <button
-                v-if="form.barcodes.length > 1 && mode !== 'view'"
-                type="button"
-                @click="removeBarcode(index)"
-                class="mt-[2px] h-[42px] min-w-[42px] rounded-xl border border-slate-300 bg-white text-black hover:bg-slate-100 transition"
-              >
-                -
-              </button>
-            </div>
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-[210px_340px_minmax(0,1fr)]">
+        <section class="hidden xl:block">
+          <div class="mb-3">
+            <h3 class="text-sm font-semibold text-slate-900">Imagen</h3>
+            <p class="mt-1 text-xs text-slate-500">Foto opcional del producto.</p>
           </div>
 
           <button
-            v-if="mode !== 'view'"
             type="button"
-            @click="addBarcode"
-            class="mt-3 w-full h-11 rounded-xl border-2 border-dashed border-slate-300 bg-white text-slate-600 font-medium hover:border-black hover:text-black transition"
-          >
-            Agregar código alterno
-          </button>
-        </div>
-
-        <!-- IMAGEN -->
-        <div>
-          <label class="block text-sm font-semibold text-slate-600 mb-2">
-            Imagen del producto
-          </label>
-
-          <div
-            class="border-2 border-dashed border-slate-300 rounded-2xl px-6 py-4 flex items-center gap-5 bg-slate-50"
+            class="flex min-h-[286px] w-full items-center justify-center rounded-[24px] border border-dashed bg-slate-50/80 p-4 text-left transition"
+            :class="
+              mode === 'view'
+                ? 'cursor-default border-slate-200'
+                : isDragActive
+                  ? 'border-slate-900 bg-slate-100'
+                  : 'border-slate-300 hover:border-slate-400'
+            "
+            :disabled="mode === 'view'"
+            @click="openFilePicker"
+            @dragover.prevent="handleDragOver"
+            @dragleave.prevent="handleDragLeave"
+            @drop.prevent="handleDrop"
           >
             <template v-if="imagePreview">
               <img
                 :src="imagePreview"
-                :class="
-                  mode === 'view'
-                    ? 'w-40 h-40 object-contain rounded-2xl border bg-white'
-                    : 'w-28 h-28 object-contain rounded-2xl shadow border bg-white'
-                "
+                class="h-[248px] w-full rounded-[18px] bg-white object-contain"
               />
             </template>
 
             <template v-else>
-              <div
-                class="w-28 h-28 rounded-2xl bg-white border flex items-center justify-center"
-              >
-                <span class="material-symbols-outlined text-4xl text-slate-400">
+              <div class="flex h-[248px] w-full flex-col items-center justify-center rounded-[18px] bg-white px-4 text-center">
+                <span class="material-symbols-outlined text-[42px] text-slate-300">
                   image
                 </span>
+                <p class="mt-3 text-sm font-semibold text-slate-700">
+                  {{ mode === "view" ? "Sin imagen" : "Seleccionar o arrastrar archivo" }}
+                </p>
+                <p v-if="mode !== 'view'" class="mt-1 text-xs text-slate-500">
+                  JPG, PNG o WEBP
+                </p>
               </div>
             </template>
-            <div v-if="mode !== 'view'" class="flex-1">
-              <p class="text-sm font-semibold text-slate-900">
-                Imagen del producto
-              </p>
+          </button>
+        </section>
 
-              <p class="text-xs text-slate-500 mt-1">JPG, PNG o WEBP</p>
-
-              <template v-if="mode !== 'view'">
-                <input
-                  type="file"
-                  accept="image/*"
-                  class="mt-3 text-sm"
-                  @change="form.image = $event.target.files[0]"
-                />
-              </template>
-
-              <template v-else>
-                <p class="mt-3 text-xs text-green-600 font-medium">
-                  âœ“ Imagen cargada
-                </p>
-              </template>
-            </div>
-          </div>
-        </div>
-        <!-- SUCURSALES -->
-        <div v-if="mode !== 'view'" class="md:col-span-2">
-          <div class="mb-3 flex flex-col gap-3 rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/70 p-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <label class="block text-sm font-semibold text-slate-700">
-              Sucursales donde se agregará
-              </label>
-              <p class="mt-1 text-xs text-slate-500">
-                La sucursal actual queda seleccionada y protegida automáticamente.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:border-slate-300 hover:bg-slate-100"
-              @click="
-                form.branch_ids.length === branchesDB.length
-                  ? (form.branch_ids = [props.branch?.id].filter(Boolean))
-                  : (form.branch_ids = branchesDB.map((branch) => branch.id))
-              "
-            >
-              {{
-                form.branch_ids.length === branchesDB.length
-                  ? "Quitar todas"
-                  : "Seleccionar todas"
-              }}
-            </button>
+        <section class="space-y-3 xl:hidden">
+          <div>
+            <h3 class="text-sm font-semibold text-slate-900">Imagen</h3>
+            <p class="mt-1 text-xs text-slate-500">Foto opcional del producto.</p>
           </div>
 
-          <div
-            class="max-h-[220px] overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-3 shadow-inner shadow-slate-100"
+          <button
+            type="button"
+            class="flex min-h-[180px] w-full items-center justify-center rounded-[22px] border border-dashed bg-slate-50/80 p-4 text-left transition"
+            :class="
+              mode === 'view'
+                ? 'cursor-default border-slate-200'
+                : isDragActive
+                  ? 'border-slate-900 bg-slate-100'
+                  : 'border-slate-300 hover:border-slate-400'
+            "
+            :disabled="mode === 'view'"
+            @click="openFilePicker"
+            @dragover.prevent="handleDragOver"
+            @dragleave.prevent="handleDragLeave"
+            @drop.prevent="handleDrop"
           >
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <label
-                v-for="branchItem in branchesDB"
-                :key="branchItem.id"
-                class="group relative flex items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 transition"
-                :class="
-                  isCurrentBranch(branchItem.id)
-                    ? 'cursor-not-allowed border-blue-200 bg-blue-50 shadow-sm shadow-blue-100/80'
-                    : form.branch_ids.includes(branchItem.id)
-                      ? 'cursor-pointer border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-300/50'
-                      : 'cursor-pointer border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                "
+            <template v-if="imagePreview">
+              <img
+                :src="imagePreview"
+                class="h-[148px] w-full rounded-[16px] bg-white object-contain"
+              />
+            </template>
+
+            <template v-else>
+              <div class="flex h-[148px] w-full flex-col items-center justify-center rounded-[16px] bg-white px-4 text-center">
+                <span class="material-symbols-outlined text-[36px] text-slate-300">
+                  image
+                </span>
+                <p class="mt-2 text-sm font-semibold text-slate-700">
+                  {{ mode === "view" ? "Sin imagen" : "Seleccionar o arrastrar archivo" }}
+                </p>
+                <p v-if="mode !== 'view'" class="mt-1 text-xs text-slate-500">JPG, PNG o WEBP</p>
+              </div>
+            </template>
+          </button>
+        </section>
+
+        <section class="space-y-3">
+          <div>
+            <h3 class="text-sm font-semibold text-slate-900">Códigos de barras</h3>
+            <p class="text-xs text-slate-500">Principal y alternos del producto.</p>
+          </div>
+
+          <div class="rounded-[22px] border border-slate-200 bg-slate-50/60 p-3">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <p class="text-xs font-medium text-slate-500">
+                {{ form.barcodes.length > 1 ? `${form.barcodes.length} códigos capturados` : 'Captura el código principal' }}
+              </p>
+
+              <button
+                v-if="mode !== 'view'"
+                type="button"
+                @click="addBarcode"
+                class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
               >
-                <input
-                  type="checkbox"
-                  :value="branchItem.id"
-                  v-model="form.branch_ids"
-                  :disabled="isCurrentBranch(branchItem.id)"
-                  class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 disabled:opacity-70"
-                />
+                Agregar código
+              </button>
+            </div>
 
-                <div class="min-w-0">
-                  <p
-                    class="truncate text-sm font-semibold"
-                    :class="
-                      isCurrentBranch(branchItem.id)
-                        ? 'text-blue-900'
-                        : form.branch_ids.includes(branchItem.id)
-                          ? 'text-white'
-                          : 'text-slate-800'
-                    "
-                  >
-                    {{ branchItem.name }}
-                  </p>
-
-                  <p
-                    class="mt-1 text-xs"
-                    :class="
-                      isCurrentBranch(branchItem.id)
-                        ? 'text-blue-700'
-                        : form.branch_ids.includes(branchItem.id)
-                          ? 'text-slate-200'
-                          : 'text-slate-500'
-                    "
-                  >
-                    {{
-                      isCurrentBranch(branchItem.id)
-                        ? 'Sucursal actual'
-                        : form.branch_ids.includes(branchItem.id)
-                          ? 'Producto disponible aquí'
-                          : 'Marcar para habilitar'
-                    }}
-                  </p>
+            <div class="max-h-[250px] space-y-2 overflow-y-auto pr-1">
+              <div
+                v-for="(barcode, index) in form.barcodes"
+                :key="index"
+                class="flex items-start gap-2"
+              >
+                <div class="flex-1">
+                  <InputField
+                    :label="index === 0 ? 'Código principal' : `Alterno ${index}`"
+                    field="barcode"
+                    v-model="form.barcodes[index]"
+                    icon="barcode_scanner"
+                    :error="null"
+                    :readonly="mode === 'view'"
+                  />
                 </div>
 
-                <span
-                  v-if="isCurrentBranch(branchItem.id)"
-                  class="ml-auto inline-flex shrink-0 items-center rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-blue-700"
-                >
-                  Fija
-                </span>
+                <ActionIconButton
+                  v-if="form.barcodes.length > 1 && mode !== 'view'"
+                  class="mt-7 shrink-0"
+                  icon="delete"
+                  title="Eliminar código"
+                  variant="red"
+                  @click="removeBarcode(index)"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
 
-                <span
-                  v-else-if="form.branch_ids.includes(branchItem.id)"
-                  class="ml-auto inline-flex shrink-0 items-center rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white"
-                >
-                  Activa
-                </span>
-              </label>
+        <section class="space-y-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-semibold text-slate-900">Datos básicos</h3>
+            </div>
+
+            <div class="pt-0.5 text-right">
+              <p class="text-xs text-slate-500">Identificación, categoría, unidad y precios.</p>
             </div>
           </div>
 
-          <p v-if="form.errors.branch_ids" class="text-red-500 text-xs mt-2">
-            {{ form.errors.branch_ids }}
-          </p>
-        </div>
-
-        <div class="relative">
-          <div class="flex items-center justify-between mb-2">
-            <label class="text-sm font-semibold text-slate-600">
-              Categoría
-            </label>
-
-            <button
-              v-if="mode !== 'view'"
-              type="button"
-              @click="toggleCategoryInputMode"
-              class="text-xs px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200"
-            >
-              {{
-                categoryInputMode === "select"
-                  ? "+ Nueva categoría"
-                  : "Usar categoría existente"
-              }}
-            </button>
-          </div>
-
-          <template v-if="categoryInputMode === 'select'">
-            <SelectField
-              label=""
-              field="category_id"
-              v-model="form.category_id"
-              :options="categoriesDB"
-              placeholder="Selecciona una categoría"
-              :disabled="mode === 'view'"
-              :error="form.errors.category_id"
-            />
-          </template>
-
-          <template v-else>
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
             <InputField
-              label=""
-              field="category_name"
-              v-model="form.category_name"
-              placeholder="Escribe el nombre de la categoría"
-              :error="form.errors.category_name"
+              label="Nombre"
+              field="name"
+              v-model="form.name"
+              :error="form.errors.name"
+              :readonly="mode === 'view'"
+              class="md:col-span-2 2xl:col-span-3"
+            />
+
+            <template v-if="categoryInputMode === 'select'">
+              <div>
+                <div class="mb-1 flex items-center justify-between gap-2">
+                  <label for="category_id" class="block text-sm font-semibold text-slate-700">
+                    Categoría
+                  </label>
+
+                  <button
+                    v-if="mode !== 'view'"
+                    type="button"
+                    @click="toggleCategoryInputMode"
+                    class="rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                  >
+                    + Nueva categoría
+                  </button>
+                </div>
+
+                <SelectField
+                  label="Categoría"
+                  field="category_id"
+                  v-model="form.category_id"
+                  :options="categoriesDB"
+                  placeholder="Selecciona una categoría"
+                  :disabled="mode === 'view'"
+                  :error="form.errors.category_id"
+                  :hide-label="true"
+                />
+              </div>
+            </template>
+
+            <template v-else>
+              <div>
+                <div class="mb-1 flex items-center justify-between gap-2">
+                  <label for="category_name" class="block text-sm font-semibold text-slate-700">
+                    Categoría
+                  </label>
+
+                  <button
+                    v-if="mode !== 'view'"
+                    type="button"
+                    @click="toggleCategoryInputMode"
+                    class="rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                  >
+                    Usar existente
+                  </button>
+                </div>
+
+                <InputField
+                  label="Categoría"
+                  field="category_name"
+                  v-model="form.category_name"
+                  placeholder="Escribe la categoría"
+                  :error="form.errors.category_name"
+                  :readonly="mode === 'view'"
+                  :hide-label="true"
+                />
+              </div>
+            </template>
+
+            <SelectField
+              label="Unidad de medida"
+              field="unit"
+              v-model="form.unit"
+              :options="units"
+              placeholder="Selecciona unidad"
+              :disabled="mode === 'view'"
+            />
+
+            <InputField
+              label="Stock mínimo"
+              field="min_stock"
+              v-model="form.min_stock"
+              :error="form.errors.min_stock"
+              type="number"
               :readonly="mode === 'view'"
             />
-          </template>
-        </div>
 
-        <InputField
-          label="Nombre"
-          field="name"
-          v-model="form.name"
-          :error="form.errors.name"
-          :readonly="mode === 'view'"
-        />
-
-        <SelectField
-          label="Unidad de medida"
-          field="unit"
-          v-model="form.unit"
-          :options="units"
-          placeholder="Selecciona unidad"
-          :disabled="mode === 'view'"
-        />
-        <InputField
-          label="Stock mínimo"
-          field="min_stock"
-          v-model="form.min_stock"
-          :error="form.errors.min_stock"
-          type="number"
-          :readonly="mode === 'view'"
-        />
-
-        <div class="md:col-span-2 grid grid-cols-1 gap-5 md:grid-cols-2">
-          <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
             <InputField
               label="Precio compra"
               field="cost"
@@ -717,26 +752,102 @@ function submit() {
               step="0.01"
               :readonly="mode === 'view'"
             />
+
+            <InputField
+              label="Precio venta"
+              field="sale_price"
+              :model-value="form.sale_price"
+              @update:modelValue="handleSalePriceChange"
+              prefix="$"
+              :error="
+                invalidPrice
+                  ? 'El precio de venta no puede ser menor al precio inicial'
+                  : form.errors.sale_price
+              "
+              type="text"
+              step="0.01"
+              :readonly="mode === 'view'"
+            />
+          </div>
+        </section>
+
+        <section class="space-y-3 xl:col-span-3">
+          <div class="flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
+            <div>
+              <h3 class="text-sm font-semibold text-slate-900">
+                Sucursales donde se agregará
+              </h3>
+              <p class="text-xs text-slate-500">Selecciona dónde estará disponible este producto.</p>
+            </div>
+
+            <button
+              v-if="mode !== 'view'"
+              type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+              @click="
+                form.branch_ids.length === branchesDB.length
+                  ? (form.branch_ids = [props.branch?.id].filter(Boolean))
+                  : (form.branch_ids = branchesDB.map((branch) => branch.id))
+              "
+            >
+              {{
+                form.branch_ids.length === branchesDB.length
+                  ? 'Quitar todas'
+                  : 'Seleccionar todas'
+              }}
+            </button>
           </div>
 
-          <InputField
-            label="Precio venta"
-            field="sale_price"
-            :model-value="form.sale_price"
-            @update:modelValue="handleSalePriceChange"
-            prefix="$"
-            :error="
-              invalidPrice
-                ? 'El precio de venta no puede ser menor al precio inicial'
-                : form.errors.sale_price
-            "
-            type="text"
-            step="0.01"
-            :readonly="mode === 'view'"
-          />
-        </div>
-      </div>
+          <div class="overflow-y-auto rounded-[20px] border border-slate-200 bg-slate-50/60 p-3 xl:max-h-[176px]">
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              <label
+                v-for="branchItem in branchesDB"
+                :key="branchItem.id"
+                class="flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition"
+                :class="
+                  isCurrentBranch(branchItem.id)
+                    ? 'cursor-not-allowed border-blue-200 bg-blue-50'
+                    : form.branch_ids.includes(branchItem.id)
+                      ? 'cursor-pointer border-slate-900 bg-slate-900 text-white'
+                      : 'cursor-pointer border-slate-200 bg-white hover:border-slate-300'
+                "
+              >
+                <input
+                  type="checkbox"
+                  :value="branchItem.id"
+                  v-model="form.branch_ids"
+                  :disabled="mode === 'view' || isCurrentBranch(branchItem.id)"
+                  class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 disabled:opacity-70"
+                />
 
+                <span
+                  class="min-w-0 flex-1 truncate text-sm font-medium"
+                  :class="
+                    isCurrentBranch(branchItem.id)
+                      ? 'text-blue-900'
+                      : form.branch_ids.includes(branchItem.id)
+                        ? 'text-white'
+                        : 'text-slate-800'
+                  "
+                >
+                  {{ branchItem.name }}
+                </span>
+
+                <span
+                  v-if="isCurrentBranch(branchItem.id)"
+                  class="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-blue-700"
+                >
+                  Fija
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <p v-if="form.errors.branch_ids" class="text-xs text-red-500">
+            {{ form.errors.branch_ids }}
+          </p>
+        </section>
+      </div>
     </div>
   </GlobalModal>
 </template>

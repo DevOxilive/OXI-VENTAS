@@ -27,6 +27,10 @@ const props = defineProps({
         type: Object,
         default: () => ({}),
     },
+    filterOptions: {
+        type: Object,
+        default: () => ({}),
+    },
 })
 
 const search = ref(props.filters.search || '')
@@ -36,10 +40,15 @@ const { handlePageChange } = useGlobalTablePagination()
 const statusFilter = ref(props.filters.employmentStatus || '')
 const departmentFilter = ref(props.filters.department || '')
 const positionFilter = ref(props.filters.position || '')
+const startDateFromFilter = ref(props.filters.startDateFrom || '')
+const startDateToFilter = ref(props.filters.startDateTo || '')
 let systemsChannel = null
 
 const employees = computed(() => props.employeesDB?.data || [])
 const employeePaginator = computed(() => props.employeesDB || {})
+const positions = computed(() => props.filterOptions?.positions || [])
+const departments = computed(() => props.filterOptions?.departments || [])
+const statuses = computed(() => props.filterOptions?.statuses || [])
 
 const normalizedEmployees = computed(() =>
     employees.value.map((employee) => ({
@@ -52,7 +61,9 @@ const { exportExcel } = useEmployeeExport(
     statusFilter,
     departmentFilter,
     positionFilter,
-    search
+    search,
+    startDateFromFilter,
+    startDateToFilter,
 )
 
 const {
@@ -81,6 +92,8 @@ function reloadEmployees() {
         employmentStatus: statusFilter.value,
         department: departmentFilter.value,
         position: positionFilter.value,
+        startDateFrom: startDateFromFilter.value,
+        startDateTo: startDateToFilter.value,
     }, {
         preserveScroll: true,
         preserveState: true,
@@ -90,7 +103,7 @@ function reloadEmployees() {
 
 function refreshEmployeesRealtime() {
     router.reload({
-        only: ['employeesDB'],
+        only: ['employeesDB', 'filterOptions'],
         preserveScroll: true,
         preserveState: true,
     })
@@ -101,6 +114,16 @@ watch(recordsPerPage, reloadEmployees)
 watch(statusFilter, reloadEmployees)
 watch(departmentFilter, reloadEmployees)
 watch(positionFilter, reloadEmployees)
+watch(startDateFromFilter, reloadEmployees)
+watch(startDateToFilter, reloadEmployees)
+
+function handleEmployeeToolbarFilter({ key, value }) {
+    if (key === 'employmentStatus') statusFilter.value = value
+    if (key === 'department') departmentFilter.value = value
+    if (key === 'position') positionFilter.value = value
+    if (key === 'startDateFrom') startDateFromFilter.value = value
+    if (key === 'startDateTo') startDateToFilter.value = value
+}
 
 function handleEmployeeTableAction({ action, row }) {
     if (action === 'view' && can('employees.view')) openViewModal(row)
@@ -140,9 +163,20 @@ onBeforeUnmount(() => {
     <PageLayout>
         <template #toolbar>
             <EmployeeToolbar :search="search" :records-per-page="recordsPerPage"
+                :active-filters="{
+                    employmentStatus: statusFilter,
+                    department: departmentFilter,
+                    position: positionFilter,
+                    startDateFrom: startDateFromFilter,
+                    startDateTo: startDateToFilter,
+                }"
+                :positions="positions"
+                :departments="departments"
+                :statuses="statuses"
                 :filtered-records="normalizedEmployees.length" :total-records="employeePaginator?.total || 0"
                 :can-create="can('employees.create')" :can-export="can('files.export')"
                 @action="handleEmployeeToolbarAction" @update:search="search = $event"
+                @update:filter="handleEmployeeToolbarFilter"
                 @update:records-per-page="recordsPerPage = $event" />
         </template>
 
@@ -159,4 +193,3 @@ onBeforeUnmount(() => {
         " :mode="modalMode" :employeeToEdit="liveSelectedEmployee" @close="closeModal" />
     </PageLayout>
 </template>
-

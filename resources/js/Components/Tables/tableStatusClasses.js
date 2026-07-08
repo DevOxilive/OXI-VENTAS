@@ -11,7 +11,7 @@ export const predefinedStatusMaps = {
     'Disponible': 'green',
     'Stock bajo': 'amber',
     'Agotado': 'red',
-    'Producto sin rotacion': 'purple',
+    'Producto sin rotación': 'purple',
   },
   physical: {
     'Faltante': 'red',

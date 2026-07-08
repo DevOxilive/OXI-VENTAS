@@ -371,8 +371,8 @@ export const fieldRegistry = {
         titleCase: true,
         preventSpam: true,
         spamLevel: "soft",
-        message: "Nombre de categorÃ­a invÃ¡lido.",
-        spamMessage: "Nombre de categorÃ­a no vÃ¡lido.",
+        message: "Nombre de categoría inválido.",
+        spamMessage: "Nombre de categoría no válido.",
     },
 
     toolbar_search: {
@@ -380,7 +380,7 @@ export const fieldRegistry = {
         type: "text",
         max: 120,
         preserveCase: true,
-        message: "Busqueda invÃ¡lida.",
+        message: "Búsqueda inválida.",
     },
 
     toolbar_filter_text: {
@@ -388,7 +388,7 @@ export const fieldRegistry = {
         type: "text",
         max: 120,
         preserveCase: true,
-        message: "Filtro invÃ¡lido.",
+        message: "Filtro inválido.",
     },
 
     lot_number: {

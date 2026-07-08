@@ -56,7 +56,6 @@ export function useBranchInventory(props) {
 
     const search = ref(props.filters?.search ?? "");
     const categoryFilter = ref(props.filters?.category ?? "");
-    const subcategoryFilter = ref(props.filters?.subcategory ?? "");
     const stockFilter = ref(props.filters?.stock ?? "");
     const statusFilter = ref(props.filters?.status ?? "");
     const expirationStatusFilter = ref(props.filters?.expiration_status ?? "");
@@ -73,7 +72,6 @@ export function useBranchInventory(props) {
     const products = computed(() => props.productsDB ?? []);
     const branches = computed(() => props.branchesDB ?? []);
     const categories = computed(() => props.categoriesDB ?? []);
-    const subcategories = computed(() => props.subcategoriesDB ?? []);
     const currentBranch = computed(() => props.currentBranch ?? null);
 
     const inventoryAlerts = computed(() => props.inventoryAlerts ?? {});
@@ -304,7 +302,7 @@ export function useBranchInventory(props) {
                 expired: "Lotes vencidos",
                 nearExpiration: "Lotes próximos a vencer",
                 lowStock: "Productos con stock bajo",
-                inactiveCandidates: "Productos sin rotacion",
+                inactiveCandidates: "Productos sin rotación",
             }[selectedAlertType.value] || ""
         );
     });
@@ -327,7 +325,6 @@ export function useBranchInventory(props) {
             window.location.pathname,
             {
                 search: search.value || undefined,
-                subcategory: subcategoryFilter.value || undefined,
                 category: categoryFilter.value || undefined,
                 stock: stockFilter.value || undefined,
                 status: statusFilter.value || undefined,
@@ -345,8 +342,33 @@ export function useBranchInventory(props) {
 
     const goToPage = handlePageChange;
 
-    async function ensureProductDetails(product) {
+    function clearProductDetailCache(productId) {
+        if (!productId || !detailCache.value[productId]) return;
+
+        const nextCache = { ...detailCache.value };
+        delete nextCache[productId];
+        detailCache.value = nextCache;
+    }
+
+    function shouldRefreshRealtimeDetails(productId) {
+        if (!productId) return false;
+
+        return Boolean(
+            detailCache.value[productId] ||
+                selectedMovementProduct.value?.id === productId ||
+                selectedMovementsProduct.value?.id === productId ||
+                selectedConfigProduct.value?.id === productId ||
+                selectedBatchesProductId.value === productId,
+        );
+    }
+
+    async function ensureProductDetails(product, options = {}) {
         if (!product?.id) return product;
+        const { forceRefresh = false } = options;
+
+        if (forceRefresh) {
+            clearProductDetailCache(product.id);
+        }
 
         if (detailCache.value[product.id]) {
             return (
@@ -391,6 +413,20 @@ export function useBranchInventory(props) {
             visualProducts.value.find((item) => item.id === product.id) ??
             product
         );
+    }
+
+    async function refreshProductDetails(productId) {
+        if (!productId) return null;
+
+        const product =
+            visualProducts.value.find((item) => item.id === productId) ??
+            selectedMovementsProduct.value ??
+            selectedMovementProduct.value ??
+            selectedConfigProduct.value ??
+            liveSelectedBatchesProduct.value ??
+            { id: productId };
+
+        return ensureProductDetails(product, { forceRefresh: true });
     }
 
     const openCreateModal = () => {
@@ -471,7 +507,6 @@ export function useBranchInventory(props) {
 
     watch(recordsToShow, reloadInventory);
     watch(categoryFilter, reloadInventory);
-    watch(subcategoryFilter, reloadInventory);
     watch(stockFilter, reloadInventory);
     watch(statusFilter, reloadInventory);
     watch(expirationStatusFilter, reloadInventory);
@@ -514,12 +549,19 @@ export function useBranchInventory(props) {
                     },
                 };
 
+                const shouldRefreshDetails =
+                    shouldRefreshRealtimeDetails(branchProductId);
+
                 router.reload({
                     only: ["branchProductsDB", "inventoryStats", "inventoryAlerts"],
                     preserveScroll: true,
                     preserveState: true,
 
-                    onSuccess: () => {
+                    onSuccess: async () => {
+                        if (shouldRefreshDetails) {
+                            await refreshProductDetails(branchProductId);
+                        }
+
                         if (!selectedMovementsProduct.value) return;
 
                         const updatedProduct = visualProducts.value.find(
@@ -562,7 +604,6 @@ export function useBranchInventory(props) {
         products,
         branches,
         categories,
-        subcategories,
         currentBranch,
 
         showCreateModal,
@@ -581,7 +622,6 @@ export function useBranchInventory(props) {
 
         search,
         categoryFilter,
-        subcategoryFilter,
         stockFilter,
         statusFilter,
         expirationStatusFilter,

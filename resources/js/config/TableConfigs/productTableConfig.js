@@ -32,7 +32,7 @@ export const productTableConfig = {
             format: "badge",
             mobileLabel: "Cat.",
             mobileDisplay: false,
-            fallback: "Sin categorÃ­a",
+            fallback: "Sin categoría",
         },
         {
             key: "unit",

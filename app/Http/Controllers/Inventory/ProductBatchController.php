@@ -164,9 +164,8 @@ class ProductBatchController extends Controller
     {
         return $branchProduct->fresh([
             'branch:id,name',
-            'product:id,name,category_id,subcategory_id,sale_price,cost,unit',
+            'product:id,name,category_id,sale_price,cost,unit',
             'product.category:id,name',
-            'product.subcategory:id,name,category_id',
             'product.barcodes:id,product_id,code',
 
             'batches' => fn($query) => $query

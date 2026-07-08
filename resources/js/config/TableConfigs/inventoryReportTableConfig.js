@@ -10,9 +10,9 @@ export const inventoryReportTableConfig = {
         },
         {
             key: "category",
-            label: "Categoria",
+            label: "Categoría",
             format: "text",
-            mobileLabel: "Categoria",
+            mobileLabel: "Categoría",
             mobileDisplay: true,
         },
         {
@@ -29,7 +29,7 @@ export const inventoryReportTableConfig = {
             formatOptions: {
                 statusMap: {
                     Caducado: "red",
-                    "Proximo a caducar": "amber",
+                    "Próximo a caducar": "amber",
                     Vigente: "green",
                     Agotado: "red",
                     "Stock bajo": "amber",
@@ -37,9 +37,9 @@ export const inventoryReportTableConfig = {
                     "Con lotes por vencer": "amber",
                     "Sin movimiento reciente": "slate",
                     "Sin movimiento": "slate",
-                    "Rotacion baja": "amber",
-                    "Rotacion media": "blue",
-                    "Rotacion alta": "green",
+                    "Rotación baja": "amber",
+                    "Rotación media": "blue",
+                    "Rotación alta": "green",
                 },
             },
             mobileLabel: "Estado",
@@ -66,9 +66,9 @@ export const inventoryReportTableConfig = {
         },
         {
             key: "days",
-            label: "Dias",
+            label: "Días",
             format: "number",
-            mobileLabel: "Dias",
+            mobileLabel: "Días",
             mobileDisplay: true,
         },
         {
@@ -78,7 +78,7 @@ export const inventoryReportTableConfig = {
         },
         {
             key: "last_entry_at",
-            label: "Ultima entrada",
+            label: "Última entrada",
             format: "date",
         },
         {
@@ -88,7 +88,7 @@ export const inventoryReportTableConfig = {
         },
         {
             key: "min_stock",
-            label: "Stock minimo",
+            label: "Stock mínimo",
             format: "number",
         },
         {

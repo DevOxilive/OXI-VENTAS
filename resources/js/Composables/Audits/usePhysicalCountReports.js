@@ -45,7 +45,7 @@ export function usePhysicalCountReports(props) {
     )
 
     const summaryTableItems = computed(() => [
-        { id: 'audits', indicator: 'Auditorias', value: props.summary.audits ?? 0 },
+        { id: 'audits', indicator: 'Auditorías', value: props.summary.audits ?? 0 },
         { id: 'records', indicator: 'Registros', value: props.summary.records ?? 0 },
         { id: 'participants', indicator: 'Usuarios', value: props.summary.participants ?? 0 },
         { id: 'counted_products', indicator: 'Contados', value: props.summary.counted_products ?? 0 },

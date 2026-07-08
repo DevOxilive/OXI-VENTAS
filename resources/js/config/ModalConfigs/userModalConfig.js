@@ -8,16 +8,18 @@ export function getUserModalConfig({
 } = {}) {
     return {
         mode: isEditing ? 'edit' : 'create',
-        title: isEditing ? 'Actualizar usuario' : 'Registrar usuario',
-        subtitle: 'Configuracion de acceso y permisos',
+        title: 'Formulario de usuario',
+        subtitle: isEditing
+            ? 'Actualiza la cuenta de acceso, el rol y los permisos asignados.'
+            : 'Configura la cuenta de acceso, el rol y los permisos asignados.',
         totalErrors,
         processing,
         saveButtonText: isEditing
-            ? 'Actualizar usuario'
-            : 'Guardar usuario',
+            ? 'Guardar cambios'
+            : 'Crear usuario',
         closeButtonText: canSave ? 'Cancelar' : 'Cerrar',
         ...modalPresets.workspace,
-        size: 'lg',
+        size: 'full',
         showSave: canSave,
         alerts: {
             entityName: 'Usuario',

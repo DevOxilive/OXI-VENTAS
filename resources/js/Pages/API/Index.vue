@@ -1,6 +1,9 @@
 <script setup>
 import ApiTokenManager from '@/Pages/API/Partials/ApiTokenManager.vue';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
+import PageLayout from '@/Layouts/PageLayout.vue';
+
+defineOptions({ layout: AdminLayout })
 
 defineProps({
     tokens: Array,
@@ -10,15 +13,19 @@ defineProps({
 </script>
 
 <template>
-    <AppLayout title="API Tokens">
-        <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                API Tokens
-            </h2>
-        </template>
+    <PageLayout>
+        <div class="mx-auto w-full max-w-6xl">
+            <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+                <div class="mb-6">
+                    <h1 class="text-2xl font-semibold text-slate-800">
+                        API Tokens
+                    </h1>
 
-        <div>
-            <div class="max-w-7xl mx-auto py-10 sm:px-6 lg:px-8">
+                    <p class="mt-1 text-sm text-slate-500">
+                        Administra los tokens de acceso y sus permisos.
+                    </p>
+                </div>
+
                 <ApiTokenManager
                     :tokens="tokens"
                     :available-permissions="availablePermissions"
@@ -26,5 +33,5 @@ defineProps({
                 />
             </div>
         </div>
-    </AppLayout>
+    </PageLayout>
 </template>

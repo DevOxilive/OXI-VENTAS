@@ -20,8 +20,8 @@ export function getInventoryMovementReportToolbarConfig({
         filters: [
             {
                 key: 'categoryId',
-                label: 'Categoria',
-                placeholder: 'Todas las categorias',
+                label: 'Categoría',
+                placeholder: 'Todas las categorías',
                 value: filters?.categoryId ?? '',
                 options: categories,
                 optionLabel: 'name',
@@ -77,10 +77,10 @@ export function getInventoryMovementReportToolbarConfig({
             },
             {
                 key: 'search',
-                label: 'Busqueda',
+                label: 'Búsqueda',
                 type: 'text',
                 field: 'toolbar_search',
-                placeholder: 'Producto, codigo, lote, usuario o nota...',
+                placeholder: 'Producto, código, lote, usuario o nota...',
                 value: filters?.search ?? '',
             },
         ],

@@ -51,13 +51,13 @@
         <thead>
             <tr>
                 <th>Producto</th>
-                <th>Categoria</th>
+                <th>Categoría</th>
                 <th>Lote</th>
                 <th>Estado</th>
                 <th>Cantidad</th>
                 <th>Inicial</th>
                 <th>Caducidad</th>
-                <th>Dias</th>
+                <th>Días</th>
                 <th>Ingreso</th>
                 <th>Ult. entrada</th>
                 <th>Movimiento</th>

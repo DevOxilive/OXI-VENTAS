@@ -17,7 +17,6 @@ const props = defineProps({
     productsDB: Object,
     filters: Object,
     categoriesDB: Array,
-    subcategoriesDB: Array,
     reportsDB: {
         type: Array,
         default: () => [],
@@ -50,7 +49,7 @@ function closeDraft() {
             <section class="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_420px]">
                 <div class="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <PurchaseReportFilters :filters="report.localFilters.value" :categories="categoriesDB"
-                        :subcategories="subcategoriesDB" @apply="report.applyFilters" />
+                        @apply="report.applyFilters" />
                     <PurchaseReportTable :products="report.products.value" :selected-items="report.selectedItems.value"
                         @toggle="report.toggleProduct" />
 

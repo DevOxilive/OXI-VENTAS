@@ -9,7 +9,7 @@ function parseDateValue(value) {
 
 export function useProductMovementsModal(props, emit) {
     const productName = computed(() => props.product?.name ?? "Producto");
-    const productCode = computed(() => props.product?.code ?? "Sin codigo");
+    const productCode = computed(() => props.product?.code ?? "Sin código");
     const unit = computed(() => props.product?.unit ?? "pieza");
     const currentStock = computed(() => Number(props.product?.stock ?? 0));
 
@@ -68,9 +68,9 @@ export function useProductMovementsModal(props, emit) {
 
     const movementGroupOptions = computed(() => [
         { value: "all", label: "Todos" },
-        { value: "audits", label: "Auditorias" },
+        { value: "audits", label: "Auditorías" },
         { value: "adjustments", label: "Ajustes manuales" },
-        { value: "damaged", label: "Danados" },
+        { value: "damaged", label: "Dañados" },
         { value: "expired", label: "Caducados" },
         { value: "others", label: "Otros" },
     ]);
@@ -103,7 +103,7 @@ export function useProductMovementsModal(props, emit) {
         const parsedDate = parseDateValue(date);
 
         if (!parsedDate) {
-            return "Fecha invalida";
+            return "Fecha inválida";
         }
 
         return new Intl.DateTimeFormat("es-MX", {
@@ -117,11 +117,11 @@ export function useProductMovementsModal(props, emit) {
 
     function reasonLabel(reason, movement = null) {
         if (movement && isAdministrativeAdjustment(movement)) {
-            return "Actualizacion de datos";
+            return "Actualización de datos";
         }
 
         if (movement && isAuditMovement(movement)) {
-            return "Auditoria";
+            return "Auditoría";
         }
 
         if (movement?.type === "ADJUSTMENT" && reason === "INVENTORY_DIFFERENCE") {
@@ -132,7 +132,7 @@ export function useProductMovementsModal(props, emit) {
             {
                 PURCHASE: "Compra",
                 SALE: "Venta",
-                DAMAGED: "Danado",
+                DAMAGED: "Dañado",
                 EXPIRED: "Caducado",
                 OTHER: "Otro",
                 INVENTORY_DIFFERENCE: "Ajuste manual",

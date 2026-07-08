@@ -8,7 +8,6 @@ export function usePurchaseReport(props) {
     const localFilters = ref({
         search: props.filters?.search ?? "",
         category: props.filters?.category ?? "",
-        subcategory: props.filters?.subcategory ?? "",
         stock: props.filters?.stock ?? "",
         per_page: props.filters?.per_page ?? 50,
     });

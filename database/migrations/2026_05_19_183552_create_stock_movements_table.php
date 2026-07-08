@@ -25,6 +25,7 @@ return new class extends Migration {
                 'SALE',
                 'DAMAGED',
                 'EXPIRED',
+                'OTHER',
                 'INVENTORY_DIFFERENCE',
             ]);
 

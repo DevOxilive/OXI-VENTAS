@@ -117,10 +117,10 @@ export function useEditBranchProductConfig(product) {
             route("inventory.branch-inventory.update-config", productId),
             getModalRequestOptions({
                 mode: "edit",
-                entityName: "ConfiguraciÃ³n",
-                successTitle: "ConfiguraciÃ³n actualizada correctamente",
-                errorTitle: "Error al actualizar configuraciÃ³n",
-                errorMessage: "No fue posible guardar la configuraciÃ³n del producto.",
+                entityName: "Configuración",
+                successTitle: "Configuración actualizada correctamente",
+                errorTitle: "Error al actualizar configuración",
+                errorMessage: "No fue posible guardar la configuración del producto.",
                 onSuccess,
             }),
         );
