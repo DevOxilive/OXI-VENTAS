@@ -1,6 +1,5 @@
 <script setup>
 import { ref, watch, defineProps, defineEmits } from 'vue';
-import InputLabel from './InputLabel.vue';
 
 const props = defineProps({
     modelValue: {
@@ -22,7 +21,7 @@ const props = defineProps({
         type: String,
         default: 'Selecciona una opción'
     },
-    required: { 
+    required: {
         type: Boolean,
         default: false
     },
@@ -37,7 +36,6 @@ const props = defineProps({
 });
 
 const emits = defineEmits(['update:modelValue']);
-
 const selectValue = ref(props.modelValue);
 
 watch(selectValue, (newValue) => {
@@ -51,15 +49,22 @@ watch(() => props.modelValue, (newValue) => {
 
 <template>
     <div class="mb-4">
-        <InputLabel :for="id">{{ label }}: <span v-if="required" class="text-red-600">*</span></InputLabel>
-        <select :id="id" v-model="selectValue" :required="required" :disabled="disabled"
-            class="block appearance-none w-full bg-gray-200 border border-gray-200 text-gray-700 py-2 px-4 rounded leading-tight focus:outline-none focus:bg-white focus:border-gray-500">
+        <label :for="id" class="mb-1 block text-sm font-semibold text-slate-700">
+            {{ label }}: <span v-if="required" class="text-red-600">*</span>
+        </label>
+        <select
+            :id="id"
+            v-model="selectValue"
+            :required="required"
+            :disabled="disabled"
+            class="block w-full appearance-none rounded border border-gray-200 bg-gray-200 px-4 py-2 text-gray-700 leading-tight focus:border-gray-500 focus:bg-white focus:outline-none"
+        >
             <option value="" selected :disabled="required">{{ defaultTextSelected }}</option>
             <template v-if="data">
-                <option v-for="d in data" :value="d" :key="d">{{ d }}</option>
+                <option v-for="d in data" :key="d" :value="d">{{ d }}</option>
             </template>
-            <slot/>
+            <slot />
         </select>
-        <p class="mt-3 ml-3" v-if="isTesting">{{ modelValue }}</p>
+        <p v-if="isTesting" class="mt-3 ml-3">{{ modelValue }}</p>
     </div>
 </template>

@@ -1,14 +1,10 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
-import ActionSection from '@/Components/ActionSection.vue';
-import ConfirmsPassword from '@/Components/ConfirmsPassword.vue';
-import DangerButton from '@/Components/DangerButton.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import AppButton from '@/Components/Buttons/AppButton.vue';
+import ActionSection from '@/Components/Cards/ActionSection.vue';
+import InputField from '@/Components/Forms/InputField.vue';
+import GlobalModal from '@/Components/Modales/GlobalModal.vue';
 
 const props = defineProps({
     requiresConfirmation: Boolean,
@@ -25,6 +21,12 @@ const recoveryCodes = ref([]);
 const confirmationForm = useForm({
     code: '',
 });
+const passwordConfirmationForm = useForm({
+    password: '',
+});
+const confirmingPassword = ref(false);
+const pendingPasswordAction = ref(null);
+const passwordInput = ref(null);
 
 const twoFactorEnabled = computed(
     () => ! enabling.value && page.props.auth.user?.two_factor_enabled,
@@ -102,6 +104,48 @@ const disableTwoFactorAuthentication = () => {
         },
     });
 };
+
+const passwordActions = {
+    enable: enableTwoFactorAuthentication,
+    confirm: confirmTwoFactorAuthentication,
+    regenerate: regenerateRecoveryCodes,
+    showRecovery: showRecoveryCodes,
+    disable: disableTwoFactorAuthentication,
+};
+
+const requestPasswordConfirmation = (action) => {
+    axios.get(route('password.confirmation')).then((response) => {
+        if (response.data.confirmed) {
+            passwordActions[action]?.();
+            return;
+        }
+
+        pendingPasswordAction.value = action;
+        confirmingPassword.value = true;
+
+        nextTick(() => passwordInput.value?.focus());
+    });
+};
+
+const submitPasswordConfirmation = () => {
+    passwordConfirmationForm.post(route('password.confirm'), {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => {
+            const action = pendingPasswordAction.value;
+            closePasswordConfirmationModal();
+            passwordActions[action]?.();
+        },
+        onError: () => passwordInput.value?.focus(),
+    });
+};
+
+const closePasswordConfirmationModal = () => {
+    confirmingPassword.value = false;
+    pendingPasswordAction.value = null;
+    passwordConfirmationForm.reset();
+    passwordConfirmationForm.clearErrors();
+};
 </script>
 
 <template>
@@ -154,21 +198,19 @@ const disableTwoFactorAuthentication = () => {
                     </div>
 
                     <div v-if="confirming" class="mt-4">
-                        <InputLabel for="code" value="Code" />
-
-                        <TextInput
-                            id="code"
+                        <InputField
                             v-model="confirmationForm.code"
+                            label="Code"
+                            field="code"
                             type="text"
                             name="code"
-                            class="block mt-1 w-1/2"
+                            class="w-full md:w-1/2"
+                            :error="confirmationForm.errors.code"
                             inputmode="numeric"
                             autofocus
                             autocomplete="one-time-code"
                             @keyup.enter="confirmTwoFactorAuthentication"
                         />
-
-                        <InputError :message="confirmationForm.errors.code" class="mt-2" />
                     </div>
                 </div>
 
@@ -189,65 +231,113 @@ const disableTwoFactorAuthentication = () => {
 
             <div class="mt-5">
                 <div v-if="! twoFactorEnabled">
-                    <ConfirmsPassword @confirmed="enableTwoFactorAuthentication">
-                        <PrimaryButton type="button" :class="{ 'opacity-25': enabling }" :disabled="enabling">
-                            Enable
-                        </PrimaryButton>
-                    </ConfirmsPassword>
+                    <AppButton variant="primary" type="button" :class="{ 'opacity-25': enabling }" :disabled="enabling" @click="requestPasswordConfirmation('enable')">
+                        Enable
+                    </AppButton>
                 </div>
 
                 <div v-else>
-                    <ConfirmsPassword @confirmed="confirmTwoFactorAuthentication">
-                        <PrimaryButton
-                            v-if="confirming"
-                            type="button"
-                            class="me-3"
-                            :class="{ 'opacity-25': enabling || confirmationForm.processing }"
-                            :disabled="enabling || confirmationForm.processing"
-                        >
-                            Confirm
-                        </PrimaryButton>
-                    </ConfirmsPassword>
+                    <AppButton
+                        v-if="confirming"
+                        variant="primary"
+                        type="button"
+                        class="me-3"
+                        :class="{ 'opacity-25': enabling || confirmationForm.processing }"
+                        :disabled="enabling || confirmationForm.processing"
+                        @click="requestPasswordConfirmation('confirm')"
+                    >
+                        Confirm
+                    </AppButton>
 
-                    <ConfirmsPassword @confirmed="regenerateRecoveryCodes">
-                        <SecondaryButton
-                            v-if="recoveryCodes.length > 0 && ! confirming"
-                            class="me-3"
-                        >
-                            Regenerate Recovery Codes
-                        </SecondaryButton>
-                    </ConfirmsPassword>
+                    <AppButton
+                        v-if="recoveryCodes.length > 0 && ! confirming"
+                        variant="secondary"
+                        class="me-3"
+                        @click="requestPasswordConfirmation('regenerate')"
+                    >
+                        Regenerate Recovery Codes
+                    </AppButton>
 
-                    <ConfirmsPassword @confirmed="showRecoveryCodes">
-                        <SecondaryButton
-                            v-if="recoveryCodes.length === 0 && ! confirming"
-                            class="me-3"
-                        >
-                            Show Recovery Codes
-                        </SecondaryButton>
-                    </ConfirmsPassword>
+                    <AppButton
+                        v-if="recoveryCodes.length === 0 && ! confirming"
+                        variant="secondary"
+                        class="me-3"
+                        @click="requestPasswordConfirmation('showRecovery')"
+                    >
+                        Show Recovery Codes
+                    </AppButton>
 
-                    <ConfirmsPassword @confirmed="disableTwoFactorAuthentication">
-                        <SecondaryButton
-                            v-if="confirming"
-                            :class="{ 'opacity-25': disabling }"
-                            :disabled="disabling"
-                        >
-                            Cancel
-                        </SecondaryButton>
-                    </ConfirmsPassword>
+                    <AppButton
+                        v-if="confirming"
+                        variant="secondary"
+                        :class="{ 'opacity-25': disabling }"
+                        :disabled="disabling"
+                        @click="requestPasswordConfirmation('disable')"
+                    >
+                        Cancel
+                    </AppButton>
 
-                    <ConfirmsPassword @confirmed="disableTwoFactorAuthentication">
-                        <DangerButton
-                            v-if="! confirming"
-                            :class="{ 'opacity-25': disabling }"
-                            :disabled="disabling"
-                        >
-                            Disable
-                        </DangerButton>
-                    </ConfirmsPassword>
+                    <AppButton
+                        v-if="! confirming"
+                        variant="danger"
+                        :class="{ 'opacity-25': disabling }"
+                        :disabled="disabling"
+                        @click="requestPasswordConfirmation('disable')"
+                    >
+                        Disable
+                    </AppButton>
                 </div>
             </div>
+
+            <GlobalModal
+                v-if="confirmingPassword"
+                title="Confirm Password"
+                :processing="passwordConfirmationForm.processing"
+                :show-header="true"
+                :show-footer="false"
+                :show-save="false"
+                size="lg"
+                @close="closePasswordConfirmationModal"
+            >
+                <template #content>
+                    <div class="space-y-4 px-5 py-5 md:px-6">
+                        <p class="text-sm text-slate-600">
+                            For your security, please confirm your password to continue.
+                        </p>
+
+                        <div>
+                            <InputField
+                                ref="passwordInput"
+                                v-model="passwordConfirmationForm.password"
+                                label="Password"
+                                field="password"
+                                type="password"
+                                placeholder="Password"
+                                :error="passwordConfirmationForm.errors.password"
+                                autocomplete="current-password"
+                                @keyup.enter="submitPasswordConfirmation"
+                            />
+                        </div>
+                    </div>
+                </template>
+
+                <template #footer="{ close }">
+                    <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:px-6">
+                        <AppButton variant="secondary" @click="close">
+                            Cancel
+                        </AppButton>
+
+                        <AppButton
+                            variant="primary"
+                            :class="{ 'opacity-25': passwordConfirmationForm.processing }"
+                            :disabled="passwordConfirmationForm.processing"
+                            @click="submitPasswordConfirmation"
+                        >
+                            Confirm
+                        </AppButton>
+                    </div>
+                </template>
+            </GlobalModal>
         </template>
     </ActionSection>
 </template>

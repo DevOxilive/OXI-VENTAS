@@ -1,9 +1,9 @@
 <script setup>
 import { computed } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import AuthenticationCard from '@/Components/AuthenticationCard.vue';
-import AuthenticationCardLogo from '@/Components/AuthenticationCardLogo.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
+import AppButton from '@/Components/Buttons/AppButton.vue';
+import AuthenticationCard from '@/Components/Login/AuthenticationCard.vue';
+import AuthenticationCardLogo from '@/Components/Login/AuthenticationCardLogo.vue';
 
 const props = defineProps({
     status: String,
@@ -36,9 +36,9 @@ const verificationLinkSent = computed(() => props.status === 'verification-link-
 
         <form @submit.prevent="submit">
             <div class="mt-4 flex items-center justify-between">
-                <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                <AppButton variant="primary" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
                     Resend Verification Email
-                </PrimaryButton>
+                </AppButton>
 
                 <div>
                     <Link

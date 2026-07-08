@@ -1,7 +1,11 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, useAttrs } from 'vue'
 import { fieldRegistry } from '@/Validation/fieldRegistry'
 import { sanitizeField } from '@/Validation/sanitizers'
+
+defineOptions({
+    inheritAttrs: false,
+})
 
 const props = defineProps({
     label: String,
@@ -23,6 +27,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'validate', 'keydown'])
 const inputEl = ref(null)
+const attrs = useAttrs()
 
 const inputId = computed(() =>
     props.field || props.label?.toLowerCase().replace(/\s+/g, '-')
@@ -128,7 +133,7 @@ function blockExtraInput(e) {
                 {{ icon }}
             </span>
         </span>
-        <input ref="inputEl" :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
+        <input ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
             :readonly="readonly" @keydown="(e) => { blockExtraInput(e); emit('keydown', e) }"
             @wheel="preventNumberWheel" @input="handleInput" @blur="emit('validate', field)" :class="[
                 'w-full py-3 rounded-xl border outline-none transition text-sm',

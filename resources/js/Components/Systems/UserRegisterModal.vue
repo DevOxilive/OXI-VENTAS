@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import InputField from '@/Components/Forms/InputField.vue'
+import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import { getUserModalConfig } from '@/config/ModalConfigs/userModalConfig'
 
@@ -91,6 +92,15 @@ function isPermissionLocked(permissionId) {
     return props.lockedPermissionIds.includes(permissionId)
 }
 
+function toggleSalesBranch(branchId) {
+    if (props.form.branch_ids.includes(branchId)) {
+        props.form.branch_ids = props.form.branch_ids.filter((id) => id !== branchId)
+        return
+    }
+
+    props.form.branch_ids = [...props.form.branch_ids, branchId]
+}
+
 function closeModal() {
     emit('close')
 }
@@ -176,19 +186,15 @@ function closeModal() {
                                 </p>
 
                                 <div class="grid grid-cols-1 gap-2">
-                                    <label
+                                    <SelectionCheckboxCard
                                         v-for="branch in branches"
                                         :key="branch.id"
-                                        class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 hover:bg-slate-50"
-                                    >
-                                        <input
-                                            v-model="form.branch_ids"
-                                            type="checkbox"
-                                            :value="branch.id"
-                                        >
-
-                                        <span>{{ branch.name }}</span>
-                                    </label>
+                                        compact
+                                        :checked="form.branch_ids.includes(branch.id)"
+                                        :title="branch.name"
+                                        description="Haz clic para permitir esta sucursal"
+                                        @toggle="toggleSalesBranch(branch.id)"
+                                    />
                                 </div>
 
                                 <p v-if="errors.branch_ids" class="mt-2 text-xs text-red-500">

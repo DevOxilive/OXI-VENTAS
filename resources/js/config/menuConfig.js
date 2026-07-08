@@ -28,7 +28,15 @@ export function generateMenu(role, permissions = [], branches = []) {
             text: "Capital Humano",
             key: "human-resources",
             icon: "badge",
-            url: route("human-resources.employees.index"),
+            isOpen: false,
+            children: [
+                {
+                    text: "Registro de empleados",
+                    key: "human-resources.employees",
+                    icon: "group",
+                    url: route("human-resources.employees.index"),
+                },
+            ],
         });
     }
 

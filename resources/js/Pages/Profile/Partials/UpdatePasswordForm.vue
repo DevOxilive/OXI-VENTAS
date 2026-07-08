@@ -1,12 +1,10 @@
 <script setup>
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import ActionMessage from '@/Components/ActionMessage.vue';
-import FormSection from '@/Components/FormSection.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import AppButton from '@/Components/Buttons/AppButton.vue';
+import FormSection from '@/Components/Cards/FormSection.vue';
+import InputField from '@/Components/Forms/InputField.vue';
+import { SuccessAlert } from '@/Components/Modales/UniversalActionModal';
 
 const passwordInput = ref(null);
 const currentPasswordInput = ref(null);
@@ -21,7 +19,13 @@ const updatePassword = () => {
     form.put(route('user-password.update'), {
         errorBag: 'updatePassword',
         preserveScroll: true,
-        onSuccess: () => form.reset(),
+        onSuccess: () => {
+            form.reset();
+            SuccessAlert({
+                title: 'Contraseña actualizada',
+                message: 'La contraseña se actualizó correctamente.',
+            });
+        },
         onError: () => {
             if (form.errors.password) {
                 form.reset('password', 'password_confirmation');
@@ -49,52 +53,45 @@ const updatePassword = () => {
 
         <template #form>
             <div class="col-span-6 sm:col-span-4">
-                <InputLabel for="current_password" value="Current Password" />
-                <TextInput
-                    id="current_password"
+                <InputField
                     ref="currentPasswordInput"
                     v-model="form.current_password"
+                    label="Current Password"
+                    field="current_password"
                     type="password"
-                    class="mt-1 block w-full"
+                    :error="form.errors.current_password"
                     autocomplete="current-password"
                 />
-                <InputError :message="form.errors.current_password" class="mt-2" />
             </div>
 
             <div class="col-span-6 sm:col-span-4">
-                <InputLabel for="password" value="New Password" />
-                <TextInput
-                    id="password"
+                <InputField
                     ref="passwordInput"
                     v-model="form.password"
+                    label="New Password"
+                    field="password"
                     type="password"
-                    class="mt-1 block w-full"
+                    :error="form.errors.password"
                     autocomplete="new-password"
                 />
-                <InputError :message="form.errors.password" class="mt-2" />
             </div>
 
             <div class="col-span-6 sm:col-span-4">
-                <InputLabel for="password_confirmation" value="Confirm Password" />
-                <TextInput
-                    id="password_confirmation"
+                <InputField
                     v-model="form.password_confirmation"
+                    label="Confirm Password"
+                    field="password_confirmation"
                     type="password"
-                    class="mt-1 block w-full"
+                    :error="form.errors.password_confirmation"
                     autocomplete="new-password"
                 />
-                <InputError :message="form.errors.password_confirmation" class="mt-2" />
             </div>
         </template>
 
         <template #actions>
-            <ActionMessage :on="form.recentlySuccessful" class="me-3">
-                Saved.
-            </ActionMessage>
-
-            <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+            <AppButton variant="primary" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
                 Save
-            </PrimaryButton>
+            </AppButton>
         </template>
     </FormSection>
 </template>

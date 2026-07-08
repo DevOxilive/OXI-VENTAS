@@ -1,10 +1,7 @@
 <script setup>
 import { ref, watch, defineProps, defineEmits, onMounted } from 'vue';
-import InputLabel from './InputLabel.vue';
-import PrimaryButton from '../PrimaryButton.vue';
-import { ArrowPathIcon, EyeIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import ActionIconButton from '@/Components/Forms/ActionIconButton.vue';
 
-/* ----------------------- Definición de Props y Emits ----------------------- */
 const props = defineProps({
     modelValue: {
         type: [String, Number, null, Array],
@@ -53,25 +50,20 @@ const props = defineProps({
         default: false
     }
 });
+
 const emits = defineEmits(['update:modelValue', 'change']);
 
-/* ------------------------------ Constantes ------------------------------- */
 const inputValue = ref(props.modelValue);
 const pattern = ref('');
 const fileInput = ref(null);
 const fileUrl = ref('');
 
-// Expresiones regulares predefinidas
-const onlyLetters = "^[A-Za-zÀ-ÿ]+$";
-const lettersAndSpace = "^[A-Za-zÀ-ÿ\\s]+$";
-const onlyNumbers = "^[0-9]+$";
-const lettersAndNumbers = "^[A-Za-zÀ-ÿ0-9]+$";
-const lettersNumbersAndSpace = "^[A-Za-zÀ-ÿ0-9\\s]+$";
-const email = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"; // Por definir
-
-/* ------------------------------ Funciones y Watch ------------------------------ */
-
-// Monitorea los cambios en inputValue y actualiza modelValue
+const onlyLetters = '^[A-Za-zÀ-ÿ]+$';
+const lettersAndSpace = '^[A-Za-zÀ-ÿ\\s]+$';
+const onlyNumbers = '^[0-9]+$';
+const lettersAndNumbers = '^[A-Za-zÀ-ÿ0-9]+$';
+const lettersNumbersAndSpace = '^[A-Za-zÀ-ÿ0-9\\s]+$';
+const email = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$';
 watch(inputValue, (newValue) => {
     if (props.type === 'text' && typeof newValue === 'string' && !props.notUpper) {
         emits('update:modelValue', newValue.toUpperCase());
@@ -80,12 +72,10 @@ watch(inputValue, (newValue) => {
     }
 });
 
-// Monitorea modelValue para sincronizar el valor del input
 watch(() => props.modelValue, (newValue) => {
     inputValue.value = newValue;
 });
 
-// Maneja el cambio de archivo
 const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -94,53 +84,55 @@ const handleFileChange = (event) => {
     }
 };
 
-// Valida si la tecla presionada cumple con la expresión regular
-const validateRegex = (event, pattern) => {
+const validateRegex = (event, regexPattern) => {
     const key = event.key;
-    const regex = new RegExp(pattern);
+    const regex = new RegExp(regexPattern);
+
     if (!regex.test(key)) {
         event.preventDefault();
     }
 };
 
-// Abre el archivo almacenado
 const fetchFile = async () => {
     if (fileUrl.value) {
         window.open(fileUrl.value, '_blank');
-    } else {
-        const path = props.modelValue;
-        const extension = path.split('.').pop().toLowerCase();
-        const encodedPath = encodeURIComponent(path);
+        return;
+    }
 
-        try {
-            const response = await axios.get(route('files-storage.patient.show', encodedPath), {
-                responseType: 'blob'
-            });
+    const path = props.modelValue;
+    const extension = path.split('.').pop().toLowerCase();
+    const encodedPath = encodeURIComponent(path);
 
-            let fileURL;
-            if (extension === 'pdf') {
-                fileURL = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-                window.open(fileURL, '_blank'); // Abre el PDF en una nueva pestaña
-            } else if (['jpg', 'jpeg', 'png'].includes(extension)) {
-                fileURL = window.URL.createObjectURL(new Blob([response.data]));
-                const imgWindow = window.open(); // Abre una nueva ventana
-                imgWindow.document.write(`<img src="${fileURL}" style="max-width:100%;"/>`); // Muestra la imagen
-            } else {
-                console.log("Tipo de archivo no soportado para visualización.");
-            }
-        } catch (err) {
-            console.log("Error al traer el archivo. Error: ", err);
+    try {
+        const response = await axios.get(route('files-storage.patient.show', encodedPath), {
+            responseType: 'blob'
+        });
+
+        let fileURL;
+
+        if (extension === 'pdf') {
+            fileURL = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            window.open(fileURL, '_blank');
+            return;
         }
+
+        if (['jpg', 'jpeg', 'png'].includes(extension)) {
+            fileURL = window.URL.createObjectURL(new Blob([response.data]));
+            const imgWindow = window.open();
+            imgWindow.document.write(`<img src="${fileURL}" style="max-width:100%;"/>`);
+            return;
+        }
+
+        console.log('Tipo de archivo no soportado para visualización.');
+    } catch (err) {
+        console.log('Error al traer el archivo. Error: ', err);
     }
 };
 
-
-// Activa la selección de archivo
 const triggerFileSelect = () => {
     fileInput.value.click();
 };
 
-// Borra el archivo seleccionado
 const clearFileInput = () => {
     if (fileInput.value) {
         fileInput.value.value = '';
@@ -148,79 +140,97 @@ const clearFileInput = () => {
     }
 };
 
-// Establece el patrón de validación basado en la propiedad regex
 onMounted(() => {
-    if (props.regex) {
-        if (props.type == 'email') {
-            pattern.value = email;
-        } else {
-            switch (props.regex) {
-                case 'only-letters':
-                    pattern.value = onlyLetters;
-                    break;
-                case 'only-numbers':
-                    pattern.value = onlyNumbers;
-                    break;
-                case 'letters-and-numbers':
-                    pattern.value = lettersAndNumbers;
-                    break;
-                case 'letters-and-space':
-                    pattern.value = lettersAndSpace;
-                    break;
-                case 'all':
-                    pattern.value = lettersNumbersAndSpace;
-                    break;
-            }
-        }
+    if (!props.regex) return;
+
+    if (props.type === 'email') {
+        pattern.value = email;
+        return;
+    }
+
+    switch (props.regex) {
+        case 'only-letters':
+            pattern.value = onlyLetters;
+            break;
+        case 'only-numbers':
+            pattern.value = onlyNumbers;
+            break;
+        case 'letters-and-numbers':
+            pattern.value = lettersAndNumbers;
+            break;
+        case 'letters-and-space':
+            pattern.value = lettersAndSpace;
+            break;
+        case 'all':
+            pattern.value = lettersNumbersAndSpace;
+            break;
     }
 });
 </script>
 
 <template>
     <div class="mb-4">
-        <!-- Condición para mostrar etiqueta -->
-        <InputLabel :for="id" v-if="!withoutLabel">{{ label }}: <span v-if="required" class="text-red-600">*</span></InputLabel>
-        
-        <!-- Sección para el input de tipo 'file' -->
-        <div class="flex" v-if="type === 'file'">
-            <label class="relative inline-block w-full px-4 py-1 text-center bg-slate-200 hover:bg-violet-100 text-violet-800 hover:text-violet-700 bg-violet font-semibold rounded-full input-file cursor-pointer">
+        <label v-if="!withoutLabel" :for="id" class="mb-1 block text-sm font-semibold text-slate-700">
+            {{ label }}: <span v-if="required" class="text-red-600">*</span>
+        </label>
+
+        <div v-if="type === 'file'" class="flex">
+            <label class="relative inline-block w-full cursor-pointer rounded-full bg-slate-200 px-4 py-1 text-center font-semibold text-violet-800 hover:bg-violet-100 hover:text-violet-700">
                 <span class="inline-block max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap align-middle">
                     {{ modelValue ? modelValue : 'Selecciona un documento' }}
                 </span>
-                <input :id="id" :name="id" type="file" ref="fileInput" @change="handleFileChange" 
-                       :accept="accept || '.png,.jpg,.jpeg,.pdf'" class="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer" />
+                <input
+                    :id="id"
+                    :name="id"
+                    type="file"
+                    ref="fileInput"
+                    class="absolute left-0 top-0 h-full w-full cursor-pointer opacity-0"
+                    :accept="accept || '.png,.jpg,.jpeg,.pdf'"
+                    @change="handleFileChange"
+                />
             </label>
 
-            <!-- Botones para manejar archivo -->
             <template v-if="!modelValue">
-                <PrimaryButton class="ml-3" @click.prevent="triggerFileSelect">
-                    <PlusIcon class="w-4 h-4 stroke-white stroke-2" />
-                </PrimaryButton>
+                <ActionIconButton class="ml-3" icon="add" title="Seleccionar archivo" variant="amber" @click.prevent="triggerFileSelect" />
             </template>
             <template v-else>
-                <PrimaryButton class="ml-3" @click.prevent="fetchFile">
-                    <EyeIcon class="w-4 h-4 stroke-white stroke-2" />
-                </PrimaryButton>
-                <PrimaryButton class="ml-3" @click.prevent="triggerFileSelect">
-                    <ArrowPathIcon class="w-4 h-4 stroke-white stroke-2" />
-                </PrimaryButton>
-                <PrimaryButton class="ml-3" @click.prevent="clearFileInput">
-                    <TrashIcon class="w-4 h-4 stroke-white stroke-2" />
-                </PrimaryButton>
+                <ActionIconButton class="ml-3" icon="visibility" title="Ver archivo" variant="slate" @click.prevent="fetchFile" />
+                <ActionIconButton class="ml-3" icon="sync" title="Reemplazar archivo" variant="amber" @click.prevent="triggerFileSelect" />
+                <ActionIconButton class="ml-3" icon="delete" title="Eliminar archivo" variant="red" @click.prevent="clearFileInput" />
             </template>
         </div>
 
-        <!-- Sección para el input de otros tipos -->
-        <div class="flex" v-else>
-            <input v-if="type === 'date'" :id="id" type="date" v-model="inputValue" :min="min" :max="max"
-                   :required="required" :disabled="disabled" :autocomplete="autocomplete" class="w-full py-2 px-3 rounded-md shadow focus:outline-none focus:ring-cyan-500" />
-            <input v-else :id="id" :type="type" :placeholder="placeholder" v-model="inputValue" :minlength="min"
-                   :maxlength="max" :required="required" :disabled="disabled" :class="className"
-                   :autocomplete="autocomplete" @keypress="(event) => validateRegex(event, pattern)" class="w-full py-2 px-3 rounded-md shadow focus:outline-none focus:ring-cyan-500" />
+        <div v-else class="flex">
+            <input
+                v-if="type === 'date'"
+                :id="id"
+                type="date"
+                v-model="inputValue"
+                :min="min"
+                :max="max"
+                :required="required"
+                :disabled="disabled"
+                :autocomplete="autocomplete"
+                class="w-full rounded-md px-3 py-2 shadow focus:outline-none focus:ring-cyan-500"
+            />
+            <input
+                v-else
+                :id="id"
+                :type="type"
+                :placeholder="placeholder"
+                v-model="inputValue"
+                :minlength="min"
+                :maxlength="max"
+                :required="required"
+                :disabled="disabled"
+                :class="className"
+                :autocomplete="autocomplete"
+                class="w-full rounded-md px-3 py-2 shadow focus:outline-none focus:ring-cyan-500"
+                @keypress="(event) => validateRegex(event, pattern)"
+            />
             <slot />
         </div>
 
-        <!-- Mostrar el valor si isTesting es true -->
         <span v-if="isTesting">El valor es: {{ inputValue }}</span>
     </div>
 </template>

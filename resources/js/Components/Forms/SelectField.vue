@@ -1,6 +1,10 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, useAttrs } from 'vue'
 import { fieldRegistry } from '@/Validation/fieldRegistry'
+
+defineOptions({
+    inheritAttrs: false,
+})
 
 const selectId = computed(() =>
     props.field || props.label?.toLowerCase().replace(/\s+/g, '-')
@@ -24,6 +28,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue', 'validate', 'change'])
+const attrs = useAttrs()
 
 const fieldConfig = computed(() => fieldRegistry[props.field])
 
@@ -60,7 +65,7 @@ function handleBlur() {
             {{ label }}
         </label>
 
-        <select :id="selectId" :name="field" :value="modelValue" :disabled="disabled" @change="handleChange"
+        <select v-bind="attrs" :id="selectId" :name="field" :value="modelValue" :disabled="disabled" @change="handleChange"
             @blur="handleBlur" :class="[
                 'w-full px-4 py-3 rounded-xl border outline-none text-sm transition',
                 disabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-white',

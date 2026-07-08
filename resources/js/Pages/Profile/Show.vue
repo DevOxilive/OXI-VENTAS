@@ -1,28 +1,35 @@
 <script setup>
-import AppLayout from '@/Layouts/AppLayout.vue';
-import DeleteUserForm from '@/Pages/Profile/Partials/DeleteUserForm.vue';
-import LogoutOtherBrowserSessionsForm from '@/Pages/Profile/Partials/LogoutOtherBrowserSessionsForm.vue';
-import SectionBorder from '@/Components/SectionBorder.vue';
-import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthenticationForm.vue';
-import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue';
-import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
+import SectionBorder from '@/Components/Layout/SectionBorder.vue'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import PageLayout from '@/Layouts/PageLayout.vue'
+import DeleteUserForm from '@/Pages/Profile/Partials/DeleteUserForm.vue'
+import LogoutOtherBrowserSessionsForm from '@/Pages/Profile/Partials/LogoutOtherBrowserSessionsForm.vue'
+import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthenticationForm.vue'
+import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue'
+import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue'
+
+defineOptions({ layout: AdminLayout })
 
 defineProps({
     confirmsTwoFactorAuthentication: Boolean,
     sessions: Array,
-});
+})
 </script>
 
 <template>
-    <AppLayout title="Profile">
-        <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Profile
-            </h2>
-        </template>
+    <PageLayout>
+        <div class="mx-auto w-full max-w-6xl space-y-6">
+            <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+                <div class="mb-6">
+                    <h1 class="text-2xl font-semibold text-slate-800">
+                        Mi perfil
+                    </h1>
 
-        <div>
-            <div class="max-w-7xl mx-auto py-10 sm:px-6 lg:px-8">
+                    <p class="mt-1 text-sm text-slate-500">
+                        Administra tu informacion de acceso y seguridad.
+                    </p>
+                </div>
+
                 <div v-if="$page.props.jetstream.canUpdateProfileInformation">
                     <UpdateProfileInformationForm :user="$page.props.auth.user" />
 
@@ -53,5 +60,5 @@ defineProps({
                 </template>
             </div>
         </div>
-    </AppLayout>
+    </PageLayout>
 </template>

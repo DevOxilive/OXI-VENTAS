@@ -1,13 +1,11 @@
 <script setup>
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import ActionMessage from '@/Components/ActionMessage.vue';
-import ActionSection from '@/Components/ActionSection.vue';
-import DialogModal from '@/Components/DialogModal.vue';
-import InputError from '@/Components/InputError.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import AppButton from '@/Components/Buttons/AppButton.vue';
+import ActionSection from '@/Components/Cards/ActionSection.vue';
+import GlobalModal from '@/Components/Modales/GlobalModal.vue';
+import InputField from '@/Components/Forms/InputField.vue';
+import { SuccessAlert } from '@/Components/Modales/UniversalActionModal';
 
 defineProps({
     sessions: Array,
@@ -29,7 +27,13 @@ const confirmLogout = () => {
 const logoutOtherBrowserSessions = () => {
     form.delete(route('other-browser-sessions.destroy'), {
         preserveScroll: true,
-        onSuccess: () => closeModal(),
+        onSuccess: () => {
+            closeModal();
+            SuccessAlert({
+                title: 'Sesiones cerradas',
+                message: 'Las demás sesiones del navegador se cerraron correctamente.',
+            });
+        },
         onError: () => passwordInput.value.focus(),
         onFinish: () => form.reset(),
     });
@@ -88,54 +92,60 @@ const closeModal = () => {
             </div>
 
             <div class="flex items-center mt-5">
-                <PrimaryButton @click="confirmLogout">
+                <AppButton variant="primary" @click="confirmLogout">
                     Log Out Other Browser Sessions
-                </PrimaryButton>
-
-                <ActionMessage :on="form.recentlySuccessful" class="ms-3">
-                    Done.
-                </ActionMessage>
+                </AppButton>
             </div>
 
-            <!-- Log Out Other Devices Confirmation Modal -->
-            <DialogModal :show="confirmingLogout" @close="closeModal">
-                <template #title>
-                    Log Out Other Browser Sessions
-                </template>
-
+            <GlobalModal
+                v-if="confirmingLogout"
+                title="Log Out Other Browser Sessions"
+                :processing="form.processing"
+                :show-header="true"
+                :show-footer="false"
+                :show-save="false"
+                size="lg"
+                @close="closeModal"
+            >
                 <template #content>
-                    Please enter your password to confirm you would like to log out of your other browser sessions across all of your devices.
+                    <div class="space-y-4 px-5 py-5 md:px-6">
+                        <p class="text-sm text-slate-600">
+                            Please enter your password to confirm you would like to log out of your other browser sessions across all of your devices.
+                        </p>
 
-                    <div class="mt-4">
-                        <TextInput
-                            ref="passwordInput"
-                            v-model="form.password"
-                            type="password"
-                            class="mt-1 block w-3/4"
-                            placeholder="Password"
-                            autocomplete="current-password"
-                            @keyup.enter="logoutOtherBrowserSessions"
-                        />
-
-                        <InputError :message="form.errors.password" class="mt-2" />
+                        <div>
+                            <InputField
+                                ref="passwordInput"
+                                v-model="form.password"
+                                label="Password"
+                                field="password"
+                                type="password"
+                                placeholder="Password"
+                                :error="form.errors.password"
+                                autocomplete="current-password"
+                                @keyup.enter="logoutOtherBrowserSessions"
+                            />
+                        </div>
                     </div>
                 </template>
 
-                <template #footer>
-                    <SecondaryButton @click="closeModal">
-                        Cancel
-                    </SecondaryButton>
+                <template #footer="{ close }">
+                    <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:px-6">
+                        <AppButton variant="secondary" @click="close">
+                            Cancel
+                        </AppButton>
 
-                    <PrimaryButton
-                        class="ms-3"
-                        :class="{ 'opacity-25': form.processing }"
-                        :disabled="form.processing"
-                        @click="logoutOtherBrowserSessions"
-                    >
-                        Log Out Other Browser Sessions
-                    </PrimaryButton>
+                        <AppButton
+                            variant="primary"
+                            :class="{ 'opacity-25': form.processing }"
+                            :disabled="form.processing"
+                            @click="logoutOtherBrowserSessions"
+                        >
+                            Log Out Other Browser Sessions
+                        </AppButton>
+                    </div>
                 </template>
-            </DialogModal>
+            </GlobalModal>
         </template>
     </ActionSection>
 </template>

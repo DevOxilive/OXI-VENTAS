@@ -14,6 +14,10 @@ const props = defineProps({
         type: Array,
         default: () => ['py-1', 'bg-white'],
     },
+    panelClasses: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 let open = ref(false);
@@ -30,6 +34,7 @@ onUnmounted(() => document.removeEventListener('keydown', closeOnEscape));
 const widthClass = computed(() => {
     return {
         '48': 'w-48',
+        '60': 'w-60',
     }[props.width.toString()];
 });
 
@@ -49,7 +54,7 @@ const alignmentClasses = computed(() => {
 <template>
     <div class="relative">
         <div @click="open = ! open">
-            <slot name="trigger" />
+            <slot name="trigger" :open="open" />
         </div>
 
         <!-- Full Screen Dropdown Overlay -->
@@ -66,12 +71,12 @@ const alignmentClasses = computed(() => {
             <div
                 v-show="open"
                 class="absolute z-50 mt-2 rounded-md shadow-lg"
-                :class="[widthClass, alignmentClasses]"
+                :class="[widthClass, alignmentClasses, panelClasses]"
                 style="display: none;"
                 @click="open = false"
             >
                 <div class="rounded-md ring-1 ring-black ring-opacity-5" :class="contentClasses">
-                    <slot name="content" />
+                    <slot name="content" :open="open" />
                 </div>
             </div>
         </transition>

@@ -1,12 +1,10 @@
 <script setup>
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import ActionSection from '@/Components/ActionSection.vue';
-import DangerButton from '@/Components/DangerButton.vue';
-import DialogModal from '@/Components/DialogModal.vue';
-import InputError from '@/Components/InputError.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import AppButton from '@/Components/Buttons/AppButton.vue';
+import ActionSection from '@/Components/Cards/ActionSection.vue';
+import InputField from '@/Components/Forms/InputField.vue';
+import GlobalModal from '@/Components/Modales/GlobalModal.vue';
 
 const confirmingUserDeletion = ref(false);
 const passwordInput = ref(null);
@@ -53,50 +51,60 @@ const closeModal = () => {
             </div>
 
             <div class="mt-5">
-                <DangerButton @click="confirmUserDeletion">
+                <AppButton variant="danger" @click="confirmUserDeletion">
                     Delete Account
-                </DangerButton>
+                </AppButton>
             </div>
 
-            <!-- Delete Account Confirmation Modal -->
-            <DialogModal :show="confirmingUserDeletion" @close="closeModal">
-                <template #title>
-                    Delete Account
-                </template>
-
+            <GlobalModal
+                v-if="confirmingUserDeletion"
+                title="Delete Account"
+                :processing="form.processing"
+                :show-header="true"
+                :show-footer="false"
+                :show-save="false"
+                size="lg"
+                @close="closeModal"
+            >
                 <template #content>
-                    Are you sure you want to delete your account? Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.
+                    <div class="space-y-4 px-5 py-5 md:px-6">
+                        <p class="text-sm text-slate-600">
+                            Are you sure you want to delete your account? Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.
+                        </p>
 
-                    <div class="mt-4">
-                        <TextInput
-                            ref="passwordInput"
-                            v-model="form.password"
-                            type="password"
-                            class="mt-1 block w-3/4"
-                            placeholder="Password"
-                            autocomplete="current-password"
-                            @keyup.enter="deleteUser"
-                        />
-
-                        <InputError :message="form.errors.password" class="mt-2" />
+                        <div>
+                            <InputField
+                                ref="passwordInput"
+                                v-model="form.password"
+                                label="Password"
+                                field="password"
+                                type="password"
+                                placeholder="Password"
+                                :error="form.errors.password"
+                                autocomplete="current-password"
+                                @keyup.enter="deleteUser"
+                            />
+                        </div>
                     </div>
                 </template>
 
-                <template #footer>
-                    <SecondaryButton @click="closeModal">
-                        Cancel
-                    </SecondaryButton>
+                <template #footer="{ close }">
+                    <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:px-6">
+                        <AppButton variant="secondary" @click="close">
+                            Cancel
+                        </AppButton>
 
-                    <DangerButton
-                        class="ms-3"
-                        :class="{ 'opacity-25': form.processing }"
-                        :disabled="form.processing"
-                        @click="deleteUser"
-                    >
-                        Delete Account
-                    </DangerButton>
+                        <AppButton
+                            variant="danger"
+                            :class="{ 'opacity-25': form.processing }"
+                            :disabled="form.processing"
+                            @click="deleteUser"
+                        >
+                            Delete Account
+                        </AppButton>
+                    </div>
                 </template>
-            </DialogModal>
+            </GlobalModal>
         </template>
     </ActionSection>
 </template>
