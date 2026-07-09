@@ -178,10 +178,39 @@ export async function printHtmlTicket(printerName, html, dimensions = {}) {
       format: "html",
       flavor: "plain",
       data: html,
-      options: {
-        pageWidth: widthMm,
-        pageHeight: heightMm,
-      },
     },
   ]);
+}
+
+export async function printImageLabel(printerName, base64Image, dimensions = {}, copies = 1) {
+  if (!printerName) {
+    throw new Error("No hay una impresora seleccionada.");
+  }
+
+  await connectQzTray();
+
+  const widthMm = Number(dimensions.width);
+  const heightMm = Number(dimensions.height);
+  const usesBrother62mmContinuousTape = /brother\s+ql-1110/i.test(printerName);
+  const mediaWidthMm = usesBrother62mmContinuousTape ? 62 : widthMm;
+  const copyCount = Math.max(1, Math.min(100, Math.trunc(Number(copies) || 1)));
+  const config = qz.configs.create(printerName, {
+    copies: copyCount,
+    margins: 0,
+    scaleContent: true,
+    units: "mm",
+    colorType: "blackwhite",
+    interpolation: "nearest-neighbor",
+    size: {
+      width: mediaWidthMm,
+      height: heightMm,
+    },
+  });
+
+  return qz.print(config, [{
+    type: "pixel",
+    format: "image",
+    flavor: "base64",
+    data: base64Image,
+  }]);
 }

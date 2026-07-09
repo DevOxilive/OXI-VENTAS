@@ -102,6 +102,12 @@ Route::middleware([
         Route::put('/tickets/{ticketTemplate}', [TicketTemplateController::class, 'update'])
             ->middleware('permission:systems.tickets.update')
             ->name('tickets.update');
+
+        Route::get('/labels', function () {
+            return redirect()->route('printers.labels.index');
+        })
+            ->middleware('permission:systems.labels.view,systems.labels.update')
+            ->name('labels.index');
     });
 
     /*
@@ -186,6 +192,14 @@ Route::middleware([
         Route::put('/tickets/{ticketTemplate}', [TicketTemplateController::class, 'update'])
             ->middleware('permission:systems.tickets.update')
             ->name('tickets.update');
+
+        Route::get('/labels', [TicketTemplateController::class, 'labels'])
+            ->middleware('permission:systems.labels.view,systems.labels.update')
+            ->name('labels.index');
+
+        Route::put('/labels/{ticketTemplate}', [TicketTemplateController::class, 'updateLabel'])
+            ->middleware('permission:systems.labels.update')
+            ->name('labels.update');
     });
 
     /*
