@@ -136,10 +136,7 @@ const {
     liveSelectedBatchesProduct,
     openProductBatchesModal,
     closeProductBatchesModal,
-    openBatchAdjustmentFromList,
-
     batchAdjustmentProcessing,
-    batchAdjustmentUsesLot,
     batchAdjustmentForm,
     batchAdjustmentErrors,
     batchAdjustmentTotalErrors,
@@ -147,7 +144,6 @@ const {
     batchAdjustmentCalculatedQuantity,
     batchAdjustmentText,
     batchAdjustmentQuantityResultColor,
-    toggleBatchAdjustmentLot,
     setBatchAdjustmentType,
     validateBatchAdjustmentField,
     saveEditedBatch,
@@ -208,7 +204,8 @@ function handleInventoryAction({ action, row }) {
             @page-change="goToPage" @action="handleInventoryAction" />
 
         <StockEntryModal v-if="showEntryModal && liveSelectedMovementProduct && can('inventory.branches.create')"
-            :product="liveSelectedMovementProduct" @close="closeEntryModal" />
+            :product="liveSelectedMovementProduct" :branches="branchesDB" :current-branch="currentBranch"
+            @close="closeEntryModal" />
 
         <StockExitModal v-if="showExitModal && liveSelectedMovementProduct && can('inventory.branches.update')"
             :product="liveSelectedMovementProduct" @close="closeExitModal" />
@@ -220,12 +217,12 @@ function handleInventoryAction({ action, row }) {
         <ProductBatchesModal v-if="showProductBatchesModal && liveSelectedBatchesProduct"
             :product="liveSelectedBatchesProduct" :selected-batch="liveSelectedBatch" :form="batchAdjustmentForm"
             :frontend-errors="batchAdjustmentErrors" :total-errors="batchAdjustmentTotalErrors"
-            :processing="batchAdjustmentProcessing" :uses-lot="batchAdjustmentUsesLot"
+            :processing="batchAdjustmentProcessing"
             :is-seasonal="batchAdjustmentIsSeasonal" :calculated-quantity="batchAdjustmentCalculatedQuantity"
             :adjustment-text="batchAdjustmentText" :quantity-result-color="batchAdjustmentQuantityResultColor"
-            :toggle-lot="toggleBatchAdjustmentLot" :set-adjustment-type="setBatchAdjustmentType"
-            :validate-field="validateBatchAdjustmentField" @adjust-batch="openBatchAdjustmentFromList"
-            @select-batch="adjustBatch" @save="saveEditedBatch" @close="closeProductBatchesModal" />
+            :set-adjustment-type="setBatchAdjustmentType"
+            :validate-field="validateBatchAdjustmentField" @select-batch="adjustBatch" @save="saveEditedBatch"
+            @close="closeProductBatchesModal" />
 
         <InventoryAlertsModal v-if="showAlertModal" :title="selectedAlertTitle" :type="selectedAlertType"
             :batches="selectedAlertBatches" @close="closeAlertModal" />
