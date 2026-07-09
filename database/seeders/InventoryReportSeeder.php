@@ -19,8 +19,7 @@ use Illuminate\Support\Facades\Hash;
 
 class InventoryReportSeeder extends Seeder
 {
-    private const PRODUCT_COUNT = 100;
-    private const PRODUCT_PREFIX = 'Demo Reporte Inventario';
+    private const LEGACY_PRODUCT_PREFIX = 'Demo Reporte Inventario';
     private const BARCODE_PREFIX = 'RPTINV';
     private const EXTRA_HISTORY_ROUNDS = 3;
 
@@ -47,18 +46,20 @@ class InventoryReportSeeder extends Seeder
     private function seedBranch(Branch $branch, StockMovementService $stockService, $categories): void
     {
         $users = $this->reportUsers($branch);
+        $catalog = $this->catalog();
 
         $this->clearLegacyDemoInventory($branch);
 
-        for ($index = 1; $index <= self::PRODUCT_COUNT; $index++) {
+        foreach ($catalog as $index => $_productData) {
+            $position = $index + 1;
             $product = $this->product($index, $categories);
-            $branchProduct = $this->branchProduct($branch, $product, $index);
+            $branchProduct = $this->branchProduct($branch, $product, $position);
 
             $this->clearDemoInventory($branchProduct);
 
-            $batches = $this->batchesForProduct($index);
-            $entryUser = $users[$index % $users->count()];
-            $entryDate = now()->subDays(120 - ($index % 70))->setTime(9, 0);
+            $batches = $this->batchesForProduct($position);
+            $entryUser = $users[$position % $users->count()];
+            $entryDate = now()->subDays(120 - ($position % 70))->setTime(9, 0);
             $entryQuantity = collect($batches)->sum('quantity');
 
             $entryMovement = $stockService->move(
@@ -66,7 +67,7 @@ class InventoryReportSeeder extends Seeder
                 type: StockMovement::TYPE_IN,
                 reason: StockMovement::REASON_PURCHASE,
                 quantity: (float) $entryQuantity,
-                notes: $index === 15
+                notes: $position === 15
                     ? 'Caso auditoria: ingreso inicial de 15 piezas, despues corregido a 14.'
                     : 'Seeder reportes: entrada obligatoria con lotes.',
                 userId: $entryUser->id,
@@ -76,37 +77,37 @@ class InventoryReportSeeder extends Seeder
             $this->dateMovement($entryMovement, $entryDate);
             $this->dateBatches($branchProduct, $batches, $entryDate);
 
-            if ($index === 15) {
+            if ($position === 15) {
                 $this->createCorrectionCase($stockService, $branchProduct, $users, $entryDate);
                 continue;
             }
 
-            if ($index % 10 === 0) {
-                $this->consumeAllStock($stockService, $branchProduct, $users, $index);
+            if ($position % 10 === 0) {
+                $this->consumeAllStock($stockService, $branchProduct, $users, $position);
                 continue;
             }
 
-            if ($index % 4 === 0) {
-                $this->createExpiredMovement($stockService, $branchProduct, $users, $index);
+            if ($position % 4 === 0) {
+                $this->createExpiredMovement($stockService, $branchProduct, $users, $position);
             }
 
-            if ($index % 5 === 0) {
-                $this->createDamagedMovement($stockService, $branchProduct, $users, $index);
+            if ($position % 5 === 0) {
+                $this->createDamagedMovement($stockService, $branchProduct, $users, $position);
             }
 
-            if ($index % 6 === 0) {
-                $this->createManualAdjustment($stockService, $branchProduct, $users, $index);
+            if ($position % 6 === 0) {
+                $this->createManualAdjustment($stockService, $branchProduct, $users, $position);
             }
 
-            if ($index % 7 === 0) {
-                $this->createSaleMovement($stockService, $branchProduct, $users, $index);
+            if ($position % 7 === 0) {
+                $this->createSaleMovement($stockService, $branchProduct, $users, $position);
             }
 
             $this->createOperationalTrail(
                 stockService: $stockService,
                 branchProduct: $branchProduct,
                 users: $users,
-                index: $index,
+                index: $position,
                 entryDate: $entryDate,
             );
         }
@@ -132,37 +133,65 @@ class InventoryReportSeeder extends Seeder
 
     private function categories()
     {
-        return collect([
-            'Oxigenoterapia',
-            'Desechables',
-            'Refacciones',
-            'Medicamentos',
-            'Accesorios',
-        ])->mapWithKeys(fn (string $name) => [
+        return $this->catalog()
+            ->pluck('category')
+            ->unique()
+            ->values()
+            ->mapWithKeys(fn (string $name) => [
             $name => Category::firstOrCreate(['name' => $name]),
         ]);
     }
 
     private function product(int $index, $categories): Product
     {
-        $categoryNames = $categories->keys()->values();
-        $category = $categories[$categoryNames[($index - 1) % $categoryNames->count()]];
-        $name = self::PRODUCT_PREFIX . ' ' . str_pad((string) $index, 3, '0', STR_PAD_LEFT);
-        $cost = 25 + ($index * 3.75);
-        $salePrice = 55 + ($index * 5.50);
+        $catalogItem = $this->catalog()[$index] ?? $this->catalog()->first();
+        $category = $categories[$catalogItem['category']];
+        $cost = (float) $catalogItem['cost'];
+        $salePrice = (float) $catalogItem['sale_price'];
 
         return Product::updateOrCreate(
-            ['name' => $name],
+            ['name' => $catalogItem['name']],
             [
-                'description' => 'Producto demo nutrido para reportes de inventario.',
+                'description' => $catalogItem['description'],
                 'cost' => $cost,
                 'sale_price' => $salePrice,
                 'margin_percentage' => $this->calculateMarginPercentage($cost, $salePrice),
-                'unit' => 'pieza',
+                'unit' => $catalogItem['unit'],
                 'category_id' => $category->id,
                 'active' => true,
             ]
         );
+    }
+
+    private function catalog()
+    {
+        return collect([
+            ['category' => 'Refrescos', 'name' => 'Coca-Cola 600 ml', 'description' => 'Refresco Coca-Cola sabor original en presentacion individual de 600 ml.', 'cost' => 13.50, 'sale_price' => 19.00, 'unit' => 'pieza'],
+            ['category' => 'Refrescos', 'name' => 'Pepsi 600 ml', 'description' => 'Refresco Pepsi cola en botella individual de 600 ml.', 'cost' => 12.80, 'sale_price' => 18.00, 'unit' => 'pieza'],
+            ['category' => 'Refrescos', 'name' => 'Sprite 600 ml', 'description' => 'Refresco Sprite sabor lima-limon en botella de 600 ml.', 'cost' => 12.90, 'sale_price' => 18.50, 'unit' => 'pieza'],
+            ['category' => 'Refrescos', 'name' => 'Fanta Naranja 600 ml', 'description' => 'Refresco Fanta de naranja en botella individual de 600 ml.', 'cost' => 12.90, 'sale_price' => 18.50, 'unit' => 'pieza'],
+            ['category' => 'Refrescos', 'name' => 'Sidral Mundet 600 ml', 'description' => 'Refresco Sidral Mundet de manzana en botella individual de 600 ml.', 'cost' => 13.20, 'sale_price' => 19.00, 'unit' => 'pieza'],
+            ['category' => 'Vinos', 'name' => 'L.A. Cetto Cabernet Sauvignon 750 ml', 'description' => 'Vino tinto mexicano Cabernet Sauvignon en botella de 750 ml.', 'cost' => 168.00, 'sale_price' => 229.00, 'unit' => 'pieza'],
+            ['category' => 'Vinos', 'name' => 'L.A. Cetto Blanc de Blancs 750 ml', 'description' => 'Vino blanco seco L.A. Cetto Blanc de Blancs en botella de 750 ml.', 'cost' => 155.00, 'sale_price' => 215.00, 'unit' => 'pieza'],
+            ['category' => 'Vinos', 'name' => 'Mateus Rose 750 ml', 'description' => 'Vino rosado Mateus en botella de 750 ml.', 'cost' => 149.00, 'sale_price' => 209.00, 'unit' => 'pieza'],
+            ['category' => 'Vinos', 'name' => 'Casillero del Diablo Cabernet Sauvignon 750 ml', 'description' => 'Vino tinto chileno Casillero del Diablo Cabernet Sauvignon.', 'cost' => 198.00, 'sale_price' => 279.00, 'unit' => 'pieza'],
+            ['category' => 'Vinos', 'name' => 'Freixenet Carta Nevada 750 ml', 'description' => 'Vino espumoso Freixenet Carta Nevada en botella de 750 ml.', 'cost' => 238.00, 'sale_price' => 329.00, 'unit' => 'pieza'],
+            ['category' => 'Papas', 'name' => 'Sabritas Original 45 g', 'description' => 'Papas fritas Sabritas clasicas en bolsa de 45 gramos.', 'cost' => 13.00, 'sale_price' => 18.00, 'unit' => 'pieza'],
+            ['category' => 'Papas', 'name' => 'Ruffles Queso 50 g', 'description' => 'Papas Ruffles sabor queso en presentacion de 50 gramos.', 'cost' => 14.20, 'sale_price' => 20.00, 'unit' => 'pieza'],
+            ['category' => 'Papas', 'name' => 'Doritos Nacho 61 g', 'description' => 'Botana Doritos Nacho con queso en bolsa de 61 gramos.', 'cost' => 14.80, 'sale_price' => 21.00, 'unit' => 'pieza'],
+            ['category' => 'Papas', 'name' => 'Cheetos Torciditos 52 g', 'description' => 'Botana Cheetos Torciditos en presentacion de 52 gramos.', 'cost' => 13.80, 'sale_price' => 19.50, 'unit' => 'pieza'],
+            ['category' => 'Papas', 'name' => 'Chips Jalapeno 42 g', 'description' => 'Papas Chips sabor jalapeno en bolsa de 42 gramos.', 'cost' => 15.20, 'sale_price' => 22.00, 'unit' => 'pieza'],
+            ['category' => 'Lacteos', 'name' => 'Leche Lala Entera 1 L', 'description' => 'Leche entera Lala en envase de un litro.', 'cost' => 22.50, 'sale_price' => 29.50, 'unit' => 'pieza'],
+            ['category' => 'Lacteos', 'name' => 'Leche Santa Clara Deslactosada 1 L', 'description' => 'Leche deslactosada Santa Clara en envase de un litro.', 'cost' => 24.50, 'sale_price' => 32.00, 'unit' => 'pieza'],
+            ['category' => 'Lacteos', 'name' => 'Yogurt Yoplait Fresa 1 kg', 'description' => 'Yogurt Yoplait sabor fresa en presentacion de un kilogramo.', 'cost' => 39.00, 'sale_price' => 52.00, 'unit' => 'pieza'],
+            ['category' => 'Lacteos', 'name' => 'Queso Panela Lala 400 g', 'description' => 'Queso panela Lala empacado en presentacion de 400 gramos.', 'cost' => 67.00, 'sale_price' => 89.00, 'unit' => 'pieza'],
+            ['category' => 'Lacteos', 'name' => 'Crema Alpura 426 ml', 'description' => 'Crema Alpura en envase de 426 mililitros.', 'cost' => 26.50, 'sale_price' => 36.00, 'unit' => 'pieza'],
+            ['category' => 'Quimicos', 'name' => 'Cloro Cloralex 950 ml', 'description' => 'Cloro Cloralex desinfectante en presentacion de 950 mililitros.', 'cost' => 14.00, 'sale_price' => 21.00, 'unit' => 'pieza'],
+            ['category' => 'Quimicos', 'name' => 'Pinol Original 828 ml', 'description' => 'Limpiador Pinol original en botella de 828 mililitros.', 'cost' => 21.50, 'sale_price' => 31.00, 'unit' => 'pieza'],
+            ['category' => 'Quimicos', 'name' => 'Fabuloso Lavanda 1 L', 'description' => 'Limpiador multiusos Fabuloso aroma lavanda en presentacion de un litro.', 'cost' => 19.50, 'sale_price' => 28.00, 'unit' => 'pieza'],
+            ['category' => 'Quimicos', 'name' => 'Suavitel Fresca Primavera 850 ml', 'description' => 'Suavizante Suavitel aroma fresca primavera en botella de 850 mililitros.', 'cost' => 17.50, 'sale_price' => 25.00, 'unit' => 'pieza'],
+            ['category' => 'Quimicos', 'name' => 'Detergente Roma 1 kg', 'description' => 'Detergente en polvo Roma en bolsa de un kilogramo.', 'cost' => 36.00, 'sale_price' => 49.00, 'unit' => 'pieza'],
+        ])->values();
     }
 
     private function calculateMarginPercentage(float $cost, float $salePrice): ?float
@@ -637,7 +666,10 @@ class InventoryReportSeeder extends Seeder
             'Humidificador reusable',
         ];
 
-        $products = Product::whereIn('name', $legacyNames)->get();
+        $products = Product::query()
+            ->whereIn('name', $legacyNames)
+            ->orWhere('name', 'like', self::LEGACY_PRODUCT_PREFIX . '%')
+            ->get();
 
         foreach ($products as $product) {
             $branchProducts = BranchProduct::where('branch_id', $branch->id)

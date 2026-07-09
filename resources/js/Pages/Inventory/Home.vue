@@ -47,7 +47,7 @@ const search = ref(props.filters.search ?? '')
 const categoryFilter = ref(props.filters.category_id ?? 'Todas')
 const recordsToShow = ref(Number(props.filters.per_page ?? 50))
 const { handlePageChange } = useGlobalTablePagination({
-  only: ['productsDB', 'filters'],
+  only: ['productsDB', 'filters', 'categoriesDB'],
 })
 
 const products = computed(() => props.productsDB?.data ?? [])
@@ -111,7 +111,7 @@ function reloadProducts(pageOrUrl = 1) {
       preserveState: true,
       preserveScroll: true,
       replace: true,
-      only: ['productsDB', 'filters'],
+      only: ['productsDB', 'filters', 'categoriesDB'],
     }
   )
 }

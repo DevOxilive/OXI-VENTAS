@@ -6,7 +6,6 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
-use App\Models\Branch;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -37,18 +36,13 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfTwoFactorAuthenticatable::class);
 
         Fortify::loginView(function () {
-            return Inertia::render('Auth/Login', [
-                'branches' => Branch::where('active', true)
-                    ->orderBy('name')
-                    ->get(),
-            ]);
+            return Inertia::render('Auth/Login');
         });
 
         Fortify::authenticateUsing(function (Request $request) {
             $request->validate([
                 'email' => ['required', 'string'],
                 'password' => ['required', 'string'],
-                'branch_id' => ['nullable', 'exists:branches,id'],
             ]);
 
             $user = User::with(['role', 'employee'])
@@ -67,33 +61,9 @@ class FortifyServiceProvider extends ServiceProvider
                 ]);
             }
 
-            $role = $user->role?->name;
-
-            if ($role === 'Ventas') {
-                if (! $request->branch_id) {
-                    throw ValidationException::withMessages([
-                        'branch_id' => 'Debes seleccionar tu sucursal.',
-                    ]);
-                }
-
-                $canEnter = $user->branches()
-                    ->where('branches.id', $request->branch_id)
-                    ->exists();
-
-                if (! $canEnter) {
-                    throw ValidationException::withMessages([
-                        'branch_id' => 'No tienes acceso a la sucursal seleccionada.',
-                    ]);
-                }
-
-                session([
-                    'branch_id' => $request->branch_id,
-                ]);
-            } else {
-                session([
-                    'branch_id' => null,
-                ]);
-            }
+            session([
+                'branch_id' => null,
+            ]);
 
             return $user;
         });

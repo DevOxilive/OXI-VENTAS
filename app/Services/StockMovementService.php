@@ -342,9 +342,10 @@ class StockMovementService
             ])
             ->where('quantity', '>', 0);
 
-        $hasTrackedBatches = (clone $batchQuery)->exists();
+        $hasTrackedInventory = (bool) $branchProduct->tracks_batches
+            || ProductBatch::where('branch_product_id', $branchProduct->id)->exists();
 
-        $stock = $hasTrackedBatches
+        $stock = $hasTrackedInventory
             ? (float) $batchQuery->sum('quantity')
             : (float) $branchProduct->stock;
 

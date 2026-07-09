@@ -4,13 +4,11 @@ import { Head, useForm } from '@inertiajs/vue3';
 defineProps({
     canResetPassword: Boolean,
     status: String,
-    branches: Array,
 });
 
 const form = useForm({
     email: '',
     password: '',
-    branch_id: '',
     remember: false,
 });
 
@@ -105,32 +103,6 @@ const submit = () => {
 
                             <p v-if="form.errors.password" class="mt-2 text-sm text-red-500">
                                 {{ form.errors.password }}
-                            </p>
-                        </div>
-
-                        <div>
-                            <label class="mb-2 block text-sm font-semibold text-slate-700">
-                                Sucursal
-                            </label>
-                            <select
-                                v-model="form.branch_id"
-                                class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200 sm:text-lg"
-                            >
-                                <option disabled value="">
-                                    Selecciona tu sucursal si eres vendedor
-                                </option>
-
-                                <option
-                                    v-for="branch in branches"
-                                    :key="branch.id"
-                                    :value="branch.id"
-                                >
-                                    {{ branch.name }}
-                                </option>
-                            </select>
-
-                            <p v-if="form.errors.branch_id" class="mt-2 text-sm text-red-500">
-                                {{ form.errors.branch_id }}
                             </p>
                         </div>
 

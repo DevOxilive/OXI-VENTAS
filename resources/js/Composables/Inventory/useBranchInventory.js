@@ -576,6 +576,7 @@ export function useBranchInventory(props) {
                     only: [
                         "branchProductsDB",
                         "productsDB",
+                        "categoriesDB",
                         "inventoryStats",
                         "inventoryAlerts",
                     ],

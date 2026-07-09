@@ -7,7 +7,7 @@ export function usePurchaseReport(props) {
 
     const localFilters = ref({
         search: props.filters?.search ?? "",
-        category: props.filters?.category ?? "",
+        category_id: props.filters?.category_id ?? "",
         stock: props.filters?.stock ?? "",
         per_page: props.filters?.per_page ?? 50,
     });
@@ -73,7 +73,7 @@ export function usePurchaseReport(props) {
 
     function applyFilters() {
         router.get(
-            route("inventory.branches.purchase-reports.create", {
+            route("inventory.branches.purchase-reports.index", {
                 branch: props.currentBranch.id,
             }),
             localFilters.value,

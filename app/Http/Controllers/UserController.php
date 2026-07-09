@@ -68,6 +68,48 @@ class UserController extends Controller
             ->exists();
     }
 
+    private function requiresBranchAssignments(Role $role, array $permissionIds = []): bool
+    {
+        if ($role->name === 'Administrador') {
+            return false;
+        }
+
+        if ($role->name === 'Ventas') {
+            return true;
+        }
+
+        if ($this->requiresSalesBranchesByPermissionIds($permissionIds)) {
+            return true;
+        }
+
+        if (empty($permissionIds)) {
+            return false;
+        }
+
+        return Permission::query()
+            ->whereIn('id', $permissionIds)
+            ->where(function ($query) {
+                $query
+                    ->where('name', 'like', 'inventory.products.%')
+                    ->orWhere('name', 'like', 'inventory.branches.%')
+                    ->orWhere('name', 'like', 'inventory.purchase-reports.%')
+                    ->orWhere('name', 'like', 'audits.physical-counts.%')
+                    ->orWhere('name', 'like', 'sales.%')
+                    ->orWhereIn('name', [
+                        'inventory.view',
+                        'inventory.create',
+                        'inventory.update',
+                        'inventory.delete',
+                    ]);
+            })
+            ->exists();
+    }
+
+    private function shouldPersistBranchAssignments(Role $role): bool
+    {
+        return $role->name !== 'Administrador';
+    }
+
     private function visiblePermissionsQuery()
     {
         return Permission::query()
@@ -342,12 +384,11 @@ class UserController extends Controller
 
         $role = Role::findOrFail($validated['role_id']);
         $finalPermissionIds = $validated['permissions'] ?? [];
-        $requiresSalesBranches = $role->name === 'Ventas'
-            || $this->requiresSalesBranchesByPermissionIds($finalPermissionIds);
+        $requiresBranchAssignments = $this->requiresBranchAssignments($role, $finalPermissionIds);
 
-        if ($requiresSalesBranches && empty($validated['branch_ids'])) {
+        if ($requiresBranchAssignments && empty($validated['branch_ids'])) {
             return back()->withErrors([
-                'branch_ids' => 'Debes seleccionar al menos una sucursal para este usuario de ventas.',
+                'branch_ids' => 'Debes seleccionar al menos una sucursal para este usuario.',
             ])->withInput();
         }
 
@@ -367,9 +408,9 @@ class UserController extends Controller
         );
 
         $user->branches()->sync(
-            $requiresSalesBranches
-            ? ($validated['branch_ids'] ?? [])
-            : []
+            $this->shouldPersistBranchAssignments($role)
+                ? ($validated['branch_ids'] ?? [])
+                : []
         );
 
         $user->load(['role', 'permissions', 'branches']);
@@ -399,12 +440,11 @@ class UserController extends Controller
 
         $role = Role::findOrFail($validated['role_id']);
         $finalPermissionIds = $validated['permissions'] ?? [];
-        $requiresSalesBranches = $role->name === 'Ventas'
-            || $this->requiresSalesBranchesByPermissionIds($finalPermissionIds);
+        $requiresBranchAssignments = $this->requiresBranchAssignments($role, $finalPermissionIds);
 
-        if ($requiresSalesBranches && empty($validated['branch_ids'])) {
+        if ($requiresBranchAssignments && empty($validated['branch_ids'])) {
             return back()->withErrors([
-                'branch_ids' => 'Debes seleccionar al menos una sucursal para este usuario de ventas.',
+                'branch_ids' => 'Debes seleccionar al menos una sucursal para este usuario.',
             ])->withInput();
         }
 
@@ -428,9 +468,9 @@ class UserController extends Controller
         );
 
         $user->branches()->sync(
-            $requiresSalesBranches
-            ? ($validated['branch_ids'] ?? [])
-            : []
+            $this->shouldPersistBranchAssignments($role)
+                ? ($validated['branch_ids'] ?? [])
+                : []
         );
 
         $this->refreshAuthenticatedSession($request, $user);

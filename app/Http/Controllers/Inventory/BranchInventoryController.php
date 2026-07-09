@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Inventory;
 
 use App\Events\InventoryStockUpdated;
 use App\Events\RealtimeActivityLogged;
+use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
@@ -18,6 +19,8 @@ use Inertia\Inertia;
 
 class BranchInventoryController extends Controller
 {
+    use AuthorizesBranchAccess;
+
     public function index(Request $request)
     {
         return $this->renderInventory($request, null);
@@ -25,6 +28,8 @@ class BranchInventoryController extends Controller
 
     public function show(Request $request, Branch $branch)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         return $this->renderInventory($request, $branch);
     }
 
@@ -303,11 +308,27 @@ class BranchInventoryController extends Controller
             ],
 
             'productsDB' => Product::query()
-                ->select(['id', 'name', 'sale_price', 'cost', 'unit', 'category_id'])
-                ->where('active', true)
-                ->orderBy('name')
+                ->select(['products.id', 'products.name', 'products.sale_price', 'products.cost', 'products.unit', 'products.category_id'])
+                ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
+                ->when($branch, fn ($query) => $query->where('branch_products.branch_id', $branch->id))
+                ->where('products.active', true)
+                ->with(['category:id,name', 'barcodes:id,product_id,code'])
+                ->distinct()
+                ->orderBy('products.name')
                 ->limit(300)
-                ->get(),
+                ->get()
+                ->map(fn (Product $product) => [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'sale_price' => $product->sale_price,
+                    'cost' => $product->cost,
+                    'unit' => $product->unit,
+                    'category_id' => $product->category_id,
+                    'category_name' => $product->category?->name,
+                    'main_barcode' => $product->barcodes?->first()?->code,
+                    'label' => trim($product->name . ' - ' . ($product->barcodes?->first()?->code ?? 'Sin codigo')),
+                ])
+                ->values(),
 
             'branchesDB' => Branch::query()
                 ->select(['id', 'name', 'slug'])
@@ -315,10 +336,7 @@ class BranchInventoryController extends Controller
                 ->orderBy('name')
                 ->get(),
 
-            'categoriesDB' => Category::query()
-                ->select(['id', 'name'])
-                ->orderBy('name')
-                ->get(),
+            'categoriesDB' => $this->categoryOptions($branch),
 
             'filters' => [
                 'search' => $request->search,
@@ -330,6 +348,18 @@ class BranchInventoryController extends Controller
                 'per_page' => $perPage,
             ],
         ]);
+    }
+
+    private function categoryOptions(?Branch $branch)
+    {
+        return Category::query()
+            ->select(['categories.id', 'categories.name'])
+            ->join('products', 'products.category_id', '=', 'categories.id')
+            ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
+            ->when($branch, fn ($query) => $query->where('branch_products.branch_id', $branch->id))
+            ->distinct()
+            ->orderBy('categories.name')
+            ->get();
     }
 
     public function details(BranchProduct $branchProduct): JsonResponse

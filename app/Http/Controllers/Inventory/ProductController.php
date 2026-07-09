@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Events\ProductChanged;
 use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Controller;
@@ -18,6 +19,8 @@ use Inertia\Inertia;
 
 class ProductController extends Controller
 {
+    use AuthorizesBranchAccess;
+
     private const PRODUCT_IMAGE_PRIVATE_DISK = 'local';
     private const PRODUCT_IMAGE_LEGACY_DISK = 'public';
 
@@ -35,6 +38,8 @@ class ProductController extends Controller
 
     public function index(Request $request, Branch $branch)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $perPage = TablePagination::resolvePerPage($request, 10);
 
         $query = BranchProduct::query()
@@ -172,6 +177,8 @@ class ProductController extends Controller
 
     public function store(Request $request, Branch $branch)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $data = $request->validate([
             'barcodes' => ['nullable', 'array'],
             'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct', 'unique:barcodes,code'],
@@ -264,6 +271,8 @@ class ProductController extends Controller
 
     public function update(Request $request, Branch $branch, Product $product)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $data = $request->validate([
             'barcodes' => ['nullable', 'array'],
             'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct'],
@@ -395,6 +404,8 @@ class ProductController extends Controller
 
     public function destroy(Branch $branch, Product $product)
     {
+        $this->abortIfUserCannotAccessBranch(request(), $branch);
+
         $productId = $product->id;
         $productName = $product->name;
         $branchIds = BranchProduct::where('product_id', $product->id)
