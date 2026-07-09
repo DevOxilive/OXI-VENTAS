@@ -126,6 +126,10 @@ function isOpen(item) {
     return Boolean(openItems[item.key])
 }
 
+function hasChildren(item) {
+    return Array.isArray(item?.children) && item.children.length > 0
+}
+
 function closeAllItems() {
     Object.keys(openItems).forEach((key) => {
         openItems[key] = false
@@ -268,7 +272,7 @@ onBeforeUnmount(() => {
         <li v-for="item in items" :key="item.key || item.text">
             <div>
                 <Link
-                    v-if="item.url"
+                    v-if="item.url && !hasChildren(item)"
                     :href="item.url"
                     class="group flex items-center rounded-xl text-slate-700 transition hover:bg-slate-100"
                     :class="extended ? 'gap-3 px-3 py-3' : 'justify-center px-2 py-3'"
@@ -319,7 +323,7 @@ onBeforeUnmount(() => {
                     </div>
 
                     <span
-                        v-if="item.children?.length && extended"
+                        v-if="hasChildren(item) && extended"
                         class="material-symbols-outlined text-[18px] text-slate-400 transition"
                     >
                         {{ isOpen(item) ? "expand_more" : "chevron_right" }}
@@ -328,7 +332,7 @@ onBeforeUnmount(() => {
             </div>
 
             <div
-                v-if="item.children?.length && isOpen(item) && extended"
+                v-if="hasChildren(item) && isOpen(item) && extended"
                 class="ml-5 mt-1 space-y-1 border-l border-slate-200 pl-2.5"
             >
                 <SidebarItem

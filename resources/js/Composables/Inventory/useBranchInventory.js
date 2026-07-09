@@ -170,7 +170,6 @@ export function useBranchInventory(props) {
         showBatchAdjustmentModal,
         liveSelectedBatch,
         processing: batchAdjustmentProcessing,
-        usesLot: batchAdjustmentUsesLot,
         form: batchAdjustmentForm,
         frontendErrors: batchAdjustmentErrors,
         totalErrors: batchAdjustmentTotalErrors,
@@ -180,7 +179,6 @@ export function useBranchInventory(props) {
         quantityResultColor: batchAdjustmentQuantityResultColor,
         adjustBatch,
         closeBatchAdjustmentModal,
-        toggleLot: toggleBatchAdjustmentLot,
         setAdjustmentType: setBatchAdjustmentType,
         validateField: validateBatchAdjustmentField,
         saveEditedBatch,
@@ -208,11 +206,6 @@ export function useBranchInventory(props) {
     function closeProductBatchesModal() {
         showProductBatchesModal.value = false;
         selectedBatchesProductId.value = null;
-    }
-
-    function openBatchAdjustmentFromList(batch) {
-        closeProductBatchesModal();
-        adjustBatch(batch);
     }
 
     const liveSelectedMovementProduct = computed(() => {
@@ -670,8 +663,6 @@ export function useBranchInventory(props) {
         liveSelectedBatchesProduct,
         openProductBatchesModal,
         closeProductBatchesModal,
-        openBatchAdjustmentFromList,
-
         showBatchAdjustmentModal,
         liveSelectedBatch,
 
@@ -679,7 +670,6 @@ export function useBranchInventory(props) {
         closeBatchAdjustmentModal,
 
         batchAdjustmentProcessing,
-        batchAdjustmentUsesLot,
         batchAdjustmentForm,
         batchAdjustmentErrors,
         batchAdjustmentTotalErrors,
@@ -688,7 +678,6 @@ export function useBranchInventory(props) {
         batchAdjustmentText,
         batchAdjustmentQuantityResultColor,
 
-        toggleBatchAdjustmentLot,
         setBatchAdjustmentType,
         validateBatchAdjustmentField,
         saveEditedBatch,

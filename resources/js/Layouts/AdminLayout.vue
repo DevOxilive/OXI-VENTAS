@@ -12,6 +12,7 @@ import {
 import { ToastAlert } from '@/Components/Modales/UniversalActionModal'
 
 const page = usePage()
+const desktopMediaQuery = '(min-width: 768px)'
 
 const { permissions, role } = usePermissions()
 
@@ -31,10 +32,13 @@ const sidebarOpen = ref(false)
 const desktopSidebarCollapsed = ref(false)
 const desktopSidebarStorageKey = 'desktopSidebarCollapsed'
 const collapseEventName = 'sidebar:collapse-all'
+const isDesktopViewport = ref(false)
 let systemsChannel = null
 let activityChannel = null
 let handleUserChanged = null
 let handleRealtimeActivity = null
+let desktopMediaQueryList = null
+let handleDesktopViewportChange = null
 
 function emitCollapseAllItems() {
     if (typeof window === 'undefined') return
@@ -66,13 +70,18 @@ function expandDesktopSidebar() {
 
 function closeSidebarAfterNavigation() {
     sidebarOpen.value = false
-    desktopSidebarCollapsed.value = true
     emitCollapseAllItems()
 }
 
 function closeSidebarFromOutside() {
-    if (sidebarOpen.value || !desktopSidebarCollapsed.value) {
+    if (!isDesktopViewport.value && sidebarOpen.value) {
         closeSidebarAfterNavigation()
+        return
+    }
+
+    if (isDesktopViewport.value && !desktopSidebarCollapsed.value) {
+        desktopSidebarCollapsed.value = true
+        emitCollapseAllItems()
     }
 }
 
@@ -84,6 +93,18 @@ onMounted(() => {
     if (typeof window !== 'undefined') {
         desktopSidebarCollapsed.value =
             window.localStorage.getItem(desktopSidebarStorageKey) === 'true'
+
+        desktopMediaQueryList = window.matchMedia(desktopMediaQuery)
+        handleDesktopViewportChange = (event) => {
+            isDesktopViewport.value = event.matches
+
+            if (event.matches) {
+                sidebarOpen.value = false
+            }
+        }
+
+        isDesktopViewport.value = desktopMediaQueryList.matches
+        desktopMediaQueryList.addEventListener('change', handleDesktopViewportChange)
     }
 
     if (!window.Echo || !page.props.auth?.user?.id) return
@@ -118,6 +139,10 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+    if (desktopMediaQueryList && handleDesktopViewportChange) {
+        desktopMediaQueryList.removeEventListener('change', handleDesktopViewportChange)
+    }
+
     if (systemsChannel && handleUserChanged) {
         systemsChannel.stopListening('.UserChanged', handleUserChanged)
     }
@@ -143,10 +168,10 @@ watch(desktopSidebarCollapsed, (value) => {
         />
 
         <aside
-            class="fixed z-50 flex h-dvh flex-col overflow-hidden border-r bg-white shadow-sm transition-all duration-300 md:static md:z-auto md:translate-x-0"
+            class="fixed left-0 top-0 z-50 flex h-dvh flex-col overflow-hidden border-r bg-white shadow-sm transition-all duration-300 md:static md:z-auto md:translate-x-0"
             :class="[
                 sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-                desktopSidebarCollapsed ? 'w-20' : 'w-72',
+                desktopSidebarCollapsed ? 'w-72 md:w-20' : 'w-72',
             ]"
         >
             <div class="shrink-0 border-b border-slate-100 px-4 py-3">
@@ -183,7 +208,7 @@ watch(desktopSidebarCollapsed, (value) => {
 
             <SidebarItem
                 :items="menuItems"
-                :extended="!desktopSidebarCollapsed"
+                :extended="isDesktopViewport ? !desktopSidebarCollapsed : true"
                 :branch-keys="branchKeys"
                 @expand-request="expandDesktopSidebar"
                 @navigate="closeSidebarAfterNavigation"
@@ -196,7 +221,7 @@ watch(desktopSidebarCollapsed, (value) => {
                     <div class="flex min-w-0 items-center gap-3">
                         <button
                             class="rounded-xl bg-slate-100 p-2.5 transition hover:bg-slate-200 md:hidden"
-                            @click="toggleSidebar"
+                            @click.stop="toggleSidebar"
                         >
                             <span class="material-symbols-outlined text-[22px] text-slate-700">
                                 menu
