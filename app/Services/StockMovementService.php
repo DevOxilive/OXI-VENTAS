@@ -29,129 +29,115 @@ class StockMovementService
             throw new InvalidArgumentException('La cantidad no puede ser 0.');
         }
 
-        return DB::transaction(function () use ($branchProduct, $type, $reason, $quantity, $notes, $userId, $batches, $batchAllocationMethod, $manualBatches) {
-            $branchProduct = BranchProduct::whereKey($branchProduct->id)
+        return DB::transaction(function () use (
+            $branchProduct,
+            $type,
+            $reason,
+            $quantity,
+            $notes,
+            $userId,
+            $batches,
+            $batchAllocationMethod,
+            $manualBatches
+        ) {
+            return $this->performMovement(
+                branchProduct: $branchProduct,
+                type: $type,
+                reason: $reason,
+                quantity: $quantity,
+                notes: $notes,
+                userId: $userId,
+                batches: $batches,
+                batchAllocationMethod: $batchAllocationMethod,
+                manualBatches: $manualBatches,
+            );
+        });
+    }
+
+    public function distributeIncoming(
+        BranchProduct $sourceBranchProduct,
+        string $reason,
+        float $quantity,
+        ?string $notes = null,
+        ?int $userId = null,
+        array $batch = [],
+        array $branchAllocations = []
+    ): array {
+        if ($quantity <= 0) {
+            throw new InvalidArgumentException('La cantidad debe ser mayor a 0.');
+        }
+
+        $normalizedAllocations = collect($branchAllocations)
+            ->map(function ($allocation) {
+                return [
+                    'branch_id' => (int) ($allocation['branch_id'] ?? 0),
+                    'quantity' => (float) ($allocation['quantity'] ?? 0),
+                ];
+            })
+            ->filter(fn ($allocation) => $allocation['branch_id'] > 0 && $allocation['quantity'] > 0)
+            ->values();
+
+        if ($normalizedAllocations->isEmpty()) {
+            throw new InvalidArgumentException('Debes seleccionar al menos una sucursal para la entrada.');
+        }
+
+        if (round($normalizedAllocations->sum('quantity'), 3) !== round($quantity, 3)) {
+            throw new InvalidArgumentException('La suma asignada a sucursales debe coincidir con la cantidad total.');
+        }
+
+        return DB::transaction(function () use (
+            $sourceBranchProduct,
+            $reason,
+            $notes,
+            $userId,
+            $batch,
+            $normalizedAllocations
+        ) {
+            $sourceBranchProduct = BranchProduct::whereKey($sourceBranchProduct->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $this->validateMovement($type, $reason, $quantity);
+            return $normalizedAllocations
+                ->map(function ($allocation) use ($sourceBranchProduct, $reason, $notes, $userId, $batch) {
+                    $targetBranchProduct = $this->resolveTargetBranchProduct(
+                        sourceBranchProduct: $sourceBranchProduct,
+                        targetBranchId: $allocation['branch_id'],
+                    );
 
-            $previousStock = (float) $branchProduct->stock;
+                    $movement = $this->performMovement(
+                        branchProduct: $targetBranchProduct,
+                        type: StockMovement::TYPE_IN,
+                        reason: $reason,
+                        quantity: $allocation['quantity'],
+                        notes: $notes,
+                        userId: $userId,
+                        batches: [[
+                            'lot_number' => $batch['lot_number'] ?? null,
+                            'expiration_date' => $batch['expiration_date'] ?? null,
+                            'received_at' => $batch['received_at'] ?? null,
+                            'supplier' => $batch['supplier'] ?? null,
+                            'quantity' => $allocation['quantity'],
+                        ]],
+                    );
 
-            if ($type === StockMovement::TYPE_IN) {
-                $this->ensureBatchTrackingForIncomingMovement($branchProduct, $batches);
-
-                if (count($batches) === 0) {
-                    $batches = [
-                        [
-                            'lot_number' => null,
-                            'expiration_date' => null,
-                            'quantity' => $quantity,
-                            'supplier' => null,
-                        ]
+                    return [
+                        'branch_id' => $targetBranchProduct->branch_id,
+                        'branch_product_id' => $targetBranchProduct->id,
+                        'movement_id' => $movement->id,
+                        'quantity' => $allocation['quantity'],
                     ];
-                }
-            }
-
-            if ($type === StockMovement::TYPE_OUT) {
-                if ($batchAllocationMethod !== StockMovementBatch::ALLOCATION_MANUAL) {
-                    throw new InvalidArgumentException('La salida debe indicar selección manual de entradas/lotes.');
-                }
-
-                if (count($manualBatches) === 0) {
-                    throw new InvalidArgumentException('Debes seleccionar al menos una entrada/lote para la salida.');
-                }
-            }
-
-            if ($type === StockMovement::TYPE_ADJUSTMENT && $quantity < 0 && count($manualBatches) === 0) {
-                throw new InvalidArgumentException('Debes seleccionar al menos una entrada/lote para el ajuste negativo.');
-            }
-
-            $projectedStock = match ($type) {
-                StockMovement::TYPE_IN => $previousStock + $quantity,
-                StockMovement::TYPE_OUT => $previousStock - $quantity,
-                StockMovement::TYPE_ADJUSTMENT => $previousStock + $quantity,
-                default => throw new InvalidArgumentException('Tipo de movimiento inválido.'),
-            };
-
-            if ($projectedStock < 0) {
-                throw new InvalidArgumentException('No hay stock suficiente para realizar este movimiento.');
-            }
-
-            $movement = StockMovement::create([
-                'branch_product_id' => $branchProduct->id,
-                'type' => $type,
-                'reason' => $reason,
-                'quantity' => $quantity,
-                'previous_stock' => $previousStock,
-                'new_stock' => $projectedStock,
-                'user_id' => $userId ?? Auth::id(),
-                'notes' => $notes,
-            ]);
-
-            if ($type === StockMovement::TYPE_IN) {
-                $this->createIncomingBatches(
-                    movement: $movement,
-                    branchProduct: $branchProduct,
-                    batches: $batches,
-                    expectedQuantity: $quantity
-                );
-            }
-
-            if ($type === StockMovement::TYPE_OUT) {
-                $this->consumeManualBatches(
-                    movement: $movement,
-                    branchProduct: $branchProduct,
-                    manualBatches: $manualBatches,
-                    expectedQuantity: $quantity
-                );
-            }
-
-            if ($type === StockMovement::TYPE_ADJUSTMENT) {
-                $this->applyBatchAdjustment(
-                    movement: $movement,
-                    branchProduct: $branchProduct,
-                    quantity: $quantity,
-                    manualBatches: $manualBatches
-                );
-            }
-
-            $newStock = $this->syncBranchProductStock($branchProduct);
-
-            $movement->update([
-                'new_stock' => $newStock,
-            ]);
-
-            if ($type === StockMovement::TYPE_IN && $reason === StockMovement::REASON_PURCHASE) {
-                $branchProduct->update([
-                    'last_restocked_at' => now(),
-                ]);
-            }
-
-            $branchProduct = $branchProduct->fresh([
-                'product:id,name',
-            ]);
-
-            event(new InventoryStockUpdated($branchProduct));
-            event(RealtimeActivityLogged::message(
-                $this->activityActionLabel($type),
-                'stock del producto',
-                $branchProduct->product?->name,
-                'Inventario',
-                $type,
-            ));
-
-            return $movement;
+                })
+                ->all();
         });
     }
 
     private function activityActionLabel(string $type): string
     {
         return match ($type) {
-            StockMovement::TYPE_IN => 'registró una entrada de',
-            StockMovement::TYPE_OUT => 'registró una salida de',
-            StockMovement::TYPE_ADJUSTMENT => 'ajustó',
-            default => 'actualizó',
+            StockMovement::TYPE_IN => 'registro una entrada de',
+            StockMovement::TYPE_OUT => 'registro una salida de',
+            StockMovement::TYPE_ADJUSTMENT => 'ajusto',
+            default => 'actualizo',
         };
     }
 
@@ -164,7 +150,7 @@ class StockMovementService
         ];
 
         if (!in_array($type, $validTypes, true)) {
-            throw new InvalidArgumentException('Tipo de movimiento inválido.');
+            throw new InvalidArgumentException('Tipo de movimiento invalido.');
         }
 
         $validReasonsByType = [
@@ -183,7 +169,7 @@ class StockMovementService
         ];
 
         if (!in_array($reason, $validReasonsByType[$type], true)) {
-            throw new InvalidArgumentException('Motivo de movimiento inválido para este tipo.');
+            throw new InvalidArgumentException('Motivo de movimiento invalido para este tipo.');
         }
 
         if ($type !== StockMovement::TYPE_ADJUSTMENT && $quantity <= 0) {
@@ -214,7 +200,7 @@ class StockMovementService
         }
 
         $hasExpirationDate = collect($batches)
-            ->contains(fn($batch) => !empty($batch['expiration_date']));
+            ->contains(fn ($batch) => !empty($batch['expiration_date']));
 
         $branchProduct->update([
             'tracks_batches' => true,
@@ -231,7 +217,7 @@ class StockMovementService
         float $expectedQuantity
     ): void {
         $totalBatchQuantity = collect($batches)
-            ->sum(fn($batch) => (float) ($batch['quantity'] ?? 0));
+            ->sum(fn ($batch) => (float) ($batch['quantity'] ?? 0));
 
         if (round($totalBatchQuantity, 3) !== round($expectedQuantity, 3)) {
             throw new InvalidArgumentException('La suma de las entradas/lotes debe coincidir con la cantidad total.');
@@ -273,7 +259,7 @@ class StockMovementService
         float $expectedQuantity
     ): void {
         $totalManualQuantity = collect($manualBatches)
-            ->sum(fn($batch) => (float) ($batch['quantity'] ?? 0));
+            ->sum(fn ($batch) => (float) ($batch['quantity'] ?? 0));
 
         if (round($totalManualQuantity, 3) !== round($expectedQuantity, 3)) {
             throw new InvalidArgumentException('La suma manual de entradas/lotes debe coincidir con la cantidad total.');
@@ -335,34 +321,189 @@ class StockMovementService
                 movement: $movement,
                 branchProduct: $branchProduct,
                 batches: count($manualBatches) > 0
-                ? $manualBatches
-                : [
-                    [
+                    ? $manualBatches
+                    : [[
                         'lot_number' => null,
                         'expiration_date' => null,
                         'quantity' => $quantity,
                         'supplier' => null,
-                    ]
-                ],
+                    ]],
                 expectedQuantity: $quantity
             );
         }
     }
 
-    private function syncBranchProductStock(BranchProduct $branchProduct): float
+    private function getCurrentBranchProductStock(BranchProduct $branchProduct, bool $syncStoredStock = true): float
     {
-        $stock = (float) ProductBatch::where('branch_product_id', $branchProduct->id)
+        $batchQuery = ProductBatch::where('branch_product_id', $branchProduct->id)
             ->whereIn('status', [
                 ProductBatch::STATUS_ACTIVE,
                 ProductBatch::STATUS_SEASONAL,
             ])
-            ->where('quantity', '>', 0)
-            ->sum('quantity');
+            ->where('quantity', '>', 0);
 
-        $branchProduct->update([
-            'stock' => $stock,
-        ]);
+        $hasTrackedBatches = (clone $batchQuery)->exists();
+
+        $stock = $hasTrackedBatches
+            ? (float) $batchQuery->sum('quantity')
+            : (float) $branchProduct->stock;
+
+        if ($syncStoredStock && (float) $branchProduct->stock !== $stock) {
+            $branchProduct->update([
+                'stock' => $stock,
+            ]);
+        }
 
         return $stock;
+    }
+
+    private function performMovement(
+        BranchProduct $branchProduct,
+        string $type,
+        string $reason,
+        float $quantity,
+        ?string $notes = null,
+        ?int $userId = null,
+        array $batches = [],
+        string $batchAllocationMethod = StockMovementBatch::ALLOCATION_MANUAL,
+        array $manualBatches = []
+    ): StockMovement {
+        $branchProduct = BranchProduct::whereKey($branchProduct->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $this->validateMovement($type, $reason, $quantity);
+
+        $previousStock = $this->getCurrentBranchProductStock($branchProduct);
+
+        if ($type === StockMovement::TYPE_IN) {
+            $this->ensureBatchTrackingForIncomingMovement($branchProduct, $batches);
+
+            if (count($batches) === 0) {
+                $batches = [[
+                    'lot_number' => null,
+                    'expiration_date' => null,
+                    'quantity' => $quantity,
+                    'supplier' => null,
+                ]];
+            }
+        }
+
+        if ($type === StockMovement::TYPE_OUT) {
+            if ($batchAllocationMethod !== StockMovementBatch::ALLOCATION_MANUAL) {
+                throw new InvalidArgumentException('La salida debe indicar seleccion manual de entradas/lotes.');
+            }
+
+            if (count($manualBatches) === 0) {
+                throw new InvalidArgumentException('Debes seleccionar al menos una entrada/lote para la salida.');
+            }
+        }
+
+        if ($type === StockMovement::TYPE_ADJUSTMENT && $quantity < 0 && count($manualBatches) === 0) {
+            throw new InvalidArgumentException('Debes seleccionar al menos una entrada/lote para el ajuste negativo.');
+        }
+
+        $projectedStock = match ($type) {
+            StockMovement::TYPE_IN => $previousStock + $quantity,
+            StockMovement::TYPE_OUT => $previousStock - $quantity,
+            StockMovement::TYPE_ADJUSTMENT => $previousStock + $quantity,
+            default => throw new InvalidArgumentException('Tipo de movimiento invalido.'),
+        };
+
+        if ($projectedStock < 0) {
+            throw new InvalidArgumentException('No hay stock suficiente para realizar este movimiento.');
+        }
+
+        $movement = StockMovement::create([
+            'branch_product_id' => $branchProduct->id,
+            'type' => $type,
+            'reason' => $reason,
+            'quantity' => $quantity,
+            'previous_stock' => $previousStock,
+            'new_stock' => $projectedStock,
+            'user_id' => $userId ?? Auth::id(),
+            'notes' => $notes,
+        ]);
+
+        if ($type === StockMovement::TYPE_IN) {
+            $this->createIncomingBatches(
+                movement: $movement,
+                branchProduct: $branchProduct,
+                batches: $batches,
+                expectedQuantity: $quantity
+            );
+        }
+
+        if ($type === StockMovement::TYPE_OUT) {
+            $this->consumeManualBatches(
+                movement: $movement,
+                branchProduct: $branchProduct,
+                manualBatches: $manualBatches,
+                expectedQuantity: $quantity
+            );
+        }
+
+        if ($type === StockMovement::TYPE_ADJUSTMENT) {
+            $this->applyBatchAdjustment(
+                movement: $movement,
+                branchProduct: $branchProduct,
+                quantity: $quantity,
+                manualBatches: $manualBatches
+            );
+        }
+
+        $newStock = $this->getCurrentBranchProductStock($branchProduct);
+
+        $movement->update([
+            'new_stock' => $newStock,
+        ]);
+
+        if ($type === StockMovement::TYPE_IN && $reason === StockMovement::REASON_PURCHASE) {
+            $branchProduct->update([
+                'last_restocked_at' => now(),
+            ]);
+        }
+
+        $branchProduct = $branchProduct->fresh([
+            'product:id,name',
+        ]);
+
+        event(new InventoryStockUpdated($branchProduct));
+        event(RealtimeActivityLogged::message(
+            $this->activityActionLabel($type),
+            'stock del producto',
+            $branchProduct->product?->name,
+            'Inventario',
+            $type,
+        ));
+
+        return $movement;
+    }
+
+    private function resolveTargetBranchProduct(
+        BranchProduct $sourceBranchProduct,
+        int $targetBranchId
+    ): BranchProduct {
+        BranchProduct::updateOrCreate(
+            [
+                'branch_id' => $targetBranchId,
+                'product_id' => $sourceBranchProduct->product_id,
+            ],
+            [
+                'stock' => 0,
+                'min_stock' => $sourceBranchProduct->min_stock ?? 0,
+                'status' => $sourceBranchProduct->status ?? BranchProduct::STATUS_ACTIVE,
+                'tracks_batches' => (bool) $sourceBranchProduct->tracks_batches,
+                'tracks_expiration' => (bool) $sourceBranchProduct->tracks_expiration,
+                'season_start_date' => $sourceBranchProduct->season_start_date,
+                'season_end_date' => $sourceBranchProduct->season_end_date,
+                'inactive_candidate_after_days' => $sourceBranchProduct->inactive_candidate_after_days ?? 90,
+            ]
+        );
+
+        return BranchProduct::where('branch_id', $targetBranchId)
+            ->where('product_id', $sourceBranchProduct->product_id)
+            ->lockForUpdate()
+            ->firstOrFail();
     }
 }
