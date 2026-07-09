@@ -1,11 +1,11 @@
 import { computed, reactive, ref, watch } from "vue";
 import { router } from "@inertiajs/vue3";
 import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
+
 export function useBatchAdjustmentModal(products) {
     const showBatchAdjustmentModal = ref(false);
     const selectedBatchId = ref(null);
     const processing = ref(false);
-    const usesLot = ref(false);
 
     const form = reactive({
         id: null,
@@ -81,28 +81,29 @@ export function useBatchAdjustmentModal(products) {
     });
 
     const calculatedQuantity = computed(() => {
-        return (
-            Number(form.original_quantity || 0) + signedAdjustmentQuantity.value
-        );
+        return Number(form.original_quantity || 0) + signedAdjustmentQuantity.value;
     });
 
     const adjustmentText = computed(() => {
         const amount = Number(form.adjustment_amount || 0);
 
         if (!amount) {
-            return "No se aplicará ajuste de cantidad.";
+            return "No se aplicara ajuste de cantidad.";
         }
 
         return form.adjustment_type === "ADD"
-            ? `Se agregarán ${amount} unidad(es).`
-            : `Se eliminarán ${amount} unidad(es).`;
+            ? `Se agregaran ${amount} unidad(es).`
+            : `Se eliminaran ${amount} unidad(es).`;
     });
 
     const quantityResultColor = computed(() => {
-        if (calculatedQuantity.value < form.original_quantity)
+        if (calculatedQuantity.value < form.original_quantity) {
             return "text-red-600";
-        if (calculatedQuantity.value > form.original_quantity)
+        }
+
+        if (calculatedQuantity.value > form.original_quantity) {
             return "text-emerald-600";
+        }
 
         return "text-slate-900";
     });
@@ -125,8 +126,6 @@ export function useBatchAdjustmentModal(products) {
             form.status = batch.status || "ACTIVE";
             form.notes = "";
 
-            usesLot.value = Boolean(batch.lot_number);
-
             clearErrors();
         },
         { immediate: true },
@@ -136,8 +135,6 @@ export function useBatchAdjustmentModal(products) {
         () => form.status,
         (status) => {
             if (status !== "SEASONAL") {
-                form.season_start_date = "";
-                form.season_end_date = "";
                 frontendErrors.season_start_date = "";
                 frontendErrors.season_end_date = "";
             }
@@ -157,15 +154,6 @@ export function useBatchAdjustmentModal(products) {
         });
     }
 
-    function toggleLot() {
-        usesLot.value = !usesLot.value;
-
-        if (!usesLot.value) {
-            form.lot_number = "";
-            frontendErrors.lot_number = "";
-        }
-    }
-
     function setAdjustmentType(type) {
         form.adjustment_type = type;
         validateField("adjustment_amount");
@@ -178,40 +166,37 @@ export function useBatchAdjustmentModal(products) {
             if (
                 form.adjustment_amount === "" ||
                 form.adjustment_amount === null
-            )
+            ) {
                 return;
+            }
 
             const amount = Number(form.adjustment_amount);
 
             if (Number.isNaN(amount)) {
-                frontendErrors.adjustment_amount =
-                    "La cantidad debe ser un número.";
+                frontendErrors.adjustment_amount = "La cantidad debe ser un numero.";
                 return;
             }
 
             if (amount < 0) {
-                frontendErrors.adjustment_amount =
-                    "Captura solo números positivos.";
+                frontendErrors.adjustment_amount = "Captura solo numeros positivos.";
                 return;
             }
 
             if (amount === 0) {
-                frontendErrors.adjustment_amount =
-                    "La cantidad debe ser mayor a 0.";
+                frontendErrors.adjustment_amount = "La cantidad debe ser mayor a 0.";
                 return;
             }
 
             if (calculatedQuantity.value < 0) {
                 frontendErrors.adjustment_amount =
-                    "No puedes eliminar más unidades de las disponibles.";
-                return;
+                    "No puedes eliminar mas unidades de las disponibles.";
             }
 
             return;
         }
 
-        if (field === "lot_number" && usesLot.value && !form.lot_number) {
-            frontendErrors.lot_number = "El número de lote es obligatorio.";
+        if (field === "lot_number" && !form.lot_number) {
+            frontendErrors.lot_number = "El numero de lote es obligatorio.";
         }
 
         if (field === "status" && !form.status) {
@@ -249,8 +234,7 @@ export function useBatchAdjustmentModal(products) {
         }
 
         if (field === "notes" && form.notes && form.notes.length > 500) {
-            frontendErrors.notes =
-                "La nota no puede superar los 500 caracteres.";
+            frontendErrors.notes = "La nota no puede superar los 500 caracteres.";
         }
     }
 
@@ -290,7 +274,7 @@ export function useBatchAdjustmentModal(products) {
         router.put(
             route("inventory.product-batches.update", form.id),
             {
-                lot_number: usesLot.value ? form.lot_number || null : null,
+                lot_number: form.lot_number || null,
                 expiration_date: form.expiration_date || null,
                 supplier: form.supplier || null,
                 received_at: form.received_at || null,
@@ -315,10 +299,7 @@ export function useBatchAdjustmentModal(products) {
                     successTitle: "Lote actualizado",
                     errorTitle: "No se pudo actualizar",
                     errorMessage:
-                        "Revisa la información del lote e intenta nuevamente.",
-                    onSuccess: () => {
-                        emit("created", form.lot_number);
-                    },
+                        "Revisa la informacion del lote e intenta nuevamente.",
                 }),
                 onFinish: () => {
                     processing.value = false;
@@ -326,13 +307,13 @@ export function useBatchAdjustmentModal(products) {
             },
         );
     }
+
     return {
         showBatchAdjustmentModal,
         liveSelectedBatch,
         selectedBatchId,
 
         processing,
-        usesLot,
         form,
         frontendErrors,
         totalErrors,
@@ -343,7 +324,6 @@ export function useBatchAdjustmentModal(products) {
 
         adjustBatch,
         closeBatchAdjustmentModal,
-        toggleLot,
         setAdjustmentType,
         validateField,
         saveEditedBatch,

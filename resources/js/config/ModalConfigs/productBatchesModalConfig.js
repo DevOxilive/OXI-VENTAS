@@ -12,7 +12,10 @@ export function getProductBatchesModalConfig({
         processing,
         saveButtonText: 'Guardar cambios',
         closeButtonText: 'Cerrar',
-        ...modalPresets.workspaceControlled,
+        ...modalPresets.standard,
+        size: '2xl',
+        height: 'full',
+        scrollMode: 'controlled',
         alerts: {
             entityName: 'Lotes',
             edit: {

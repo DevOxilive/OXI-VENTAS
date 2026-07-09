@@ -69,6 +69,10 @@ class StockMovementController extends Controller
             ],
             'batches.*.supplier' => ['nullable', 'string', 'max:100'],
 
+            'branch_allocations' => ['nullable', 'array'],
+            'branch_allocations.*.branch_id' => ['required_with:branch_allocations', 'exists:branches,id'],
+            'branch_allocations.*.quantity' => ['required_with:branch_allocations', 'numeric', 'min:0.001'],
+
             /*
             |--------------------------------------------------------------------------
             | Selección manual de lotes para salidas
@@ -112,33 +116,57 @@ class StockMovementController extends Controller
         $branchProduct = BranchProduct::findOrFail($validated['branch_product_id']);
 
         try {
+            $hasBranchAllocations = $validated['type'] === StockMovement::TYPE_IN
+                && collect($validated['branch_allocations'] ?? [])->isNotEmpty();
+
             /*
             |--------------------------------------------------------------------------
             | 3. Mandamos todo al service
             |--------------------------------------------------------------------------
             */
 
-            $movement = $stockService->move(
-                branchProduct: $branchProduct,
-                type: $validated['type'],
-                reason: $validated['reason'],
-                quantity: (float) $validated['quantity'],
-                notes: $validated['notes'] ?? null,
-                userId: Auth::id(),
-                batches: $validated['batches'] ?? [],
-                batchAllocationMethod: $validated['batch_allocation_method']
-                ?? StockMovementBatch::ALLOCATION_MANUAL,
-                manualBatches: $validated['manual_batches'] ?? [],
-            );
+            if ($hasBranchAllocations) {
+                $this->validateBranchAllocationTotal(
+                    (float) $validated['quantity'],
+                    $validated['branch_allocations'] ?? [],
+                );
+
+                $movement = $stockService->distributeIncoming(
+                    sourceBranchProduct: $branchProduct,
+                    reason: $validated['reason'],
+                    quantity: (float) $validated['quantity'],
+                    notes: $validated['notes'] ?? null,
+                    userId: Auth::id(),
+                    batch: ($validated['batches'] ?? [])[0] ?? [],
+                    branchAllocations: $validated['branch_allocations'] ?? [],
+                );
+            } else {
+                $movement = $stockService->move(
+                    branchProduct: $branchProduct,
+                    type: $validated['type'],
+                    reason: $validated['reason'],
+                    quantity: (float) $validated['quantity'],
+                    notes: $validated['notes'] ?? null,
+                    userId: Auth::id(),
+                    batches: $validated['batches'] ?? [],
+                    batchAllocationMethod: $validated['batch_allocation_method']
+                    ?? StockMovementBatch::ALLOCATION_MANUAL,
+                    manualBatches: $validated['manual_batches'] ?? [],
+                );
+            }
         } catch (Throwable $e) {
             return back()->withErrors([
                 'stock' => $e->getMessage(),
             ]);
         }
 
+        $movementId = $movement instanceof StockMovement
+            ? $movement->id
+            : collect($movement)->pluck('movement_id')->filter()->first();
+
         return back()->with([
             'success' => 'Movimiento de stock registrado correctamente.',
-            'movement_id' => $movement->id,
+            'movement_id' => $movementId,
         ]);
     }
 
@@ -202,6 +230,18 @@ class StockMovementController extends Controller
 
         if (!$requiredPermission || !$user?->hasPermission($requiredPermission)) {
             throw new AuthorizationException('No tienes permisos para registrar este movimiento.');
+        }
+    }
+
+    private function validateBranchAllocationTotal(float $expectedQuantity, array $allocations): void
+    {
+        $total = collect($allocations)
+            ->sum(fn ($allocation) => (float) ($allocation['quantity'] ?? 0));
+
+        if (round($total, 3) !== round($expectedQuantity, 3)) {
+            throw ValidationException::withMessages([
+                'branch_allocations' => 'La suma asignada a sucursales debe coincidir con la cantidad total.',
+            ]);
         }
     }
 }

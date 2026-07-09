@@ -16,6 +16,7 @@ export function useAdjustStockForm(props, emit) {
         quantity: "",
         notes: "",
         batches: [],
+        branch_allocations: [],
         batch_allocation_method: "MANUAL",
         manual_batches: [],
     });
@@ -126,6 +127,7 @@ export function useAdjustStockForm(props, emit) {
             frontendErrors.quantity = "";
             frontendErrors.stock = "";
             frontendErrors.batches = "";
+            frontendErrors.branch_allocations = "";
             frontendErrors.manual_batches = "";
         },
     );
@@ -174,6 +176,7 @@ export function useAdjustStockForm(props, emit) {
 
         frontendErrors.stock = "";
         frontendErrors.batches = "";
+        frontendErrors.branch_allocations = "";
         frontendErrors.manual_batches = "";
 
         Object.keys(frontendErrors).forEach((key) => {
@@ -298,14 +301,17 @@ export function useAdjustStockForm(props, emit) {
         form.quantity = "";
         form.notes = "";
         form.batches = [];
+        form.branch_allocations = [];
         form.manual_batches = [];
         form.batch_allocation_method = "MANUAL";
 
         clearFrontendErrors();
     }
 
-    function saveAdjustment() {
-        if (!validateCompleteForm()) {
+    function saveAdjustment(transformPayload = null, options = {}) {
+        const { skipValidation = false } = options;
+
+        if (!skipValidation && !validateCompleteForm()) {
             WarningAlert({
                 title: "Formulario incompleto",
                 message:
@@ -314,8 +320,11 @@ export function useAdjustStockForm(props, emit) {
 
             return;
         }
-        console.log("PAYLOAD FINAL:", form.data());
-        form.post(route("inventory.stock-movements.store"), getModalRequestOptions({
+        const requestForm = typeof transformPayload === "function"
+            ? form.transform(transformPayload)
+            : form;
+
+        requestForm.post(route("inventory.stock-movements.store"), getModalRequestOptions({
             mode: "create",
             entityName: "Movimiento de stock",
             close: () => emit("close"),

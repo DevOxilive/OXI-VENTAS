@@ -13,6 +13,7 @@ export function getStockEntryModalConfig({
         saveButtonText: 'Registrar entrada',
         closeButtonText: 'Cancelar',
         ...modalPresets.standard,
+        size: '2xl',
         alerts: {
             entityName: 'Entrada de stock',
             create: {
