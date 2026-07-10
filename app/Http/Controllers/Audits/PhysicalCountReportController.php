@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Audits;
 
+use App\Exports\PhysicalCountAuditWorkbookExport;
 use App\Exports\PhysicalCountReportExport;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
@@ -50,6 +51,12 @@ class PhysicalCountReportController extends Controller
                 'folio' => $audit->folio,
                 'status' => $audit->status,
                 'started_at' => optional($audit->started_at)->toDateTimeString(),
+                'participants' => $audit->participants
+                    ->map(fn ($participant) => [
+                        'id' => $participant->id,
+                        'name' => $participant->name,
+                    ])
+                    ->values(),
             ])->values(),
             'users' => $this->availableAuditUsers(),
             'categories' => Category::orderBy('name')->get(['id', 'name']),
@@ -69,11 +76,10 @@ class PhysicalCountReportController extends Controller
         $branch = $this->resolveBranch($request->query('branch'));
         $filters = $this->normalizeFilters($request, $branch);
         $payload = $this->buildReportPayload($branch, $filters, false);
-        $exportData = $this->buildExportData($payload, $filters['report_type']);
         $filterLabels = $this->buildFilterLabels($filters, $payload['audits']);
 
         return Excel::download(
-            new PhysicalCountReportExport($exportData['headings'], $exportData['rows']),
+            new PhysicalCountAuditWorkbookExport($payload, $filters, $filterLabels, $branch->name),
             'reporte-auditoria-' . $branch->slug . '-' . now()->format('Ymd_His') . '.xlsx'
         );
     }
@@ -139,7 +145,7 @@ class PhysicalCountReportController extends Controller
                 'branchProduct.product.subcategory:id,name,category_id',
             ])
             ->whereIn('physical_count_id', $auditIds)
-            ->when($filters['user_id'], fn ($query, $userId) => $query->where('user_id', $userId))
+            ->when($filters['user_ids'] !== [], fn ($query) => $query->whereIn('user_id', $filters['user_ids']))
             ->when($filters['search'], function ($query, $search) {
                 FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
                     FlexibleSearch::orWhereColumns($subQuery, [
@@ -310,6 +316,7 @@ class PhysicalCountReportController extends Controller
             'userSummary' => $userSummary,
             'categorySummary' => $categorySummary,
             'topDifferences' => $topDifferences,
+            'entries' => $entries,
         ];
     }
 
@@ -542,6 +549,8 @@ class PhysicalCountReportController extends Controller
             'branch' => $branch->slug,
             'physical_count_id' => $request->input('physical_count_id'),
             'user_id' => $request->input('user_id'),
+            'user_ids' => $this->normalizeUserIds($request),
+            'user_scope' => $request->input('user_scope', 'participants'),
             'category_id' => $request->input('category_id'),
             'report_date' => $request->input('report_date'),
             'date_scope' => $request->input('date_scope', 'day'),
@@ -570,9 +579,9 @@ class PhysicalCountReportController extends Controller
     private function buildFilterLabels(array $filters, Collection $audits): array
     {
         $selectedAudit = $audits->firstWhere('id', (int) $filters['physical_count_id']);
-        $selectedUser = $filters['user_id']
-            ? User::query()->find($filters['user_id'], ['id', 'name'])
-            : null;
+        $selectedUsers = $filters['user_ids'] !== []
+            ? User::query()->whereIn('id', $filters['user_ids'])->orderBy('name')->get(['id', 'name'])
+            : collect();
         $selectedCategory = $filters['category_id']
             ? Category::query()->find($filters['category_id'], ['id', 'name'])
             : null;
@@ -581,7 +590,7 @@ class PhysicalCountReportController extends Controller
             'audit' => $selectedAudit
                 ? trim(($selectedAudit->name ?: 'Auditoria') . ' - ' . ($selectedAudit->folio ?: 'Sin folio'))
                 : 'Todas',
-            'user' => $selectedUser?->name ?: 'Todos',
+            'user' => $selectedUsers->isNotEmpty() ? $selectedUsers->pluck('name')->join(', ') : 'Todos',
             'category' => $selectedCategory?->name ?: 'Todas',
             'status' => match ($filters['status']) {
                 'found' => 'Encontrados',
@@ -616,6 +625,31 @@ class PhysicalCountReportController extends Controller
             ->where('slug', $branchSlug)
             ->select('id', 'name', 'slug', 'color')
             ->firstOrFail();
+    }
+
+    private function normalizeUserIds(Request $request): array
+    {
+        $userIds = $request->input('user_ids', []);
+
+        if (is_string($userIds)) {
+            $userIds = preg_split('/,/', $userIds) ?: [];
+        }
+
+        if (! is_array($userIds)) {
+            $userIds = [];
+        }
+
+        if ($request->filled('user_id')) {
+            $userIds[] = $request->input('user_id');
+        }
+
+        return collect($userIds)
+            ->filter(fn ($id) => $id !== null && $id !== '')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function canViewReports(Request $request): bool

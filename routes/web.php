@@ -414,6 +414,9 @@ Route::middleware([
         Route::delete('/physical-count-entries/{entry}', [PhysicalCountController::class, 'destroyEntry'])
             ->name('physical-count-entries.destroy');
 
+        Route::get('/physical-counts/{physicalCount}/search-products', [PhysicalCountController::class, 'searchProducts'])
+            ->middleware('permission:audits.physical-counts.count,audits.physical-counts.update')
+            ->name('physical-counts.search-products');
 
         Route::get('/physical-counts/{physicalCount}', [PhysicalCountController::class, 'show'])
             ->middleware('permission:audits.physical-counts.view,audits.physical-counts.count,audits.physical-counts.update')

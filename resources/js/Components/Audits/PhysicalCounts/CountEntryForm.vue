@@ -87,11 +87,8 @@ function submit() {
     form.post(route('audits.physical-counts.entries.store', props.physicalCountId), {
         preserveScroll: true,
         onSuccess: () => {
-            form.counted_quantity = ''
-            form.damaged_quantity = ''
-            form.expired_quantity = ''
-            form.expiration_date = ''
-            form.notes = ''
+            form.reset()
+            pendingLotNumber.value = ''
             ToastAlert({
                 title: 'Conteo guardado correctamente',
             })

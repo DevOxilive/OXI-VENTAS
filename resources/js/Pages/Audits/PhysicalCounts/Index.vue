@@ -8,6 +8,7 @@ import PageLayout from '@/Layouts/PageLayout.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import CreatePhysicalCountModal from '@/Components/Audits/PhysicalCounts/CreatePhysicalCountModal.vue'
+import ManagePhysicalCountParticipantsModal from '@/Components/Audits/PhysicalCounts/ManagePhysicalCountParticipantsModal.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 
 import { usePermissions } from '@/Composables/usePermissions'
@@ -53,6 +54,8 @@ const search = ref(props.filters.search || '')
 const statusFilter = ref(props.filters.status || '')
 const recordsPerPage = ref(Number(props.filters.per_page || 25))
 const showCreateModal = ref(false)
+const showParticipantsModal = ref(false)
+const selectedPhysicalCount = ref(null)
 let filterTimeout = null
 
 const physicalCounts = computed(() => props.physicalCounts?.data || [])
@@ -95,6 +98,12 @@ function handleToolbarAction(action) {
 async function handleTableAction({ action, row }) {
     if (action === 'open') {
         router.visit(route('audits.physical-counts.show', row.id))
+        return
+    }
+
+    if (action === 'participants') {
+        selectedPhysicalCount.value = row
+        showParticipantsModal.value = true
         return
     }
 
@@ -154,7 +163,9 @@ async function handleTableAction({ action, row }) {
         const result = await confirmModalAction({
             mode: 'update',
             title: 'Aplicar ajustes',
-            message: '¿Deseas aplicar los ajustes de esta auditoría? El stock se actualizará con base en el conteo físico.',
+            message: row.status === 'applied'
+                ? '¿Deseas volver a aplicar los ajustes? Se recalculará el stock con los conteos actuales de esta auditoría.'
+                : '¿Deseas aplicar los ajustes de esta auditoría? El stock se actualizará con base en el conteo físico.',
             confirmText: 'Sí, aplicar',
             cancelText: 'Cancelar',
             confirmButtonColor: '#16a34a',
@@ -261,6 +272,15 @@ watch(search, () => {
             :branch="props.branch"
             :users="props.users"
             @close="showCreateModal = false"
+        />
+
+        <ManagePhysicalCountParticipantsModal
+            v-if="can('audits.physical-counts.update')"
+            :show="showParticipantsModal"
+            :physical-count="selectedPhysicalCount"
+            :users="props.users"
+            @close="showParticipantsModal = false"
+            @updated="reloadPhysicalCounts"
         />
     </PageLayout>
 </template>

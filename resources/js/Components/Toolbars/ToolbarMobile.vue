@@ -41,7 +41,7 @@ const props = defineProps({
     showCounter: Boolean,
 })
 
-defineEmits([
+const emit = defineEmits([
     'back',
     'update:search',
     'update:filter',
@@ -90,6 +90,52 @@ function handleTextFilterInput(event, filter) {
 
     event.target.value = value
     return value
+}
+
+function normalizeMultiValue(value) {
+    return Array.isArray(value) ? value.map((item) => String(item)) : []
+}
+
+function isMultiSelected(filter, option) {
+    return normalizeMultiValue(filter.value).includes(String(getOptionValue(option, filter)))
+}
+
+function toggleMultiFilter(filter, option) {
+    const optionValue = String(getOptionValue(option, filter))
+    const current = normalizeMultiValue(filter.value)
+    const next = current.includes(optionValue)
+        ? current.filter((value) => value !== optionValue)
+        : [...current, optionValue]
+
+    emit('update:filter', {
+        key: filter.key,
+        value: next,
+    })
+}
+
+function clearMultiFilter(filter) {
+    emit('update:filter', {
+        key: filter.key,
+        value: [],
+    })
+}
+
+function multiFilterLabel(filter) {
+    const selected = normalizeMultiValue(filter.value)
+
+    if (selected.length === 0) {
+        return filter.placeholder || filter.label
+    }
+
+    if (selected.length === 1) {
+        const selectedOption = (filter.options || []).find((option) =>
+            String(getOptionValue(option, filter)) === selected[0]
+        )
+
+        return selectedOption ? getOptionLabel(selectedOption, filter) : '1 seleccionado'
+    }
+
+    return `${selected.length} seleccionados`
 }
 </script>
 
@@ -212,6 +258,51 @@ function handleTextFilterInput(event, filter) {
                             key: filter.key,
                             value: handleTextFilterInput($event, filter)
                         })" />
+
+                    <details v-else-if="filter.type === 'multiselect'" class="group relative">
+                        <summary
+                            class="flex h-11 cursor-pointer list-none items-center justify-between rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none"
+                        >
+                            <span class="truncate">
+                                {{ multiFilterLabel(filter) }}
+                            </span>
+
+                            <span class="material-symbols-outlined text-[20px] text-slate-400 transition group-open:rotate-180">
+                                expand_more
+                            </span>
+                        </summary>
+
+                        <div class="mt-2 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                            <button
+                                type="button"
+                                class="mb-2 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                                @click="clearMultiFilter(filter)"
+                            >
+                                Todos
+                            </button>
+
+                            <button
+                                v-for="option in filter.options || []"
+                                :key="getOptionValue(option, filter)"
+                                type="button"
+                                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50"
+                                @click="toggleMultiFilter(filter, option)"
+                            >
+                                <span
+                                    class="flex h-4 w-4 items-center justify-center rounded border"
+                                    :class="isMultiSelected(filter, option) ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'"
+                                >
+                                    <span v-if="isMultiSelected(filter, option)" class="material-symbols-outlined text-[13px]">
+                                        check
+                                    </span>
+                                </span>
+
+                                <span class="truncate text-slate-700">
+                                    {{ getOptionLabel(option, filter) }}
+                                </span>
+                            </button>
+                        </div>
+                    </details>
 
                     <select v-else :value="filter.value ?? ''"
                         class="w-full h-11 border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none" @change="$emit('update:filter', {

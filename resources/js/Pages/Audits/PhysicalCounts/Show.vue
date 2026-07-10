@@ -30,7 +30,7 @@ const props = defineProps({
 
 const { can } = usePermissions()
 
-const isOpen = computed(() => props.physicalCount.status === 'open')
+const canCapture = computed(() => ['open', 'applied'].includes(props.physicalCount.status))
 const canViewAuditStock = computed(() => can('audits.physical-counts.view-stock'))
 
 const toolbarConfig = computed(() =>
@@ -50,9 +50,8 @@ function handleToolbarAction(action) {
 
 function reloadAuditDetail() {
     router.reload({
-        only: ['physicalCount', 'scannedProduct'],
         preserveScroll: true,
-        preserveState: true,
+        preserveState: false,
     })
 }
 
@@ -62,6 +61,14 @@ onMounted(() => {
     window.Echo.channel('audits')
         .listen('.PhysicalCountChanged', (event) => {
             if (event.physicalCount?.id !== props.physicalCount.id) return
+
+            if (event.action === 'deleted') {
+                router.visit(route('audits.physical-counts.index', {
+                    branch: props.physicalCount.branch.slug,
+                }))
+                return
+            }
+
             reloadAuditDetail()
         })
 })
@@ -94,19 +101,21 @@ onBeforeUnmount(() => {
 
             <div
                 v-if="physicalCount.status === 'applied'"
-                class="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+                class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
             >
-                Esta auditoría ya fue aplicada al inventario.
+                Esta auditoria ya fue aplicada al inventario. Puedes seguir capturando conteos dentro de la misma auditoria.
             </div>
 
-            <div class="space-y-6">
-                <template v-if="isOpen">
-                    <ProductScanForm :physical-count-id="physicalCount.id" />
+            <div class="space-y-4">
+                <template v-if="canCapture">
+                    <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(260px,0.58fr)_minmax(360px,1.42fr)]">
+                        <ProductScanForm :physical-count-id="physicalCount.id" />
 
-                    <ProductFoundCard
-                        :product="scannedProduct"
-                        :can-view-stock="canViewAuditStock"
-                    />
+                        <ProductFoundCard
+                            :product="scannedProduct"
+                            :can-view-stock="canViewAuditStock"
+                        />
+                    </div>
 
                     <CountEntryForm
                         v-if="scannedProduct"

@@ -103,23 +103,23 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="relative rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 class="text-lg font-semibold text-gray-900">
+    <div class="relative h-full rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+        <h2 class="text-sm font-semibold text-gray-900">
             Buscar producto
         </h2>
 
-        <p class="mt-1 text-sm text-gray-500">
+        <p class="sr-only">
             Escanea un código o escribe el nombre del producto.
         </p>
 
-        <form class="mt-4 flex gap-3" @submit.prevent="scan">
+        <form class="mt-2 flex flex-col gap-2 sm:flex-row" @submit.prevent="scan">
             <div class="relative w-full">
                 <input
                     ref="searchInput"
                     v-model="form.code"
                     type="text"
                     placeholder="Escanea código o escribe el nombre del producto"
-                    class="w-full rounded-lg border-gray-300 text-sm"
+                    class="h-8 w-full rounded-lg border-gray-300 text-xs"
                     autocomplete="off"
                 >
 
@@ -147,7 +147,7 @@ onMounted(() => {
 
             <button
                 type="submit"
-                class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                class="h-8 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white disabled:opacity-50"
                 :disabled="form.processing"
             >
                 Buscar

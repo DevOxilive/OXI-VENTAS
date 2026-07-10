@@ -54,7 +54,7 @@ export const physicalCountTableConfig = {
             icon: "lock",
             variant: "amber",
             permission: "audits.physical-counts.update",
-            hidden: (item) => item.status !== "open",
+            hidden: (item) => !["open", "applied"].includes(item.status),
         },
         {
             id: "reopen",
@@ -65,12 +65,19 @@ export const physicalCountTableConfig = {
             hidden: (item) => item.status !== "closed",
         },
         {
+            id: "participants",
+            label: "Participantes",
+            icon: "group_add",
+            variant: "indigo",
+            permission: "audits.physical-counts.update",
+        },
+        {
             id: "apply",
             label: "Aplicar ajustes",
             icon: "check_circle",
             variant: "green",
             permission: "audits.physical-counts.update",
-            hidden: (item) => item.status !== "closed",
+            hidden: (item) => !["closed", "applied"].includes(item.status),
         },
         {
             id: "delete",

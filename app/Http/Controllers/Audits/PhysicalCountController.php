@@ -259,7 +259,7 @@ class PhysicalCountController extends Controller
         $physicalCount->participants()->sync($participantIds);
         $this->snapshotService->ensureForAudit($physicalCount);
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'created'))->toOthers();
+        broadcast(new PhysicalCountChanged($physicalCount, 'created'));
         event(RealtimeActivityLogged::message('creó', 'la auditoría', $physicalCount->folio, 'Auditorías', 'created'));
 
         return redirect()
@@ -289,7 +289,7 @@ class PhysicalCountController extends Controller
 
         $physicalCount->participants()->sync($participantIds);
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'updated'))->toOthers();
+        broadcast(new PhysicalCountChanged($physicalCount, 'updated'));
         event(RealtimeActivityLogged::message('actualizó', 'la auditoría', $physicalCount->folio, 'Auditorías', 'updated'));
 
         return back()->with('success', 'Auditoría actualizada correctamente.');
@@ -310,7 +310,7 @@ class PhysicalCountController extends Controller
         $folio = $physicalCount->folio;
         $physicalCount->delete();
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'deleted'))->toOthers();
+        broadcast(new PhysicalCountChanged($physicalCount, 'deleted'));
         event(RealtimeActivityLogged::message('eliminó', 'la auditoría', $folio, 'Auditorías', 'deleted'));
 
         return redirect()
@@ -322,7 +322,7 @@ class PhysicalCountController extends Controller
     {
         $this->abortIfCannotCapture($request, $physicalCount);
 
-        if ($physicalCount->status === 'open') {
+        if ($this->canCaptureInStatus($physicalCount)) {
             $this->snapshotService->ensureForAudit($physicalCount);
         } else {
             $physicalCount->load('snapshot.items');
@@ -349,7 +349,7 @@ class PhysicalCountController extends Controller
         $this->abortIfCannotCapture($request, $physicalCount);
         $this->snapshotService->ensureForAudit($physicalCount);
 
-        if ($physicalCount->status !== 'open') {
+        if (! $this->canCaptureInStatus($physicalCount)) {
             return back()->withErrors([
                 'status' => 'Esta auditoría no está abierta. No se pueden registrar conteos.',
             ]);
@@ -409,20 +409,12 @@ class PhysicalCountController extends Controller
             'notes' => $data['notes'] ?? null,
         ]);
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'entry_created'))->toOthers();
+        broadcast(new PhysicalCountChanged($physicalCount, 'entry_created'));
         event(RealtimeActivityLogged::message('registró', 'una captura en la auditoría', $physicalCount->folio, 'Auditorías', 'entry_created'));
 
         return redirect()
             ->route('audits.physical-counts.show', $physicalCount)
-            ->with([
-                'success' => 'Conteo guardado correctamente.',
-                'scannedProduct' => $this->scannedProductPayload(
-                    $request,
-                    $physicalCount,
-                    $branchProduct,
-                    $data['scanned_code'] ?? $branchProduct->barcode
-                ),
-            ]);
+            ->with('success', 'Conteo guardado correctamente.');
     }
 
     public function updateEntry(Request $request, PhysicalCountEntry $entry)
@@ -430,7 +422,7 @@ class PhysicalCountController extends Controller
         $entry->load('physicalCount');
         $this->abortIfCannotManageAudit($request, $entry->physicalCount);
 
-        if ($entry->physicalCount->status !== 'open') {
+        if (! $this->canCaptureInStatus($entry->physicalCount)) {
             return back()->withErrors([
                 'status' => 'Esta auditoría no está abierta. No se pueden editar conteos.',
             ]);
@@ -456,7 +448,7 @@ class PhysicalCountController extends Controller
         }
 
         $entry->update($data);
-        broadcast(new PhysicalCountChanged($entry->physicalCount, 'entry_updated'))->toOthers();
+        broadcast(new PhysicalCountChanged($entry->physicalCount, 'entry_updated'));
         event(RealtimeActivityLogged::message('actualizó', 'una captura en la auditoría', $entry->physicalCount->folio, 'Auditorías', 'entry_updated'));
 
         return back()->with('success', 'Registro actualizado correctamente.');
@@ -467,7 +459,7 @@ class PhysicalCountController extends Controller
         $entry->load('physicalCount');
         $this->abortIfCannotManageAudit($request, $entry->physicalCount);
 
-        if ($entry->physicalCount->status !== 'open') {
+        if (! $this->canCaptureInStatus($entry->physicalCount)) {
             return back()->withErrors([
                 'status' => 'Esta auditoría no está abierta. No se pueden eliminar conteos.',
             ]);
@@ -476,7 +468,7 @@ class PhysicalCountController extends Controller
         $physicalCount = $entry->physicalCount;
         $entry->delete();
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'entry_deleted'))->toOthers();
+        broadcast(new PhysicalCountChanged($physicalCount, 'entry_deleted'));
         event(RealtimeActivityLogged::message('eliminó', 'una captura en la auditoría', $physicalCount->folio, 'Auditorías', 'entry_deleted'));
 
         return back()->with('success', 'Registro eliminado correctamente.');
@@ -486,7 +478,7 @@ class PhysicalCountController extends Controller
     {
         $this->abortIfCannotCapture($request, $physicalCount);
 
-        if ($physicalCount->status !== 'open') {
+        if (! $this->canCaptureInStatus($physicalCount)) {
             return response()->json([]);
         }
 
@@ -545,7 +537,7 @@ class PhysicalCountController extends Controller
     {
         $this->abortIfCannotCapture($request, $physicalCount);
 
-        if ($physicalCount->status !== 'open') {
+        if (! $this->canCaptureInStatus($physicalCount)) {
             return back()->withErrors([
                 'status' => 'Esta auditoría no está abierta. No se pueden escanear productos.',
             ]);
@@ -609,7 +601,7 @@ class PhysicalCountController extends Controller
     {
         $this->abortIfCannotCapture($request, $physicalCount);
 
-        if ($physicalCount->status !== 'open') {
+        if (! $this->canCaptureInStatus($physicalCount)) {
             return back()->withErrors([
                 'status' => 'Esta auditoría no está abierta. No se pueden crear lotes.',
             ]);
@@ -646,7 +638,7 @@ class PhysicalCountController extends Controller
             ]
         );
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'batch_created'))->toOthers();
+        broadcast(new PhysicalCountChanged($physicalCount, 'batch_created'));
         event(RealtimeActivityLogged::message('creó', 'un lote en la auditoría', $physicalCount->folio, 'Auditorías', 'batch_created'));
 
         return back()->with([
@@ -664,9 +656,9 @@ class PhysicalCountController extends Controller
     {
         $this->abortIfCannotManageAudit($request, $physicalCount);
 
-        if ($physicalCount->status !== 'open') {
+        if (! in_array($physicalCount->status, ['open', 'applied'], true)) {
             return back()->withErrors([
-                'status' => 'Solo auditorías abiertas pueden cerrarse.',
+                'status' => 'Solo auditorías abiertas o aplicadas pueden cerrarse.',
             ]);
         }
 
@@ -675,7 +667,7 @@ class PhysicalCountController extends Controller
             'closed_at' => now(),
         ]);
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'closed'))->toOthers();
+        broadcast(new PhysicalCountChanged($physicalCount, 'closed'));
         event(RealtimeActivityLogged::message('cerró', 'la auditoría', $physicalCount->folio, 'Auditorías', 'closed'));
 
         return back()->with('success', 'Auditoría cerrada correctamente.');
@@ -696,7 +688,7 @@ class PhysicalCountController extends Controller
             'closed_at' => null,
         ]);
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'reopened'))->toOthers();
+        broadcast(new PhysicalCountChanged($physicalCount, 'reopened'));
         event(RealtimeActivityLogged::message('reabrió', 'la auditoría', $physicalCount->folio, 'Auditorías', 'reopened'));
 
         return back()->with('success', 'Auditoría reabierta correctamente.');
@@ -706,9 +698,9 @@ class PhysicalCountController extends Controller
     {
         $this->abortIfCannotManageAudit($request, $physicalCount);
 
-        if ($physicalCount->status !== 'closed') {
+        if (! in_array($physicalCount->status, ['closed', 'applied'], true)) {
             return back()->withErrors([
-                'status' => 'Solo se pueden aplicar ajustes de una auditoría finalizada.',
+                'status' => 'Solo se pueden aplicar ajustes de una auditoría finalizada o aplicada.',
             ]);
         }
 
@@ -791,7 +783,7 @@ class PhysicalCountController extends Controller
 
             $physicalCount->update(['status' => 'applied']);
         });
-        broadcast(new PhysicalCountChanged($physicalCount, 'applied'))->toOthers();
+        broadcast(new PhysicalCountChanged($physicalCount, 'applied'));
         event(RealtimeActivityLogged::message('aplicó ajustes de', 'la auditoría', $physicalCount->folio, 'Auditorías', 'applied'));
 
         return redirect()
@@ -1126,6 +1118,11 @@ class PhysicalCountController extends Controller
     private function canViewAuditStock(Request $request): bool
     {
         return (bool) $request->user()?->hasPermission('audits.physical-counts.view-stock');
+    }
+
+    private function canCaptureInStatus(PhysicalCount $physicalCount): bool
+    {
+        return in_array($physicalCount->status, ['open', 'applied'], true);
     }
 
     private function isAssignedParticipant(?User $user, PhysicalCount $physicalCount): bool
