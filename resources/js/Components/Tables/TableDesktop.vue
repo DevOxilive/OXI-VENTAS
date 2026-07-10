@@ -116,10 +116,10 @@ function renderCellContent(row, column) {
   <div class="hidden md:block">
     <div class="overflow-x-auto">
       <table class="w-full text-sm border-collapse">
-        <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
+        <thead class="border-b border-secondary bg-secondary text-text">
           <tr>
             <th v-if="selectable" class="px-4 py-3 w-10">
-              <input v-model="allSelected" type="checkbox" class="w-4 h-4 border-slate-300 rounded cursor-pointer" />
+              <input v-model="allSelected" type="checkbox" class="h-4 w-4 cursor-pointer rounded border-secondary text-primary focus:ring-primary" />
             </th>
 
             <th v-for="column in visibleColumns" :key="column.key"
@@ -134,15 +134,15 @@ function renderCellContent(row, column) {
           </tr>
         </thead>
 
-        <tbody class="divide-y divide-slate-100 bg-white">
+        <tbody class="divide-y divide-secondary bg-background">
           <tr v-for="(row, index) in items" :key="row[rowKey] || index" :class="[
             'transition-colors',
-            hoverEffect ? 'hover:bg-slate-50' : '',
-            striped && index % 2 === 1 ? 'bg-slate-50/60' : '',
+            hoverEffect ? 'hover:bg-secondary' : '',
+            striped && index % 2 === 1 ? 'bg-secondary' : '',
           ]" @click="handleRowClick(row)">
             <td v-if="selectable" class="px-4 py-3 w-10">
               <input type="checkbox" :checked="isRowSelected(row)"
-                class="w-4 h-4 border-slate-300 rounded cursor-pointer" @click.stop @change="toggleRowSelection(row)" />
+                class="h-4 w-4 cursor-pointer rounded border-secondary text-primary focus:ring-primary" @click.stop @change="toggleRowSelection(row)" />
             </td>
 
             <td v-for="column in visibleColumns" :key="column.key" class="px-4 py-3 align-middle"
@@ -160,7 +160,7 @@ function renderCellContent(row, column) {
                 <img v-if="getCellValue(row, column)" :src="getCellValue(row, column)"
                   :alt="column.formatOptions?.alt || 'Imagen'" class="h-8 w-8 rounded object-cover" />
 
-                <span v-else class="text-slate-400 text-xs">
+                <span v-else class="text-xs text-text opacity-50">
                   {{ column.formatOptions?.fallback || 'Sin imagen' }}
                 </span>
               </template>
@@ -168,11 +168,11 @@ function renderCellContent(row, column) {
               <template v-else-if="column.format === 'swatch'">
                 <div class="flex items-center gap-3">
                   <span
-                    class="h-4 w-4 shrink-0 rounded-full border border-slate-200"
+                    class="h-4 w-4 shrink-0 rounded-full border border-secondary"
                     :style="{ backgroundColor: renderCellContent(row, column).color }"
                   />
 
-                  <span class="font-medium text-slate-700">
+                  <span class="font-medium text-text">
                     {{ renderCellContent(row, column).label }}
                   </span>
                 </div>
@@ -180,16 +180,16 @@ function renderCellContent(row, column) {
 
               <template v-else>
                 <div v-if="column.formatOptions?.multiline || column.subKey" class="space-y-0.5">
-                  <div class="font-medium text-slate-800 truncate">
+                  <div class="truncate font-medium text-text">
                     {{ getCellValue(row, column) }}
                   </div>
 
-                  <div v-if="column.subKey" class="text-xs text-slate-400 truncate">
+                  <div v-if="column.subKey" class="truncate text-xs text-text opacity-50">
                     {{ getNestedValue(row, column.subKey) }}
                   </div>
                 </div>
 
-                <span v-else class="block truncate" :class="column.textClass || 'text-slate-700'">
+                <span v-else class="block truncate" :class="column.textClass || 'text-text opacity-80'">
                   {{ renderCellContent(row, column).content }}
                 </span>
               </template>
@@ -206,13 +206,13 @@ function renderCellContent(row, column) {
           </tr>
 
           <tr v-if="items.length === 0 && !loading">
-            <td :colspan="totalColumns" class="px-4 py-10 text-center text-slate-500">
+            <td :colspan="totalColumns" class="px-4 py-10 text-center text-text opacity-70">
               {{ noDataMessage }}
             </td>
           </tr>
 
           <tr v-if="loading">
-            <td :colspan="totalColumns" class="px-4 py-10 text-center text-slate-500">
+            <td :colspan="totalColumns" class="px-4 py-10 text-center text-text opacity-70">
               Cargando...
             </td>
           </tr>

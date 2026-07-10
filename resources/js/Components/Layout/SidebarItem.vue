@@ -274,7 +274,7 @@ onBeforeUnmount(() => {
                 <Link
                     v-if="item.url && !hasChildren(item)"
                     :href="item.url"
-                    class="group flex items-center rounded-xl text-slate-700 transition hover:bg-slate-100"
+                    class="group flex items-center rounded-xl text-text transition hover:bg-secondary"
                     :class="extended ? 'gap-3 px-3 py-3' : 'justify-center px-2 py-3'"
                     :style="itemStyle(item)"
                     @click="handleLinkClick(item)"
@@ -299,7 +299,7 @@ onBeforeUnmount(() => {
                 <button
                     v-else
                     type="button"
-                    class="group flex w-full items-center rounded-xl text-slate-700 transition hover:bg-slate-100"
+                    class="group flex w-full items-center rounded-xl text-text transition hover:bg-secondary"
                     :class="extended ? 'justify-between gap-3 px-3 py-3' : 'justify-center px-2 py-3'"
                     :style="itemStyle(item)"
                     @mouseenter="hoveredItem = item.key"
@@ -324,7 +324,7 @@ onBeforeUnmount(() => {
 
                     <span
                         v-if="hasChildren(item) && extended"
-                        class="material-symbols-outlined text-[18px] text-slate-400 transition"
+                        class="material-symbols-outlined text-[18px] text-text opacity-50 transition"
                     >
                         {{ isOpen(item) ? "expand_more" : "chevron_right" }}
                     </span>
@@ -333,7 +333,7 @@ onBeforeUnmount(() => {
 
             <div
                 v-if="hasChildren(item) && isOpen(item) && extended"
-                class="ml-5 mt-1 space-y-1 border-l border-slate-200 pl-2.5"
+                class="ml-5 mt-1 space-y-1 border-l border-secondary pl-2.5"
             >
                 <SidebarItem
                     :items="item.children"

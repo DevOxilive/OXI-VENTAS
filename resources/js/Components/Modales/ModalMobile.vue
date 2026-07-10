@@ -91,7 +91,7 @@ function closeFromBackdrop(closeOnBackdrop) {
         />
 
         <section
-            class="relative flex max-h-[94dvh] w-full flex-col overflow-hidden overscroll-contain rounded-t-[28px] bg-white shadow-2xl touch-pan-y"
+            class="relative flex max-h-[94dvh] w-full flex-col overflow-hidden overscroll-contain rounded-t-[28px] border border-secondary bg-background shadow-2xl touch-pan-y"
             :class="panelClass"
             role="dialog"
             aria-modal="true"
@@ -111,7 +111,7 @@ function closeFromBackdrop(closeOnBackdrop) {
 
             <main
                 v-if="$slots.content"
-                class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-white touch-pan-y"
+                class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-background touch-pan-y"
                 @click.stop
                 @wheel.stop
                 @touchmove.stop

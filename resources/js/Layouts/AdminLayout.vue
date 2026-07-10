@@ -160,21 +160,21 @@ watch(desktopSidebarCollapsed, (value) => {
 </script>
 
 <template>
-    <div class="flex h-dvh overflow-hidden bg-white">
+    <div class="flex h-dvh overflow-hidden bg-background text-text">
         <div
             v-if="sidebarOpen"
-            class="fixed inset-0 z-40 bg-black/40 md:hidden"
+            class="fixed inset-0 z-40 bg-black/35 md:hidden"
             @click="toggleSidebar"
         />
 
         <aside
-            class="fixed left-0 top-0 z-50 flex h-dvh flex-col overflow-hidden border-r bg-white shadow-sm transition-all duration-300 md:static md:z-auto md:translate-x-0"
+            class="fixed left-0 top-0 z-50 flex h-dvh flex-col overflow-hidden border-r border-secondary bg-background shadow-sm transition-all duration-300 md:static md:z-auto md:translate-x-0"
             :class="[
                 sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
                 desktopSidebarCollapsed ? 'w-72 md:w-20' : 'w-72',
             ]"
         >
-            <div class="shrink-0 border-b border-slate-100 px-4 py-3">
+            <div class="shrink-0 border-b border-secondary px-4 py-3">
                 <div
                     class="flex min-h-16 items-center gap-3"
                     :class="desktopSidebarCollapsed ? 'justify-center' : 'justify-between'"
@@ -182,7 +182,7 @@ watch(desktopSidebarCollapsed, (value) => {
                     <div class="flex min-w-0 items-center gap-3">
                         <button
                             type="button"
-                            class="group relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:scale-[1.02] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-200"
+                            class="group relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-secondary bg-secondary shadow-sm transition hover:scale-[1.02] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary"
                             :class="desktopSidebarCollapsed ? 'h-12 w-12' : 'h-14 w-14'"
                             @click="toggleDesktopSidebar"
                         >
@@ -194,11 +194,11 @@ watch(desktopSidebarCollapsed, (value) => {
                         </button>
 
                         <div v-if="!desktopSidebarCollapsed" class="min-w-0">
-                            <p class="text-sm font-semibold text-slate-800">
+                            <p class="text-sm font-semibold text-text">
                                 Super Kay
                             </p>
 
-                            <p class="text-xs text-slate-400">
+                            <p class="text-xs text-text opacity-50">
                                 Menu principal
                             </p>
                         </div>
@@ -216,14 +216,14 @@ watch(desktopSidebarCollapsed, (value) => {
         </aside>
 
         <section class="flex min-w-0 flex-1 flex-col overflow-hidden" @click="closeSidebarFromOutside">
-            <header class="shrink-0 border-b bg-white px-4 py-3 shadow-sm md:px-8">
+            <header class="shrink-0 border-b border-secondary bg-background px-4 py-3 shadow-sm md:px-8">
                 <div class="flex min-h-16 items-center justify-between gap-4 md:justify-end">
                     <div class="flex min-w-0 items-center gap-3">
                         <button
-                            class="rounded-xl bg-slate-100 p-2.5 transition hover:bg-slate-200 md:hidden"
+                            class="rounded-xl bg-secondary p-2.5 transition hover:brightness-95 md:hidden"
                             @click.stop="toggleSidebar"
                         >
-                            <span class="material-symbols-outlined text-[22px] text-slate-700">
+                            <span class="material-symbols-outlined text-[22px] text-text">
                                 menu
                             </span>
                         </button>
@@ -239,21 +239,21 @@ watch(desktopSidebarCollapsed, (value) => {
                             <template #trigger="{ open }">
                                 <button
                                     type="button"
-                                    class="flex h-16 min-w-[15rem] items-center gap-3 border border-slate-200 bg-white px-4 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                                    class="flex h-16 min-w-[15rem] items-center gap-3 border border-secondary bg-background px-4 text-left shadow-sm transition hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary"
                                     :class="open ? 'rounded-t-2xl rounded-b-none border-b-0' : 'rounded-2xl'"
                                 >
-                                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+                                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary text-text">
                                         <span class="material-symbols-outlined text-[24px]">
                                             account_circle
                                         </span>
                                     </span>
 
                                     <span class="min-w-0 flex-1">
-                                        <span class="block truncate text-sm font-semibold text-slate-800">
+                                        <span class="block truncate text-sm font-semibold text-text">
                                             {{ page.props.auth.user.name }}
                                         </span>
 
-                                        <span class="block truncate text-xs text-slate-500">
+                                        <span class="block truncate text-xs text-text opacity-70">
                                             {{ role }}
                                         </span>
                                     </span>
@@ -261,10 +261,10 @@ watch(desktopSidebarCollapsed, (value) => {
                             </template>
 
                             <template #content>
-                                <div class="overflow-hidden rounded-b-2xl border border-t-0 border-slate-200 bg-white shadow-sm">
+                                <div class="overflow-hidden rounded-b-2xl border border-t-0 border-secondary bg-background shadow-sm">
                                     <DropdownLink
                                         :href="route('profile.show')"
-                                        class="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:bg-slate-50"
+                                        class="border-b border-secondary px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
                                     >
                                         Editar perfil
                                     </DropdownLink>
@@ -272,7 +272,7 @@ watch(desktopSidebarCollapsed, (value) => {
                                     <form @submit.prevent="logout">
                                         <DropdownLink
                                             as="button"
-                                            class="px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:bg-slate-50"
+                                            class="px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
                                         >
                                             Cerrar sesion
                                         </DropdownLink>

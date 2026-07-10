@@ -32,16 +32,16 @@ export const predefinedStatusMaps = {
  * Color variant to Tailwind class map
  */
 const variantMap = {
-  green: 'bg-green-100 text-green-700',
-  red: 'bg-red-100 text-red-700',
-  amber: 'bg-amber-100 text-amber-700',
-  blue: 'bg-blue-100 text-blue-700',
-  slate: 'bg-slate-100 text-slate-600',
-  purple: 'bg-purple-100 text-purple-700',
-  orange: 'bg-orange-100 text-orange-700',
-  indigo: 'bg-indigo-100 text-indigo-700',
-  pink: 'bg-pink-100 text-pink-700',
-  cyan: 'bg-cyan-100 text-cyan-700',
+  green: 'bg-secondary text-accent',
+  red: 'bg-secondary text-primary',
+  amber: 'bg-secondary text-accent',
+  blue: 'bg-secondary text-primary',
+  slate: 'bg-secondary text-text',
+  purple: 'bg-secondary text-primary',
+  orange: 'bg-secondary text-accent',
+  indigo: 'bg-secondary text-primary',
+  pink: 'bg-secondary text-primary',
+  cyan: 'bg-secondary text-primary',
 }
 
 /**

@@ -97,24 +97,24 @@ function blockExtraInput(e) {
 
 <template>
     <div>
-        <label :for="textareaId" class="block text-sm font-semibold mb-1 text-slate-700">
+        <label :for="textareaId" class="mb-1 block text-sm font-semibold text-text">
             {{ label }}
         </label>
 
         <textarea v-bind="attrs" :id="textareaId" :name="field" :value="modelValue" :rows="rows" :readonly="readonly"
             :style="{ maxHeight: textareaMaxHeight }" @keydown="blockExtraInput" @input="handleInput"
             @blur="emit('validate', field)" :class="[
-                'w-full px-4 py-3 rounded-xl border outline-none transition text-sm resize-none',
-                readonly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white',
-                error ? 'border-red-500 bg-red-50' : 'border-slate-300 focus:border-[#1f1d2b]'
+                'w-full resize-none rounded-xl border px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
+                readonly ? 'cursor-not-allowed border-secondary bg-secondary text-text opacity-60' : 'bg-background text-text',
+                error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'
             ]" />
 
         <div class="flex justify-between items-center mt-1">
-            <p v-if="error" class="text-red-500 text-xs">
+            <p v-if="error" class="text-xs text-primary">
                 {{ error }}
             </p>
 
-            <p v-if="fieldConfig?.max" class="text-[11px] text-slate-400 ml-auto">
+            <p v-if="fieldConfig?.max" class="ml-auto text-[11px] text-text opacity-50">
                 {{ (modelValue || '').toString().length }}/{{ fieldConfig.max }}
             </p>
         </div>

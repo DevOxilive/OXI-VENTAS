@@ -88,16 +88,16 @@ function getActionButtonClasses(action) {
   const baseClasses = 'h-9 px-3 rounded-xl text-xs font-bold transition-colors inline-flex items-center justify-center gap-1'
 
   const variantMap = {
-    blue: 'bg-blue-100 text-blue-700 hover:bg-blue-200',
-    green: 'bg-green-100 text-green-700 hover:bg-green-200',
-    red: 'bg-red-100 text-red-700 hover:bg-red-200',
-    amber: 'bg-amber-100 text-amber-700 hover:bg-amber-200',
-    slate: 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-    purple: 'bg-purple-100 text-purple-700 hover:bg-purple-200',
-    orange: 'bg-orange-100 text-orange-700 hover:bg-orange-200',
-    indigo: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200',
-    pink: 'bg-pink-100 text-pink-700 hover:bg-pink-200',
-    cyan: 'bg-cyan-100 text-cyan-700 hover:bg-cyan-200',
+    blue: 'bg-secondary text-primary hover:brightness-95',
+    green: 'bg-secondary text-accent hover:brightness-95',
+    red: 'bg-secondary text-primary hover:brightness-95',
+    amber: 'bg-secondary text-accent hover:brightness-95',
+    slate: 'bg-secondary text-text hover:brightness-95',
+    purple: 'bg-secondary text-primary hover:brightness-95',
+    orange: 'bg-secondary text-accent hover:brightness-95',
+    indigo: 'bg-secondary text-primary hover:brightness-95',
+    pink: 'bg-secondary text-primary hover:brightness-95',
+    cyan: 'bg-secondary text-primary hover:brightness-95',
   }
 
   return `${baseClasses} ${variantMap[action.variant] || variantMap.blue}`
@@ -105,17 +105,17 @@ function getActionButtonClasses(action) {
 </script>
 
 <template>
-  <div class="md:hidden space-y-2 p-3 bg-slate-50">
+  <div class="space-y-2 bg-secondary p-3 md:hidden">
     <article v-for="(row, index) in items" :key="row[rowKey] || index"
-      class="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm" @click="handleRowClick(row)">
+      class="rounded-2xl border border-secondary bg-background p-3 shadow-sm" @click="handleRowClick(row)">
       <div class="flex justify-between items-start gap-3">
         <div class="min-w-0">
-          <p v-if="mobileCardHeaderField" class="font-semibold text-slate-800 truncate">
+          <p v-if="mobileCardHeaderField" class="truncate font-semibold text-text">
             {{ getNestedValue(row, mobileCardHeaderField) }}
           </p>
 
           <template v-for="column in columns" :key="column.key">
-            <p v-if="column.mobileSecondary" class="text-xs text-slate-500 truncate mt-0.5">
+            <p v-if="column.mobileSecondary" class="mt-0.5 truncate text-xs text-text opacity-70">
               {{ getCellValue(row, column) }}
             </p>
           </template>
@@ -126,7 +126,7 @@ function getActionButtonClasses(action) {
             'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 whitespace-nowrap',
             column.format === 'badge'
               ? renderCellContent(row, column).classes
-              : 'bg-slate-100 text-slate-600',
+              : 'bg-secondary text-text',
           ]">
             {{
               column.format === 'badge'
@@ -140,7 +140,7 @@ function getActionButtonClasses(action) {
       <div v-if="mobileBodyColumns.length" class="mt-3 grid grid-cols-2 gap-3">
         <template v-for="column in mobileBodyColumns" :key="column.key">
           <div class="min-w-0">
-            <p class="text-slate-400 text-xs font-medium">
+            <p class="text-xs font-medium text-text opacity-50">
               {{ column.mobileLabel || column.label }}
             </p>
 
@@ -156,16 +156,16 @@ function getActionButtonClasses(action) {
 
             <div v-else-if="column.format === 'swatch'" class="mt-1 flex items-center gap-2">
               <span
-                class="h-4 w-4 shrink-0 rounded-full border border-slate-200"
+                class="h-4 w-4 shrink-0 rounded-full border border-secondary"
                 :style="{ backgroundColor: renderCellContent(row, column).color }"
               />
 
-              <p class="font-medium text-slate-700 truncate">
+              <p class="truncate font-medium text-text">
                 {{ renderCellContent(row, column).label }}
               </p>
             </div>
 
-            <p v-else class="font-medium text-slate-700 truncate mt-0.5">
+            <p v-else class="mt-0.5 truncate font-medium text-text">
               {{ renderCellContent(row, column).content }}
             </p>
           </div>
@@ -185,11 +185,11 @@ function getActionButtonClasses(action) {
     </article>
 
     <div v-if="items.length === 0 && !loading"
-      class="bg-white border border-slate-200 rounded-2xl p-6 text-center text-slate-500 shadow-sm">
+      class="rounded-2xl border border-secondary bg-background p-6 text-center text-text opacity-70 shadow-sm">
       {{ noDataMessage }}
     </div>
 
-    <div v-if="loading" class="bg-white border border-slate-200 rounded-2xl p-6 text-center text-slate-500 shadow-sm">
+    <div v-if="loading" class="rounded-2xl border border-secondary bg-background p-6 text-center text-text opacity-70 shadow-sm">
       Cargando...
     </div>
   </div>

@@ -170,12 +170,12 @@ onMounted(() => {
 
 <template>
     <div class="mb-4">
-        <label v-if="!withoutLabel" :for="id" class="mb-1 block text-sm font-semibold text-slate-700">
-            {{ label }}: <span v-if="required" class="text-red-600">*</span>
+        <label v-if="!withoutLabel" :for="id" class="mb-1 block text-sm font-semibold text-text">
+            {{ label }}: <span v-if="required" class="text-primary">*</span>
         </label>
 
         <div v-if="type === 'file'" class="flex">
-            <label class="relative inline-block w-full cursor-pointer rounded-full bg-slate-200 px-4 py-1 text-center font-semibold text-violet-800 hover:bg-violet-100 hover:text-violet-700">
+            <label class="relative inline-block w-full cursor-pointer rounded-full border border-secondary bg-secondary px-4 py-1 text-center font-semibold text-text transition hover:brightness-95">
                 <span class="inline-block max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap align-middle">
                     {{ modelValue ? modelValue : 'Selecciona un documento' }}
                 </span>
@@ -211,7 +211,7 @@ onMounted(() => {
                 :required="required"
                 :disabled="disabled"
                 :autocomplete="autocomplete"
-                class="w-full rounded-md px-3 py-2 shadow focus:outline-none focus:ring-cyan-500"
+                class="w-full rounded-md border border-secondary bg-background px-3 py-2 text-text shadow focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <input
                 v-else
@@ -225,7 +225,7 @@ onMounted(() => {
                 :disabled="disabled"
                 :class="className"
                 :autocomplete="autocomplete"
-                class="w-full rounded-md px-3 py-2 shadow focus:outline-none focus:ring-cyan-500"
+                class="w-full rounded-md border border-secondary bg-background px-3 py-2 text-text shadow focus:outline-none focus:ring-2 focus:ring-primary"
                 @keypress="(event) => validateRegex(event, pattern)"
             />
             <slot />

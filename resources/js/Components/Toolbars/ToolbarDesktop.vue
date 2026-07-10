@@ -69,15 +69,15 @@ function filterWrapperClasses(filter) {
 
 function optionToneClasses(option, active) {
     if (!active) {
-        return 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+        return 'border-secondary bg-background text-text hover:bg-secondary'
     }
 
     const tones = {
-        red: 'border-red-200 bg-red-50 text-red-700 ring-2 ring-red-100',
-        amber: 'border-amber-200 bg-amber-50 text-amber-700 ring-2 ring-amber-100',
-        blue: 'border-blue-200 bg-blue-50 text-blue-700 ring-2 ring-blue-100',
-        rose: 'border-rose-200 bg-rose-50 text-rose-700 ring-2 ring-rose-100',
-        slate: 'border-slate-300 bg-slate-50 text-slate-700 ring-2 ring-slate-100',
+        red: 'border-primary bg-secondary text-primary ring-2 ring-primary',
+        amber: 'border-accent bg-secondary text-accent ring-2 ring-accent',
+        blue: 'border-primary bg-secondary text-primary ring-2 ring-primary',
+        rose: 'border-primary bg-secondary text-primary ring-2 ring-primary',
+        slate: 'border-secondary bg-secondary text-text ring-2 ring-secondary',
     }
 
     return tones[option?.tone] ?? tones.slate
@@ -145,11 +145,11 @@ function multiFilterLabel(filter) {
 </script>
 
 <template>
-    <section class="hidden md:block bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
+    <section class="hidden space-y-4 rounded-2xl border border-secondary bg-background p-5 shadow-sm md:block">
         <div class="hidden md:block space-y-3">
             <div v-if="backButton">
                 <button type="button"
-                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                    class="inline-flex items-center gap-2 rounded-xl border border-secondary bg-background px-4 py-2 text-sm font-black text-text shadow-sm transition hover:bg-secondary"
                     @click="$emit('back')">
                     <span class="material-symbols-outlined text-[19px]">
                         arrow_back
@@ -161,11 +161,11 @@ function multiFilterLabel(filter) {
         </div>
         <div class="flex items-start justify-between gap-6">
             <div class="min-w-0">
-                <h2 v-if="title" class="text-xl font-black text-slate-800">
+                <h2 v-if="title" class="text-xl font-black text-text">
                     {{ title }}
                 </h2>
 
-                <p v-if="subtitle" class="text-sm text-slate-500 mt-1">
+                <p v-if="subtitle" class="mt-1 text-sm text-text opacity-70">
                     {{ subtitle }}
                 </p>
             </div>
@@ -186,9 +186,9 @@ function multiFilterLabel(filter) {
         <div v-if="tabs.length" class="overflow-x-auto">
             <div class="flex min-w-max gap-2">
                 <button v-for="tab in tabs" :key="tab.key" type="button"
-                    class="rounded-xl px-4 py-2 text-sm font-bold transition flex items-center gap-2" :class="activeTab === tab.key
-                        ? 'bg-slate-900 text-white'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+                    class="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition" :class="activeTab === tab.key
+                        ? 'bg-primary text-white'
+                        : 'text-text opacity-70 hover:bg-secondary hover:text-text hover:opacity-100'"
                     @click="$emit('update:active-tab', tab.key)">
                     <span v-if="tab.icon" class="material-symbols-outlined text-[18px]">
                         {{ tab.icon }}
@@ -202,12 +202,12 @@ function multiFilterLabel(filter) {
         <div v-if="hasSearch || hasRecordsPerPage || visibleFilters.length"
             class="flex flex-wrap items-end gap-3">
             <input v-if="hasSearch" :value="search" type="text" :placeholder="searchPlaceholder"
-                class="h-11 w-full min-w-[280px] flex-[2_1_360px] border border-slate-300 rounded-xl px-4 text-sm outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                class="h-11 w-full min-w-[280px] flex-[2_1_360px] rounded-xl border border-secondary bg-background px-4 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
                 @input="$emit('update:search', handleSearchInput($event))" />
 
             <div v-for="filter in visibleFilters" :key="filter.key" :class="filterWrapperClasses(filter)">
                 <div v-if="filter.type === 'button-group'">
-                    <p v-if="filter.label" class="mb-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                    <p v-if="filter.label" class="mb-2 text-xs font-black uppercase tracking-[0.18em] text-text opacity-50">
                         {{ filter.label }}
                     </p>
 
@@ -236,12 +236,12 @@ function multiFilterLabel(filter) {
                 </div>
 
                 <label v-else class="block">
-                    <span v-if="filter.label" class="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                    <span v-if="filter.label" class="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-text opacity-50">
                         {{ filter.label }}
                     </span>
 
                     <input v-if="filter.type === 'date'" :value="filter.value ?? ''" type="date"
-                        class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                        class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
                         @input="$emit('update:filter', {
                             key: filter.key,
                             value: $event.target.value
@@ -249,7 +249,7 @@ function multiFilterLabel(filter) {
 
                     <input v-else-if="filter.type === 'text'" :value="filter.value ?? ''" type="text"
                         :placeholder="filter.placeholder || filter.label"
-                        class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                        class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
                         @input="$emit('update:filter', {
                             key: filter.key,
                             value: handleTextFilterInput($event, filter)
@@ -257,21 +257,21 @@ function multiFilterLabel(filter) {
 
                     <details v-else-if="filter.type === 'multiselect'" class="group relative">
                         <summary
-                            class="flex h-11 cursor-pointer list-none items-center justify-between rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                            class="flex h-11 cursor-pointer list-none items-center justify-between rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                         >
                             <span class="truncate">
                                 {{ multiFilterLabel(filter) }}
                             </span>
 
-                            <span class="material-symbols-outlined text-[20px] text-slate-400 transition group-open:rotate-180">
+                            <span class="material-symbols-outlined text-[20px] text-text opacity-50 transition group-open:rotate-180">
                                 expand_more
                             </span>
                         </summary>
 
-                        <div class="absolute z-40 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                        <div class="absolute z-40 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-secondary bg-background p-2 shadow-xl">
                             <button
                                 type="button"
-                                class="mb-2 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                                class="mb-2 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-text opacity-70 hover:bg-secondary"
                                 @click="clearMultiFilter(filter)"
                             >
                                 Todos
@@ -281,19 +281,19 @@ function multiFilterLabel(filter) {
                                 v-for="option in filter.options || []"
                                 :key="getOptionValue(option, filter)"
                                 type="button"
-                                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50"
+                                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-secondary"
                                 @click="toggleMultiFilter(filter, option)"
                             >
                                 <span
                                     class="flex h-4 w-4 items-center justify-center rounded border"
-                                    :class="isMultiSelected(filter, option) ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'"
+                                    :class="isMultiSelected(filter, option) ? 'border-primary bg-primary text-white' : 'border-secondary bg-background'"
                                 >
                                     <span v-if="isMultiSelected(filter, option)" class="material-symbols-outlined text-[13px]">
                                         check
                                     </span>
                                 </span>
 
-                                <span class="truncate text-slate-700">
+                                <span class="truncate text-text">
                                     {{ getOptionLabel(option, filter) }}
                                 </span>
                             </button>
@@ -301,7 +301,7 @@ function multiFilterLabel(filter) {
                     </details>
 
                     <select v-else :value="filter.value ?? ''"
-                        class="h-11 w-full border border-slate-300 rounded-xl px-3 text-sm bg-white outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                        class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
                         @change="$emit('update:filter', {
                             key: filter.key,
                             value: $event.target.value
@@ -319,25 +319,25 @@ function multiFilterLabel(filter) {
             </div>
 
             <div v-if="hasRecordsPerPage"
-                class="h-11 flex items-center gap-2 shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-3">
-                <span class="text-sm text-slate-500 whitespace-nowrap">
+                class="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-secondary bg-secondary px-3">
+                <span class="whitespace-nowrap text-sm text-text opacity-70">
                     Mostrar
                 </span>
 
-                <select :value="recordsPerPage" class="bg-transparent text-sm font-semibold text-slate-700 outline-none"
+                <select :value="recordsPerPage" class="bg-transparent text-sm font-semibold text-text outline-none"
                     @change="$emit('update:records-per-page', Number($event.target.value))">
                     <option v-for="option in recordsPerPageOptions" :key="option" :value="option">
                         {{ option }}
                     </option>
                 </select>
 
-                <span class="text-sm text-slate-500 whitespace-nowrap">
+                <span class="whitespace-nowrap text-sm text-text opacity-70">
                     filas
                 </span>
             </div>
         </div>
 
-        <p v-if="showCounter" class="text-xs text-slate-400">
+        <p v-if="showCounter" class="text-xs text-text opacity-50">
             {{ filteredRecords }} de {{ totalRecords }} registros
         </p>
     </section>

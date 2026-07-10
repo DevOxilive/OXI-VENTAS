@@ -61,15 +61,15 @@ function handleBlur() {
 
 <template>
     <div>
-        <label v-if="!hideLabel" :for="selectId" class="block text-sm font-semibold mb-1 text-slate-700">
+        <label v-if="!hideLabel" :for="selectId" class="mb-1 block text-sm font-semibold text-text">
             {{ label }}
         </label>
 
         <select v-bind="attrs" :id="selectId" :name="field" :value="modelValue" :disabled="disabled" @change="handleChange"
             @blur="handleBlur" :class="[
-                'w-full px-4 py-3 rounded-xl border outline-none text-sm transition',
-                disabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-white',
-                error ? 'border-red-500 bg-red-50' : 'border-slate-300 focus:border-[#1f1d2b]'
+                'w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
+                disabled ? 'cursor-not-allowed border-secondary bg-secondary text-text opacity-60' : 'bg-background text-text',
+                error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'
             ]">
             <option disabled value="">
                 {{ placeholder }}
@@ -82,11 +82,11 @@ function handleBlur() {
         </select>
 
         <div class="flex justify-between items-center mt-1">
-            <p v-if="error" class="text-red-500 text-xs">
+            <p v-if="error" class="text-xs text-primary">
                 {{ error }}
             </p>
 
-            <p v-if="fieldConfig?.required" class="text-[11px] text-slate-400 ml-auto">
+            <p v-if="fieldConfig?.required" class="ml-auto text-[11px] text-text opacity-50">
                 Obligatorio
             </p>
         </div>

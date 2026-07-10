@@ -174,31 +174,31 @@ onBeforeUnmount(() => {
     >
         <div
             v-if="shouldShowBanner"
-            class="fixed bottom-4 left-4 right-4 z-[9999] mx-auto max-w-md rounded-2xl border border-emerald-100 bg-white/95 p-4 shadow-2xl shadow-emerald-950/10 backdrop-blur"
+            class="fixed bottom-4 left-4 right-4 z-[9999] mx-auto max-w-md rounded-2xl border border-secondary bg-background p-4 shadow-2xl backdrop-blur"
         >
             <div class="flex items-start gap-3">
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-white shadow">
                     <span class="material-symbols-outlined text-[22px]">install_mobile</span>
                 </div>
 
                 <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold text-slate-900">
+                    <p class="text-sm font-semibold text-text">
                         {{ installTitle }}
                     </p>
 
-                    <p class="mt-1 text-sm text-slate-600">
+                    <p class="mt-1 text-sm text-text opacity-70">
                         {{ installDescription }}
                     </p>
 
                     <div
                         v-if="showInstallHelp"
-                        class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
+                        class="mt-3 rounded-xl border border-secondary bg-secondary p-3"
                     >
-                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-text opacity-70">
                             Pasos
                         </p>
 
-                        <ol class="mt-2 space-y-1 text-sm text-slate-700">
+                        <ol class="mt-2 space-y-1 text-sm text-text">
                             <li
                                 v-for="(step, index) in manualSteps"
                                 :key="step"
@@ -211,7 +211,7 @@ onBeforeUnmount(() => {
                     <div class="mt-4 flex flex-wrap gap-2">
                         <button
                             type="button"
-                            class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                            class="rounded-xl border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
                             @click="promptInstall"
                         >
                             {{ primaryActionLabel }}
@@ -219,7 +219,7 @@ onBeforeUnmount(() => {
 
                         <button
                             type="button"
-                            class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                            class="rounded-xl border border-secondary px-4 py-2 text-sm font-semibold text-text transition hover:bg-secondary"
                             @click="closeBanner"
                         >
                             Luego

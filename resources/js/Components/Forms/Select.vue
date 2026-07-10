@@ -49,15 +49,15 @@ watch(() => props.modelValue, (newValue) => {
 
 <template>
     <div class="mb-4">
-        <label :for="id" class="mb-1 block text-sm font-semibold text-slate-700">
-            {{ label }}: <span v-if="required" class="text-red-600">*</span>
+        <label :for="id" class="mb-1 block text-sm font-semibold text-text">
+            {{ label }}: <span v-if="required" class="text-primary">*</span>
         </label>
         <select
             :id="id"
             v-model="selectValue"
             :required="required"
             :disabled="disabled"
-            class="block w-full appearance-none rounded border border-gray-200 bg-gray-200 px-4 py-2 text-gray-700 leading-tight focus:border-gray-500 focus:bg-white focus:outline-none"
+            class="block w-full appearance-none rounded border border-secondary bg-secondary px-4 py-2 leading-tight text-text focus:border-primary focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary"
         >
             <option value="" selected :disabled="required">{{ defaultTextSelected }}</option>
             <template v-if="data">

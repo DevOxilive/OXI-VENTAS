@@ -153,7 +153,7 @@ function normalizePaginationLabel(label) {
 </script>
 
 <template>
-  <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+  <section class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
     <div class="max-h-[560px] overflow-y-auto">
       <TableDesktop
         :items="items"
@@ -187,9 +187,9 @@ function normalizePaginationLabel(label) {
 
     <footer
       v-if="hasPagination"
-      class="border-t border-slate-200 bg-slate-50 px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+      class="flex flex-col gap-3 border-t border-secondary bg-secondary px-4 py-4 md:flex-row md:items-center md:justify-between"
     >
-      <p class="text-sm text-slate-500 text-center md:text-left">
+      <p class="text-center text-sm text-text opacity-70 md:text-left">
         Pagina {{ currentPage }} de {{ lastPage }}
         <span class="hidden md:inline"> - </span>
         <span class="block md:inline">Total: {{ totalRecords }} registros</span>
@@ -199,7 +199,7 @@ function normalizePaginationLabel(label) {
         <button
           type="button"
           :disabled="!pagination?.prev_page_url"
-          class="min-w-9 px-3 py-2 rounded-lg text-sm border transition inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+          class="min-w-9 inline-flex items-center justify-center rounded-lg border border-secondary bg-background px-3 py-2 text-sm text-text transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
           @click="goToPage({ url: pagination.prev_page_url })"
         >
           <span class="material-symbols-outlined text-[18px]">chevron_left</span>
@@ -212,8 +212,8 @@ function normalizePaginationLabel(label) {
           :disabled="!link.url && !link.active"
           class="min-w-9 px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 disabled:cursor-not-allowed"
           :class="link.active
-            ? 'bg-slate-900 text-white border-slate-900'
-            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'"
+            ? 'border-primary bg-primary text-white'
+            : 'border-secondary bg-background text-text hover:bg-secondary'"
           @click="goToPage(link)"
         >
           {{ normalizePaginationLabel(link.label) }}
@@ -222,7 +222,7 @@ function normalizePaginationLabel(label) {
         <button
           type="button"
           :disabled="!pagination?.next_page_url"
-          class="min-w-9 px-3 py-2 rounded-lg text-sm border transition inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+          class="min-w-9 inline-flex items-center justify-center rounded-lg border border-secondary bg-background px-3 py-2 text-sm text-text transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
           @click="goToPage({ url: pagination.next_page_url })"
         >
           <span class="material-symbols-outlined text-[18px]">chevron_right</span>

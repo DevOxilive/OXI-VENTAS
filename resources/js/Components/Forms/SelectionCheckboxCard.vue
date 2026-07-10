@@ -44,12 +44,12 @@ const emit = defineEmits(['toggle'])
         :class="[
             compact ? 'px-4 py-3' : 'px-4 py-4',
             darkChecked && checked
-                ? 'border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-300/50'
+                ? 'border-primary bg-primary text-white shadow-lg'
                 : checked
-                    ? 'border-slate-300 bg-white shadow-sm hover:border-slate-400 hover:shadow-md'
-                    : 'border-slate-200 bg-slate-50/80 hover:border-slate-300 hover:bg-white',
+                    ? 'border-primary bg-background shadow-sm hover:border-primary hover:shadow-md'
+                    : 'border-secondary bg-secondary hover:border-primary hover:bg-background',
             disabled ? 'cursor-default' : '',
-            highlighted && !darkChecked ? 'border-emerald-300 bg-emerald-50' : '',
+            highlighted && !darkChecked ? 'border-accent bg-secondary' : '',
         ]"
         @click="!disabled && emit('toggle')"
     >
@@ -78,7 +78,7 @@ const emit = defineEmits(['toggle'])
             <p
                 v-if="description"
                 class="mt-1 text-xs"
-                :class="darkChecked && checked ? 'text-slate-300' : 'text-slate-500'"
+                :class="darkChecked && checked ? 'text-white opacity-80' : 'text-text opacity-70'"
             >
                 {{ description }}
             </p>
@@ -87,7 +87,7 @@ const emit = defineEmits(['toggle'])
         <span
             v-if="badge"
             class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-            :class="darkChecked && checked ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-600'"
+            :class="darkChecked && checked ? 'bg-secondary text-text' : 'bg-secondary text-text'"
         >
             {{ badge }}
         </span>
