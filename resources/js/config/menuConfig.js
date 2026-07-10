@@ -252,7 +252,9 @@ export function generateMenu(role, permissions = [], branches = []) {
     if (
         isAdmin ||
         can("systems.tickets.view") ||
-        can("systems.tickets.update")
+        can("systems.tickets.update") ||
+        can("systems.labels.view") ||
+        can("systems.labels.update")
     ) {
         menu.push({
             text: "Impresoras",
@@ -266,6 +268,18 @@ export function generateMenu(role, permissions = [], branches = []) {
                     icon: "receipt_long",
                     url: route("printers.tickets.index"),
                 },
+                ...(isAdmin ||
+                can("systems.labels.view") ||
+                can("systems.labels.update")
+                    ? [
+                          {
+                              text: "Etiquetas",
+                              key: "printers.labels",
+                              icon: "barcode",
+                              url: route("printers.labels.index"),
+                          },
+                      ]
+                    : []),
             ],
         });
     }

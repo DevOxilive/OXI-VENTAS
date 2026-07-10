@@ -58,6 +58,35 @@ class TicketTemplate extends Model
         ];
     }
 
+    public static function defaultLabelSettings(): array
+    {
+        return [
+            'label_width_mm' => 62,
+            'label_height_mm' => 18,
+            'print_engine' => 'visual',
+            'barcode_height_mm' => 6,
+            'barcode_width_percent' => 100,
+            'show_border' => true,
+            'header_text' => 'SUPER KAY',
+            'footer_text' => 'Precio sujeto a cambio',
+            'custom_text' => '',
+            'blocks' => [
+                ['key' => 'brand_title', 'enabled' => false, 'position_percent' => 50, 'size_percent' => 100],
+                ['key' => 'product_name', 'enabled' => true, 'position_percent' => 50, 'size_percent' => 440],
+                ['key' => 'price', 'enabled' => true, 'position_percent' => 50, 'size_percent' => 440],
+                ['key' => 'category', 'enabled' => false, 'position_percent' => 50, 'size_percent' => 72],
+                ['key' => 'barcode', 'enabled' => false, 'position_percent' => 50, 'size_percent' => 100],
+                ['key' => 'barcode_text', 'enabled' => false, 'position_percent' => 50, 'size_percent' => 74],
+                ['key' => 'sku', 'enabled' => false, 'position_percent' => 50, 'size_percent' => 72],
+                ['key' => 'stock', 'enabled' => false, 'position_percent' => 50, 'size_percent' => 72],
+                ['key' => 'branch', 'enabled' => false, 'position_percent' => 50, 'size_percent' => 72],
+                ['key' => 'date', 'enabled' => false, 'position_percent' => 50, 'size_percent' => 72],
+                ['key' => 'custom_text', 'enabled' => false, 'position_percent' => 50, 'size_percent' => 80],
+                ['key' => 'footer_text', 'enabled' => false, 'position_percent' => 50, 'size_percent' => 70],
+            ],
+        ];
+    }
+
     public static function salesTemplate(): self
     {
         $template = static::query()->firstOrCreate(
@@ -72,6 +101,28 @@ class TicketTemplate extends Model
         $normalizedSettings = static::sanitizeSettings(
             static::upgradeLegacySettings($template->settings ?? [])
         );
+
+        if (!$template->settings || $normalizedSettings !== ($template->settings ?? [])) {
+            $template->update([
+                'settings' => $normalizedSettings,
+            ]);
+        }
+
+        return $template->fresh();
+    }
+
+    public static function productLabelTemplate(): self
+    {
+        $template = static::query()->firstOrCreate(
+            ['slug' => 'product-label'],
+            [
+                'name' => 'Etiqueta de producto',
+                'is_active' => true,
+                'settings' => static::defaultLabelSettings(),
+            ]
+        );
+
+        $normalizedSettings = static::sanitizeLabelSettings($template->settings ?? []);
 
         if (!$template->settings || $normalizedSettings !== ($template->settings ?? [])) {
             $template->update([
@@ -127,6 +178,50 @@ class TicketTemplate extends Model
             'cash_box_text' => static::nonBlankText($settings['cash_box_text'] ?? null, $defaults['cash_box_text']),
             'footer_text' => static::nonBlankText($settings['footer_text'] ?? null, $defaults['footer_text']),
             'show_dividers' => true,
+            'blocks' => $settings['blocks'],
+        ];
+    }
+
+    public static function sanitizeLabelSettings(array $settings = []): array
+    {
+        $defaults = static::defaultLabelSettings();
+        $allowedBlockKeys = collect($defaults['blocks'])->pluck('key')->all();
+        $defaultBlocks = collect($defaults['blocks'])->keyBy('key');
+        $incomingBlocks = collect($settings['blocks'] ?? [])
+            ->filter(fn ($block) => is_array($block) && in_array($block['key'] ?? null, $allowedBlockKeys, true))
+            ->unique('key')
+            ->values();
+
+        $settings['blocks'] = $incomingBlocks
+            ->concat(
+                collect($defaults['blocks'])
+                    ->reject(fn (array $block) => $incomingBlocks->contains('key', $block['key']))
+            )
+            ->map(function (array $incoming) use ($defaultBlocks) {
+                $defaultBlock = $defaultBlocks->get($incoming['key']);
+
+                return [
+                    'key' => $defaultBlock['key'],
+                    'enabled' => array_key_exists('enabled', $incoming)
+                        ? filter_var($incoming['enabled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $defaultBlock['enabled']
+                        : $defaultBlock['enabled'],
+                    'position_percent' => max(0, min(100, (int) ($incoming['position_percent'] ?? $defaultBlock['position_percent']))),
+                    'size_percent' => max(50, min(440, (int) ($incoming['size_percent'] ?? $defaultBlock['size_percent']))),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'label_width_mm' => $defaults['label_width_mm'],
+            'label_height_mm' => $defaults['label_height_mm'],
+            'print_engine' => 'visual',
+            'barcode_height_mm' => max(6, min(28, (int) ($settings['barcode_height_mm'] ?? $defaults['barcode_height_mm']))),
+            'barcode_width_percent' => max(45, min(100, (int) ($settings['barcode_width_percent'] ?? $defaults['barcode_width_percent']))),
+            'show_border' => filter_var($settings['show_border'] ?? $defaults['show_border'], FILTER_VALIDATE_BOOLEAN),
+            'header_text' => static::nonBlankText($settings['header_text'] ?? null, $defaults['header_text']),
+            'footer_text' => static::nonBlankText($settings['footer_text'] ?? null, $defaults['footer_text']),
+            'custom_text' => trim((string) ($settings['custom_text'] ?? $defaults['custom_text'])),
             'blocks' => $settings['blocks'],
         ];
     }

@@ -102,6 +102,12 @@ Route::middleware([
         Route::put('/tickets/{ticketTemplate}', [TicketTemplateController::class, 'update'])
             ->middleware('permission:systems.tickets.update')
             ->name('tickets.update');
+
+        Route::get('/labels', function () {
+            return redirect()->route('printers.labels.index');
+        })
+            ->middleware('permission:systems.labels.view,systems.labels.update')
+            ->name('labels.index');
     });
 
     /*
@@ -186,6 +192,14 @@ Route::middleware([
         Route::put('/tickets/{ticketTemplate}', [TicketTemplateController::class, 'update'])
             ->middleware('permission:systems.tickets.update')
             ->name('tickets.update');
+
+        Route::get('/labels', [TicketTemplateController::class, 'labels'])
+            ->middleware('permission:systems.labels.view,systems.labels.update')
+            ->name('labels.index');
+
+        Route::put('/labels/{ticketTemplate}', [TicketTemplateController::class, 'updateLabel'])
+            ->middleware('permission:systems.labels.update')
+            ->name('labels.update');
     });
 
     /*
@@ -410,6 +424,9 @@ Route::middleware([
         Route::delete('/physical-count-entries/{entry}', [PhysicalCountController::class, 'destroyEntry'])
             ->name('physical-count-entries.destroy');
 
+        Route::get('/physical-counts/{physicalCount}/search-products', [PhysicalCountController::class, 'searchProducts'])
+            ->middleware('permission:audits.physical-counts.count,audits.physical-counts.update')
+            ->name('physical-counts.search-products');
 
         Route::get('/physical-counts/{physicalCount}', [PhysicalCountController::class, 'show'])
             ->middleware('permission:audits.physical-counts.view,audits.physical-counts.count,audits.physical-counts.update')

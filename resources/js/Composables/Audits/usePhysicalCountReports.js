@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
@@ -21,6 +21,8 @@ export function usePhysicalCountReports(props) {
         branch: props.filters.branch || props.branch?.slug || '',
         physical_count_id: props.filters.physical_count_id || '',
         user_id: props.filters.user_id || '',
+        user_ids: props.filters.user_ids || [],
+        user_scope: props.filters.user_scope || 'participants',
         category_id: props.filters.category_id || '',
         report_date: props.filters.report_date || '',
         date_scope: props.filters.date_scope || 'day',
@@ -29,9 +31,6 @@ export function usePhysicalCountReports(props) {
         report_type: props.filters.report_type || 'summary',
         per_page: Number(props.filters.per_page || 25),
     })
-
-    const syncingFromServer = ref(false)
-    let filterTimeout = null
 
     const toolbarConfig = computed(() =>
         getPhysicalCountReportsToolbarConfig({
@@ -81,6 +80,8 @@ export function usePhysicalCountReports(props) {
             branch: form.branch || props.branch?.slug || '',
             physical_count_id: form.physical_count_id || '',
             user_id: form.user_id || '',
+            user_ids: form.user_ids || [],
+            user_scope: form.user_scope || 'participants',
             category_id: form.category_id || '',
             report_date: form.report_date || '',
             date_scope: form.date_scope || 'day',
@@ -110,13 +111,6 @@ export function usePhysicalCountReports(props) {
         })
     }
 
-    function scheduleFilterReload(delay = 250) {
-        if (syncingFromServer.value) return
-
-        clearTimeout(filterTimeout)
-        filterTimeout = setTimeout(() => applyFilters(), delay)
-    }
-
     function updateSearch(value) {
         form.search = value
     }
@@ -124,6 +118,11 @@ export function usePhysicalCountReports(props) {
     function updateFilter({ key, value }) {
         if (key === 'branch' && value !== form.branch && form.physical_count_id) {
             form.physical_count_id = ''
+        }
+
+        if (['branch', 'physical_count_id', 'user_scope'].includes(key)) {
+            form.user_ids = []
+            form.user_id = ''
         }
 
         if (key === 'search') {
@@ -135,10 +134,11 @@ export function usePhysicalCountReports(props) {
     }
 
     function clearFilters() {
-        syncingFromServer.value = true
         form.branch = props.branch?.slug || ''
         form.physical_count_id = ''
         form.user_id = ''
+        form.user_ids = []
+        form.user_scope = 'participants'
         form.category_id = ''
         form.report_date = ''
         form.date_scope = 'day'
@@ -146,8 +146,6 @@ export function usePhysicalCountReports(props) {
         form.search = ''
         form.report_type = 'summary'
         form.per_page = 25
-        syncingFromServer.value = false
-
         router.get(route('audits.physical-counts.reports'), { branch: form.branch }, {
             preserveScroll: true,
             preserveState: true,
@@ -167,6 +165,11 @@ export function usePhysicalCountReports(props) {
 
     function handleToolbarAction(action) {
         const actionId = typeof action === 'string' ? action : action?.id
+
+        if (actionId === 'filter') {
+            applyFilters()
+            return
+        }
 
         if (actionId === 'clear') {
             clearFilters()
@@ -201,28 +204,13 @@ export function usePhysicalCountReports(props) {
     }
 
     watch(
-        () => [
-            form.branch,
-            form.physical_count_id,
-            form.user_id,
-            form.category_id,
-            form.report_date,
-            form.date_scope,
-            form.status,
-            form.search,
-            form.report_type,
-            form.per_page,
-        ],
-        () => scheduleFilterReload(250)
-    )
-
-    watch(
         () => props.filters,
         (filters) => {
-            syncingFromServer.value = true
             form.branch = filters.branch || props.branch?.slug || ''
             form.physical_count_id = filters.physical_count_id || ''
             form.user_id = filters.user_id || ''
+            form.user_ids = filters.user_ids || []
+            form.user_scope = filters.user_scope || 'participants'
             form.category_id = filters.category_id || ''
             form.report_date = filters.report_date || ''
             form.date_scope = filters.date_scope || 'day'
@@ -230,7 +218,6 @@ export function usePhysicalCountReports(props) {
             form.search = filters.search || ''
             form.report_type = filters.report_type || 'summary'
             form.per_page = Number(filters.per_page || 25)
-            syncingFromServer.value = false
         },
         { deep: true }
     )
@@ -245,8 +232,6 @@ export function usePhysicalCountReports(props) {
     })
 
     onBeforeUnmount(() => {
-        clearTimeout(filterTimeout)
-
         if (!window.Echo) return
         window.Echo.leave('audits')
     })

@@ -6,6 +6,14 @@ export function getPhysicalCountReportsToolbarConfig({
     users = [],
     categories = [],
 } = {}) {
+    const selectedAudit = audits.find((audit) => String(audit.id) === String(form.physical_count_id))
+    const participantOptions = selectedAudit
+        ? selectedAudit.participants || []
+        : audits.flatMap((audit) => audit.participants || [])
+    const scopedUsers = form.user_scope === 'participants'
+        ? uniqueUsers(participantOptions)
+        : users
+
     return {
         title: 'Reportes de auditoría',
         subtitle: branch?.name
@@ -37,11 +45,22 @@ export function getPhysicalCountReportsToolbarConfig({
                 })),
             },
             {
-                key: 'user_id',
+                key: 'user_scope',
+                label: 'Lista usuarios',
+                placeholder: 'Participantes',
+                value: form.user_scope,
+                options: [
+                    { label: 'Participantes de auditoría', value: 'participants' },
+                    { label: 'Todos los usuarios', value: 'all' },
+                ],
+            },
+            {
+                key: 'user_ids',
                 label: 'Usuario',
                 placeholder: 'Todos los usuarios',
-                value: form.user_id,
-                options: users,
+                type: 'multiselect',
+                value: form.user_ids,
+                options: scopedUsers,
                 optionLabel: 'name',
                 optionValue: 'id',
             },
@@ -98,6 +117,12 @@ export function getPhysicalCountReportsToolbarConfig({
         ],
         actions: [
             {
+                id: 'filter',
+                label: 'Filtrar',
+                icon: 'filter_alt',
+                variant: 'blue',
+            },
+            {
                 id: 'clear',
                 label: 'Limpiar',
                 icon: 'restart_alt',
@@ -124,4 +149,15 @@ export function getPhysicalCountReportsToolbarConfig({
             { key: 'differences', label: 'Diferencias', icon: 'analytics' },
         ],
     }
+}
+
+function uniqueUsers(users = []) {
+    const seen = new Set()
+
+    return users.filter((user) => {
+        if (!user?.id || seen.has(user.id)) return false
+
+        seen.add(user.id)
+        return true
+    })
 }
