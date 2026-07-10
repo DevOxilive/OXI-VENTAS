@@ -1,7 +1,7 @@
 ﻿<script setup>
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { usePage, useForm, router } from '@inertiajs/vue3'
-import { usePermissionLabels } from '@/Composables/usePermissionLabels'
+import { requiresBranchAssignments, usePermissionLabels } from '@/Composables/usePermissionLabels'
 import UserToolbar from '@/Components/Systems/UserToolbar.vue'
 import UserTable from '@/Components/Systems/UserTable.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
@@ -38,9 +38,10 @@ const roleFilter = ref(filters.value.role || '')
 const { handlePageChange } = useGlobalTablePagination()
 
 const {
-  groupedPermissions,
+  permissionSections,
   permissionLabel,
   moduleLabel,
+  sectionLabel,
 } = usePermissionLabels(permissions)
 
 const showModal = ref(false)
@@ -120,10 +121,6 @@ const selectedRole = computed(() => {
   return roles.value.find((role) => String(role.id) === String(form.role_id))
 })
 
-const isSalesRole = computed(() => {
-  return selectedRole.value?.name === 'Ventas'
-})
-
 const selectedPermissionNames = computed(() => {
   const selectedPermissionIds = form.permissions.map((permissionId) => Number(permissionId))
 
@@ -132,8 +129,15 @@ const selectedPermissionNames = computed(() => {
     .map((permission) => permission.name)
 })
 
-const requiresSalesBranches = computed(() => {
-  return isSalesRole.value || selectedPermissionNames.value.some((permission) => permission.startsWith('sales.'))
+const requiresBranchAccess = computed(() => {
+  return requiresBranchAssignments(
+    selectedRole.value?.name || '',
+    selectedPermissionNames.value,
+  )
+})
+
+const canAssignBranches = computed(() => {
+  return true
 })
 
 function getPermissionsByRole(roleId) {
@@ -164,10 +168,6 @@ function assignPermissionsByRole() {
   if (isLoadingEdit.value) return
 
   form.permissions = getPermissionsByRole(form.role_id)
-
-  if (!requiresSalesBranches.value) {
-    form.branch_ids = []
-  }
 }
 
 function validateForm() {
@@ -185,8 +185,8 @@ function validateForm() {
     errors.value.role_id = 'Debes seleccionar un rol'
   }
 
-  if (requiresSalesBranches.value && form.branch_ids.length === 0) {
-    errors.value.branch_ids = 'Selecciona al menos una sucursal para este usuario de ventas'
+  if (requiresBranchAccess.value && form.branch_ids.length === 0) {
+    errors.value.branch_ids = 'Selecciona al menos una sucursal para este usuario'
   }
 
   if (!isEditing.value || form.password) {
@@ -325,7 +325,11 @@ function togglePermission(id) {
 }
 
 function enableModule(module) {
-  const ids = groupedPermissions.value[module].map((permission) => permission.id)
+  const selectedModule = permissionSections.value
+    .flatMap((section) => section.modules)
+    .find((item) => item.key === module)
+
+  const ids = selectedModule?.permissions?.map((permission) => permission.id) || []
 
   form.permissions = [
     ...new Set([
@@ -336,7 +340,11 @@ function enableModule(module) {
 }
 
 function disableModule(module) {
-  const ids = groupedPermissions.value[module].map((permission) => permission.id)
+  const selectedModule = permissionSections.value
+    .flatMap((section) => section.modules)
+    .find((item) => item.key === module)
+
+  const ids = selectedModule?.permissions?.map((permission) => permission.id) || []
 
   form.permissions = form.permissions.filter((id) => !ids.includes(id))
 }
@@ -395,12 +403,6 @@ watch(() => form.role_id, () => {
   if (isEditing.value) return
 
   assignPermissionsByRole()
-})
-
-watch(requiresSalesBranches, (value) => {
-  if (value) return
-
-  form.branch_ids = []
 })
 
 function closeModal() {
@@ -555,10 +557,11 @@ onBeforeUnmount(() => {
       @close="closeUserDetail" />
 
     <UserRegisterModal v-if="showModal" :form="form" :errors="errors" :roles="roles" :branches="branches"
-      :groupedPermissions="groupedPermissions" :isEditing="isEditing"
-      :canSave="isEditing ? can('users.update') : can('users.create')" :requiresSalesBranches="requiresSalesBranches"
+      :permission-sections="permissionSections" :isEditing="isEditing"
+      :canSave="isEditing ? can('users.update') : can('users.create')" :requires-branch-access="requiresBranchAccess"
+      :can-assign-branches="canAssignBranches"
       :locked-permission-ids="lockedPermissionIds"
-      :module-label="moduleLabel" :permission-label="permissionLabel" @close="closeModal" @save="saveUser"
+      :module-label="moduleLabel" :section-label="sectionLabel" :permission-label="permissionLabel" @close="closeModal" @save="saveUser"
       @toggle-permission="togglePermission" @change-role="assignPermissionsByRole"
       @enable-module="enableModule" @disable-module="disableModule" />
   </PageLayout>

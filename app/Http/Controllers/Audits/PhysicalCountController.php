@@ -6,6 +6,7 @@ use App\Events\PhysicalCountChanged;
 use App\Events\RealtimeActivityLogged;
 use App\Exports\PhysicalCountExport;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
@@ -28,6 +29,8 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class PhysicalCountController extends Controller
 {
+    use AuthorizesBranchAccess;
+
     public function __construct(
         private PhysicalCountSnapshotService $snapshotService
     ) {
@@ -1089,17 +1092,7 @@ class PhysicalCountController extends Controller
 
     private function resolveBranch(?string $branchSlug): Branch
     {
-        if (! $branchSlug) {
-            return Branch::where('active', true)
-                ->orderBy('name')
-                ->select('id', 'name', 'slug', 'color')
-                ->firstOrFail();
-        }
-
-        return Branch::where('active', true)
-            ->where('slug', $branchSlug)
-            ->select('id', 'name', 'slug', 'color')
-            ->firstOrFail();
+        return $this->resolveAccessibleBranch(request(), $branchSlug);
     }
 
     private function canManageAudits(?User $user): bool

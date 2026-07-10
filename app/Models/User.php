@@ -6,6 +6,8 @@ use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -80,6 +82,39 @@ class User extends Authenticatable
     public function branches()
     {
         return $this->belongsToMany(Branch::class, 'branch_user');
+    }
+
+    public function accessibleBranchesQuery(): Builder|BelongsToMany
+    {
+        if ($this->role?->name === 'Administrador') {
+            return Branch::query()->where('active', true);
+        }
+
+        return $this->branches()->where('active', true);
+    }
+
+    public function accessibleBranchIds(): array
+    {
+        return $this->accessibleBranchesQuery()
+            ->pluck('branches.id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    public function hasBranchAccess(int $branchId): bool
+    {
+        if ($this->role?->name === 'Administrador') {
+            return Branch::query()
+                ->where('active', true)
+                ->whereKey($branchId)
+                ->exists();
+        }
+
+        return $this->branches()
+            ->where('active', true)
+            ->where('branches.id', $branchId)
+            ->exists();
     }
 
     public function assignedPhysicalCounts()

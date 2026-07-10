@@ -14,6 +14,22 @@ import { getProductToolbarConfig } from '@/config/ToolbarConfigs/productToolbarC
 
 defineOptions({ layout: AdminLayout })
 
+function cloneProductsPayload(payload) {
+  return {
+    ...(payload ?? {}),
+    data: Array.isArray(payload?.data)
+      ? payload.data.map((item) => ({ ...item }))
+      : [],
+    links: Array.isArray(payload?.links) ? [...payload.links] : [],
+  }
+}
+
+function sortProducts(items) {
+  return [...items].sort((left, right) => {
+    return Number(right?.branch_product_id ?? 0) - Number(left?.branch_product_id ?? 0)
+  })
+}
+
 const { can } = usePermissions()
 
 const props = defineProps({
@@ -39,19 +55,29 @@ const props = defineProps({
   },
 })
 
+const productsState = ref(cloneProductsPayload(props.productsDB))
 const branch = computed(() => props.branch ?? {})
 const categoriesDB = computed(() => props.categoriesDB ?? [])
 const branchesDB = computed(() => props.branchesDB ?? [])
+
+watch(
+  () => props.productsDB,
+  (value) => {
+    productsState.value = cloneProductsPayload(value)
+  },
+  { deep: true }
+)
 
 const search = ref(props.filters.search ?? '')
 const categoryFilter = ref(props.filters.category_id ?? 'Todas')
 const recordsToShow = ref(Number(props.filters.per_page ?? 50))
 const { handlePageChange } = useGlobalTablePagination({
-  only: ['productsDB', 'filters'],
+  only: ['productsDB', 'filters', 'categoriesDB'],
 })
 
-const products = computed(() => props.productsDB?.data ?? [])
-const currentPage = computed(() => props.productsDB?.current_page ?? 1)
+const products = computed(() => productsState.value?.data ?? [])
+const currentPage = computed(() => productsState.value?.current_page ?? 1)
+const totalProducts = computed(() => productsState.value?.total ?? products.value.length)
 
 const productToolbarConfig = computed(() =>
   getProductToolbarConfig({
@@ -111,9 +137,69 @@ function reloadProducts(pageOrUrl = 1) {
       preserveState: true,
       preserveScroll: true,
       replace: true,
-      only: ['productsDB', 'filters'],
+      only: ['productsDB', 'filters', 'categoriesDB'],
     }
   )
+}
+
+function upsertProduct(product) {
+  if (!product?.branch_product_id) return
+
+  const nextItems = [...products.value]
+  const existingIndex = nextItems.findIndex((item) => {
+    return Number(item.branch_product_id) === Number(product.branch_product_id)
+  })
+
+  if (existingIndex >= 0) {
+    nextItems[existingIndex] = {
+      ...nextItems[existingIndex],
+      ...product,
+    }
+  } else {
+    nextItems.push(product)
+  }
+
+  const sortedItems = sortProducts(nextItems)
+  const currentTotal = Number(productsState.value?.total ?? nextItems.length)
+
+  productsState.value = {
+    ...(productsState.value ?? {}),
+    data: sortedItems,
+    total: existingIndex >= 0 ? currentTotal : currentTotal + 1,
+  }
+}
+
+function removeProduct(productId) {
+  const nextItems = products.value.filter((item) => {
+    return Number(item.id) !== Number(productId)
+  })
+
+  const currentTotal = Number(productsState.value?.total ?? products.value.length)
+  const removed = nextItems.length !== products.value.length
+
+  productsState.value = {
+    ...(productsState.value ?? {}),
+    data: nextItems,
+    total: removed ? Math.max(0, currentTotal - 1) : currentTotal,
+  }
+}
+
+async function fetchProductSnapshot(productId) {
+  if (!productId || !branch.value?.slug) return null
+
+  try {
+    const { data } = await window.axios.get(
+      route('inventory.branches.products.snapshot', {
+        branch: branch.value.slug,
+        productId,
+      })
+    )
+
+    return data?.product ?? null
+  } catch (error) {
+    console.error('No se pudo actualizar el producto en tiempo real', error)
+    return null
+  }
 }
 
 let searchTimer = null
@@ -152,7 +238,7 @@ function shouldReloadForProductEvent(event) {
 onMounted(() => {
   if (!window.Echo) return
 
-  const reloadOnProductChange = (event) => {
+  const updateOnProductChange = async (event) => {
     if (!shouldReloadForProductEvent(event)) return
 
     if (
@@ -169,11 +255,23 @@ onMounted(() => {
       closeModal()
     }
 
-    reloadProducts(currentPage.value)
+    if (event.action === 'deleted') {
+      removeProduct(event.productId ?? event.product_id)
+      return
+    }
+
+    const product = await fetchProductSnapshot(event.productId ?? event.product_id)
+
+    if (!product) {
+      removeProduct(event.productId ?? event.product_id)
+      return
+    }
+
+    upsertProduct(product)
   }
 
   window.Echo.channel('inventory.products')
-    .listen('.product.changed', reloadOnProductChange)
+    .listen('.product.changed', updateOnProductChange)
 })
 
 onBeforeUnmount(() => {
@@ -189,12 +287,12 @@ onBeforeUnmount(() => {
   <PageLayout>
     <template #toolbar>
       <GlobalToolbar v-bind="productToolbarConfig" :search="search" :records-per-page="recordsToShow"
-        :filtered-records="products.length" :total-records="productsDB?.total ?? products.length"
+        :filtered-records="products.length" :total-records="totalProducts"
         @update:search="search = $event" @update:filter="handleProductToolbarFilter"
         @update:records-per-page="recordsToShow = $event" @action="handleProductToolbarAction" />
     </template>
 
-    <ProductTable :items="products" :pagination="productsDB" @page-change="handlePageChange"
+    <ProductTable :items="products" :pagination="productsState" @page-change="handlePageChange"
       @action="handleProductAction" />
 
     <ProductModal v-if="

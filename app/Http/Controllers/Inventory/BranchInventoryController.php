@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Inventory;
 
 use App\Events\InventoryStockUpdated;
 use App\Events\RealtimeActivityLogged;
+use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
@@ -18,6 +19,8 @@ use Inertia\Inertia;
 
 class BranchInventoryController extends Controller
 {
+    use AuthorizesBranchAccess;
+
     public function index(Request $request)
     {
         return $this->renderInventory($request, null);
@@ -25,6 +28,8 @@ class BranchInventoryController extends Controller
 
     public function show(Request $request, Branch $branch)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         return $this->renderInventory($request, $branch);
     }
 
@@ -303,11 +308,27 @@ class BranchInventoryController extends Controller
             ],
 
             'productsDB' => Product::query()
-                ->select(['id', 'name', 'sale_price', 'cost', 'unit', 'category_id'])
-                ->where('active', true)
-                ->orderBy('name')
+                ->select(['products.id', 'products.name', 'products.sale_price', 'products.cost', 'products.unit', 'products.category_id'])
+                ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
+                ->when($branch, fn ($query) => $query->where('branch_products.branch_id', $branch->id))
+                ->where('products.active', true)
+                ->with(['category:id,name', 'barcodes:id,product_id,code'])
+                ->distinct()
+                ->orderBy('products.name')
                 ->limit(300)
-                ->get(),
+                ->get()
+                ->map(fn (Product $product) => [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'sale_price' => $product->sale_price,
+                    'cost' => $product->cost,
+                    'unit' => $product->unit,
+                    'category_id' => $product->category_id,
+                    'category_name' => $product->category?->name,
+                    'main_barcode' => $product->barcodes?->first()?->code,
+                    'label' => trim($product->name . ' - ' . ($product->barcodes?->first()?->code ?? 'Sin codigo')),
+                ])
+                ->values(),
 
             'branchesDB' => Branch::query()
                 ->select(['id', 'name', 'slug'])
@@ -315,10 +336,7 @@ class BranchInventoryController extends Controller
                 ->orderBy('name')
                 ->get(),
 
-            'categoriesDB' => Category::query()
-                ->select(['id', 'name'])
-                ->orderBy('name')
-                ->get(),
+            'categoriesDB' => $this->categoryOptions($branch),
 
             'filters' => [
                 'search' => $request->search,
@@ -332,53 +350,54 @@ class BranchInventoryController extends Controller
         ]);
     }
 
+    private function categoryOptions(?Branch $branch)
+    {
+        return Category::query()
+            ->select(['categories.id', 'categories.name'])
+            ->join('products', 'products.category_id', '=', 'categories.id')
+            ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
+            ->when($branch, fn ($query) => $query->where('branch_products.branch_id', $branch->id))
+            ->distinct()
+            ->orderBy('categories.name')
+            ->get();
+    }
+
     public function details(BranchProduct $branchProduct): JsonResponse
     {
-        $branchProduct->load([
-            'branch:id,name,slug',
-            'product:id,name,category_id,sale_price,cost,unit',
-            'product.category:id,name',
-            'product.barcodes:id,product_id,code',
-            'batches' => fn($query) => $query
-                ->select([
-                    'id',
-                    'branch_product_id',
-                    'lot_number',
-                    'expiration_date',
-                    'initial_quantity',
-                    'quantity',
-                    'supplier',
-                    'received_at',
-                    'status',
-                    'season_start_date',
-                    'season_end_date',
-                ])
-                ->where('quantity', '>', 0)
-                ->orderByRaw('expiration_date IS NULL')
-                ->orderBy('expiration_date')
-                ->orderBy('id'),
-            'movements' => fn($query) => $query
-                ->select([
-                    'id',
-                    'branch_product_id',
-                    'user_id',
-                    'type',
-                    'reason',
-                    'quantity',
-                    'previous_stock',
-                    'new_stock',
-                    'notes',
-                    'created_at',
-                ])
-                ->with([
-                    'user:id,name',
-                    'batches:id,stock_movement_id,product_batch_id,quantity',
-                    'batches.productBatch:id,lot_number',
-                ])
-                ->latest(),
+        return response()->json($this->serializeBranchProductDetails($branchProduct));
+    }
+
+    public function realtimeSnapshot(Request $request, Branch $branch): JsonResponse
+    {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
+        $validated = $request->validate([
+            'branch_product_id' => ['nullable', 'exists:branch_products,id'],
+            'product_id' => ['nullable', 'exists:products,id'],
         ]);
 
-        return response()->json($branchProduct);
+        $branchProduct = BranchProduct::query()
+            ->where('branch_id', $branch->id)
+            ->when(
+                filled($validated['branch_product_id'] ?? null),
+                fn ($query) => $query->whereKey($validated['branch_product_id'])
+            )
+            ->when(
+                blank($validated['branch_product_id'] ?? null) && filled($validated['product_id'] ?? null),
+                fn ($query) => $query->where('product_id', $validated['product_id'])
+            )
+            ->first();
+
+        return response()->json([
+            'branchProduct' => $branchProduct
+                ? $this->serializeBranchProductRow($branchProduct)
+                : null,
+            'branchProductDetails' => $branchProduct
+                ? $this->serializeBranchProductDetails($branchProduct)
+                : null,
+            'inventoryStats' => $this->inventoryStatsPayload($branch),
+            'inventoryAlerts' => $this->inventoryAlertsPayload($branch),
+        ]);
     }
 
     public function store(Request $request)
@@ -444,5 +463,283 @@ class BranchInventoryController extends Controller
         ));
 
         return back()->with('success', 'Configuracion del producto actualizada correctamente.');
+    }
+
+    private function serializeBranchProductRow(BranchProduct $branchProduct): array
+    {
+        $branchProduct->loadMissing([
+            'branch:id,name,slug',
+            'product:id,name,category_id,sale_price,cost,unit',
+            'product.category:id,name',
+            'product.barcodes:id,product_id,code',
+        ]);
+        $branchProduct->loadCount([
+            'activeBatches as active_batches_count',
+        ]);
+        $branchProduct->loadMin([
+            'activeBatches as next_expiration_date',
+        ], 'expiration_date');
+
+        return [
+            'id' => $branchProduct->id,
+            'branch_id' => $branchProduct->branch_id,
+            'product_id' => $branchProduct->product_id,
+            'barcode' => $branchProduct->barcode,
+            'stock' => $branchProduct->stock,
+            'min_stock' => $branchProduct->min_stock,
+            'status' => $branchProduct->status,
+            'season_start_date' => $branchProduct->season_start_date,
+            'season_end_date' => $branchProduct->season_end_date,
+            'last_restocked_at' => $branchProduct->last_restocked_at,
+            'inactive_candidate_after_days' => $branchProduct->inactive_candidate_after_days,
+            'tracks_batches' => $branchProduct->tracks_batches,
+            'tracks_expiration' => $branchProduct->tracks_expiration,
+            'active_batches_count' => $branchProduct->active_batches_count ?? 0,
+            'next_expiration_date' => $branchProduct->next_expiration_date,
+            'branch' => $branchProduct->branch,
+            'product' => $branchProduct->product,
+        ];
+    }
+
+    private function serializeBranchProductDetails(BranchProduct $branchProduct): array
+    {
+        $branchProduct->load([
+            'branch:id,name,slug',
+            'product:id,name,category_id,sale_price,cost,unit',
+            'product.category:id,name',
+            'product.barcodes:id,product_id,code',
+            'batches' => fn($query) => $query
+                ->select([
+                    'id',
+                    'branch_product_id',
+                    'lot_number',
+                    'expiration_date',
+                    'initial_quantity',
+                    'quantity',
+                    'supplier',
+                    'received_at',
+                    'status',
+                    'season_start_date',
+                    'season_end_date',
+                ])
+                ->where('quantity', '>', 0)
+                ->orderByRaw('expiration_date IS NULL')
+                ->orderBy('expiration_date')
+                ->orderBy('id'),
+            'movements' => fn($query) => $query
+                ->select([
+                    'id',
+                    'branch_product_id',
+                    'user_id',
+                    'type',
+                    'reason',
+                    'quantity',
+                    'previous_stock',
+                    'new_stock',
+                    'notes',
+                    'created_at',
+                ])
+                ->with([
+                    'user:id,name',
+                    'batches:id,stock_movement_id,product_batch_id,quantity',
+                    'batches.productBatch:id,lot_number',
+                ])
+                ->latest(),
+        ]);
+
+        return $branchProduct->toArray();
+    }
+
+    private function inventoryBaseStatsQuery(?Branch $branch)
+    {
+        return BranchProduct::query()
+            ->where('status', BranchProduct::STATUS_ACTIVE)
+            ->when($branch, fn ($query) => $query->where('branch_id', $branch->id));
+    }
+
+    private function inventoryBatchAlertsQuery(?Branch $branch)
+    {
+        return ProductBatch::query()
+            ->where('status', ProductBatch::STATUS_ACTIVE)
+            ->where('quantity', '>', 0)
+            ->whereHas('branchProduct', function ($query) use ($branch) {
+                $query->where('status', BranchProduct::STATUS_ACTIVE)
+                    ->when($branch, fn ($innerQuery) => $innerQuery->where('branch_id', $branch->id));
+            });
+    }
+
+    private function inventoryInactiveCandidatesQuery(?Branch $branch)
+    {
+        return $this->inventoryBaseStatsQuery($branch)
+            ->whereNotNull('last_restocked_at')
+            ->whereRaw('DATE_ADD(last_restocked_at, INTERVAL inactive_candidate_after_days DAY) <= NOW()');
+    }
+
+    private function inventoryStatsPayload(?Branch $branch): array
+    {
+        $today = now()->toDateString();
+        $nearExpirationLimit = now()->addDays(30)->toDateString();
+        $baseStatsQuery = $this->inventoryBaseStatsQuery($branch);
+        $batchAlertsQuery = $this->inventoryBatchAlertsQuery($branch);
+        $inactiveCandidateProductsQuery = $this->inventoryInactiveCandidatesQuery($branch);
+
+        return [
+            'total_products' => (clone $baseStatsQuery)->count(),
+            'total_stock' => (clone $baseStatsQuery)->sum('stock'),
+            'low_stock' => (clone $baseStatsQuery)
+                ->whereColumn('stock', '<=', 'min_stock')
+                ->where('stock', '>', 0)
+                ->count(),
+            'out_of_stock' => (clone $baseStatsQuery)
+                ->where('stock', '<=', 0)
+                ->count(),
+            'expiring_soon' => (clone $batchAlertsQuery)
+                ->whereDate('expiration_date', '>=', $today)
+                ->whereDate('expiration_date', '<=', $nearExpirationLimit)
+                ->count(),
+            'inactive_candidates' => (clone $inactiveCandidateProductsQuery)->count(),
+            'inventory_value' => (clone $baseStatsQuery)
+                ->join('products', 'products.id', '=', 'branch_products.product_id')
+                ->selectRaw('COALESCE(SUM(branch_products.stock * products.sale_price), 0) as total')
+                ->value('total'),
+        ];
+    }
+
+    private function inventoryAlertsPayload(?Branch $branch): array
+    {
+        $today = now()->toDateString();
+        $nearExpirationLimit = now()->addDays(30)->toDateString();
+        $baseStatsQuery = $this->inventoryBaseStatsQuery($branch);
+        $batchAlertsQuery = $this->inventoryBatchAlertsQuery($branch);
+        $inactiveCandidateProductsQuery = $this->inventoryInactiveCandidatesQuery($branch);
+
+        $expiredBatchesList = (clone $batchAlertsQuery)
+            ->with(['branchProduct.product.barcodes'])
+            ->whereDate('expiration_date', '<', $today)
+            ->orderBy('expiration_date')
+            ->limit(50)
+            ->get()
+            ->map(fn ($batch) => $this->mapBatchAlert($batch))
+            ->values();
+
+        $nearExpirationBatchesList = (clone $batchAlertsQuery)
+            ->with(['branchProduct.product.barcodes'])
+            ->whereDate('expiration_date', '>=', $today)
+            ->whereDate('expiration_date', '<=', $nearExpirationLimit)
+            ->orderBy('expiration_date')
+            ->limit(50)
+            ->get()
+            ->map(fn ($batch) => $this->mapBatchAlert($batch))
+            ->values();
+
+        $lowStockProductsList = (clone $baseStatsQuery)
+            ->with(['product.barcodes'])
+            ->whereColumn('stock', '<=', 'min_stock')
+            ->where('stock', '>', 0)
+            ->orderBy('stock')
+            ->limit(50)
+            ->get()
+            ->map(fn ($branchProduct) => $this->mapLowStockProduct($branchProduct))
+            ->values();
+
+        $inactiveCandidateProductsList = (clone $inactiveCandidateProductsQuery)
+            ->with(['product.barcodes'])
+            ->orderBy('last_restocked_at')
+            ->limit(50)
+            ->get()
+            ->map(fn ($branchProduct) => $this->mapInactiveCandidateProduct($branchProduct))
+            ->values();
+
+        return [
+            'expired_batches' => (clone $batchAlertsQuery)
+                ->whereDate('expiration_date', '<', $today)
+                ->count(),
+            'near_expiration_batches' => (clone $batchAlertsQuery)
+                ->whereDate('expiration_date', '>=', $today)
+                ->whereDate('expiration_date', '<=', $nearExpirationLimit)
+                ->count(),
+            'low_stock_products' => (clone $baseStatsQuery)
+                ->whereColumn('stock', '<=', 'min_stock')
+                ->where('stock', '>', 0)
+                ->count(),
+            'inactive_candidate_products' => (clone $inactiveCandidateProductsQuery)->count(),
+            'expired_batches_list' => $expiredBatchesList,
+            'near_expiration_batches_list' => $nearExpirationBatchesList,
+            'low_stock_products_list' => $lowStockProductsList,
+            'inactive_candidate_products_list' => $inactiveCandidateProductsList,
+        ];
+    }
+
+    private function mapBatchAlert(ProductBatch $batch): array
+    {
+        $branchProduct = $batch->branchProduct;
+        $product = $branchProduct?->product;
+
+        $productName = collect([
+            $product?->name,
+            $product?->barcodes?->first()?->code,
+        ])->first(fn ($value) => filled($value));
+
+        $productCode = collect([
+            $product?->barcodes?->first()?->code,
+            $product?->barcodes?->first()?->code,
+            "BP-{$batch->branch_product_id}",
+        ])->first(fn ($value) => filled($value));
+
+        return [
+            'id' => $batch->id,
+            'branch_product_id' => $batch->branch_product_id,
+            'lot_number' => $batch->lot_number,
+            'expiration_date' => $batch->expiration_date,
+            'formatted_expiration_date' => $batch->formatted_expiration_date,
+            'quantity' => $batch->quantity,
+            'unit' => $product?->unit ?? 'piezas',
+            'initial_quantity' => $batch->initial_quantity,
+            'status' => $batch->status,
+            'expiration_status' => $batch->expiration_status,
+            'expiration_human_text' => $batch->expiration_human_text,
+            'product_name' => $productName ?: 'Producto sin nombre',
+            'product_code' => $productCode,
+            'branch_product' => $branchProduct,
+        ];
+    }
+
+    private function mapLowStockProduct(BranchProduct $branchProduct): array
+    {
+        $product = $branchProduct->product;
+
+        $productName = collect([
+            $product?->name,
+            $product?->barcodes?->first()?->code,
+        ])->first(fn ($value) => filled($value));
+
+        $productCode = collect([
+            $product?->barcodes?->first()?->code,
+            $product?->barcodes?->first()?->code,
+            "BP-{$branchProduct->id}",
+        ])->first(fn ($value) => filled($value));
+
+        return [
+            'id' => $branchProduct->id,
+            'product_id' => $branchProduct->product_id,
+            'name' => $productName ?: 'Producto sin nombre',
+            'code' => $productCode,
+            'stock' => $branchProduct->stock,
+            'unit' => $product?->unit ?? 'piezas',
+            'minStock' => $branchProduct->min_stock,
+            'min_stock' => $branchProduct->min_stock,
+            'status' => 'Stock bajo',
+            'product' => $product,
+            'branch_product' => $branchProduct,
+        ];
+    }
+
+    private function mapInactiveCandidateProduct(BranchProduct $branchProduct): array
+    {
+        return array_merge($this->mapLowStockProduct($branchProduct), [
+            'status' => 'Producto sin rotacion',
+            'last_restocked_at' => $branchProduct->last_restocked_at,
+            'inactive_candidate_after_days' => $branchProduct->inactive_candidate_after_days,
+        ]);
     }
 }

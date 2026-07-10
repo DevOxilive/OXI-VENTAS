@@ -14,7 +14,7 @@ const emit = defineEmits(['apply'])
 
 function clearFilters() {
     props.filters.search = ''
-    props.filters.category = ''
+    props.filters.category_id = ''
     props.filters.stock = ''
     props.filters.per_page = 50
 
@@ -34,38 +34,54 @@ function clearFilters() {
         </div>
 
         <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
-            <input v-model="filters.search" type="text" placeholder="Buscar producto, código o barcode..."
+            <input
+                v-model="filters.search"
+                type="text"
+                placeholder="Buscar producto, código o barcode..."
                 class="lg:col-span-4 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-slate-900 focus:ring-slate-900"
-                @keyup.enter="emit('apply')">
+                @keyup.enter="emit('apply')"
+            >
 
-            <select v-model="filters.category"
+            <select
+                v-model="filters.category_id"
                 class="lg:col-span-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-slate-900 focus:ring-slate-900"
-                @change="emit('apply')">
+                @change="emit('apply')"
+            >
                 <option value="">Categorías</option>
-                <option v-for="category in categories" :key="category" :value="category">
-                    {{ category }}
+                <option
+                    v-for="category in categories"
+                    :key="category.id ?? category"
+                    :value="category.id ?? category"
+                >
+                    {{ category.name ?? category }}
                 </option>
             </select>
 
-            <select v-model="filters.stock"
+            <select
+                v-model="filters.stock"
                 class="lg:col-span-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-slate-900 focus:ring-slate-900"
-                @change="emit('apply')">
+                @change="emit('apply')"
+            >
                 <option value="">Todo el stock</option>
                 <option value="LOW">Stock bajo</option>
                 <option value="OUT">Agotados</option>
             </select>
 
-            <select v-model="filters.per_page"
+            <select
+                v-model="filters.per_page"
                 class="lg:col-span-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-slate-900 focus:ring-slate-900"
-                @change="emit('apply')">
+                @change="emit('apply')"
+            >
                 <option :value="25">25</option>
                 <option :value="50">50</option>
                 <option :value="100">100</option>
             </select>
 
-            <button type="button"
+            <button
+                type="button"
                 class="lg:col-span-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                @click="clearFilters">
+                @click="clearFilters"
+            >
                 Limpiar
             </button>
         </div>

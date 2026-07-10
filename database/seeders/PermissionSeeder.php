@@ -10,13 +10,13 @@ class PermissionSeeder extends Seeder
     public function run(): void
     {
         $permissions = [
+            // Capital Humano
             'employees.view',
             'employees.create',
             'employees.update',
             'employees.delete',
 
-            'files.export',
-
+            // Sistemas
             'users.view',
             'users.create',
             'users.update',
@@ -40,22 +40,21 @@ class PermissionSeeder extends Seeder
             'branches.create',
             'branches.update',
             'branches.delete',
+            'files.export',
 
+            // Sucursales
             'inventory.products.view',
             'inventory.products.create',
             'inventory.products.update',
             'inventory.products.delete',
-
             'inventory.branches.view',
             'inventory.branches.create',
             'inventory.branches.update',
             'inventory.branches.delete',
-
             'inventory.purchase-reports.view',
             'inventory.purchase-reports.create',
             'inventory.purchase-reports.update',
             'inventory.purchase-reports.delete',
-
             'audits.physical-counts.view',
             'audits.physical-counts.count',
             'audits.physical-counts.reports',
@@ -63,6 +62,21 @@ class PermissionSeeder extends Seeder
             'audits.physical-counts.create',
             'audits.physical-counts.update',
             'audits.physical-counts.delete',
+            'inventory.view',
+            'inventory.create',
+            'inventory.update',
+            'inventory.delete',
+
+            // Ventas
+            'sales.view',
+            'sales.create',
+            'sales.update',
+            'sales.delete',
+            'sales.reports',
+
+            // Impresoras
+            'systems.tickets.view',
+            'systems.tickets.update',
         ];
 
         foreach ($permissions as $permission) {

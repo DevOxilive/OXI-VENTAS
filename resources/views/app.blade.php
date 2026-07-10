@@ -8,8 +8,8 @@
     <meta name="theme-color" content="#15803d">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="{{ config('app.name', 'OXI-VENTAS') }}">
-    <meta name="application-name" content="{{ config('app.name', 'OXI-VENTAS') }}">
+    <meta name="apple-mobile-web-app-title" content="{{ config('app.name', 'Super-Kay') }}">
+    <meta name="application-name" content="{{ config('app.name', 'Super-Kay') }}">
     <meta name="mobile-web-app-capable" content="yes">
 
     <title inertia>{{ config('app.name', 'Laravel') }}</title>

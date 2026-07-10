@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Exports\InventoryReportExport;
 use App\Models\Branch;
@@ -18,8 +19,12 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
+    use AuthorizesBranchAccess;
+
     public function index(Branch $branch)
     {
+        $this->abortIfUserCannotAccessBranch(request(), $branch);
+
         return Inertia::render('Inventory/Reports/Index', [
             'currentBranch' => $branch,
         ]);
@@ -27,6 +32,8 @@ class ReportController extends Controller
 
     public function inventory(Request $request, Branch $branch, InventoryReportService $reportService)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $filters = $this->resolveFilters($request);
         $activeReport = $request->input('report', 'dashboard');
         $activeReport = $activeReport === 'movements' ? 'dashboard' : $activeReport;
@@ -47,7 +54,7 @@ class ReportController extends Controller
             'activeReport' => $activeReport,
             'filters' => $filters,
             'catalogs' => [
-                'categories' => $this->categoryOptions(),
+                'categories' => $this->categoryOptions($branch),
                 'products' => $this->branchProductOptions($branch),
             ],
             'summary' => $reportService->summary($branch),
@@ -58,6 +65,8 @@ class ReportController extends Controller
 
     public function movements(Request $request, Branch $branch, InventoryReportService $reportService)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $filters = array_merge($this->resolveFilters($request), [
             'report' => 'movements',
         ]);
@@ -66,7 +75,7 @@ class ReportController extends Controller
             'currentBranch' => $branch,
             'filters' => $filters,
             'catalogs' => [
-                'categories' => $this->categoryOptions(),
+                'categories' => $this->categoryOptions($branch),
                 'products' => $this->branchProductOptions($branch),
                 'users' => $this->movementUserOptions($branch),
                 'movementTypes' => $this->movementTypes(),
@@ -78,6 +87,8 @@ class ReportController extends Controller
 
     public function exportExcel(Request $request, Branch $branch, InventoryReportService $reportService)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $filters = $this->resolveFilters($request);
         $rows = $reportService->rows($branch, $filters);
         $title = $this->reportTitle($filters['report'] ?? 'dashboard');
@@ -91,6 +102,8 @@ class ReportController extends Controller
 
     public function exportPdf(Request $request, Branch $branch, InventoryReportService $reportService)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $filters = $this->resolveFilters($request);
         $rows = $reportService->rows($branch, $filters);
 
@@ -107,6 +120,8 @@ class ReportController extends Controller
 
     public function exportMovementsExcel(Request $request, Branch $branch, InventoryReportService $reportService)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $filters = array_merge($this->resolveFilters($request), [
             'report' => 'movements',
         ]);
@@ -121,6 +136,8 @@ class ReportController extends Controller
 
     public function exportMovementsPdf(Request $request, Branch $branch, InventoryReportService $reportService)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $filters = array_merge($this->resolveFilters($request), [
             'report' => 'movements',
         ]);
@@ -201,11 +218,15 @@ class ReportController extends Controller
             ->values();
     }
 
-    private function categoryOptions()
+    private function categoryOptions(Branch $branch)
     {
         return Category::query()
-            ->select('id', 'name')
-            ->orderBy('name')
+            ->select(['categories.id', 'categories.name'])
+            ->join('products', 'products.category_id', '=', 'categories.id')
+            ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
+            ->where('branch_products.branch_id', $branch->id)
+            ->distinct()
+            ->orderBy('categories.name')
             ->get();
     }
 

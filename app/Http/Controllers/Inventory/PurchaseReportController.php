@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
+use App\Models\Category;
 use App\Models\PurchaseReport;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
@@ -13,87 +15,19 @@ use Inertia\Inertia;
 
 class PurchaseReportController extends Controller
 {
+    use AuthorizesBranchAccess;
+
     public function create(Request $request, Branch $branch)
     {
-        $perPage = TablePagination::resolvePerPage($request, 50);
+        $this->abortIfUserCannotAccessBranch($request, $branch);
 
-        $filters = [
-            'search' => $request->input('search', ''),
-            'category' => $request->input('category', ''),
-            'stock' => $request->input('stock', ''),
-            'per_page' => $perPage,
-        ];
-
-        $products = BranchProduct::query()
-            ->with([
-                'product.category',
-                'product.barcodes',
-            ])
-            ->where('branch_id', $branch->id)
-            ->when($filters['search'], function ($query, $search) {
-                FlexibleSearch::apply($query, $search, function ($searchQuery, $phrase, $terms) {
-                    FlexibleSearch::orWhereColumns($searchQuery, [
-                        'branch_products.barcode',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product', [
-                        'name',
-                        'code',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
-                        'code',
-                    ], $phrase, $terms);
-                });
-            })
-            ->when($filters['category'], function ($query, $category) {
-                $query->whereHas('product.category', fn($q) => $q->where('name', $category));
-            })
-            ->when($filters['stock'] === 'LOW', function ($query) {
-                $query->whereColumn('stock', '<=', 'min_stock')
-                    ->where('stock', '>', 0);
-            })
-            ->when($filters['stock'] === 'OUT', function ($query) {
-                $query->where('stock', '<=', 0);
-            })
-            ->orderBy('stock')
-            ->paginate($filters['per_page'])
-            ->withQueryString()
-            ->through(fn($item) => [
-                'id' => $item->id,
-                'product_id' => $item->product?->id,
-                'name' => $item->product?->name ?? 'Producto sin nombre',
-                'code' => $item->product?->code ?? '',
-                'main_barcode' => $item->product?->barcodes?->first()?->code ?? '',
-                'barcodes' => $item->product?->barcodes?->pluck('code')->values() ?? [],
-                'category' => $item->product?->category?->name ?? 'Sin categoria',
-                'stock' => (float) $item->stock,
-                'min_stock' => (float) $item->min_stock,
-                'price' => (float) $item->price,
-            ]);
-
-        $filterOptions = BranchProduct::query()
-            ->with(['product.category'])
-            ->where('branch_id', $branch->id)
-            ->get()
-            ->map(fn($item) => [
-                'category' => $item->product?->category?->name,
-            ]);
-
-        return redirect()->route('inventario.branches.purchase-reports.index', [
-            'branch' => $branch->id,
-        ]);
-
-        return Inertia::render('Inventory/PurchaseReport', [
-            'currentBranch' => $branch,
-            'productsDB' => $products,
-            'filters' => $filters,
-            'categoriesDB' => $filterOptions->pluck('category')->filter()->unique()->values(),
-        ]);
+        return $this->index($request, $branch);
     }
 
     public function store(Request $request, Branch $branch)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $validated = $request->validate([
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
@@ -155,16 +89,79 @@ class PurchaseReportController extends Controller
 
     public function index(Request $request, Branch $branch)
     {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $perPage = TablePagination::resolvePerPage($request, 50);
 
         $filters = [
             'search' => $request->input('search', ''),
-            'category' => $request->input('category', ''),
+            'category_id' => $request->input('category_id', ''),
             'stock' => $request->input('stock', ''),
             'per_page' => $perPage,
         ];
 
-        $products = BranchProduct::query()
+        $products = $this->productsQuery($branch, $filters)
+            ->orderBy('stock')
+            ->paginate($filters['per_page'])
+            ->withQueryString()
+            ->through(fn ($item) => [
+                'id' => $item->id,
+                'product_id' => $item->product?->id,
+                'name' => $item->product?->name ?? 'Producto sin nombre',
+                'code' => $item->product?->code ?? '',
+                'main_barcode' => $item->product?->barcodes?->first()?->code ?? '',
+                'barcodes' => $item->product?->barcodes?->pluck('code')->values() ?? [],
+                'category_id' => $item->product?->category?->id,
+                'category_name' => $item->product?->category?->name ?? 'Sin categoria',
+                'category' => $item->product?->category?->name ?? 'Sin categoria',
+                'stock' => (float) $item->stock,
+                'min_stock' => (float) $item->min_stock,
+                'price' => (float) $item->price,
+                'label' => trim(($item->product?->name ?? 'Producto sin nombre')
+                    . ' - '
+                    . ($item->product?->barcodes?->first()?->code ?? 'Sin codigo')),
+            ]);
+
+        $reports = PurchaseReport::query()
+            ->with([
+                'items.branchProduct.product.barcodes',
+                'items.branchProduct.product.category',
+            ])
+            ->withCount('items')
+            ->where('branch_id', $branch->id)
+            ->latest()
+            ->get();
+
+        return Inertia::render('Inventory/PurchaseReport', [
+            'currentBranch' => $branch,
+            'productsDB' => $products,
+            'reportsDB' => $reports,
+            'filters' => $filters,
+            'categoriesDB' => $this->categoryOptions($branch),
+        ]);
+    }
+
+    public function show(Branch $branch, PurchaseReport $purchaseReport)
+    {
+        $this->abortIfUserCannotAccessBranch(request(), $branch);
+
+        abort_unless($purchaseReport->branch_id === $branch->id, 404);
+
+        $purchaseReport->load([
+            'user',
+            'items.branchProduct.product.barcodes',
+            'items.branchProduct.product.category',
+        ]);
+
+        return Inertia::render('Inventory/PurchaseReportShow', [
+            'currentBranch' => $branch,
+            'reportDB' => $purchaseReport,
+        ]);
+    }
+
+    private function productsQuery(Branch $branch, array $filters)
+    {
+        return BranchProduct::query()
             ->with([
                 'product.category',
                 'product.barcodes',
@@ -186,65 +183,29 @@ class PurchaseReportController extends Controller
                     ], $phrase, $terms);
                 });
             })
-            ->when($filters['category'], fn($query, $category) => $query->whereHas('product.category', fn($q) => $q->where('name', $category)))
-            ->when($filters['stock'] === 'LOW', fn($query) => $query->whereColumn('stock', '<=', 'min_stock')->where('stock', '>', 0))
-            ->when($filters['stock'] === 'OUT', fn($query) => $query->where('stock', '<=', 0))
-            ->orderBy('stock')
-            ->paginate($filters['per_page'])
-            ->withQueryString()
-            ->through(fn($item) => [
-                'id' => $item->id,
-                'product_id' => $item->product?->id,
-                'name' => $item->product?->name ?? 'Producto sin nombre',
-                'code' => $item->product?->code ?? '',
-                'main_barcode' => $item->product?->barcodes?->first()?->code ?? '',
-                'barcodes' => $item->product?->barcodes?->pluck('code')->values() ?? [],
-                'category' => $item->product?->category?->name ?? 'Sin categoria',
-                'stock' => (float) $item->stock,
-                'min_stock' => (float) $item->min_stock,
-                'price' => (float) $item->price,
-            ]);
-
-        $filterOptions = BranchProduct::query()
-            ->with(['product.category'])
-            ->where('branch_id', $branch->id)
-            ->get()
-            ->map(fn($item) => [
-                'category' => $item->product?->category?->name,
-            ]);
-
-        $reports = PurchaseReport::query()
-            ->with([
-                'items.branchProduct.product.barcodes',
-                'items.branchProduct.product.category',
-            ])
-            ->withCount('items')
-            ->where('branch_id', $branch->id)
-            ->latest()
-            ->get();
-
-        return Inertia::render('Inventory/PurchaseReport', [
-            'currentBranch' => $branch,
-            'productsDB' => $products,
-            'reportsDB' => $reports,
-            'filters' => $filters,
-            'categoriesDB' => $filterOptions->pluck('category')->filter()->unique()->values(),
-        ]);
+            ->when($filters['category_id'], function ($query, $categoryId) {
+                $query->whereHas('product', function ($productQuery) use ($categoryId) {
+                    $productQuery->where('category_id', $categoryId);
+                });
+            })
+            ->when($filters['stock'] === 'LOW', function ($query) {
+                $query->whereColumn('stock', '<=', 'min_stock')
+                    ->where('stock', '>', 0);
+            })
+            ->when($filters['stock'] === 'OUT', function ($query) {
+                $query->where('stock', '<=', 0);
+            });
     }
 
-    public function show(Branch $branch, PurchaseReport $purchaseReport)
+    private function categoryOptions(Branch $branch)
     {
-        abort_unless($purchaseReport->branch_id === $branch->id, 404);
-
-        $purchaseReport->load([
-            'user',
-            'items.branchProduct.product.barcodes',
-            'items.branchProduct.product.category',
-        ]);
-
-        return Inertia::render('Inventory/PurchaseReportShow', [
-            'currentBranch' => $branch,
-            'reportDB' => $purchaseReport,
-        ]);
+        return Category::query()
+            ->select(['categories.id', 'categories.name'])
+            ->join('products', 'products.category_id', '=', 'categories.id')
+            ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
+            ->where('branch_products.branch_id', $branch->id)
+            ->distinct()
+            ->orderBy('categories.name')
+            ->get();
     }
 }
