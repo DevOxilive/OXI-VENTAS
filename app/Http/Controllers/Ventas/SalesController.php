@@ -304,17 +304,10 @@ class SalesController extends Controller
 
     private function allowedBranches($user)
     {
-        if ($user->role?->name === 'Administrador') {
-            return Branch::query()
-                ->where('active', true)
-                ->orderBy('name')
-                ->get(['id', 'name', 'slug', 'color']);
-        }
-
-        return $user->branches()
-            ->where('active', true)
+        return $user->accessibleBranchesQuery()
+            ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
             ->orderBy('name')
-            ->get(['branches.id', 'branches.name', 'branches.slug', 'branches.color']);
+            ->get();
     }
 
     private function shouldShowBranchSelector(Request $request, $user, $allowedBranches): bool
@@ -326,13 +319,13 @@ class SalesController extends Controller
 
     private function resolveBranch(Request $request, $user, $allowedBranches): ?Branch
     {
-        $branchId = $request->query('branch') ?? $user->branch_id;
-
-        if (!$branchId && $user->branches->isNotEmpty()) {
-            $branchId = $user->branches->first()->id;
-        }
+        $branchId = $request->query('branch');
 
         if (!$branchId && $allowedBranches->count() === 1) {
+            $branchId = $allowedBranches->first()->id;
+        }
+
+        if (!$branchId && $allowedBranches->isNotEmpty()) {
             $branchId = $allowedBranches->first()->id;
         }
 
@@ -348,8 +341,7 @@ class SalesController extends Controller
         $query = Branch::query()->whereKey($branchId)->where('active', true);
 
         if ($user->role?->name !== 'Administrador') {
-            $allowedBranchIds = $user->branches->pluck('id')->push($user->branch_id)->filter()->unique()->values();
-            $query->whereIn('id', $allowedBranchIds);
+            $query->whereIn('id', $user->accessibleBranchIds());
         }
 
         return $query->firstOrFail();

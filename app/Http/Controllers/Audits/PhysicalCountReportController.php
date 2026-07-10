@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Audits;
 
 use App\Exports\PhysicalCountReportExport;
+use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
@@ -22,6 +23,8 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class PhysicalCountReportController extends Controller
 {
+    use AuthorizesBranchAccess;
+
     public function __construct(
         private PhysicalCountSnapshotService $snapshotService
     ) {
@@ -605,17 +608,7 @@ class PhysicalCountReportController extends Controller
 
     private function resolveBranch(?string $branchSlug): Branch
     {
-        if (!$branchSlug) {
-            return Branch::where('active', true)
-                ->orderBy('name')
-                ->select('id', 'name', 'slug', 'color')
-                ->firstOrFail();
-        }
-
-        return Branch::where('active', true)
-            ->where('slug', $branchSlug)
-            ->select('id', 'name', 'slug', 'color')
-            ->firstOrFail();
+        return $this->resolveAccessibleBranch(request(), $branchSlug);
     }
 
     private function canViewReports(Request $request): bool

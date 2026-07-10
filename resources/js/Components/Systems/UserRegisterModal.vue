@@ -12,15 +12,23 @@ const props = defineProps({
     errors: Object,
     roles: Array,
     branches: Array,
-    groupedPermissions: Object,
+    permissionSections: {
+        type: Array,
+        default: () => [],
+    },
     isEditing: Boolean,
     canSave: Boolean,
-    requiresSalesBranches: Boolean,
+    requiresBranchAccess: Boolean,
+    canAssignBranches: Boolean,
     lockedPermissionIds: {
         type: Array,
         default: () => [],
     },
     moduleLabel: {
+        type: Function,
+        required: true,
+    },
+    sectionLabel: {
         type: Function,
         required: true,
     },
@@ -50,15 +58,19 @@ const modalConfig = computed(() => getUserModalConfig({
     processing: Boolean(props.form?.processing),
 }))
 
+const activePermissionSection = ref(null)
 const activePermissionModule = ref(null)
 
-const permissionEntries = computed(() => {
-    return Object.entries(props.groupedPermissions || {})
-        .filter(([, group]) => Array.isArray(group) && group.length > 0)
+const availableSections = computed(() => {
+    return props.permissionSections || []
 })
 
-const activePermissionsGroup = computed(() => {
-    return permissionEntries.value.find(([module]) => module === activePermissionModule.value) || null
+const activeSection = computed(() => {
+    return availableSections.value.find((section) => section.key === activePermissionSection.value) || null
+})
+
+const activeModule = computed(() => {
+    return activeSection.value?.modules?.find((module) => module.key === activePermissionModule.value) || null
 })
 
 const passwordPlaceholder = computed(() => {
@@ -67,32 +79,62 @@ const passwordPlaceholder = computed(() => {
         : 'Contrasena'
 })
 
-watch(permissionEntries, (entries) => {
-    if (!entries.length) {
+watch(availableSections, (sections) => {
+    if (!sections.length) {
+        activePermissionSection.value = null
         activePermissionModule.value = null
         return
     }
 
-    const hasActiveModule = entries.some(([module]) => module === activePermissionModule.value)
+    const hasActiveSection = sections.some((section) => section.key === activePermissionSection.value)
 
-    if (!hasActiveModule) {
-        activePermissionModule.value = entries[0][0]
+    if (!hasActiveSection) {
+        activePermissionSection.value = sections[0].key
     }
 }, { immediate: true })
 
-function getSelectedCount(group = []) {
-    return group.filter((permission) => props.form.permissions.includes(permission.id)).length
+watch(activeSection, (section) => {
+    if (!section?.modules?.length) {
+        activePermissionModule.value = null
+        return
+    }
+
+    const hasActiveModule = section.modules.some((module) => module.key === activePermissionModule.value)
+
+    if (!hasActiveModule) {
+        activePermissionModule.value = section.modules[0].key
+    }
+}, { immediate: true })
+
+function getSelectedCount(permissions = []) {
+    return permissions.filter((permission) => props.form.permissions.includes(permission.id)).length
 }
 
-function selectPermissionModule(module) {
-    activePermissionModule.value = module
+function getSectionSelectedCount(section) {
+    return (section.modules || []).reduce((total, module) => {
+        return total + getSelectedCount(module.permissions || [])
+    }, 0)
+}
+
+function getSectionPermissionCount(section) {
+    return (section.modules || []).reduce((total, module) => {
+        return total + (module.permissions?.length || 0)
+    }, 0)
+}
+
+function selectPermissionSection(sectionKey) {
+    activePermissionSection.value = sectionKey
+}
+
+function selectPermissionModule(moduleKey) {
+    activePermissionModule.value = moduleKey
 }
 
 function isPermissionLocked(permissionId) {
     return props.lockedPermissionIds.includes(permissionId)
 }
 
-function toggleSalesBranch(branchId) {
+function toggleAssignedBranch(branchId) {
     if (props.form.branch_ids.includes(branchId)) {
         props.form.branch_ids = props.form.branch_ids.filter((id) => id !== branchId)
         return
@@ -180,10 +222,22 @@ function closeModal() {
                         </h3>
 
                         <div class="space-y-4">
-                            <div v-if="requiresSalesBranches" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                <p class="mb-3 text-sm font-semibold text-slate-700">
-                                    Sucursales permitidas para este vendedor
-                                </p>
+                                <div v-if="canAssignBranches" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <p class="mb-3 text-sm font-semibold text-slate-700">
+                                        Sucursales asignadas
+                                    </p>
+
+                                    <p class="mb-3 text-xs text-slate-500">
+                                        Estas sucursales definen a cuales puede entrar el usuario cuando tenga permisos relacionados con sucursales, stock, auditorias o ventas.
+                                    </p>
+
+                                    <p v-if="!form.role_id" class="mb-3 text-xs text-amber-600">
+                                        Primero selecciona un rol para definir si estas sucursales seran obligatorias para este usuario.
+                                    </p>
+
+                                    <p v-else-if="!requiresBranchAccess" class="mb-3 text-xs text-slate-500">
+                                        Para el rol y permisos actuales, esta asignacion queda guardada como alcance disponible, aunque todavia no sea obligatoria.
+                                    </p>
 
                                 <div class="grid grid-cols-1 gap-2">
                                     <SelectionCheckboxCard
@@ -192,10 +246,14 @@ function closeModal() {
                                         compact
                                         :checked="form.branch_ids.includes(branch.id)"
                                         :title="branch.name"
-                                        description="Haz clic para permitir esta sucursal"
-                                        @toggle="toggleSalesBranch(branch.id)"
+                                        description="Haz clic para asignar esta sucursal"
+                                        @toggle="toggleAssignedBranch(branch.id)"
                                     />
                                 </div>
+
+                                <p v-if="requiresBranchAccess" class="mt-2 text-xs text-slate-500">
+                                    Para la combinacion actual de rol y permisos, este usuario necesita al menos una sucursal asignada.
+                                </p>
 
                                 <p v-if="errors.branch_ids" class="mt-2 text-xs text-red-500">
                                     {{ errors.branch_ids }}
@@ -209,7 +267,7 @@ function closeModal() {
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div>
                                     <p class="text-sm font-semibold text-slate-700">
-                                        Permisos
+                                        Modulos principales
                                     </p>
                                 </div>
 
@@ -218,46 +276,78 @@ function closeModal() {
                                 </span>
                             </div>
 
-                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <div class="grid grid-cols-1 gap-2">
                                 <button
-                                    v-for="[module, group] in permissionEntries"
-                                    :key="module"
+                                    v-for="section in availableSections"
+                                    :key="section.key"
                                     type="button"
                                     class="rounded-2xl border px-3 py-3 text-left transition"
-                                    :class="activePermissionModule === module
+                                    :class="activePermissionSection === section.key
                                         ? 'border-emerald-300 bg-emerald-50 shadow-sm'
                                         : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'"
-                                    @click="selectPermissionModule(module)"
+                                    @click="selectPermissionSection(section.key)"
                                 >
                                     <div class="flex items-start justify-between gap-3">
                                         <div>
                                             <p class="text-sm font-medium text-slate-800">
-                                                {{ moduleLabel(module) }}
+                                                {{ sectionLabel(section.key) }}
                                             </p>
 
                                             <p class="mt-1 text-sm text-slate-500">
-                                                {{ getSelectedCount(group) }} de {{ group.length }} permisos activos
+                                                {{ getSectionSelectedCount(section) }} de {{ getSectionPermissionCount(section) }} permisos activos
                                             </p>
                                         </div>
                                     </div>
                                 </button>
+                            </div>
+
+                            <div
+                                v-if="activeSection"
+                                class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                            >
+                                <div class="mb-3">
+                                    <p class="text-sm font-semibold text-slate-700">
+                                        Submodulos de {{ sectionLabel(activeSection.key) }}
+                                    </p>
+                                </div>
+
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <button
+                                        v-for="module in activeSection.modules"
+                                        :key="module.key"
+                                        type="button"
+                                        class="rounded-2xl border px-3 py-3 text-left transition"
+                                        :class="activePermissionModule === module.key
+                                            ? 'border-emerald-300 bg-white shadow-sm'
+                                            : 'border-slate-200 bg-white hover:border-slate-300'"
+                                        @click="selectPermissionModule(module.key)"
+                                    >
+                                        <p class="text-sm font-medium text-slate-800">
+                                            {{ moduleLabel(module.key) }}
+                                        </p>
+
+                                        <p class="mt-1 text-sm text-slate-500">
+                                            {{ getSelectedCount(module.permissions) }} de {{ module.permissions.length }} permisos activos
+                                        </p>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </section>
 
                     <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6 xl:col-span-4">
                         <div
-                            v-if="activePermissionsGroup"
+                            v-if="activeModule"
                             class="space-y-4"
                         >
                             <div class="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
                                 <div>
                                     <h3 class="text-base font-bold text-slate-900">
-                                        {{ moduleLabel(activePermissionsGroup[0]) }}
+                                        {{ moduleLabel(activeModule.key) }}
                                     </h3>
 
                                     <p class="mt-1 text-sm text-slate-500">
-                                        {{ getSelectedCount(activePermissionsGroup[1]) }} de {{ activePermissionsGroup[1].length }} permisos activos en este modulo
+                                        {{ getSelectedCount(activeModule.permissions) }} de {{ activeModule.permissions.length }} permisos activos en este submodulo
                                     </p>
                                 </div>
 
@@ -265,24 +355,24 @@ function closeModal() {
                                     <button
                                         type="button"
                                         class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
-                                        @click="$emit('enable-module', activePermissionsGroup[0])"
+                                        @click="$emit('enable-module', activeModule.key)"
                                     >
-                                        Activar modulo
+                                        Activar submodulo
                                     </button>
 
                                     <button
                                         type="button"
                                         class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
-                                        @click="$emit('disable-module', activePermissionsGroup[0])"
+                                        @click="$emit('disable-module', activeModule.key)"
                                     >
-                                        Limpiar modulo
+                                        Limpiar submodulo
                                     </button>
                                 </div>
                             </div>
 
                             <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
                                 <button
-                                    v-for="permission in activePermissionsGroup[1]"
+                                    v-for="permission in activeModule.permissions"
                                     :key="permission.id"
                                     type="button"
                                     class="flex min-h-[72px] items-center justify-between gap-3 rounded-2xl border px-4 py-4 text-left transition"
@@ -333,7 +423,7 @@ function closeModal() {
                             v-else
                             class="flex min-h-[18rem] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500"
                         >
-                            Selecciona un modulo para ver y editar sus permisos.
+                            Selecciona un modulo y despues un submodulo para ver sus permisos.
                         </div>
                     </section>
                 </div>

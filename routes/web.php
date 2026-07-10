@@ -205,6 +205,12 @@ Route::middleware([
             )
             ->name('branches.products.index');
 
+        Route::get('/branches/{branch:slug}/products/snapshots/{productId}', [ProductController::class, 'snapshot'])
+            ->middleware(
+                'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete'
+            )
+            ->name('branches.products.snapshot');
+
         Route::get('/products/{product}/image', [ProductController::class, 'image'])
             ->middleware(
                 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete'
@@ -236,6 +242,10 @@ Route::middleware([
         Route::get('/branches/{branch}/inventory', [BranchInventoryController::class, 'show'])
             ->middleware('permission:inventory.branches.view,inventory.branches.create,inventory.branches.update,inventory.branches.delete')
             ->name('branches.inventory');
+
+        Route::get('/branches/{branch}/inventory/realtime-snapshot', [BranchInventoryController::class, 'realtimeSnapshot'])
+            ->middleware('permission:inventory.branches.view,inventory.branches.update')
+            ->name('branches.inventory.realtime-snapshot');
 
         Route::post('/branch-inventory', [BranchInventoryController::class, 'store'])
             ->middleware('permission:inventory.branches.create')

@@ -4,8 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
-use App\Models\Branch;
-use Illuminate\Support\Facades\Cache;
+
 class HandleInertiaRequests extends Middleware
 {
     /**
@@ -38,12 +37,12 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
-        $user = $request->user();
+        $user = $request->user()?->loadMissing(['role', 'permissions', 'branches']);
 
         return array_merge(parent::share($request), [
             'auth' => [
                 'user' => $user
-                    ? $user->load('role.permissions', 'permissions')
+                    ? $user
                     : null,
 
                'permissions' => $user
@@ -51,13 +50,12 @@ class HandleInertiaRequests extends Middleware
     : [],
             ],
 
-            'branches' => fn () => Cache::remember(
-                'active_branches',
-                3600,
-                fn () => Branch::where('active', true)
-                    ->orderBy('name')
-                    ->get(['id', 'name', 'slug', 'color'])
-            ),
+            'branches' => fn () => $user
+                ? $user->accessibleBranchesQuery()
+                    ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
+                    ->orderBy('branches.name')
+                    ->get()
+                : collect(),
 
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

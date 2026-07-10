@@ -118,7 +118,7 @@ onMounted(() => {
         })
 
         router.reload({
-            only: ['auth'],
+            only: ['auth', 'branches'],
             preserveScroll: true,
             preserveState: true,
         })
