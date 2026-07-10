@@ -48,8 +48,8 @@ const shouldShowBanner = computed(() => {
 
 const installTitle = computed(() => {
     return canPromptInstall.value
-        ? 'Instala OXI-VENTAS'
-        : 'Agrega OXI-VENTAS a tu pantalla';
+        ? 'Instala Super-Kay'
+        : 'Agrega Super-Kay a tu pantalla';
 });
 
 const installDescription = computed(() => {
@@ -67,14 +67,14 @@ const manualSteps = computed(() => {
         return [
             'Toca el boton Compartir del navegador.',
             'Busca la opcion Agregar a pantalla de inicio.',
-            'Confirma el nombre OXI-VENTAS y guarda.',
+            'Confirma el nombre Super-Kay y guarda.',
         ];
     }
 
     return [
         'Abre el menu del navegador.',
         'Busca Instalar app o Agregar a pantalla de inicio.',
-        'Confirma la instalacion para abrir OXI-VENTAS como app.',
+        'Confirma la instalacion para abrir Super-Kay como app.',
     ];
 });
 

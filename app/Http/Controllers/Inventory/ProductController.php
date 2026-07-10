@@ -2,18 +2,19 @@
 
 namespace App\Http\Controllers\Inventory;
 
-use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Events\ProductChanged;
 use App\Events\RealtimeActivityLogged;
+use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\Product;
+use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Support\FlexibleSearch;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -92,51 +93,15 @@ class ProductController extends Controller
             ->map(fn ($items) => $items
                 ->pluck('branch_id')
                 ->map(fn ($id) => (int) $id)
-                ->values());
+                ->values()
+                ->all());
 
-        $productsDB->getCollection()->transform(function ($item) use ($branchIdsByProduct) {
-            $product = $item->product;
-            $imageUrl = $product?->image
-                ? route('inventory.products.image', ['product' => $product->id])
-                : null;
-
-            return [
-                'id' => $product?->id,
-                'branch_product_id' => $item->id,
-                'branch_id' => $item->branch_id,
-                'branch_slug' => $item->branch?->slug,
-
-                'branch_ids' => $branchIdsByProduct->get($product?->id, collect())->values(),
-                'barcodes' => $product?->barcodes?->pluck('code')->values() ?? [],
-                'barcode' => $product?->barcodes?->first()?->code ?? 'Sin código',
-                'unit' => $product?->unit ?? '',
-                'name' => $product?->name ?? 'Producto sin nombre',
-                'image' => $imageUrl,
-                'image_path' => $product?->image,
-                'category_id' => $product?->category_id,
-                'category_name' => $product?->category?->name ?? 'Sin categorÃ­a',
-                'category' => $product?->category?->name ?? 'Sin categoría',
-
-                'min_stock' => $item->min_stock ?? 0,
-                'cost' => $product?->cost ?? 0,
-                'price' => $product?->sale_price ?? 0,
-                'sale_price' => $product?->sale_price ?? 0,
-                'salePrice' => $product?->sale_price ?? 0,
-                'margin_percentage' => $product?->margin_percentage
-                    ?? $this->calculateMarginPercentage($product?->cost ?? 0, $product?->sale_price ?? 0),
-                'profit' => number_format(
-                    ((float) ($product?->sale_price ?? 0)) - ((float) ($product?->cost ?? 0)),
-                    2
-                ),
-                'active' => $product?->active ?? true,
-                'status' => $item->status,
-                'tracks_batches' => $item->tracks_batches,
-                'tracks_expiration' => $item->tracks_expiration,
-                'entry_date' => $item->entry_date
-                    ?? optional($item->created_at)->format('Y-m-d')
-                    ?? 'Sin fecha',
-            ];
-        });
+        $productsDB->getCollection()->transform(
+            fn ($item) => $this->serializeProductRow(
+                $item,
+                $branchIdsByProduct->get($item->product_id, []),
+            )
+        );
 
         return Inertia::render('Inventory/Home', [
             'branch' => [
@@ -157,6 +122,41 @@ class ProductController extends Controller
                 'category_id' => $request->category_id,
                 'per_page' => $perPage,
             ],
+        ]);
+    }
+
+    public function snapshot(Request $request, Branch $branch, int $productId): JsonResponse
+    {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
+        $branchProduct = BranchProduct::query()
+            ->with([
+                'branch:id,name,slug',
+                'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,active,created_at',
+                'product.category:id,name',
+                'product.barcodes:id,product_id,code',
+            ])
+            ->where('branch_id', $branch->id)
+            ->where('product_id', $productId)
+            ->where('status', BranchProduct::STATUS_ACTIVE)
+            ->first();
+
+        if (!$branchProduct) {
+            return response()->json([
+                'product' => null,
+            ]);
+        }
+
+        $branchIds = BranchProduct::query()
+            ->where('product_id', $productId)
+            ->where('status', BranchProduct::STATUS_ACTIVE)
+            ->pluck('branch_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        return response()->json([
+            'product' => $this->serializeProductRow($branchProduct, $branchIds),
         ]);
     }
 
@@ -208,7 +208,7 @@ class ProductController extends Controller
         }
 
         $barcodes = collect($data['barcodes'] ?? [])
-            ->filter(fn($code) => filled($code))
+            ->filter(fn ($code) => filled($code))
             ->values();
 
         $imagePath = null;
@@ -244,7 +244,7 @@ class ProductController extends Controller
 
             $branchIds = collect($data['branch_ids'] ?? [])
                 ->push($branch->id)
-                ->map(fn($id) => (int) $id)
+                ->map(fn ($id) => (int) $id)
                 ->unique()
                 ->values();
 
@@ -264,7 +264,7 @@ class ProductController extends Controller
         });
 
         broadcast(new ProductChanged('created', $product->id, $branchIds))->toOthers();
-        event(RealtimeActivityLogged::message('creó', 'el producto', $product->name, 'Inventario', 'created'));
+        event(RealtimeActivityLogged::message('creÃ³', 'el producto', $product->name, 'Inventario', 'created'));
 
         return back()->with('success', 'Producto creado correctamente');
     }
@@ -301,7 +301,7 @@ class ProductController extends Controller
         }
 
         $barcodes = collect($data['barcodes'] ?? [])
-            ->filter(fn($code) => filled($code))
+            ->filter(fn ($code) => filled($code))
             ->values();
 
         $duplicatedBarcode = DB::table('barcodes')
@@ -311,13 +311,13 @@ class ProductController extends Controller
 
         if ($duplicatedBarcode) {
             return back()->withErrors([
-                'barcodes.0' => 'Este código de barras ya pertenece a otro producto.',
+                'barcodes.0' => 'Este cÃ³digo de barras ya pertenece a otro producto.',
             ]);
         }
 
         $previousBranchIds = BranchProduct::where('product_id', $product->id)
             ->pluck('branch_id')
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->values();
 
         $branchIds = DB::transaction(function () use ($request, $data, $product, $branch, $barcodes) {
@@ -360,7 +360,7 @@ class ProductController extends Controller
 
             $branchIds = collect($data['branch_ids'] ?? [])
                 ->push($branch->id)
-                ->map(fn($id) => (int) $id)
+                ->map(fn ($id) => (int) $id)
                 ->unique()
                 ->values();
 
@@ -397,7 +397,7 @@ class ProductController extends Controller
             ->all();
 
         broadcast(new ProductChanged('updated', $product->id, $affectedBranchIds))->toOthers();
-        event(RealtimeActivityLogged::message('actualizó', 'el producto', $product->name, 'Inventario', 'updated'));
+        event(RealtimeActivityLogged::message('actualizÃ³', 'el producto', $product->name, 'Inventario', 'updated'));
 
         return back()->with('success', 'Producto actualizado correctamente');
     }
@@ -410,7 +410,7 @@ class ProductController extends Controller
         $productName = $product->name;
         $branchIds = BranchProduct::where('product_id', $product->id)
             ->pluck('branch_id')
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
 
@@ -434,7 +434,7 @@ class ProductController extends Controller
         });
 
         broadcast(new ProductChanged('deleted', $productId, $branchIds))->toOthers();
-        event(RealtimeActivityLogged::message('eliminó', 'el producto', $productName, 'Inventario', 'deleted'));
+        event(RealtimeActivityLogged::message('eliminÃ³', 'el producto', $productName, 'Inventario', 'deleted'));
 
         return back()->with('success', 'Producto eliminado correctamente');
     }
@@ -461,5 +461,48 @@ class ProductController extends Controller
         if ($disk) {
             Storage::disk($disk)->delete($path);
         }
+    }
+
+    private function serializeProductRow(BranchProduct $branchProduct, array $branchIds = []): array
+    {
+        $product = $branchProduct->product;
+        $imageUrl = $product?->image
+            ? route('inventory.products.image', ['product' => $product->id])
+            : null;
+
+        return [
+            'id' => $product?->id,
+            'branch_product_id' => $branchProduct->id,
+            'branch_id' => $branchProduct->branch_id,
+            'branch_slug' => $branchProduct->branch?->slug,
+            'branch_ids' => collect($branchIds)->map(fn ($id) => (int) $id)->values()->all(),
+            'barcodes' => $product?->barcodes?->pluck('code')->values() ?? [],
+            'barcode' => $product?->barcodes?->first()?->code ?? 'Sin cÃ³digo',
+            'unit' => $product?->unit ?? '',
+            'name' => $product?->name ?? 'Producto sin nombre',
+            'image' => $imageUrl,
+            'image_path' => $product?->image,
+            'category_id' => $product?->category_id,
+            'category_name' => $product?->category?->name ?? 'Sin categorÃ­a',
+            'category' => $product?->category?->name ?? 'Sin categorÃ­a',
+            'min_stock' => $branchProduct->min_stock ?? 0,
+            'cost' => $product?->cost ?? 0,
+            'price' => $product?->sale_price ?? 0,
+            'sale_price' => $product?->sale_price ?? 0,
+            'salePrice' => $product?->sale_price ?? 0,
+            'margin_percentage' => $product?->margin_percentage
+                ?? $this->calculateMarginPercentage($product?->cost ?? 0, $product?->sale_price ?? 0),
+            'profit' => number_format(
+                ((float) ($product?->sale_price ?? 0)) - ((float) ($product?->cost ?? 0)),
+                2
+            ),
+            'active' => $product?->active ?? true,
+            'status' => $branchProduct->status,
+            'tracks_batches' => $branchProduct->tracks_batches,
+            'tracks_expiration' => $branchProduct->tracks_expiration,
+            'entry_date' => $branchProduct->entry_date
+                ?? optional($branchProduct->created_at)->format('Y-m-d')
+                ?? 'Sin fecha',
+        ];
     }
 }

@@ -29,7 +29,7 @@ class StockMovementService
             throw new InvalidArgumentException('La cantidad no puede ser 0.');
         }
 
-        return DB::transaction(function () use (
+        $movement = DB::transaction(function () use (
             $branchProduct,
             $type,
             $reason,
@@ -52,6 +52,10 @@ class StockMovementService
                 manualBatches: $manualBatches,
             );
         });
+
+        $this->broadcastInventoryRefresh($branchProduct->id, $type);
+
+        return $movement;
     }
 
     public function distributeIncoming(
@@ -85,7 +89,7 @@ class StockMovementService
             throw new InvalidArgumentException('La suma asignada a sucursales debe coincidir con la cantidad total.');
         }
 
-        return DB::transaction(function () use (
+        $movements = DB::transaction(function () use (
             $sourceBranchProduct,
             $reason,
             $notes,
@@ -129,6 +133,17 @@ class StockMovementService
                 })
                 ->all();
         });
+
+        collect($movements)
+            ->pluck('branch_product_id')
+            ->filter()
+            ->unique()
+            ->each(fn ($branchProductId) => $this->broadcastInventoryRefresh(
+                $branchProductId,
+                StockMovement::TYPE_IN,
+            ));
+
+        return $movements;
     }
 
     private function activityActionLabel(string $type): string
@@ -465,20 +480,29 @@ class StockMovementService
             ]);
         }
 
-        $branchProduct = $branchProduct->fresh([
-            'product:id,name',
-        ]);
+        return $movement;
+    }
+
+    private function broadcastInventoryRefresh(
+        int $branchProductId,
+        string $movementType,
+    ): void
+    {
+        $branchProduct = BranchProduct::with('product:id,name')
+            ->find($branchProductId);
+
+        if (!$branchProduct) {
+            return;
+        }
 
         event(new InventoryStockUpdated($branchProduct));
         event(RealtimeActivityLogged::message(
-            $this->activityActionLabel($type),
+            $this->activityActionLabel($movementType),
             'stock del producto',
             $branchProduct->product?->name,
             'Inventario',
-            $type,
+            $movementType,
         ));
-
-        return $movement;
     }
 
     private function resolveTargetBranchProduct(
