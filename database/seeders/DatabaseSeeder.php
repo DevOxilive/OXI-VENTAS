@@ -24,13 +24,13 @@ class DatabaseSeeder extends Seeder
             CustomerSeeder::class,
             PaymentMethodSeeder::class,
 
-            PurchaseSeeder::class,
-
             VehicleSeeder::class,
             TripSeeder::class,
             TripDetailSeeder::class,
             IncidentSeeder::class,
             InventoryReportSeeder::class,
+            PurchaseSeeder::class,
+            ExecutiveDashboardSeeder::class,
 
         ]);
     }

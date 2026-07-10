@@ -8,10 +8,14 @@ import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import PwaInstallPrompt from './Components/PwaInstallPrompt.vue';
 
 const appName = 'Super-Kay';
+const pages = {
+    './Pages/Dashboard.vue': () => import('./Pages/Dashboard.vue'),
+    ...import.meta.glob('./Pages/**/*.vue'),
+};
 
 createInertiaApp({
     title: (title) => title ? `${title} - ${appName}` : appName,
-    resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
+    resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, pages),
     setup({ el, App, props, plugin }) {
         return createApp({ render: () => h(App, props) })
             .use(plugin)

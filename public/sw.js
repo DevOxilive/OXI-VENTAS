@@ -1,4 +1,4 @@
-const VERSION = 'oxi-ventas-pwa-v5';
+const VERSION = 'oxi-ventas-pwa-v6';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -63,6 +63,12 @@ self.addEventListener('fetch', (event) => {
     }
 
     if (!['style', 'script', 'image', 'font', 'worker'].includes(request.destination)) {
+        return;
+    }
+
+    if (url.pathname.startsWith('/build/')) {
+        event.respondWith(fetch(request));
+
         return;
     }
 
