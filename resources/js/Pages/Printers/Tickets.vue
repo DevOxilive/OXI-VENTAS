@@ -4,7 +4,9 @@ import { useForm } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
+import GlobalToolbar from "@/Components/Toolbars/GlobalToolbar.vue";
 import { ToastAlert, WarningAlert } from "@/Components/Modales/UniversalActionModal";
+import { getPrinterTicketsToolbarConfig } from "@/config/ToolbarConfigs/printerTicketsToolbarConfig";
 import {
   buildTicketPreviewBlocks,
   createDefaultTicketTemplate,
@@ -47,6 +49,11 @@ const form = useForm({
 });
 
 const previewTemplate = computed(() => normalizeTicketTemplate({ ...form.settings }));
+const toolbarConfig = computed(() =>
+  getPrinterTicketsToolbarConfig({
+    processing: form.processing,
+  })
+);
 
 const previewBlocks = computed(() => buildTicketPreviewBlocks(previewTemplate.value, props.samplePrintJob));
 const paperClass = computed(() => {
@@ -118,6 +125,17 @@ function saveTemplate() {
         form.transform((data) => data);
       },
     });
+}
+
+function handleToolbarAction(actionId) {
+  if (actionId === "reset") {
+    resetTemplate();
+    return;
+  }
+
+  if (actionId === "save" && !form.processing) {
+    saveTemplate();
+  }
 }
 
 function startDrag(index) {
@@ -211,114 +229,86 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <PageLayout :padded="false">
-    <div class="px-4 py-4 2xl:px-6">
-      <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Impresoras
-            </p>
-            <h1 class="mt-1 text-xl font-black text-slate-900">
-              Tickets
-            </h1>
-            <p class="mt-1 text-[13px] text-slate-500">
-              Ajusta el ticket con una plantilla visual y libre para impresion.
-            </p>
-          </div>
+  <PageLayout>
+    <template #toolbar>
+      <GlobalToolbar
+        v-bind="toolbarConfig"
+        @action="handleToolbarAction"
+      />
+    </template>
 
-          <div class="flex flex-wrap gap-3">
-            <button
-              type="button"
-              class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              @click="resetTemplate"
-            >
-              Restablecer
-            </button>
-
-            <button
-              type="button"
-              class="rounded-2xl bg-[#1f1d2b] px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="form.processing"
-              @click="saveTemplate"
-            >
-              {{ form.processing ? "Guardando..." : "Guardar" }}
-            </button>
-          </div>
-        </div>
-
-        <div class="mt-4 space-y-4">
-          <div class="grid grid-cols-2 items-start gap-3">
+    <section class="rounded-2xl border border-secondary bg-background p-4 shadow-sm">
+      <div class="grid grid-cols-2 items-start gap-3">
             <div
               class="min-w-0 space-y-3 overflow-y-auto pr-1"
               style="max-height: calc(100vh - 2rem);"
             >
               <div class="grid gap-3 lg:grid-cols-2">
-                <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Plantilla</span>
+                <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Plantilla</span>
                   <input
                     v-model="form.name"
                     type="text"
-                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                    class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                     placeholder="Ticket principal"
                   >
                 </label>
 
-                <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Activa</span>
+                <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Activa</span>
                   <div class="mt-2 flex justify-end">
                     <input
                       v-model="form.is_active"
                       type="checkbox"
-                      class="h-5 w-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400"
+                      class="h-5 w-5 rounded border-secondary text-primary focus:ring-primary"
                     >
                   </div>
                 </label>
 
-                <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Marca</span>
+                <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Marca</span>
                   <input
                     v-model="form.settings.header_text"
                     type="text"
-                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                    class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                   >
                 </label>
 
-                <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Titulo</span>
+                <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Titulo</span>
                   <input
                     v-model="form.settings.subheader_text"
                     type="text"
-                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                    class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                   >
                 </label>
 
-                <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Caja #</span>
+                <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Caja #</span>
                   <input
                     v-model="form.settings.cash_box_text"
                     type="text"
-                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                    class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                     placeholder="Caja #1"
                   >
                 </label>
               </div>
 
-              <label class="block rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Pie</span>
+              <label class="block rounded-2xl border border-secondary bg-secondary p-3">
+                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Pie</span>
                 <textarea
                   v-model="form.settings.footer_text"
                   rows="3"
-                  class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                  class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                 />
               </label>
 
               <div class="grid gap-3 lg:grid-cols-4">
-                <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Ancho</span>
+                <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Ancho</span>
                   <select
                     v-model="form.settings.paper_width"
-                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                    class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                   >
                     <option
                       v-for="option in paperWidthOptions"
@@ -330,62 +320,62 @@ onBeforeUnmount(() => {
                   </select>
                 </label>
 
-                <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Motor</span>
-                  <div class="mt-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900">
+                <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Motor</span>
+                  <div class="mt-2 rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm font-semibold text-text">
                     Estable ESC/POS
                   </div>
                 </label>
 
-                <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Saltos</span>
+                <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Saltos</span>
                   <input
                     v-model.number="form.settings.feed_lines"
                     type="number"
                     min="1"
                     max="1"
-                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                    class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                   >
                 </label>
 
-                <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Corte</span>
+                <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Corte</span>
                   <div class="mt-2 flex justify-end">
                     <input
                       v-model="form.settings.auto_cut"
                       type="checkbox"
-                      class="h-5 w-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400"
+                      class="h-5 w-5 rounded border-secondary text-primary focus:ring-primary"
                     >
                   </div>
                 </label>
 
-                <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Cajon</span>
+                <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Cajon</span>
                   <div class="mt-2 flex justify-end">
                     <input
                       v-model="form.settings.open_cash_drawer"
                       type="checkbox"
-                      class="h-5 w-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400"
+                      class="h-5 w-5 rounded border-secondary text-primary focus:ring-primary"
                     >
                   </div>
                 </label>
 
-                <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Lineas</span>
+                <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Lineas</span>
                   <div class="mt-2 flex justify-end">
                     <input
                       v-model="form.settings.show_dividers"
                       type="checkbox"
-                      class="h-5 w-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400"
+                      class="h-5 w-5 rounded border-secondary text-primary focus:ring-primary"
                     >
                   </div>
                 </label>
               </div>
 
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div class="rounded-2xl border border-secondary bg-secondary p-3">
                 <div class="mb-3 flex items-center justify-between">
-                  <h3 class="text-sm font-bold text-slate-900">Bloques</h3>
-                  <span class="text-xs text-slate-400">Ajuste rapido</span>
+                  <h3 class="text-sm font-bold text-text">Bloques</h3>
+                  <span class="text-xs text-text opacity-50">Ajuste rapido</span>
                 </div>
 
                 <div class="grid gap-3 lg:grid-cols-3">
@@ -393,13 +383,13 @@ onBeforeUnmount(() => {
                     v-for="(block, index) in form.settings.blocks"
                     :key="block.key"
                     draggable="true"
-                    class="rounded-2xl border border-slate-200 bg-white p-3"
+                    class="rounded-2xl border border-secondary bg-background p-3"
                     @dragstart="startDrag(index)"
                     @dragover.prevent
                     @drop="dropBlock(index)"
                   >
                     <div class="space-y-3">
-                      <p class="text-sm font-bold text-slate-900">
+                      <p class="text-sm font-bold text-text">
                         {{ blockCatalog.find((item) => item.key === block.key)?.label || block.key }}
                       </p>
 
@@ -407,7 +397,7 @@ onBeforeUnmount(() => {
                         <button
                           type="button"
                           class="flex h-9 w-9 items-center justify-center rounded-xl border transition"
-                          :class="block.enabled ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-slate-200 bg-slate-50 text-slate-400'"
+                          :class="block.enabled ? 'border-primary bg-secondary text-primary' : 'border-secondary bg-secondary text-text opacity-60'"
                           @click="updateBlock(index, 'enabled', !block.enabled)"
                         >
                           <span class="material-symbols-outlined text-[18px]">visibility</span>
@@ -418,7 +408,7 @@ onBeforeUnmount(() => {
                           type="number"
                           min="60"
                           max="180"
-                          class="w-24 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                          class="w-24 rounded-2xl border border-secondary bg-secondary px-3 py-2 text-center text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                           @input="updateBlock(index, 'size_percent', clampPercent($event.target.value, 60, 180))"
                         >
                       </div>
@@ -429,35 +419,35 @@ onBeforeUnmount(() => {
             </div>
 
             <aside class="sticky top-4 h-fit self-start">
-              <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div class="border-b border-slate-200 pb-4">
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              <div class="rounded-2xl border border-secondary bg-background p-4 shadow-sm">
+                <div class="border-b border-secondary pb-4">
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-text opacity-50">
                     Ticket en vivo
                   </p>
-                  <h2 class="mt-1 text-lg font-black text-slate-900 lg:text-xl">
+                  <h2 class="mt-1 text-lg font-black text-text lg:text-xl">
                     Vista previa
                   </h2>
-                  <p class="mt-1 text-xs text-slate-500 lg:text-sm">
+                  <p class="mt-1 text-xs text-text opacity-70 lg:text-sm">
                     Arrastra cada bloque aqui mismo para moverlo a la izquierda, derecha, arriba o abajo.
                   </p>
                 </div>
 
                 <div class="mt-4 flex justify-center">
-                  <div class="w-full rounded-[24px] bg-slate-100 p-2.5 lg:p-3">
+                  <div class="w-full rounded-[24px] bg-secondary p-2.5 lg:p-3">
                     <div
                       ref="previewPaper"
-                      class="mx-auto w-full rounded-[28px] border border-slate-200 bg-white px-4 py-5 shadow-sm"
+                      class="mx-auto w-full rounded-[28px] border border-secondary bg-background px-4 py-5 shadow-sm"
                       :class="paperClass"
                     >
-                      <div class="space-y-1 text-slate-900">
+                      <div class="space-y-1 text-text">
                         <article
                           v-for="(previewBlock, index) in previewBlocks"
                           :key="previewBlock.key"
                           :data-preview-block-key="previewBlock.key"
                           class="relative rounded-xl border border-transparent px-2 py-2 transition"
                           :class="[
-                            activeHorizontalKey === previewBlock.key ? 'bg-slate-50 ring-1 ring-slate-200' : 'hover:border-slate-200 hover:bg-slate-50/70',
-                            dragIndex === index ? 'border-slate-300 bg-slate-50/80 opacity-70' : '',
+                            activeHorizontalKey === previewBlock.key ? 'bg-secondary ring-1 ring-primary' : 'hover:border-secondary hover:bg-secondary',
+                            dragIndex === index ? 'border-primary bg-secondary opacity-70' : '',
                           ]"
                           @pointerdown.prevent="startHorizontalAdjust($event, previewBlock.key)"
                         >
@@ -473,7 +463,7 @@ onBeforeUnmount(() => {
 
                             <p
                               v-else-if="row.type === 'divider'"
-                              class="overflow-hidden text-[10px] tracking-[0.12em] text-slate-400"
+                              class="overflow-hidden text-[10px] tracking-[0.12em] text-text opacity-50"
                             >
                               {{ row.text }}
                             </p>
@@ -524,8 +514,6 @@ onBeforeUnmount(() => {
               </div>
             </aside>
           </div>
-        </div>
-      </section>
-    </div>
+    </section>
   </PageLayout>
 </template>
