@@ -8,10 +8,35 @@ import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import PwaInstallPrompt from './Components/PwaInstallPrompt.vue';
 
 const appName = 'Super-Kay';
+const themeStorageKey = 'color-theme';
 const pages = {
     './Pages/Dashboard.vue': () => import('./Pages/Dashboard.vue'),
     ...import.meta.glob('./Pages/**/*.vue'),
 };
+
+function applyTheme(theme) {
+    if (typeof document === 'undefined') return;
+
+    const isDark = theme === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+        themeColorMeta.setAttribute('content', isDark ? '#070304' : '#e0000f');
+    }
+}
+
+if (typeof window !== 'undefined') {
+    const storedTheme = window.localStorage.getItem(themeStorageKey);
+    const resolvedTheme = storedTheme
+        || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+    applyTheme(resolvedTheme);
+
+    window.addEventListener('oxi-theme-change', (event) => {
+        applyTheme(event.detail?.theme === 'dark' ? 'dark' : 'light');
+    });
+}
 
 createInertiaApp({
     title: (title) => title ? `${title} - ${appName}` : appName,

@@ -173,12 +173,24 @@ function multiFilterLabel(filter) {
             <div v-if="hasActions" class="flex items-center justify-end gap-2 shrink-0">
                 <button v-for="action in visibleActions" :key="action.id" type="button"
                     class="h-10 px-4 rounded-xl text-sm font-bold transition flex items-center gap-2 whitespace-nowrap"
-                    :class="getToolbarActionClasses(action.variant)" @click="$emit('action', action.id)">
+                    :class="[
+                        getToolbarActionClasses(action.variant),
+                        action.disabled ? 'cursor-not-allowed opacity-60' : ''
+                    ]"
+                    :disabled="action.disabled"
+                    @click="$emit('action', action.id)">
                     <span v-if="action.icon" class="material-symbols-outlined text-[18px]">
                         {{ action.icon }}
                     </span>
 
                     {{ action.label }}
+
+                    <span
+                        v-if="action.badge"
+                        class="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-black text-white"
+                    >
+                        {{ action.badge }}
+                    </span>
                 </button>
             </div>
         </div>
@@ -242,6 +254,9 @@ function multiFilterLabel(filter) {
 
                     <input v-if="filter.type === 'date'" :value="filter.value ?? ''" type="date"
                         class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                        :disabled="filter.disabled"
+                        :min="filter.min"
+                        :max="filter.max"
                         @input="$emit('update:filter', {
                             key: filter.key,
                             value: $event.target.value
@@ -250,6 +265,7 @@ function multiFilterLabel(filter) {
                     <input v-else-if="filter.type === 'text'" :value="filter.value ?? ''" type="text"
                         :placeholder="filter.placeholder || filter.label"
                         class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                        :disabled="filter.disabled"
                         @input="$emit('update:filter', {
                             key: filter.key,
                             value: handleTextFilterInput($event, filter)
@@ -302,6 +318,7 @@ function multiFilterLabel(filter) {
 
                     <select v-else :value="filter.value ?? ''"
                         class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                        :disabled="filter.disabled"
                         @change="$emit('update:filter', {
                             key: filter.key,
                             value: $event.target.value

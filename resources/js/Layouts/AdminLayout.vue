@@ -31,8 +31,10 @@ const branchKeys = computed(() =>
 const sidebarOpen = ref(false)
 const desktopSidebarCollapsed = ref(false)
 const desktopSidebarStorageKey = 'desktopSidebarCollapsed'
+const colorThemeStorageKey = 'color-theme'
 const collapseEventName = 'sidebar:collapse-all'
 const isDesktopViewport = ref(false)
+const currentTheme = ref('light')
 let systemsChannel = null
 let activityChannel = null
 let handleUserChanged = null
@@ -89,10 +91,34 @@ function logout() {
     router.post(route('logout'))
 }
 
+function syncTheme(theme) {
+    if (typeof window === 'undefined') return
+
+    currentTheme.value = theme === 'dark' ? 'dark' : 'light'
+    window.localStorage.setItem(colorThemeStorageKey, currentTheme.value)
+    document.documentElement.classList.toggle('dark', currentTheme.value === 'dark')
+
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]')
+    if (themeColorMeta) {
+        themeColorMeta.setAttribute('content', currentTheme.value === 'dark' ? '#070304' : '#e0000f')
+    }
+
+    window.dispatchEvent(new CustomEvent('oxi-theme-change', {
+        detail: { theme: currentTheme.value },
+    }))
+}
+
+function toggleTheme() {
+    syncTheme(currentTheme.value === 'dark' ? 'light' : 'dark')
+}
+
 onMounted(() => {
     if (typeof window !== 'undefined') {
         desktopSidebarCollapsed.value =
             window.localStorage.getItem(desktopSidebarStorageKey) === 'true'
+        currentTheme.value =
+            window.localStorage.getItem(colorThemeStorageKey)
+            || (document.documentElement.classList.contains('dark') ? 'dark' : 'light')
 
         desktopMediaQueryList = window.matchMedia(desktopMediaQuery)
         handleDesktopViewportChange = (event) => {
@@ -230,56 +256,69 @@ watch(desktopSidebarCollapsed, (value) => {
                     </div>
 
                     <div class="shrink-0">
-                        <Dropdown
-                            align="right"
-                            width="60"
-                            :content-classes="['bg-transparent']"
-                            :panel-classes="['mt-0']"
-                        >
-                            <template #trigger="{ open }">
-                                <button
-                                    type="button"
-                                    class="flex h-16 min-w-[15rem] items-center gap-3 border border-secondary bg-background px-4 text-left shadow-sm transition hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary"
-                                    :class="open ? 'rounded-t-2xl rounded-b-none border-b-0' : 'rounded-2xl'"
-                                >
-                                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary text-text">
-                                        <span class="material-symbols-outlined text-[24px]">
-                                            account_circle
-                                        </span>
-                                    </span>
+                        <div class="flex items-center gap-3">
+                            <button
+                                type="button"
+                                class="inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-secondary bg-background text-text shadow-sm transition hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary"
+                                :title="currentTheme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo obscuro'"
+                                @click="toggleTheme"
+                            >
+                                <span class="material-symbols-outlined text-[24px]">
+                                    {{ currentTheme === 'dark' ? 'light_mode' : 'dark_mode' }}
+                                </span>
+                            </button>
 
-                                    <span class="min-w-0 flex-1">
-                                        <span class="block truncate text-sm font-semibold text-text">
-                                            {{ page.props.auth.user.name }}
-                                        </span>
-
-                                        <span class="block truncate text-xs text-text opacity-70">
-                                            {{ role }}
-                                        </span>
-                                    </span>
-                                </button>
-                            </template>
-
-                            <template #content>
-                                <div class="overflow-hidden rounded-b-2xl border border-t-0 border-secondary bg-background shadow-sm">
-                                    <DropdownLink
-                                        :href="route('profile.show')"
-                                        class="border-b border-secondary px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
+                            <Dropdown
+                                align="right"
+                                width="60"
+                                :content-classes="['bg-transparent']"
+                                :panel-classes="['mt-0']"
+                            >
+                                <template #trigger="{ open }">
+                                    <button
+                                        type="button"
+                                        class="flex h-16 min-w-[15rem] items-center gap-3 border border-secondary bg-background px-4 text-left shadow-sm transition hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary"
+                                        :class="open ? 'rounded-t-2xl rounded-b-none border-b-0' : 'rounded-2xl'"
                                     >
-                                        Editar perfil
-                                    </DropdownLink>
+                                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary text-text">
+                                            <span class="material-symbols-outlined text-[24px]">
+                                                account_circle
+                                            </span>
+                                        </span>
 
-                                    <form @submit.prevent="logout">
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block truncate text-sm font-semibold text-text">
+                                                {{ page.props.auth.user.name }}
+                                            </span>
+
+                                            <span class="block truncate text-xs text-text opacity-70">
+                                                {{ role }}
+                                            </span>
+                                        </span>
+                                    </button>
+                                </template>
+
+                                <template #content>
+                                    <div class="overflow-hidden rounded-b-2xl border border-t-0 border-secondary bg-background shadow-sm">
                                         <DropdownLink
-                                            as="button"
-                                            class="px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
+                                            :href="route('profile.show')"
+                                            class="border-b border-secondary px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
                                         >
-                                            Cerrar sesion
+                                            Editar perfil
                                         </DropdownLink>
-                                    </form>
-                                </div>
-                            </template>
-                        </Dropdown>
+
+                                        <form @submit.prevent="logout">
+                                            <DropdownLink
+                                                as="button"
+                                                class="px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
+                                            >
+                                                Cerrar sesion
+                                            </DropdownLink>
+                                        </form>
+                                    </div>
+                                </template>
+                            </Dropdown>
+                        </div>
                     </div>
                 </div>
             </header>

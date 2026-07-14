@@ -123,6 +123,10 @@ function collapseOtherBranches(activeBranchKey) {
 }
 
 function isOpen(item) {
+    if (hasActiveChild(item)) {
+        return true
+    }
+
     return Boolean(openItems[item.key])
 }
 
@@ -196,8 +200,8 @@ function itemStyle(item) {
         }
 
         return {
-            backgroundColor: "#eff6ff",
-            color: "#2563eb",
+            backgroundColor: "var(--secondary)",
+            color: "var(--primary)",
             fontWeight: "700",
         }
     }
@@ -231,7 +235,7 @@ function iconStyle(item) {
         }
 
         return {
-            color: "#2563eb",
+            color: "var(--primary)",
         }
     }
 
