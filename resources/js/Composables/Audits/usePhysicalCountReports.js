@@ -5,6 +5,9 @@ import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination
 import { getPhysicalCountReportsToolbarConfig } from '@/config/ToolbarConfigs/physicalCountReportsToolbarConfig'
 
 export function usePhysicalCountReports(props) {
+    let filterReloadTimeout = null
+    let syncingFromServer = false
+
     const { handlePageChange } = useGlobalTablePagination({
         only: [
             'summary',
@@ -14,11 +17,13 @@ export function usePhysicalCountReports(props) {
             'filters',
             'userSummary',
             'categorySummary',
+            'branchSummary',
+            'auditSummary',
             'topDifferences',
         ],
     })
     const form = reactive({
-        branch: props.filters.branch || props.branch?.slug || '',
+        branch: props.filters.branch || '',
         physical_count_id: props.filters.physical_count_id || '',
         user_id: props.filters.user_id || '',
         user_ids: props.filters.user_ids || [],
@@ -51,7 +56,7 @@ export function usePhysicalCountReports(props) {
         { id: 'pending_products', indicator: 'No encontrados', value: props.summary.pending_products ?? 0 },
         { id: 'missing_products', indicator: 'Faltantes', value: props.summary.missing_products ?? 0 },
         { id: 'surplus_products', indicator: 'Sobrantes', value: props.summary.surplus_products ?? 0 },
-        { id: 'matched_products', indicator: 'Correctos', value: props.summary.matched_products ?? 0 },
+        { id: 'matched_products', indicator: 'Macheados', value: props.summary.matched_products ?? 0 },
     ])
 
     const reportTableItems = computed(() =>
@@ -69,6 +74,20 @@ export function usePhysicalCountReports(props) {
         }))
     )
 
+    const branchSummaryItems = computed(() =>
+        (props.branchSummary || []).map((row) => ({
+            ...row,
+            advanceLabel: `${Math.round((Number(row.advance) || 0) * 100)}%`,
+        }))
+    )
+
+    const auditSummaryItems = computed(() =>
+        (props.auditSummary || []).map((row) => ({
+            ...row,
+            advanceLabel: `${Math.round((Number(row.advance) || 0) * 100)}%`,
+        }))
+    )
+
     function backToReportsCenter() {
         router.get(route('inventory.branches.reports', {
             branch: props.branch?.id,
@@ -77,7 +96,7 @@ export function usePhysicalCountReports(props) {
 
     function buildQuery(overrides = {}) {
         return {
-            branch: form.branch || props.branch?.slug || '',
+            branch: form.branch || '',
             physical_count_id: form.physical_count_id || '',
             user_id: form.user_id || '',
             user_ids: form.user_ids || [],
@@ -106,6 +125,8 @@ export function usePhysicalCountReports(props) {
                 'filters',
                 'userSummary',
                 'categorySummary',
+                'branchSummary',
+                'auditSummary',
                 'topDifferences',
             ],
         })
@@ -134,7 +155,7 @@ export function usePhysicalCountReports(props) {
     }
 
     function clearFilters() {
-        form.branch = props.branch?.slug || ''
+        form.branch = ''
         form.physical_count_id = ''
         form.user_id = ''
         form.user_ids = []
@@ -158,6 +179,8 @@ export function usePhysicalCountReports(props) {
                 'filters',
                 'userSummary',
                 'categorySummary',
+                'branchSummary',
+                'auditSummary',
                 'topDifferences',
             ],
         })
@@ -196,6 +219,8 @@ export function usePhysicalCountReports(props) {
                 'filters',
                 'userSummary',
                 'categorySummary',
+                'branchSummary',
+                'auditSummary',
                 'topDifferences',
             ],
             preserveScroll: true,
@@ -206,7 +231,8 @@ export function usePhysicalCountReports(props) {
     watch(
         () => props.filters,
         (filters) => {
-            form.branch = filters.branch || props.branch?.slug || ''
+            syncingFromServer = true
+            form.branch = filters.branch || ''
             form.physical_count_id = filters.physical_count_id || ''
             form.user_id = filters.user_id || ''
             form.user_ids = filters.user_ids || []
@@ -218,6 +244,34 @@ export function usePhysicalCountReports(props) {
             form.search = filters.search || ''
             form.report_type = filters.report_type || 'summary'
             form.per_page = Number(filters.per_page || 25)
+            setTimeout(() => {
+                syncingFromServer = false
+            }, 0)
+        },
+        { deep: true }
+    )
+
+    watch(
+        () => ({
+            branch: form.branch,
+            physical_count_id: form.physical_count_id,
+            user_ids: [...form.user_ids],
+            user_scope: form.user_scope,
+            category_id: form.category_id,
+            report_date: form.report_date,
+            date_scope: form.date_scope,
+            status: form.status,
+            search: form.search,
+            report_type: form.report_type,
+            per_page: form.per_page,
+        }),
+        () => {
+            if (syncingFromServer) return
+
+            clearTimeout(filterReloadTimeout)
+            filterReloadTimeout = setTimeout(() => {
+                applyFilters()
+            }, 450)
         },
         { deep: true }
     )
@@ -232,6 +286,8 @@ export function usePhysicalCountReports(props) {
     })
 
     onBeforeUnmount(() => {
+        clearTimeout(filterReloadTimeout)
+
         if (!window.Echo) return
         window.Echo.leave('audits')
     })
@@ -242,6 +298,8 @@ export function usePhysicalCountReports(props) {
         summaryTableItems,
         reportTableItems,
         differencesTableItems,
+        branchSummaryItems,
+        auditSummaryItems,
         backToReportsCenter,
         updateSearch,
         updateFilter,

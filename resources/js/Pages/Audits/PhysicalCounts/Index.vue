@@ -136,21 +136,44 @@ async function handleTableAction({ action, row }) {
     if (action === 'reopen') {
         const result = await confirmModalAction({
             mode: 'update',
-            title: 'Reabrir auditoría',
-            message: '¿Deseas reabrir esta auditoría? Se permitirá capturar nuevamente.',
-            confirmText: 'Sí, reabrir',
-            cancelText: 'Cancelar',
+            title: row.status === 'applied' ? 'Reactivar conteo' : 'Reabrir auditoria',
+            html: '<div class="text-left text-xs text-slate-500">Selecciona que productos se van a contar en esta nueva ronda.</div>',
+            icon: 'question',
+            input: 'radio',
+            inputValue: 'all',
+            inputOptions: {
+                all: 'Todos los productos',
+                zero_stock: 'Solo productos con stock en cero',
+            },
+            confirmButtonText: 'Continuar',
+            cancelButtonText: 'Cancelar',
             confirmButtonColor: '#2563eb',
+            width: 420,
+            customClass: {
+                popup: 'rounded-2xl !p-5',
+                title: '!text-xl !pt-2',
+                icon: '!mt-2 !mb-2',
+                htmlContainer: '!mt-2 !mb-1',
+                input: '!mt-3 !mb-2 grid grid-cols-1 gap-2 text-left sm:grid-cols-2',
+                actions: '!mt-4',
+                confirmButton: 'px-4 py-2 rounded-full',
+                cancelButton: 'px-4 py-2 rounded-full',
+            },
+            inputValidator: (value) => {
+                if (!value) return 'Selecciona una opcion para continuar.'
+            },
         })
 
         if (!result.isConfirmed) return
 
-        router.patch(route('audits.physical-counts.reopen', row.id), {}, getModalRequestOptions({
+        router.patch(route('audits.physical-counts.reopen', row.id), {
+            recapture_scope: result.value || 'all',
+        }, getModalRequestOptions({
             mode: 'update',
-            entityName: 'Auditoría',
-            successTitle: 'Auditoría reabierta correctamente',
-            errorTitle: 'Error al reabrir auditoría',
-            errorMessage: 'No fue posible reabrir la auditoría.',
+            entityName: 'Auditoria',
+            successTitle: 'Conteo reactivado correctamente',
+            errorTitle: 'Error al reactivar conteo',
+            errorMessage: 'No fue posible reactivar el conteo.',
             onSuccess: () => {
                 reloadPhysicalCounts()
             },

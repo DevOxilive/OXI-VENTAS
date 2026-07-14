@@ -9,6 +9,8 @@ import { physicalCountReportDetailTableConfig } from '@/config/TableConfigs/phys
 import { physicalCountReportUsersTableConfig } from '@/config/TableConfigs/physicalCountReportUsersTableConfig'
 import { physicalCountReportCategoriesTableConfig } from '@/config/TableConfigs/physicalCountReportCategoriesTableConfig'
 import { physicalCountReportDifferencesTableConfig } from '@/config/TableConfigs/physicalCountReportDifferencesTableConfig'
+import { physicalCountReportBranchesTableConfig } from '@/config/TableConfigs/physicalCountReportBranchesTableConfig'
+import { physicalCountReportAuditsTableConfig } from '@/config/TableConfigs/physicalCountReportAuditsTableConfig'
 
 defineOptions({ layout: AdminLayout })
 
@@ -24,6 +26,8 @@ const props = defineProps({
     reportPagination: { type: Object, default: null },
     userSummary: { type: Array, default: () => [] },
     categorySummary: { type: Array, default: () => [] },
+    branchSummary: { type: Array, default: () => [] },
+    auditSummary: { type: Array, default: () => [] },
     topDifferences: { type: Array, default: () => [] },
 })
 
@@ -33,6 +37,8 @@ const {
     summaryTableItems,
     reportTableItems,
     differencesTableItems,
+    branchSummaryItems,
+    auditSummaryItems,
     backToReportsCenter,
     updateSearch,
     updateFilter,
@@ -74,6 +80,24 @@ const {
                     :pagination="reportPagination"
                     row-key="id"
                     @page-change="handlePageChange"
+                />
+            </template>
+
+            <template v-else-if="form.report_type === 'branches'">
+                <GlobalTable
+                    :items="branchSummaryItems"
+                    v-bind="physicalCountReportBranchesTableConfig"
+                    row-key="branch_name"
+                    :show-pagination="false"
+                />
+            </template>
+
+            <template v-else-if="form.report_type === 'audits'">
+                <GlobalTable
+                    :items="auditSummaryItems"
+                    v-bind="physicalCountReportAuditsTableConfig"
+                    row-key="folio"
+                    :show-pagination="false"
                 />
             </template>
 

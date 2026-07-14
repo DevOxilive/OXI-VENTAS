@@ -25,61 +25,57 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
     public function __construct(
         protected array $payload,
         protected array $filterLabels,
-        protected string $branchName
+        protected string $branchName,
+        protected string $sourceSheetTitle = 'Concentrado'
     ) {}
 
     public function array(): array
     {
-        $summary = $this->payload['summary'] ?? [];
+        $lastRow = max(2, count($this->payload['reportRows'] ?? []) + 1);
+        $sheet = $this->quotedSheetTitle();
 
         return [
-            ['Reporte de auditoria fisica', $this->branchName],
-            ['Generado', now()->format('d/m/Y H:i')],
+            ['Total Productos', "=COUNTA({$sheet}!B2:B{$lastRow})"],
+            ['Avance', "=IFERROR(1-(COUNTIF({$sheet}!D2:D{$lastRow},\"S/D\")/COUNTA({$sheet}!B2:B{$lastRow})),0)"],
+            [null, null],
+            ['Macheados', "=SUMPRODUCT(({$sheet}!C2:C{$lastRow}={$sheet}!D2:D{$lastRow})*({$sheet}!D2:D{$lastRow}<>\"S/D\"))"],
+            ['Sobrantes', "=SUMPRODUCT(({$sheet}!D2:D{$lastRow}>{$sheet}!C2:C{$lastRow})*({$sheet}!D2:D{$lastRow}<>\"S/D\"))"],
+            ['Faltantes', "=SUMPRODUCT(({$sheet}!D2:D{$lastRow}<{$sheet}!C2:C{$lastRow})*({$sheet}!D2:D{$lastRow}<>\"S/D\"))"],
+            ['No encontrados', "=COUNTIF({$sheet}!D2:D{$lastRow},\"S/D\")"],
+            [null, null],
+            ['TOTAL', '=SUM(B4:B6)'],
+            ['Descontando el total producto - Total mach,dif,stock bajo', '=B1-B9'],
+            [null, null],
+            ['Sucursal', $this->branchName],
             ['Auditoria', $this->filterLabels['audit'] ?? 'Todas'],
             ['Usuario(s)', $this->filterLabels['user'] ?? 'Todos'],
             ['Resultado', $this->filterLabels['status'] ?? 'Todos'],
-            [],
-            ['Indicador', 'Valor'],
-            ['Auditorias', $summary['audits'] ?? 0],
-            ['Registros', $summary['records'] ?? 0],
-            ['Usuarios', $summary['participants'] ?? 0],
-            ['Productos contados', $summary['counted_products'] ?? 0],
-            ['No encontrados', $summary['pending_products'] ?? 0],
-            ['Faltantes', $summary['missing_products'] ?? 0],
-            ['Sobrantes', $summary['surplus_products'] ?? 0],
-            ['Correctos', $summary['matched_products'] ?? 0],
-            [],
-            ['Balance', 'Productos'],
-            ['Correctos', $summary['matched_products'] ?? 0],
-            ['Faltantes', $summary['missing_products'] ?? 0],
-            ['Sobrantes', $summary['surplus_products'] ?? 0],
-            ['No encontrados', $summary['pending_products'] ?? 0],
+            ['Generado', now()->format('d/m/Y H:i')],
         ];
     }
 
     public function charts()
     {
         $labels = [
-            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, 'Dashboard!$B$17', null, 1),
+            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, 'Dashboard!$B$3', null, 1),
         ];
 
         $categories = [
-            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, 'Dashboard!$A$18:$A$21', null, 4),
+            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, 'Dashboard!$A$4:$A$7', null, 4),
         ];
 
         $values = [
-            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, 'Dashboard!$B$18:$B$21', null, 4),
+            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, 'Dashboard!$B$4:$B$7', null, 4),
         ];
 
         $series = new DataSeries(
-            DataSeries::TYPE_BARCHART,
-            DataSeries::GROUPING_CLUSTERED,
+            DataSeries::TYPE_PIECHART,
+            null,
             [0],
             $labels,
             $categories,
             $values
         );
-        $series->setPlotDirection(DataSeries::DIRECTION_COL);
 
         $chart = new Chart(
             'BalanceAuditoria',
@@ -88,8 +84,8 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
             new PlotArea(null, [$series])
         );
 
-        $chart->setTopLeftPosition('D7');
-        $chart->setBottomRightPosition('L21');
+        $chart->setTopLeftPosition('C1');
+        $chart->setBottomRightPosition('P10');
 
         return $chart;
     }
@@ -98,16 +94,24 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
     {
         return [
             1 => [
-                'font' => ['bold' => true, 'size' => 16, 'color' => ['rgb' => 'FFFFFF']],
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '111827']],
+            ],
+            4 => [
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '16A34A']],
+            ],
+            5 => [
+                'font' => ['bold' => true, 'color' => ['rgb' => '111827']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FDE047']],
+            ],
+            6 => [
+                'font' => ['bold' => true, 'color' => ['rgb' => '111827']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FB923C']],
             ],
             7 => [
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '2563EB']],
-            ],
-            17 => [
-                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '16A34A']],
             ],
         ];
     }
@@ -117,13 +121,14 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
         return [
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
-                $sheet->mergeCells('A1:B1');
-                $sheet->getStyle('A1:B21')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-                $sheet->getStyle('A7:B15')->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
-                $sheet->getStyle('A17:B21')->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
-                $sheet->getColumnDimension('A')->setWidth(24);
-                $sheet->getColumnDimension('B')->setWidth(20);
-                $sheet->getRowDimension(1)->setRowHeight(26);
+                $sheet->mergeCells('C1:P10');
+                $sheet->mergeCells('A11:P16');
+                $sheet->getStyle('A1:B16')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('A1:B10')->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
+                $sheet->getStyle('A12:B16')->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
+                $sheet->getStyle('B2')->getNumberFormat()->setFormatCode('0.00%');
+                $sheet->getColumnDimension('A')->setWidth(48);
+                $sheet->getColumnDimension('B')->setWidth(18);
                 $sheet->setShowGridlines(false);
             },
         ];
@@ -132,5 +137,10 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
     public function title(): string
     {
         return 'Dashboard';
+    }
+
+    protected function quotedSheetTitle(): string
+    {
+        return "'" . str_replace("'", "''", $this->sourceSheetTitle) . "'";
     }
 }

@@ -35,17 +35,15 @@ class PhysicalCountReportController extends Controller
     {
         abort_unless($this->canViewReports($request), 403, 'No tienes permisos para ver reportes de auditoria.');
 
-        $branch = $this->resolveBranch($request->query('branch'));
+        $branches = $this->resolveReportBranches($request);
+        $branch = $branches->count() === 1 ? $branches->first() : null;
         $filters = $this->normalizeFilters($request, $branch);
-        $payload = $this->buildReportPayload($branch, $filters, true);
+        $payload = $this->buildReportPayload($branches, $filters, true);
         $filterLabels = $this->buildFilterLabels($filters, $payload['audits']);
 
         return Inertia::render('Inventory/Reports/PhysicalCountsReports', [
             'branch' => $branch,
-            'branches' => Branch::where('active', true)
-                ->select('id', 'name', 'slug', 'color')
-                ->orderBy('name')
-                ->get(),
+            'branches' => $this->accessibleBranches($request),
             'filters' => $filters,
             'summary' => $payload['summary'],
             'audits' => $payload['audits']->map(fn ($audit) => [
@@ -67,6 +65,8 @@ class PhysicalCountReportController extends Controller
             'reportPagination' => $payload['reportPagination'],
             'userSummary' => $payload['userSummary']->values(),
             'categorySummary' => $payload['categorySummary']->values(),
+            'branchSummary' => $payload['branchSummary']->values(),
+            'auditSummary' => $payload['auditSummary']->values(),
             'topDifferences' => $payload['topDifferences']->values(),
             'filterLabels' => $filterLabels,
         ]);
@@ -76,14 +76,17 @@ class PhysicalCountReportController extends Controller
     {
         abort_unless($this->canViewReports($request), 403, 'No tienes permisos para exportar reportes de auditoria.');
 
-        $branch = $this->resolveBranch($request->query('branch'));
+        $branches = $this->resolveReportBranches($request);
+        $branch = $branches->count() === 1 ? $branches->first() : null;
         $filters = $this->normalizeFilters($request, $branch);
-        $payload = $this->buildReportPayload($branch, $filters, false);
+        $payload = $this->buildReportPayload($branches, $filters, false);
         $filterLabels = $this->buildFilterLabels($filters, $payload['audits']);
+        $branchLabel = $branch?->name ?? 'Todas las sucursales';
+        $fileBranch = $branch?->slug ?? 'todas-las-sucursales';
 
         return Excel::download(
-            new PhysicalCountAuditWorkbookExport($payload, $filters, $filterLabels, $branch->name),
-            'reporte-auditoria-' . $branch->slug . '-' . now()->format('Ymd_His') . '.xlsx'
+            new PhysicalCountAuditWorkbookExport($payload, $filters, $filterLabels, $branchLabel),
+            'reporte-auditoria-' . $fileBranch . '-' . now()->format('Ymd_His') . '.xlsx'
         );
     }
 
@@ -91,14 +94,17 @@ class PhysicalCountReportController extends Controller
     {
         abort_unless($this->canViewReports($request), 403, 'No tienes permisos para exportar reportes de auditoria.');
 
-        $branch = $this->resolveBranch($request->query('branch'));
+        $branches = $this->resolveReportBranches($request);
+        $branch = $branches->count() === 1 ? $branches->first() : null;
         $filters = $this->normalizeFilters($request, $branch);
-        $payload = $this->buildReportPayload($branch, $filters, false);
+        $payload = $this->buildReportPayload($branches, $filters, false);
         $exportData = $this->buildExportData($payload, $filters['report_type']);
         $filterLabels = $this->buildFilterLabels($filters, $payload['audits']);
+        $branchLabel = $branch?->name ?? 'Todas las sucursales';
+        $fileBranch = $branch?->slug ?? 'todas-las-sucursales';
 
         $pdf = Pdf::loadView('pdf.physical-count-reports', [
-            'branch' => $branch,
+            'branch' => $branch ?? (object) ['name' => $branchLabel],
             'filters' => $filters,
             'filterLabels' => $filterLabels,
             'summary' => $payload['summary'],
@@ -108,14 +114,16 @@ class PhysicalCountReportController extends Controller
         ])->setPaper('letter', 'landscape');
 
         return $pdf->download(
-            'reporte-auditoria-' . $branch->slug . '-' . now()->format('Ymd_His') . '.pdf'
+            'reporte-auditoria-' . $fileBranch . '-' . now()->format('Ymd_His') . '.pdf'
         );
     }
 
-    private function buildReportPayload(Branch $branch, array $filters, bool $paginate): array
+    private function buildReportPayload(Collection $branches, array $filters, bool $paginate): array
     {
+        $branchIds = $branches->pluck('id')->values()->all();
+
         $audits = PhysicalCount::with(['branch', 'creator', 'participants:id,name'])
-            ->where('branch_id', $branch->id)
+            ->whereIn('branch_id', $branchIds)
             ->when($filters['physical_count_id'], fn ($query, $id) => $query->where('id', $id))
             ->when($filters['report_date'], function ($query) use ($filters) {
                 return match ($filters['date_scope']) {
@@ -172,11 +180,22 @@ class PhysicalCountReportController extends Controller
             ->when($allowedBranchProductIds !== [], fn ($query) => $query->whereIn('branch_product_id', $allowedBranchProductIds))
             ->get();
 
+        $auditsById = $audits->keyBy('id');
+        $entries = $entries
+            ->filter(function ($entry) use ($auditsById) {
+                $audit = $auditsById->get($entry->physical_count_id);
+
+                return ! $audit?->recapture_started_at
+                    || $entry->created_at >= $audit->recapture_started_at;
+            })
+            ->values();
+
         $activeBranchProducts = BranchProduct::with([
                 'product.category:id,name',
                 'product.subcategory:id,name,category_id',
+                'branch:id,name,slug',
             ])
-            ->where('branch_id', $branch->id)
+            ->whereIn('branch_id', $branchIds)
             ->where('status', BranchProduct::STATUS_ACTIVE)
             ->when($filters['category_id'], function ($query, $categoryId) {
                 $query->whereHas('product', fn ($productQuery) => $productQuery->where('category_id', $categoryId));
@@ -189,7 +208,7 @@ class PhysicalCountReportController extends Controller
                 $row['status_label'] = match ($row['status']) {
                     'missing' => 'Faltante',
                     'surplus' => 'Sobrante',
-                    'matched' => 'Correcto',
+                    'matched' => 'Macheado',
                     default => 'Pendiente',
                 };
 
@@ -209,10 +228,8 @@ class PhysicalCountReportController extends Controller
         if ($filters['status'] !== '') {
             $reportRows = $reportRows->filter(function ($row) use ($filters) {
                 return match ($filters['status']) {
-                    'found', 'counted' => $row['row_type'] === 'counted',
                     'not_found' => $row['row_type'] === 'pending',
                     'missing' => $row['status'] === 'missing',
-                    'not_missing' => in_array($row['status'], ['matched', 'surplus'], true),
                     'surplus' => $row['status'] === 'surplus',
                     'matched' => $row['status'] === 'matched',
                     default => true,
@@ -271,6 +288,58 @@ class PhysicalCountReportController extends Controller
             ->sortByDesc('products')
             ->values();
 
+        $branchSummary = $reportRows
+            ->groupBy('branch_name')
+            ->map(function ($group, $branchName) {
+                $countedProducts = $group->where('row_type', 'counted')->count();
+                $pendingProducts = $group->where('row_type', 'pending')->count();
+                $totalProducts = $group->count();
+
+                return [
+                    'branch_name' => $branchName ?: 'Sin sucursal',
+                    'audits' => $group->pluck('physical_count_id')->filter()->unique()->count(),
+                    'products' => $totalProducts,
+                    'counted_products' => $countedProducts,
+                    'pending_products' => $pendingProducts,
+                    'missing_products' => $group->where('status', 'missing')->count(),
+                    'surplus_products' => $group->where('status', 'surplus')->count(),
+                    'matched_products' => $group->where('status', 'matched')->count(),
+                    'advance' => $totalProducts > 0 ? round($countedProducts / $totalProducts, 4) : 0,
+                    'difference_units' => (float) $group->sum(fn ($row) => (float) ($row['difference'] ?? 0)),
+                    'absolute_difference_units' => (float) $group->sum(fn ($row) => abs((float) ($row['difference'] ?? 0))),
+                ];
+            })
+            ->sortBy('branch_name')
+            ->values();
+
+        $auditSummary = $reportRows
+            ->groupBy(fn ($row) => ($row['physical_count_id'] ?? 'sin-auditoria') . ':' . ($row['folio'] ?? 'Sin folio'))
+            ->map(function ($group) {
+                $first = $group->first();
+                $countedProducts = $group->where('row_type', 'counted')->count();
+                $totalProducts = $group->count();
+
+                return [
+                    'branch_name' => $first['branch_name'] ?? 'Sin sucursal',
+                    'audit_name' => $first['audit_name'] ?? 'Sin auditoria',
+                    'folio' => $first['folio'] ?? 'Sin folio',
+                    'audit_date' => $first['audit_date'] ?? null,
+                    'products' => $totalProducts,
+                    'counted_products' => $countedProducts,
+                    'pending_products' => $group->where('row_type', 'pending')->count(),
+                    'missing_products' => $group->where('status', 'missing')->count(),
+                    'surplus_products' => $group->where('status', 'surplus')->count(),
+                    'matched_products' => $group->where('status', 'matched')->count(),
+                    'advance' => $totalProducts > 0 ? round($countedProducts / $totalProducts, 4) : 0,
+                    'absolute_difference_units' => (float) $group->sum(fn ($row) => abs((float) ($row['difference'] ?? 0))),
+                ];
+            })
+            ->sortBy([
+                ['branch_name', 'asc'],
+                ['audit_date', 'desc'],
+            ])
+            ->values();
+
         $topDifferences = $reportRows
             ->where('row_type', 'counted')
             ->map(function ($row) {
@@ -318,6 +387,8 @@ class PhysicalCountReportController extends Controller
             'summary' => $summary,
             'userSummary' => $userSummary,
             'categorySummary' => $categorySummary,
+            'branchSummary' => $branchSummary,
+            'auditSummary' => $auditSummary,
             'topDifferences' => $topDifferences,
             'entries' => $entries,
         ];
@@ -339,8 +410,8 @@ class PhysicalCountReportController extends Controller
                 $countedStock = (float) $group->sum('counted_quantity');
                 $damagedStock = (float) $group->sum('damaged_quantity');
                 $expiredStock = (float) $group->sum('expired_quantity');
-                $sellableStock = max(0, $countedStock - $damagedStock - $expiredStock);
-                $difference = $sellableStock - $systemStock;
+                $newStock = max(0, $countedStock - $expiredStock);
+                $difference = $newStock - $systemStock;
 
                 return [
                     'id' => $first->physical_count_id . '-' . $first->branch_product_id,
@@ -350,6 +421,7 @@ class PhysicalCountReportController extends Controller
                     'audit_name' => $audit?->name ?? 'Sin auditoria',
                     'folio' => $audit?->folio ?? 'Sin folio',
                     'audit_date' => optional($audit?->started_at)->toDateString(),
+                    'branch_name' => $audit?->branch?->name ?? 'Sin sucursal',
                     'branch_product_id' => $first->branch_product_id,
                     'product_name' => $snapshot['product_name'] ?? $first->branchProduct?->product?->name ?? 'Sin producto',
                     'category_name' => $snapshot['category_name'] ?? $first->branchProduct?->product?->category?->name ?? 'Sin categoria',
@@ -390,6 +462,7 @@ class PhysicalCountReportController extends Controller
                     'audit_name' => $row['audit_name'],
                     'folio' => $row['folio'],
                     'audit_date' => $row['audit_date'],
+                    'branch_name' => $row['branch_name'] ?? 'Sin sucursal',
                     'branch_product_id' => $row['branch_product_id'],
                     'product_name' => $row['product_name'],
                     'category_name' => $row['category_name'],
@@ -421,6 +494,7 @@ class PhysicalCountReportController extends Controller
                     'audit_name' => $firstAudit?->name ?? 'Sin auditoria filtrada',
                     'folio' => $firstAudit?->folio ?? 'Sin folio',
                     'audit_date' => optional($firstAudit?->started_at)->toDateString(),
+                    'branch_name' => $branchProduct->branch?->name ?? 'Sin sucursal',
                     'branch_product_id' => $branchProduct->id,
                     'product_name' => $branchProduct->product?->name ?? 'Sin producto',
                     'category_name' => $branchProduct->product?->category?->name ?? 'Sin categoria',
@@ -478,11 +552,46 @@ class PhysicalCountReportController extends Controller
                     $row['matched_products'],
                 ])->all(),
             ],
+            'branches' => [
+                'title' => 'Resumen por sucursal',
+                'headings' => ['Sucursal', 'Auditorias', 'Productos', 'Contados', 'No encontrados', 'Macheados', 'Faltantes', 'Sobrantes', 'Avance', 'Dif. neta', 'Dif. absoluta'],
+                'rows' => $payload['branchSummary']->map(fn ($row) => [
+                    $row['branch_name'],
+                    $row['audits'],
+                    $row['products'],
+                    $row['counted_products'],
+                    $row['pending_products'],
+                    $row['matched_products'],
+                    $row['missing_products'],
+                    $row['surplus_products'],
+                    round(((float) $row['advance']) * 100, 2) . '%',
+                    $row['difference_units'],
+                    $row['absolute_difference_units'],
+                ])->all(),
+            ],
+            'audits' => [
+                'title' => 'Resumen por auditoria',
+                'headings' => ['Sucursal', 'Auditoria', 'Folio', 'Fecha', 'Productos', 'Contados', 'No encontrados', 'Macheados', 'Faltantes', 'Sobrantes', 'Avance', 'Dif. absoluta'],
+                'rows' => $payload['auditSummary']->map(fn ($row) => [
+                    $row['branch_name'],
+                    $row['audit_name'],
+                    $row['folio'],
+                    $row['audit_date'],
+                    $row['products'],
+                    $row['counted_products'],
+                    $row['pending_products'],
+                    $row['matched_products'],
+                    $row['missing_products'],
+                    $row['surplus_products'],
+                    round(((float) $row['advance']) * 100, 2) . '%',
+                    $row['absolute_difference_units'],
+                ])->all(),
+            ],
             'differences' => [
                 'title' => 'Ranking de diferencias',
                 'headings' => ['Auditoria', 'Producto', 'Categoria', 'Codigo', 'Sistema', 'Conteo', 'Diferencia', 'Resultado'],
                 'rows' => $payload['topDifferences']->map(fn ($row) => [
-                    $row['audit_name'],
+                    trim(($row['branch_name'] ?? 'Sin sucursal') . ' / ' . $row['audit_name']),
                     $row['product_name'],
                     $row['category_name'],
                     $row['scanned_code'],
@@ -512,6 +621,7 @@ class PhysicalCountReportController extends Controller
                     'Auditoria',
                     'Folio',
                     'Fecha',
+                    'Sucursal',
                     'Tipo',
                     'Resultado',
                     'Producto',
@@ -529,6 +639,7 @@ class PhysicalCountReportController extends Controller
                     $row['audit_name'],
                     $row['folio'],
                     $row['audit_date'],
+                    $row['branch_name'] ?? 'Sin sucursal',
                     $row['row_type_label'],
                     $row['status_label'],
                     $row['product_name'],
@@ -546,10 +657,12 @@ class PhysicalCountReportController extends Controller
         };
     }
 
-    private function normalizeFilters(Request $request, Branch $branch): array
+    private function normalizeFilters(Request $request, ?Branch $branch): array
     {
+        $branchFilter = $branch?->slug ?? '';
+
         return [
-            'branch' => $branch->slug,
+            'branch' => $branchFilter,
             'physical_count_id' => $request->input('physical_count_id'),
             'user_id' => $request->input('user_id'),
             'user_ids' => $this->normalizeUserIds($request),
@@ -596,13 +709,10 @@ class PhysicalCountReportController extends Controller
             'user' => $selectedUsers->isNotEmpty() ? $selectedUsers->pluck('name')->join(', ') : 'Todos',
             'category' => $selectedCategory?->name ?: 'Todas',
             'status' => match ($filters['status']) {
-                'found' => 'Encontrados',
-                'not_found' => 'No encontrados',
-                'counted' => 'Contados',
+                'matched' => 'Macheado',
                 'missing' => 'Faltantes',
-                'not_missing' => 'No faltantes',
                 'surplus' => 'Sobrantes',
-                'matched' => 'Correctos',
+                'not_found' => 'No encontrado',
                 default => 'Todos',
             },
             'date_scope' => match ($filters['date_scope']) {
@@ -615,9 +725,32 @@ class PhysicalCountReportController extends Controller
         ];
     }
 
-    private function resolveBranch(?string $branchSlug): Branch
+    private function resolveReportBranches(Request $request): Collection
     {
-        return $this->resolveAccessibleBranch(request(), $branchSlug);
+        $branchSlug = $request->query('branch');
+        $branches = $this->accessibleBranches($request);
+
+        if (! $branchSlug || $branchSlug === 'all') {
+            return $branches;
+        }
+
+        $branch = $branches->firstWhere('slug', $branchSlug);
+        abort_unless($branch, 403, 'No tienes acceso a esta sucursal.');
+
+        return collect([$branch]);
+    }
+
+    private function accessibleBranches(Request $request): Collection
+    {
+        /** @var User|null $user */
+        $user = $request->user()?->loadMissing(['role', 'branches']);
+
+        abort_unless($user, 401, 'Debes iniciar sesion.');
+
+        return $user->accessibleBranchesQuery()
+            ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
+            ->orderBy('branches.name')
+            ->get();
     }
 
     private function normalizeUserIds(Request $request): array
