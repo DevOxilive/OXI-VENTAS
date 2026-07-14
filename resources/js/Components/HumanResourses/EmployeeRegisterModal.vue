@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import { useEmployeeForm } from '@/Composables/HumanResources/useEmployeeForm'
 
+import FormPanel from '@/Components/Cards/FormPanel.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
@@ -89,12 +90,13 @@ watch(
         @save="saveEmployee"
         @close="$emit('close')"
     >
-        <div class="space-y-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6">
-            <section class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                <h3 class="mb-6 border-b border-slate-200 pb-4 text-center text-2xl font-black tracking-tight text-[#1f1d2b]">
-                    Datos del empleado
-                </h3>
-
+        <div class="space-y-6 rounded-3xl border border-secondary bg-background p-4 shadow-sm sm:p-5 md:p-6">
+            <FormPanel
+                title="Datos del empleado"
+                centered-heading
+                :heading-border="true"
+                panel-class="p-4"
+            >
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <InputField label="Nombre(s)" field="firstName" v-model="employee.firstName" :readonly="isReadOnly"
                         :error="frontendErrors.firstName || employee.errors.firstName" @validate="validateField('firstName')" />
@@ -117,13 +119,14 @@ watch(
                         :error="frontendErrors.employmentStatus || employee.errors.employmentStatus"
                         @validate="validateField('employmentStatus')" />
                 </div>
-            </section>
+            </FormPanel>
 
-            <section class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                <h3 class="mb-4 border-b border-slate-200 pb-3 text-center text-2xl font-black tracking-tight text-[#1f1d2b]">
-                    Domicilio
-                </h3>
-
+            <FormPanel
+                title="Domicilio"
+                centered-heading
+                :heading-border="true"
+                panel-class="p-4"
+            >
                 <div class="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <InputField label="Calle" field="street" v-model="employee.street" :readonly="isReadOnly"
@@ -157,14 +160,14 @@ watch(
                             :error="frontendErrors.mapsUrl || employee.errors.mapsUrl" @validate="validateField('mapsUrl')" />
                     </div>
 
-                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                        <div class="flex flex-col items-center gap-2 border-b border-slate-200 px-4 py-3 text-center">
-                            <p class="text-2xl font-black tracking-tight text-[#1f1d2b]">
+                    <div class="overflow-hidden rounded-2xl border border-secondary bg-background">
+                        <div class="flex flex-col items-center gap-2 border-b border-secondary px-4 py-3 text-center">
+                            <p class="text-2xl font-black tracking-tight text-text">
                                 Ubicacion
                             </p>
 
                             <button type="button"
-                                class="text-xs font-bold text-[#1f1d2b] disabled:cursor-not-allowed disabled:opacity-40"
+                                class="text-xs font-bold text-primary disabled:cursor-not-allowed disabled:opacity-40"
                                 :disabled="!canOpenMaps" @click="openGoogleMaps">
                                 Abrir mapa
                             </button>
@@ -175,19 +178,20 @@ watch(
                             :src="`https://www.google.com/maps?q=${encodeURIComponent(fullAddress)}&output=embed`" />
 
                         <div v-else class="flex h-44 items-center justify-center p-4 text-center">
-                            <p class="text-sm font-semibold text-slate-400">
+                            <p class="text-sm font-semibold text-text opacity-50">
                                 Captura el domicilio para previsualizar el mapa.
                             </p>
                         </div>
                     </div>
                 </div>
-            </section>
+            </FormPanel>
 
-            <section class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                <h3 class="mb-4 border-b border-slate-200 pb-3 text-center text-2xl font-black tracking-tight text-[#1f1d2b]">
-                    Laboral y fiscal
-                </h3>
-
+            <FormPanel
+                title="Laboral y fiscal"
+                centered-heading
+                :heading-border="true"
+                panel-class="p-4"
+            >
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <InputField label="Puesto" field="position" v-model="employee.position" :readonly="isReadOnly"
                         :error="frontendErrors.position || employee.errors.position" @validate="validateField('position')" />
@@ -219,18 +223,18 @@ watch(
                         :readonly="isReadOnly" :error="frontendErrors.accountNumber || employee.errors.accountNumber"
                         @validate="validateField('accountNumber')" />
 
-                    <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <div class="rounded-2xl border border-secondary bg-background px-4 py-3">
                         <div class="flex items-center justify-between gap-3">
                             <div>
-                                <p class="text-sm font-semibold text-slate-700">¿Está dado de alta en IMSS?</p>
-                                <p class="text-xs text-slate-500">Activa el NSS solo cuando aplique</p>
+                                <p class="text-sm font-semibold text-text">¿Está dado de alta en IMSS?</p>
+                                <p class="text-xs text-text opacity-70">Activa el NSS solo cuando aplique</p>
                             </div>
 
                             <button type="button"
                                 class="relative inline-flex h-7 w-14 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-50"
-                                :class="employee.hasImss ? 'bg-[#1f1d2b]' : 'bg-slate-300'" :disabled="isReadOnly"
+                                :class="employee.hasImss ? 'bg-primary' : 'bg-secondary'" :disabled="isReadOnly"
                                 @click="employee.hasImss = !employee.hasImss">
-                                <span class="inline-block h-6 w-6 transform rounded-full bg-white shadow transition"
+                                <span class="inline-block h-6 w-6 transform rounded-full bg-background shadow transition"
                                     :class="employee.hasImss ? 'translate-x-7' : 'translate-x-1'" />
                             </button>
                         </div>
@@ -244,7 +248,7 @@ watch(
                         placeholder="El sistema autocompleta el prefijo; captura el resto"
                         :error="frontendErrors.rfc || employee.errors.rfc" @validate="validateField('rfc')" />
                 </div>
-            </section>
+            </FormPanel>
         </div>
     </GlobalModal>
 </template>

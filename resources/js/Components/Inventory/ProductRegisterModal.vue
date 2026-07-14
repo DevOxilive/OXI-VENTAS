@@ -126,10 +126,10 @@ watch(
         @save="$emit('save')"
         @close="closeModal"
     >
-        <div class="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 md:p-6 shadow-sm">
+        <div class="rounded-3xl border border-secondary bg-background p-4 shadow-sm sm:p-5 md:p-6">
             <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <section>
-                    <h3 class="font-bold text-base border-b pb-3 mb-4">
+                    <h3 class="mb-4 border-b border-secondary pb-3 text-base font-bold text-text">
                         Datos del producto
                     </h3>
 
@@ -154,7 +154,7 @@ watch(
                 </section>
 
                 <section>
-                    <h3 class="font-bold text-base border-b pb-3 mb-4">
+                    <h3 class="mb-4 border-b border-secondary pb-3 text-base font-bold text-text">
                         Stock y ubicacion
                     </h3>
 
@@ -186,7 +186,7 @@ watch(
                 </section>
 
                 <section>
-                    <h3 class="font-bold text-base border-b pb-3 mb-4">
+                    <h3 class="mb-4 border-b border-secondary pb-3 text-base font-bold text-text">
                         Costos y control
                     </h3>
 
@@ -213,20 +213,20 @@ watch(
                 </section>
             </div>
 
-            <section v-if="modo !== 'view'" class="mt-6 rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4 sm:p-5">
+            <section v-if="modo !== 'view'" class="mt-6 rounded-[28px] border border-secondary bg-secondary p-4 sm:p-5">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h3 class="text-base font-bold text-slate-900">
+                        <h3 class="text-base font-bold text-text">
                             Sucursales asignadas
                         </h3>
-                        <p class="mt-1 text-sm text-slate-500">
+                        <p class="mt-1 text-sm text-text opacity-70">
                             La sucursal actual queda marcada automáticamente y no se puede quitar.
                         </p>
                     </div>
 
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-[1px] hover:border-slate-300 hover:bg-slate-100"
+                        class="inline-flex items-center justify-center rounded-2xl border border-secondary bg-background px-4 py-2 text-sm font-semibold text-text shadow-sm transition hover:-translate-y-[1px] hover:border-primary hover:bg-background"
                         @click="toggleAllBranches"
                     >
                         {{ product.branch_ids?.length === branches.length ? 'Quitar extras' : 'Seleccionar todas' }}
@@ -248,7 +248,7 @@ watch(
                                     : 'Haz clic para agregar'
                         "
                         :badge="isCurrentBranch(branchItem.id) ? 'Fija' : ''"
-                        :dark-checked="true"
+                        variant="solid"
                         @toggle="toggleBranch(branchItem.id)"
                     />
                 </div>

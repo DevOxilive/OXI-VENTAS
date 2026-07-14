@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onMounted, watch } from 'vue'
 import { useAdjustStockForm } from '@/Composables/Inventory/useAdjustStockForm'
+import FormPanel from '@/Components/Cards/FormPanel.vue'
+import SectionHeading from '@/Components/Cards/SectionHeading.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { getStockEntryModalConfig } from '@/config/ModalConfigs/stockEntryModalConfig'
 
@@ -343,49 +345,44 @@ onMounted(() => {
             v-if="entry"
             class="min-h-0 w-full"
         >
-            <div class="border-b border-slate-200 px-5 py-4">
-                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div class="min-w-0">
-                        <h3 class="truncate font-black text-slate-900">
-                            {{ productName }}
-                        </h3>
+            <SectionHeading
+                :description="props.currentBranch?.name || 'Sucursal actual'"
+                :bordered="true"
+                spacing="md"
+            >
+                <template #title>
+                    <h3 class="truncate font-black text-text">
+                        {{ productName }}
+                    </h3>
+                </template>
 
-                        <p class="mt-1 text-sm text-slate-500">
-                            {{ props.currentBranch?.name || 'Sucursal actual' }}
-                        </p>
-                    </div>
-
+                <template #aside>
                     <div class="flex flex-wrap gap-2">
-                        <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                        <span class="rounded-full border border-secondary bg-secondary px-3 py-1 text-xs font-semibold text-text opacity-80">
                             Stock: {{ currentStock }} {{ unit }}
                         </span>
 
-                        <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                        <span class="rounded-full border border-secondary bg-secondary px-3 py-1 text-xs font-semibold text-text opacity-80">
                             Entrada: {{ today }}
                         </span>
                     </div>
-                </div>
-            </div>
+                </template>
+            </SectionHeading>
 
             <div class="space-y-5 p-5">
                 <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.95fr)_minmax(260px,0.9fr)]">
-                    <section class="border-y border-slate-200 bg-slate-50 px-4 py-5">
-                        <div class="mb-4">
-                            <h4 class="text-sm font-black text-slate-900">
-                                Datos del producto
-                            </h4>
-
-                            <p class="mt-1 text-sm text-slate-500">
-                                Captura la cantidad y los datos principales del lote.
-                            </p>
-                        </div>
-
+                    <FormPanel
+                        title="Datos del producto"
+                        description="Captura la cantidad y los datos principales del lote."
+                        panel-class="border-y shadow-none"
+                        body-class="space-y-4"
+                    >
                         <div class="mb-4 flex flex-wrap gap-2">
-                            <span class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                            <span class="rounded-full border border-secondary bg-background px-3 py-1 text-xs font-semibold text-text opacity-80">
                                 Stock actual: {{ currentStock }} {{ unit }}
                             </span>
 
-                            <span class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                            <span class="rounded-full border border-secondary bg-background px-3 py-1 text-xs font-semibold text-text opacity-80">
                                 Entrada: {{ today }}
                             </span>
                         </div>
@@ -428,19 +425,13 @@ onMounted(() => {
                                 :readonly="form.processing"
                             />
                         </div>
-                    </section>
+                    </FormPanel>
 
-                    <section class="border-y border-slate-200 bg-slate-50 px-4 py-5">
-                        <div class="mb-4">
-                            <h4 class="text-sm font-black text-slate-900">
-                                Distribucion por sucursal
-                            </h4>
-
-                            <p class="mt-1 text-sm text-slate-500">
-                                Selecciona las sucursales y define cuantas piezas recibe cada una.
-                            </p>
-                        </div>
-
+                    <FormPanel
+                        title="Distribucion por sucursal"
+                        description="Selecciona las sucursales y define cuantas piezas recibe cada una."
+                        panel-class="border-y shadow-none"
+                    >
                         <div class="max-h-[360px] space-y-3 overflow-y-auto pr-1">
                             <div
                                 v-for="branch in branchOptions"
@@ -455,14 +446,14 @@ onMounted(() => {
                                         :description="branchDescription(branch.id)"
                                         :badge="isCurrentBranch(branch.id) ? 'Fija' : ''"
                                         :highlighted="isCurrentBranch(branch.id)"
-                                        :dark-checked="true"
+                                        variant="solid"
                                         :compact="true"
                                         @toggle="toggleBranch(branch)"
                                     />
                                 </div>
 
                                 <div class="w-[102px] shrink-0">
-                                    <label class="mb-1 block text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+                                    <label class="mb-1 block text-[11px] font-black uppercase tracking-[0.18em] text-text opacity-70">
                                         Piezas
                                     </label>
 
@@ -471,7 +462,7 @@ onMounted(() => {
                                         type="number"
                                         min="0"
                                         step="0.001"
-                                        class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[#1f1d2b] disabled:cursor-not-allowed disabled:bg-slate-100"
+                                        class="w-full rounded-2xl border border-secondary bg-background px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-primary disabled:cursor-not-allowed disabled:bg-secondary"
                                         :disabled="form.processing || !branchSelected(branch.id)"
                                         @input="updateBranchAllocation(branch.id, $event.target.value)"
                                         @blur="validateEntry"
@@ -481,32 +472,26 @@ onMounted(() => {
                         </div>
 
                         <div class="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold">
-                            <span class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">
+                            <span class="rounded-full border border-secondary bg-background px-3 py-1 text-text opacity-80">
                                 Asignado: {{ totalAllocated }} / {{ totalQuantity || 0 }} {{ unit }}
                             </span>
 
                             <span
                                 class="rounded-full border px-3 py-1"
                                 :class="remainingQuantity === 0
-                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                    : 'border-amber-200 bg-amber-50 text-amber-700'"
+                                    ? 'border-accent bg-secondary text-accent'
+                                    : 'border-primary bg-secondary text-primary'"
                             >
                                 Pendiente: {{ remainingQuantity }} {{ unit }}
                             </span>
                         </div>
-                    </section>
+                    </FormPanel>
 
-                    <section class="border-y border-slate-200 bg-slate-50 px-4 py-5">
-                        <div class="mb-4">
-                            <h4 class="text-sm font-black text-slate-900">
-                                Notas
-                            </h4>
-
-                            <p class="mt-1 text-sm text-slate-500">
-                                Agrega cualquier detalle adicional de esta entrada.
-                            </p>
-                        </div>
-
+                    <FormPanel
+                        title="Notas"
+                        description="Agrega cualquier detalle adicional de esta entrada."
+                        panel-class="border-y shadow-none"
+                    >
                         <TextareaField
                             v-model="form.notes"
                             label="Notas"
@@ -516,7 +501,7 @@ onMounted(() => {
                             :rows="9"
                             :max-height="280"
                         />
-                    </section>
+                    </FormPanel>
                 </div>
 
                 <div class="hidden">
@@ -534,46 +519,46 @@ onMounted(() => {
 
                 <div
                     v-if="frontendErrors.quantity || frontendErrors.received_at || frontendErrors.expiration_date || frontendErrors.lot_number || frontendErrors.batches || frontendErrors.branch_allocations"
-                    class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 space-y-1"
+                    class="rounded-2xl border border-primary bg-secondary px-4 py-3 space-y-1"
                 >
                     <p
                         v-if="frontendErrors.quantity"
-                        class="text-sm font-semibold text-red-700"
+                        class="text-sm font-semibold text-primary"
                     >
                         {{ frontendErrors.quantity }}
                     </p>
 
                     <p
                         v-if="frontendErrors.received_at"
-                        class="text-sm font-semibold text-red-700"
+                        class="text-sm font-semibold text-primary"
                     >
                         {{ frontendErrors.received_at }}
                     </p>
 
                     <p
                         v-if="frontendErrors.expiration_date"
-                        class="text-sm font-semibold text-red-700"
+                        class="text-sm font-semibold text-primary"
                     >
                         {{ frontendErrors.expiration_date }}
                     </p>
 
                     <p
                         v-if="frontendErrors.lot_number"
-                        class="text-sm font-semibold text-red-700"
+                        class="text-sm font-semibold text-primary"
                     >
                         {{ frontendErrors.lot_number }}
                     </p>
 
                     <p
                         v-if="frontendErrors.branch_allocations"
-                        class="text-sm font-semibold text-red-700"
+                        class="text-sm font-semibold text-primary"
                     >
                         {{ frontendErrors.branch_allocations }}
                     </p>
 
                     <p
                         v-if="frontendErrors.batches"
-                        class="text-sm font-semibold text-red-700"
+                        class="text-sm font-semibold text-primary"
                     >
                         {{ frontendErrors.batches }}
                     </p>

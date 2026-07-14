@@ -223,7 +223,6 @@ export function useBranchInventory(props) {
     });
 
     const {
-        showBatchAdjustmentModal,
         liveSelectedBatch,
         processing: batchAdjustmentProcessing,
         form: batchAdjustmentForm,
@@ -234,7 +233,7 @@ export function useBranchInventory(props) {
         adjustmentText: batchAdjustmentText,
         quantityResultColor: batchAdjustmentQuantityResultColor,
         adjustBatch,
-        closeBatchAdjustmentModal,
+        clearSelectedBatch,
         setAdjustmentType: setBatchAdjustmentType,
         validateField: validateBatchAdjustmentField,
         saveEditedBatch,
@@ -255,11 +254,13 @@ export function useBranchInventory(props) {
 
     async function openProductBatchesModal(product) {
         const detailedProduct = await ensureProductDetails(product);
+        clearSelectedBatch();
         selectedBatchesProductId.value = detailedProduct?.id ?? product.id;
         showProductBatchesModal.value = true;
     }
 
     function closeProductBatchesModal() {
+        clearSelectedBatch();
         showProductBatchesModal.value = false;
         selectedBatchesProductId.value = null;
     }
@@ -799,11 +800,9 @@ export function useBranchInventory(props) {
         liveSelectedBatchesProduct,
         openProductBatchesModal,
         closeProductBatchesModal,
-        showBatchAdjustmentModal,
         liveSelectedBatch,
 
         adjustBatch,
-        closeBatchAdjustmentModal,
 
         batchAdjustmentProcessing,
         batchAdjustmentForm,

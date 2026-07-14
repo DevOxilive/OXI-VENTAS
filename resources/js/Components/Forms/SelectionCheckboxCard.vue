@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
     checked: {
         type: Boolean,
@@ -32,53 +34,109 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    variant: {
+        type: String,
+        default: 'surface',
+    },
 })
 
 const emit = defineEmits(['toggle'])
+
+const resolvedVariant = computed(() => {
+    return props.darkChecked ? 'solid' : props.variant
+})
+
+const isSolidChecked = computed(() => {
+    return resolvedVariant.value === 'solid' && props.checked
+})
+
+const cardClasses = computed(() => {
+    const variants = {
+        surface: props.checked
+            ? 'border-primary bg-background shadow-sm hover:border-primary hover:shadow-md'
+            : 'border-secondary bg-secondary hover:border-primary hover:bg-background',
+        soft: props.checked
+            ? 'border-primary bg-secondary shadow-sm'
+            : 'border-secondary bg-background hover:border-primary hover:bg-secondary',
+        solid: props.checked
+            ? 'border-primary bg-secondary shadow-sm'
+            : 'border-secondary bg-secondary hover:border-primary hover:bg-background',
+    }
+
+    return variants[resolvedVariant.value] || variants.surface
+})
+
+const descriptionClasses = computed(() => {
+    if (resolvedVariant.value === 'solid') {
+        return 'text-text opacity-75'
+    }
+
+    return 'text-text opacity-70'
+})
+
+const badgeClasses = computed(() => {
+    if (isSolidChecked.value) {
+        return 'bg-background text-text'
+    }
+
+    return 'bg-secondary text-text'
+})
+
+const checkboxClasses = computed(() => {
+    return {
+        'is-checked': props.checked,
+        'is-disabled': props.disabled,
+    }
+})
+
+const checkboxStyle = computed(() => ({
+    '--box-size': props.compact ? '20px' : '22px',
+    '--box-bg': props.checked ? 'var(--primary)' : 'transparent',
+    '--box-border': props.checked ? 'var(--primary)' : 'color-mix(in srgb, var(--text) 22%, transparent)',
+    '--box-ring': props.checked ? 'color-mix(in srgb, var(--primary) 28%, transparent)' : 'transparent',
+    '--check-color': props.checked ? 'var(--background)' : 'transparent',
+}))
 </script>
 
 <template>
     <button
         type="button"
-        class="group flex items-center gap-3 rounded-[24px] border text-left transition"
+        class="group flex items-start gap-3 rounded-[24px] border text-left transition"
         :class="[
             compact ? 'px-4 py-3' : 'px-4 py-4',
-            darkChecked && checked
-                ? 'border-primary bg-primary text-white shadow-lg'
-                : checked
-                    ? 'border-primary bg-background shadow-sm hover:border-primary hover:shadow-md'
-                    : 'border-secondary bg-secondary hover:border-primary hover:bg-background',
+            cardClasses,
             disabled ? 'cursor-default' : '',
-            highlighted && !darkChecked ? 'border-accent bg-secondary' : '',
+            highlighted && resolvedVariant !== 'solid' ? 'border-accent bg-secondary' : '',
         ]"
         @click="!disabled && emit('toggle')"
     >
-        <span class="checkbox-wrapper-30 shrink-0" :class="{ 'is-disabled': disabled && darkChecked }">
-            <span class="checkbox" :style="{ '--size': compact ? 1 : 1.15 }">
+        <span class="checkbox-wrapper-30 mt-0.5 shrink-0" :class="checkboxClasses">
+            <span class="checkbox" :style="checkboxStyle">
                 <input
+                    class="sr-only"
                     type="checkbox"
                     :checked="checked"
                     :disabled="disabled"
+                    tabindex="-1"
                     @click.stop="!disabled && emit('toggle')"
-                />
-                <svg viewBox="0 0 22 22" aria-hidden="true">
+                >
+                <svg viewBox="0 0 16 16" aria-hidden="true">
                     <path
                         fill="none"
-                        stroke="currentColor"
-                        d="M5.5,11.3L9,14.8L20.2,3.3l0,0c-0.5-1-1.5-1.8-2.7-1.8h-13c-1.7,0-3,1.3-3,3v13c0,1.7,1.3,3,3,3h13 c1.7,0,3-1.3,3-3v-13c0-0.4-0.1-0.8-0.3-1.2"
+                        d="M3.5 8.5 6.5 11.5 12.5 4.75"
                     />
                 </svg>
             </span>
         </span>
 
         <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-semibold">
+            <p class="break-words text-sm font-semibold leading-5">
                 {{ title }}
             </p>
             <p
                 v-if="description"
-                class="mt-1 text-xs"
-                :class="darkChecked && checked ? 'text-white opacity-80' : 'text-text opacity-70'"
+                class="mt-1 break-words text-xs leading-4"
+                :class="descriptionClasses"
             >
                 {{ description }}
             </p>
@@ -86,8 +144,8 @@ const emit = defineEmits(['toggle'])
 
         <span
             v-if="badge"
-            class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-            :class="darkChecked && checked ? 'bg-secondary text-text' : 'bg-secondary text-text'"
+            class="mt-0.5 shrink-0 self-start rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            :class="badgeClasses"
         >
             {{ badge }}
         </span>
@@ -96,90 +154,61 @@ const emit = defineEmits(['toggle'])
 
 <style scoped>
 .checkbox-wrapper-30 .checkbox {
-    --bg: #fff;
-    --brdr: #d1d6ee;
-    --brdr-actv: #111827;
-    --brdr-hovr: #94a3b8;
-    --dur: calc((var(--size, 2) / 2) * 0.6s);
-    display: inline-block;
+    display: grid;
+    place-items: center;
     position: relative;
-    width: calc(var(--size, 1) * 22px);
-}
-
-.checkbox-wrapper-30 .checkbox::after {
-    content: '';
-    display: block;
-    padding-top: 100%;
-    width: 100%;
-}
-
-.checkbox-wrapper-30 .checkbox > * {
-    position: absolute;
-}
-
-.checkbox-wrapper-30 .checkbox input {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    -webkit-tap-highlight-color: transparent;
-    background-color: var(--bg);
-    border: calc(var(--newBrdr, var(--size, 1)) * 1px) solid;
-    border-radius: calc(var(--size, 1) * 4px);
-    color: var(--newBrdrClr, var(--brdr));
-    cursor: pointer;
-    margin: 0;
-    outline: none;
-    padding: 0;
-    transition: all calc(var(--dur) / 3) linear;
-}
-
-.checkbox-wrapper-30 .checkbox input:hover,
-.checkbox-wrapper-30 .checkbox input:checked {
-    --newBrdr: calc(var(--size, 1) * 2);
-}
-
-.checkbox-wrapper-30 .checkbox input:hover {
-    --newBrdrClr: var(--brdr-hovr);
-}
-
-.checkbox-wrapper-30 .checkbox input:checked {
-    --newBrdrClr: var(--brdr-actv);
-    transition-delay: calc(var(--dur) / 1.3);
-}
-
-.checkbox-wrapper-30 .checkbox input:checked + svg {
-    --dashArray: 16 93;
-    --dashOffset: 109;
+    width: var(--box-size, 22px);
+    height: var(--box-size, 22px);
 }
 
 .checkbox-wrapper-30 .checkbox svg {
     fill: none;
-    left: 0;
     pointer-events: none;
-    stroke: currentColor;
-    stroke-dasharray: var(--dashArray, 93);
-    stroke-dashoffset: var(--dashOffset, 94);
+    position: relative;
+    z-index: 1;
+    width: calc(var(--box-size, 22px) * 0.78);
+    height: calc(var(--box-size, 22px) * 0.78);
+    stroke: var(--check-color, transparent);
+    stroke-dasharray: 18;
+    stroke-dashoffset: 18;
     stroke-linecap: round;
     stroke-linejoin: round;
-    stroke-width: 2px;
-    top: 0;
-    transition: stroke-dasharray var(--dur), stroke-dashoffset var(--dur);
+    stroke-width: 2.35px;
+    transition: stroke-dashoffset 0.24s ease, transform 0.24s ease, stroke 0.24s ease;
+    transform: scale(0.78);
 }
 
-.checkbox-wrapper-30 .checkbox svg,
-.checkbox-wrapper-30 .checkbox input {
-    display: block;
-    height: 100%;
-    width: 100%;
+.checkbox-wrapper-30 .checkbox::before,
+.checkbox-wrapper-30 .checkbox::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 0.42rem;
 }
 
-.checkbox-wrapper-30.is-disabled .checkbox {
-    --bg: rgba(255, 255, 255, 0.12);
-    --brdr: rgba(255, 255, 255, 0.45);
-    --brdr-actv: #ffffff;
-    --brdr-hovr: rgba(255, 255, 255, 0.6);
+.checkbox-wrapper-30 .checkbox::before {
+    background: var(--box-bg, transparent);
+    border: 2px solid var(--box-border, color-mix(in srgb, var(--text) 22%, transparent));
+    transition: border-color 0.24s ease, background-color 0.24s ease, transform 0.24s ease;
 }
 
-.checkbox-wrapper-30.is-disabled .checkbox input {
-    cursor: default;
+.checkbox-wrapper-30 .checkbox::after {
+    box-shadow: 0 0 0 0 var(--box-ring, transparent);
+    opacity: 0;
+    transition: box-shadow 0.24s ease, opacity 0.24s ease, transform 0.24s ease;
+}
+
+.checkbox-wrapper-30.is-checked .checkbox::after {
+    box-shadow: 0 0 0 5px var(--box-ring, transparent);
+    opacity: 1;
+}
+
+.checkbox-wrapper-30.is-checked .checkbox svg {
+    stroke-dashoffset: 0;
+    transform: scale(1);
+}
+
+.checkbox-wrapper-30.is-disabled {
+    opacity: 0.72;
 }
 </style>

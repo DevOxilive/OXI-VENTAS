@@ -97,31 +97,31 @@ function submit() {
 </script>
 
 <template>
-    <div class="bg-[#f6f3f7] min-h-screen rounded-3xl p-6">
+    <div class="min-h-screen rounded-3xl bg-background p-6">
         <div class="flex items-center justify-between mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-[#1f1d2b]">
+                <h1 class="text-2xl font-bold text-text">
                     Movimientos de inventario
                 </h1>
 
-                <p class="text-sm text-slate-500 mt-1">
+                <p class="mt-1 text-sm text-text opacity-70">
                     Entradas, salidas, robos, danos y caducidades
                 </p>
             </div>
 
             <button
-                class="bg-[#1f1d2b] hover:bg-[#2a2738] text-white px-5 py-3 rounded-xl text-sm font-medium transition"
+                class="rounded-xl border border-primary bg-primary px-5 py-3 text-sm font-medium text-white transition hover:brightness-110"
                 @click="openModal"
             >
                 Nuevo movimiento
             </button>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
             <div class="overflow-x-auto">
                 <table class="w-full">
-                    <thead class="bg-slate-100">
-                        <tr class="text-left text-sm text-slate-600">
+                    <thead class="bg-secondary">
+                        <tr class="text-left text-sm text-text opacity-80">
                             <th class="px-5 py-4 font-semibold">
                                 Producto
                             </th>
@@ -153,13 +153,13 @@ function submit() {
                         <tr
                             v-for="movement in movements"
                             :key="movement.id"
-                            class="border-t border-slate-100 hover:bg-slate-50 transition"
+                            class="border-t border-secondary transition hover:bg-secondary"
                         >
-                            <td class="px-5 py-4 font-medium text-slate-800">
+                            <td class="px-5 py-4 font-medium text-text">
                                 {{ movement.branch_product?.product?.name }}
                             </td>
 
-                            <td class="px-5 py-4 text-slate-600">
+                            <td class="px-5 py-4 text-text opacity-80">
                                 {{ movement.branch_product?.branch?.name }}
                             </td>
 
@@ -167,38 +167,38 @@ function submit() {
                                 <span
                                     class="px-3 py-1 rounded-full text-xs font-medium"
                                     :class="movement.type === 'IN'
-                                        ? 'bg-green-100 text-green-700'
+                                        ? 'bg-secondary text-accent'
                                         : movement.type === 'OUT'
-                                            ? 'bg-red-100 text-red-700'
-                                            : 'bg-yellow-100 text-yellow-700'"
+                                            ? 'bg-secondary text-primary'
+                                            : 'bg-secondary text-accent'"
                                 >
                                     {{ translateMovement(movement.type) }}
                                 </span>
                             </td>
 
-                            <td class="px-5 py-4 text-slate-600">
+                            <td class="px-5 py-4 text-text opacity-80">
                                 {{ translateMovement(movement.reason) }}
                             </td>
 
-                            <td class="px-5 py-4 text-slate-600">
+                            <td class="px-5 py-4 text-text opacity-80">
                                 {{ movement.quantity }}
                             </td>
 
-                            <td class="px-5 py-4 text-slate-600">
+                            <td class="px-5 py-4 text-text opacity-80">
                                 {{ movement.previous_stock }}
                             </td>
 
-                            <td class="px-5 py-4 text-slate-600">
+                            <td class="px-5 py-4 text-text opacity-80">
                                 {{ movement.new_stock }}
                             </td>
 
-                            <td class="px-5 py-4 text-slate-500 text-sm">
+                            <td class="px-5 py-4 text-sm text-text opacity-70">
                                 {{ movement.created_at }}
                             </td>
                         </tr>
 
                         <tr v-if="movements.length === 0">
-                            <td colspan="8" class="text-center py-10 text-slate-400">
+                            <td colspan="8" class="py-10 text-center text-text opacity-50">
                                 No hay movimientos registrados.
                             </td>
                         </tr>

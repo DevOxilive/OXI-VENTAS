@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue'
 
+import FormPanel from '@/Components/Cards/FormPanel.vue'
+import SectionHeading from '@/Components/Cards/SectionHeading.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
@@ -60,7 +62,7 @@ const props = defineProps({
     },
     quantityResultColor: {
         type: String,
-        default: 'text-slate-900',
+        default: 'text-text',
     },
     setAdjustmentType: {
         type: Function,
@@ -135,12 +137,12 @@ function statusLabel(status) {
 
 function statusClass(status) {
     const classes = {
-        ACTIVE: 'border-emerald-200 bg-emerald-100 text-emerald-700',
-        INACTIVE: 'border-slate-200 bg-slate-100 text-slate-600',
-        SEASONAL: 'border-amber-200 bg-amber-100 text-amber-700',
+        ACTIVE: 'border-accent bg-secondary text-accent',
+        INACTIVE: 'border-secondary bg-background text-text opacity-80',
+        SEASONAL: 'border-primary bg-secondary text-primary',
     }
 
-    return classes[status] || 'border-slate-200 bg-slate-100 text-slate-600'
+    return classes[status] || 'border-secondary bg-background text-text opacity-80'
 }
 
 function seasonLabel(batch) {
@@ -170,27 +172,28 @@ function selectBatch(batch) {
     >
         <section class="flex h-full min-h-0 w-full flex-col overflow-hidden">
             <div class="grid h-full min-h-0 grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)]">
-                <aside class="flex min-h-[250px] max-h-[340px] flex-col border-b border-slate-200 bg-slate-50 xl:h-full xl:min-h-0 xl:max-h-full xl:border-b-0 xl:border-r">
-                    <div class="border-b border-slate-200 bg-white px-5 py-4">
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <h3 class="truncate font-black text-slate-900">
+                <aside class="flex min-h-[250px] max-h-[340px] flex-col border-b border-secondary bg-secondary xl:h-full xl:min-h-0 xl:max-h-full xl:border-b-0 xl:border-r">
+                    <div class="border-b border-secondary bg-background px-5 py-4">
+                        <SectionHeading
+                            :description="`${batches.length} lote(s) registrados`"
+                            spacing="sm"
+                        >
+                            <template #title>
+                                <h3 class="truncate font-black text-text">
                                     {{ productName }}
                                 </h3>
+                            </template>
 
-                                <p class="mt-1 text-sm text-slate-500">
-                                    {{ batches.length }} lote(s) registrados
-                                </p>
-                            </div>
-
-                            <span
-                                v-if="selectedBatch"
-                                class="shrink-0 rounded-full border px-3 py-1 text-xs font-black"
-                                :class="statusClass(selectedBatch.status)"
-                            >
-                                {{ statusLabel(selectedBatch.status) }}
-                            </span>
-                        </div>
+                            <template #aside>
+                                <span
+                                    v-if="selectedBatch"
+                                    class="shrink-0 rounded-full border px-3 py-1 text-xs font-black"
+                                    :class="statusClass(selectedBatch.status)"
+                                >
+                                    {{ statusLabel(selectedBatch.status) }}
+                                </span>
+                            </template>
+                        </SectionHeading>
                     </div>
 
                     <div class="min-h-0 flex-1 overflow-y-auto p-3">
@@ -202,19 +205,19 @@ function selectBatch(batch) {
                                 v-for="batch in batches"
                                 :key="batch.id"
                                 type="button"
-                                class="w-full rounded-2xl border bg-white px-4 py-3 text-left transition"
+                                class="w-full rounded-2xl border bg-background px-4 py-3 text-left transition"
                                 :class="isSelectedBatch(batch)
-                                    ? 'border-blue-500 bg-blue-50 shadow-sm'
-                                    : 'border-slate-200 hover:border-slate-300'"
+                                    ? 'border-primary bg-secondary shadow-sm'
+                                    : 'border-secondary hover:border-primary'"
                                 @click="selectBatch(batch)"
                             >
                                 <div class="flex items-start justify-between gap-2">
                                     <div class="min-w-0">
-                                        <p class="truncate text-sm font-black text-slate-900">
+                                        <p class="truncate text-sm font-black text-text">
                                             {{ batchLabel(batch) }}
                                         </p>
 
-                                        <p class="mt-1 text-xs text-slate-500">
+                                        <p class="mt-1 text-xs text-text opacity-70">
                                             {{ seasonLabel(batch) }}
                                         </p>
                                     </div>
@@ -227,41 +230,42 @@ function selectBatch(batch) {
                                     </span>
                                 </div>
 
-                                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                                    <span>Stock: <span class="font-semibold text-slate-700">{{ batch.quantity }} {{ unit }}</span></span>
-                                    <span>Proveedor: <span class="font-semibold text-slate-700">{{ batch.supplier || 'Sin proveedor' }}</span></span>
+                                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text opacity-70">
+                                    <span>Stock: <span class="font-semibold text-text">{{ batch.quantity }} {{ unit }}</span></span>
+                                    <span>Proveedor: <span class="font-semibold text-text">{{ batch.supplier || 'Sin proveedor' }}</span></span>
                                 </div>
                             </button>
                         </div>
 
                         <div
                             v-else
-                            class="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center"
+                            class="rounded-2xl border border-secondary bg-background px-4 py-10 text-center"
                         >
-                            <p class="text-sm font-semibold text-slate-600">
+                            <p class="text-sm font-semibold text-text opacity-80">
                                 Este producto no tiene lotes registrados.
                             </p>
                         </div>
                     </div>
                 </aside>
 
-                <section class="flex min-h-[520px] flex-col bg-white xl:h-full xl:min-h-0">
-                    <div class="border-b border-slate-200 px-5 py-4">
-                        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                            <div class="min-w-0">
-                                <h3 class="truncate font-black text-slate-900">
+                <section class="flex min-h-[520px] flex-col bg-background xl:h-full xl:min-h-0">
+                    <div class="border-b border-secondary px-5 py-4">
+                        <SectionHeading
+                            :description="'Ajusta la informacion del lote y su cantidad sin navegar entre tarjetas grandes.'"
+                            spacing="sm"
+                        >
+                            <template #title>
+                                <h3 class="truncate font-black text-text">
                                     {{ selectedBatchTitle }}
                                 </h3>
+                            </template>
 
-                                <p class="mt-1 text-sm text-slate-500">
-                                    Ajusta la informacion del lote y su cantidad sin navegar entre tarjetas grandes.
-                                </p>
-                            </div>
-
-                            <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                                Disponible: {{ availableQuantity }} {{ unit }}
-                            </span>
-                        </div>
+                            <template #aside>
+                                <span class="rounded-full border border-secondary bg-secondary px-3 py-1 text-xs font-semibold text-text opacity-80">
+                                    Disponible: {{ availableQuantity }} {{ unit }}
+                                </span>
+                            </template>
+                        </SectionHeading>
                     </div>
 
                     <div
@@ -269,7 +273,12 @@ function selectBatch(batch) {
                         class="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_280px]"
                     >
                         <div class="min-h-0 overflow-y-auto px-5 py-5">
-                            <div class="space-y-5">
+                            <FormPanel
+                                title="Informacion del lote"
+                                description="Edita los datos generales, fechas y notas del lote seleccionado."
+                                panel-class="bg-secondary shadow-none"
+                                body-class="space-y-5"
+                            >
                                 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                                     <InputField
                                         v-model="form.lot_number"
@@ -357,28 +366,24 @@ function selectBatch(batch) {
                                         @validate="validateField"
                                     />
                                 </div>
-                            </div>
+                            </FormPanel>
                         </div>
 
-                        <aside class="border-t border-slate-200 bg-slate-50 px-5 py-5 xl:border-l xl:border-t-0">
-                            <div class="space-y-4">
-                                <div>
-                                    <p class="text-sm font-black text-slate-900">
-                                        Ajuste de cantidad
-                                    </p>
+                        <aside class="border-t border-secondary bg-secondary px-5 py-5 xl:border-l xl:border-t-0">
+                            <FormPanel
+                                title="Ajuste de cantidad"
+                                description="Captura siempre la cantidad en positivo."
+                                panel-class="bg-background shadow-none"
+                                body-class="space-y-4"
+                            >
 
-                                    <p class="mt-1 text-xs text-slate-500">
-                                        Captura siempre la cantidad en positivo.
-                                    </p>
-                                </div>
-
-                                <div class="grid grid-cols-2 rounded-full bg-slate-200 p-1">
+                                <div class="grid grid-cols-2 rounded-full bg-background p-1">
                                     <button
                                         type="button"
                                         class="rounded-full px-4 py-2 text-sm font-black transition"
                                         :class="form.adjustment_type === 'ADD'
-                                            ? 'bg-white text-emerald-700 shadow-sm'
-                                            : 'text-slate-600'"
+                                            ? 'bg-accent text-background shadow-sm'
+                                            : 'text-text opacity-70'"
                                         :disabled="processing"
                                         @click="setAdjustmentType('ADD')"
                                     >
@@ -389,8 +394,8 @@ function selectBatch(batch) {
                                         type="button"
                                         class="rounded-full px-4 py-2 text-sm font-black transition"
                                         :class="form.adjustment_type === 'REMOVE'
-                                            ? 'bg-white text-red-600 shadow-sm'
-                                            : 'text-slate-600'"
+                                            ? 'bg-primary text-white shadow-sm'
+                                            : 'text-text opacity-70'"
                                         :disabled="processing"
                                         @click="setAdjustmentType('REMOVE')"
                                     >
@@ -410,18 +415,18 @@ function selectBatch(batch) {
                                 />
 
                                 <div class="grid grid-cols-2 gap-3">
-                                    <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                        <p class="text-xs font-semibold text-slate-500">
+                                    <div class="rounded-2xl border border-secondary bg-background px-4 py-3">
+                                        <p class="text-xs font-semibold text-text opacity-70">
                                             Actual
                                         </p>
 
-                                        <p class="mt-1 text-2xl font-black text-slate-900">
+                                        <p class="mt-1 text-2xl font-black text-text">
                                             {{ form.original_quantity }}
                                         </p>
                                     </div>
 
-                                    <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                        <p class="text-xs font-semibold text-slate-500">
+                                    <div class="rounded-2xl border border-secondary bg-background px-4 py-3">
+                                        <p class="text-xs font-semibold text-text opacity-70">
                                             Resultado
                                         </p>
 
@@ -431,12 +436,12 @@ function selectBatch(batch) {
                                     </div>
                                 </div>
 
-                                <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                    <p class="text-sm font-semibold text-slate-700">
+                                <div class="rounded-2xl border border-secondary bg-background px-4 py-3">
+                                    <p class="text-sm font-semibold text-text">
                                         {{ adjustmentText }}
                                     </p>
                                 </div>
-                            </div>
+                            </FormPanel>
                         </aside>
                     </div>
 
@@ -445,11 +450,11 @@ function selectBatch(batch) {
                         class="flex min-h-[340px] items-center justify-center px-6 py-10 text-center"
                     >
                         <div class="max-w-md">
-                            <p class="text-lg font-black text-slate-900">
+                            <p class="text-lg font-black text-text">
                                 Selecciona un lote para editarlo
                             </p>
 
-                            <p class="mt-2 text-sm text-slate-500">
+                            <p class="mt-2 text-sm text-text opacity-70">
                                 Desde la lista de la izquierda puedes ajustar fechas, estado, proveedor y cantidad.
                             </p>
                         </div>

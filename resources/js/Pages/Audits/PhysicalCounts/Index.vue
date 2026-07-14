@@ -137,7 +137,7 @@ async function handleTableAction({ action, row }) {
         const result = await confirmModalAction({
             mode: 'update',
             title: row.status === 'applied' ? 'Reactivar conteo' : 'Reabrir auditoria',
-            html: '<div class="text-left text-xs text-slate-500">Selecciona que productos se van a contar en esta nueva ronda.</div>',
+            html: '<div class="text-left text-xs text-[#0f0001cc] dark:text-[#fff0f1cc]">Selecciona que productos se van a contar en esta nueva ronda.</div>',
             icon: 'question',
             input: 'radio',
             inputValue: 'all',

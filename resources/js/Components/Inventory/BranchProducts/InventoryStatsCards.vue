@@ -54,10 +54,10 @@ const cards = computed(() => [
 
 function toneClass(tone) {
     return {
-        red: 'bg-red-50 border-red-200 text-red-700',
-        orange: 'bg-orange-50 border-orange-200 text-orange-700',
-        amber: 'bg-amber-50 border-amber-200 text-amber-700',
-        purple: 'bg-purple-50 border-purple-200 text-purple-700',
+        red: 'bg-secondary border-primary text-primary',
+        orange: 'bg-secondary border-accent text-accent',
+        amber: 'bg-secondary border-accent text-accent',
+        purple: 'bg-secondary border-text text-text',
     }[tone]
 }
 
@@ -70,7 +70,7 @@ function openCard(card) {
 
 <template>
     <div>
-        <p class="mb-3 text-sm font-black text-slate-700">
+        <p class="mb-3 text-sm font-black text-text">
             Alertas clave del inventario
         </p>
 

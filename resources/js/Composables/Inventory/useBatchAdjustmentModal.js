@@ -3,7 +3,6 @@ import { router } from "@inertiajs/vue3";
 import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 
 export function useBatchAdjustmentModal(products) {
-    const showBatchAdjustmentModal = ref(false);
     const selectedBatchId = ref(null);
     const processing = ref(false);
 
@@ -256,13 +255,9 @@ export function useBatchAdjustmentModal(products) {
 
     function adjustBatch(batch) {
         selectedBatchId.value = batch.id;
-        showBatchAdjustmentModal.value = true;
     }
 
-    function closeBatchAdjustmentModal() {
-        if (processing.value) return;
-
-        showBatchAdjustmentModal.value = false;
+    function clearSelectedBatch() {
         selectedBatchId.value = null;
     }
 
@@ -292,10 +287,7 @@ export function useBatchAdjustmentModal(products) {
                 ...getModalRequestOptions({
                     mode: "update",
                     entityName: "Lote",
-                    close: () => {
-                        showBatchAdjustmentModal.value = false;
-                        selectedBatchId.value = null;
-                    },
+                    close: clearSelectedBatch,
                     successTitle: "Lote actualizado",
                     errorTitle: "No se pudo actualizar",
                     errorMessage:
@@ -309,7 +301,6 @@ export function useBatchAdjustmentModal(products) {
     }
 
     return {
-        showBatchAdjustmentModal,
         liveSelectedBatch,
         selectedBatchId,
 
@@ -323,7 +314,7 @@ export function useBatchAdjustmentModal(products) {
         quantityResultColor,
 
         adjustBatch,
-        closeBatchAdjustmentModal,
+        clearSelectedBatch,
         setAdjustmentType,
         validateField,
         saveEditedBatch,

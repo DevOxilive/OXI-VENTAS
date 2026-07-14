@@ -3,6 +3,7 @@ import { router, useForm } from "@inertiajs/vue3";
 import { watch, computed, ref, onBeforeUnmount } from "vue";
 import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import InputField from "@/Components/Forms/InputField.vue";
+import SelectionCheckboxCard from "@/Components/Forms/SelectionCheckboxCard.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
 import ActionIconButton from "@/Components/Forms/ActionIconButton.vue";
 import { getProductModalConfig } from "@/config/ModalConfigs/productModalConfig";
@@ -310,6 +311,17 @@ function ensureCurrentBranchSelected() {
   }
 }
 
+function toggleBranchSelection(branchId) {
+  if (props.mode === "view" || isCurrentBranch(branchId)) return;
+
+  if (form.branch_ids.includes(branchId)) {
+    form.branch_ids = form.branch_ids.filter((id) => id !== branchId);
+    return;
+  }
+
+  form.branch_ids = [...form.branch_ids, branchId];
+}
+
 watch(
   () => [props.mode, props.branch?.id],
   ([mode]) => {
@@ -514,7 +526,7 @@ function submit() {
     @save="submit"
     @close="$emit('close')"
   >
-    <div class="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.35)] md:p-5 xl:p-6">
+    <div class="rounded-[28px] border border-secondary bg-background p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.18)] md:p-5 xl:p-6">
       <input
         ref="fileInput"
         type="file"
@@ -526,19 +538,19 @@ function submit() {
       <div class="grid grid-cols-1 gap-4 xl:grid-cols-[210px_340px_minmax(0,1fr)]">
         <section class="hidden xl:block">
           <div class="mb-3">
-            <h3 class="text-sm font-semibold text-slate-900">Imagen</h3>
-            <p class="mt-1 text-xs text-slate-500">Foto opcional del producto.</p>
+            <h3 class="text-sm font-semibold text-text">Imagen</h3>
+            <p class="mt-1 text-xs text-text opacity-70">Foto opcional del producto.</p>
           </div>
 
           <button
             type="button"
-            class="flex min-h-[286px] w-full items-center justify-center rounded-[24px] border border-dashed bg-slate-50/80 p-4 text-left transition"
+            class="flex min-h-[286px] w-full items-center justify-center rounded-[24px] border border-dashed bg-secondary p-4 text-left transition"
             :class="
               mode === 'view'
-                ? 'cursor-default border-slate-200'
+                ? 'cursor-default border-secondary'
                 : isDragActive
-                  ? 'border-slate-900 bg-slate-100'
-                  : 'border-slate-300 hover:border-slate-400'
+                  ? 'border-primary bg-background'
+                  : 'border-secondary hover:border-primary'
             "
             :disabled="mode === 'view'"
             @click="openFilePicker"
@@ -549,19 +561,19 @@ function submit() {
             <template v-if="imagePreview">
               <img
                 :src="imagePreview"
-                class="h-[248px] w-full rounded-[18px] bg-white object-contain"
+                class="h-[248px] w-full rounded-[18px] bg-background object-contain"
               />
             </template>
 
             <template v-else>
-              <div class="flex h-[248px] w-full flex-col items-center justify-center rounded-[18px] bg-white px-4 text-center">
-                <span class="material-symbols-outlined text-[42px] text-slate-300">
+              <div class="flex h-[248px] w-full flex-col items-center justify-center rounded-[18px] bg-background px-4 text-center">
+                <span class="material-symbols-outlined text-[42px] text-text opacity-30">
                   image
                 </span>
-                <p class="mt-3 text-sm font-semibold text-slate-700">
+                <p class="mt-3 text-sm font-semibold text-text">
                   {{ mode === "view" ? "Sin imagen" : "Seleccionar o arrastrar archivo" }}
                 </p>
-                <p v-if="mode !== 'view'" class="mt-1 text-xs text-slate-500">
+                <p v-if="mode !== 'view'" class="mt-1 text-xs text-text opacity-70">
                   JPG, PNG o WEBP
                 </p>
               </div>
@@ -571,19 +583,19 @@ function submit() {
 
         <section class="space-y-3 xl:hidden">
           <div>
-            <h3 class="text-sm font-semibold text-slate-900">Imagen</h3>
-            <p class="mt-1 text-xs text-slate-500">Foto opcional del producto.</p>
+            <h3 class="text-sm font-semibold text-text">Imagen</h3>
+            <p class="mt-1 text-xs text-text opacity-70">Foto opcional del producto.</p>
           </div>
 
           <button
             type="button"
-            class="flex min-h-[180px] w-full items-center justify-center rounded-[22px] border border-dashed bg-slate-50/80 p-4 text-left transition"
+            class="flex min-h-[180px] w-full items-center justify-center rounded-[22px] border border-dashed bg-secondary p-4 text-left transition"
             :class="
               mode === 'view'
-                ? 'cursor-default border-slate-200'
+                ? 'cursor-default border-secondary'
                 : isDragActive
-                  ? 'border-slate-900 bg-slate-100'
-                  : 'border-slate-300 hover:border-slate-400'
+                  ? 'border-primary bg-background'
+                  : 'border-secondary hover:border-primary'
             "
             :disabled="mode === 'view'"
             @click="openFilePicker"
@@ -594,19 +606,19 @@ function submit() {
             <template v-if="imagePreview">
               <img
                 :src="imagePreview"
-                class="h-[148px] w-full rounded-[16px] bg-white object-contain"
+                class="h-[148px] w-full rounded-[16px] bg-background object-contain"
               />
             </template>
 
             <template v-else>
-              <div class="flex h-[148px] w-full flex-col items-center justify-center rounded-[16px] bg-white px-4 text-center">
-                <span class="material-symbols-outlined text-[36px] text-slate-300">
+              <div class="flex h-[148px] w-full flex-col items-center justify-center rounded-[16px] bg-background px-4 text-center">
+                <span class="material-symbols-outlined text-[36px] text-text opacity-30">
                   image
                 </span>
-                <p class="mt-2 text-sm font-semibold text-slate-700">
+                <p class="mt-2 text-sm font-semibold text-text">
                   {{ mode === "view" ? "Sin imagen" : "Seleccionar o arrastrar archivo" }}
                 </p>
-                <p v-if="mode !== 'view'" class="mt-1 text-xs text-slate-500">JPG, PNG o WEBP</p>
+                <p v-if="mode !== 'view'" class="mt-1 text-xs text-text opacity-70">JPG, PNG o WEBP</p>
               </div>
             </template>
           </button>
@@ -614,13 +626,13 @@ function submit() {
 
         <section class="space-y-3">
           <div>
-            <h3 class="text-sm font-semibold text-slate-900">Códigos de barras</h3>
-            <p class="text-xs text-slate-500">Principal y alternos del producto.</p>
+            <h3 class="text-sm font-semibold text-text">Códigos de barras</h3>
+            <p class="text-xs text-text opacity-70">Principal y alternos del producto.</p>
           </div>
 
-          <div class="rounded-[22px] border border-slate-200 bg-slate-50/60 p-3">
+          <div class="rounded-[22px] border border-secondary bg-secondary p-3">
             <div class="mb-3 flex items-center justify-between gap-3">
-              <p class="text-xs font-medium text-slate-500">
+              <p class="text-xs font-medium text-text opacity-70">
                 {{ form.barcodes.length > 1 ? `${form.barcodes.length} códigos capturados` : 'Captura el código principal' }}
               </p>
 
@@ -628,7 +640,7 @@ function submit() {
                 v-if="mode !== 'view'"
                 type="button"
                 @click="addBarcode"
-                class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                class="inline-flex items-center justify-center rounded-xl border border-secondary bg-background px-3 py-2 text-xs font-semibold text-text transition hover:border-primary hover:text-primary"
               >
                 Agregar código
               </button>
@@ -667,11 +679,11 @@ function submit() {
         <section class="space-y-4">
           <div class="flex items-start justify-between gap-3">
             <div class="flex items-center gap-2">
-              <h3 class="text-sm font-semibold text-slate-900">Datos básicos</h3>
+              <h3 class="text-sm font-semibold text-text">Datos básicos</h3>
             </div>
 
             <div class="pt-0.5 text-right">
-              <p class="text-xs text-slate-500">Identificación, categoría, unidad y precios.</p>
+              <p class="text-xs text-text opacity-70">Identificación, categoría, unidad y precios.</p>
             </div>
           </div>
 
@@ -688,7 +700,7 @@ function submit() {
             <template v-if="categoryInputMode === 'select'">
               <div>
                 <div class="mb-1 flex items-center justify-between gap-2">
-                  <label for="category_id" class="block text-sm font-semibold text-slate-700">
+                  <label for="category_id" class="block text-sm font-semibold text-text">
                     Categoría
                   </label>
 
@@ -696,7 +708,7 @@ function submit() {
                     v-if="mode !== 'view'"
                     type="button"
                     @click="toggleCategoryInputMode"
-                    class="rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                    class="rounded-lg border border-secondary bg-background px-2.5 py-1 text-[11px] font-semibold text-text transition hover:border-primary hover:text-primary"
                   >
                     + Nueva categoría
                   </button>
@@ -718,7 +730,7 @@ function submit() {
             <template v-else>
               <div>
                 <div class="mb-1 flex items-center justify-between gap-2">
-                  <label for="category_name" class="block text-sm font-semibold text-slate-700">
+                  <label for="category_name" class="block text-sm font-semibold text-text">
                     Categoría
                   </label>
 
@@ -726,7 +738,7 @@ function submit() {
                     v-if="mode !== 'view'"
                     type="button"
                     @click="toggleCategoryInputMode"
-                    class="rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                    class="rounded-lg border border-secondary bg-background px-2.5 py-1 text-[11px] font-semibold text-text transition hover:border-primary hover:text-primary"
                   >
                     Usar existente
                   </button>
@@ -803,18 +815,18 @@ function submit() {
         </section>
 
         <section class="space-y-3 xl:col-span-3">
-          <div class="flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
+          <div class="flex items-center justify-between gap-3 border-t border-secondary pt-4">
             <div>
-              <h3 class="text-sm font-semibold text-slate-900">
+              <h3 class="text-sm font-semibold text-text">
                 Sucursales donde se agregará
               </h3>
-              <p class="text-xs text-slate-500">Selecciona dónde estará disponible este producto.</p>
+              <p class="text-xs text-text opacity-70">Selecciona dónde estará disponible este producto.</p>
             </div>
 
             <button
               v-if="mode !== 'view'"
               type="button"
-              class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+              class="inline-flex items-center justify-center rounded-xl border border-secondary bg-background px-4 py-2 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
               @click="
                 form.branch_ids.length === branchesDB.length
                   ? (form.branch_ids = [props.branch?.id].filter(Boolean))
@@ -829,52 +841,31 @@ function submit() {
             </button>
           </div>
 
-          <div class="overflow-y-auto rounded-[20px] border border-slate-200 bg-slate-50/60 p-3 xl:max-h-[176px]">
+          <div class="overflow-y-auto rounded-[20px] border border-secondary bg-secondary p-3 xl:max-h-[176px]">
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              <label
+              <SelectionCheckboxCard
                 v-for="branchItem in branchesDB"
                 :key="branchItem.id"
-                class="flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition"
-                :class="
+                compact
+                variant="solid"
+                :checked="form.branch_ids.includes(branchItem.id)"
+                :disabled="mode === 'view' || isCurrentBranch(branchItem.id)"
+                :highlighted="isCurrentBranch(branchItem.id)"
+                :title="branchItem.name"
+                :description="
                   isCurrentBranch(branchItem.id)
-                    ? 'cursor-not-allowed border-blue-200 bg-blue-50'
+                    ? 'Sucursal actual'
                     : form.branch_ids.includes(branchItem.id)
-                      ? 'cursor-pointer border-slate-900 bg-slate-900 text-white'
-                      : 'cursor-pointer border-slate-200 bg-white hover:border-slate-300'
+                      ? 'Disponible para este producto'
+                      : 'Haz clic para agregar'
                 "
-              >
-                <input
-                  type="checkbox"
-                  :value="branchItem.id"
-                  v-model="form.branch_ids"
-                  :disabled="mode === 'view' || isCurrentBranch(branchItem.id)"
-                  class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400 disabled:opacity-70"
-                />
-
-                <span
-                  class="min-w-0 flex-1 truncate text-sm font-medium"
-                  :class="
-                    isCurrentBranch(branchItem.id)
-                      ? 'text-blue-900'
-                      : form.branch_ids.includes(branchItem.id)
-                        ? 'text-white'
-                        : 'text-slate-800'
-                  "
-                >
-                  {{ branchItem.name }}
-                </span>
-
-                <span
-                  v-if="isCurrentBranch(branchItem.id)"
-                  class="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-blue-700"
-                >
-                  Fija
-                </span>
-              </label>
+                :badge="isCurrentBranch(branchItem.id) ? 'Fija' : ''"
+                @toggle="toggleBranchSelection(branchItem.id)"
+              />
             </div>
           </div>
 
-          <p v-if="form.errors.branch_ids" class="text-xs text-red-500">
+          <p v-if="form.errors.branch_ids" class="text-xs text-primary">
             {{ form.errors.branch_ids }}
           </p>
         </section>

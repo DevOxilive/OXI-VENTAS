@@ -7,6 +7,8 @@ import PageLayout from "@/Layouts/PageLayout.vue"
 import { GlobalModal, confirmModalAction, getModalRequestOptions } from "@/Components/Modales"
 import { GlobalTable } from "@/Components/Tables"
 import { GlobalToolbar } from "@/Components/Toolbars"
+import FormPanel from "@/Components/Cards/FormPanel.vue"
+import ColorField from "@/Components/Forms/ColorField.vue"
 import InputField from "@/Components/Forms/InputField.vue"
 import { usePermissions } from "@/Composables/usePermissions"
 import { getBranchModalConfig } from "@/config/ModalConfigs/branchModalConfig"
@@ -284,38 +286,30 @@ onBeforeUnmount(() => {
       @save="submit"
       @close="closeCreateModal"
     >
-      <form class="space-y-5" @submit.prevent="submit">
-        <InputField
-          v-model="form.name"
-          label="Nombre de sucursal"
-          field="name"
-          :readonly="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
-          placeholder="Ej. Ajusco"
-          :error="form.errors.name"
-        />
+      <form @submit.prevent="submit">
+        <FormPanel
+          title="Datos de la sucursal"
+          description="Captura el nombre y el color que identificara visualmente a la sucursal."
+          :heading-border="true"
+          body-class="space-y-5"
+        >
+          <InputField
+            v-model="form.name"
+            label="Nombre de sucursal"
+            field="name"
+            :readonly="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
+            placeholder="Ej. Ajusco"
+            :error="form.errors.name"
+          />
 
-        <div>
-          <label class="mb-2 block text-sm font-semibold text-slate-600">
-            Color
-          </label>
-
-          <div class="flex items-center gap-3">
-            <input
-              v-model="form.color"
-              :disabled="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
-              type="color"
-              class="h-12 w-16 cursor-pointer rounded-lg border"
-            >
-
-            <span class="text-sm font-medium text-slate-500">
-              {{ form.color || "Sin color" }}
-            </span>
-          </div>
-
-          <p v-if="form.errors.color" class="mt-1 text-xs text-red-500">
-            {{ form.errors.color }}
-          </p>
-        </div>
+          <ColorField
+            v-model="form.color"
+            label="Color"
+            field="color"
+            :disabled="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
+            :error="form.errors.color"
+          />
+        </FormPanel>
       </form>
     </GlobalModal>
   </PageLayout>

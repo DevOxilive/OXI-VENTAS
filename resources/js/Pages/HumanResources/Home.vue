@@ -6,20 +6,20 @@ defineOptions({ layout: AdminLayout })
 
 <template>
     <div>
-        <h1 class="text-3xl font-bold text-slate-700 mb-6">
+        <h1 class="mb-6 text-3xl font-bold text-text">
             Dashboard General
         </h1>
 
         <div class="grid grid-cols-3 gap-6">
-            <div class="bg-white rounded-2xl p-6 shadow-sm">
+            <div class="rounded-2xl border border-secondary bg-background p-6 shadow-sm">
                 Empleados Registrados
             </div>
 
-            <div class="bg-white rounded-2xl p-6 shadow-sm">
+            <div class="rounded-2xl border border-secondary bg-background p-6 shadow-sm">
                 Usuarios Activos
             </div>
 
-            <div class="bg-white rounded-2xl p-6 shadow-sm">
+            <div class="rounded-2xl border border-secondary bg-background p-6 shadow-sm">
                 Roles del Sistema
             </div>
         </div>
