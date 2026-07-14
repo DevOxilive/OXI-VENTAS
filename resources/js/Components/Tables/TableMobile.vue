@@ -36,6 +36,45 @@ const mobileBodyColumns = computed(() =>
   )
 )
 
+const tableRows = computed(() =>
+  props.items.map((row, index) => {
+    const cellByKey = new Map()
+
+    props.columns.forEach((column) => {
+      const value = getCellValue(row, column)
+
+      cellByKey.set(column.key, {
+        key: column.key,
+        column,
+        value,
+        content: renderCellContentFromValue(value, column),
+      })
+    })
+
+    return {
+      row,
+      index,
+      key: row[props.rowKey] || index,
+      cellByKey,
+      headerValue: getNestedValue(row, props.mobileCardHeaderField),
+      secondaryCells: props.columns
+        .filter((column) => column.mobileSecondary)
+        .map((column) => cellByKey.get(column.key))
+        .filter(Boolean),
+      badgeCells: props.columns
+        .filter((column) => column.mobileBadge)
+        .map((column) => cellByKey.get(column.key))
+        .filter(Boolean),
+      bodyCells: mobileBodyColumns.value
+        .map((column) => cellByKey.get(column.key))
+        .filter(Boolean),
+      visibleActions: canViewActions.value
+        ? props.actions.filter((action) => isActionVisible(action, row, { can }))
+        : [],
+    }
+  })
+)
+
 function handleAction(action, row) {
   emit('action', { action: action.id, row })
 
@@ -48,8 +87,7 @@ function handleRowClick(row) {
   emit('row-click', row)
 }
 
-function renderCellContent(row, column) {
-  const value = getCellValue(row, column)
+function renderCellContentFromValue(value, column) {
   const formatted = formatCellValue(value, column)
 
   if (column.format === 'badge') {
@@ -106,75 +144,75 @@ function getActionButtonClasses(action) {
 
 <template>
   <div class="space-y-2 bg-secondary p-3 md:hidden">
-    <article v-for="(row, index) in items" :key="row[rowKey] || index"
-      class="rounded-2xl border border-secondary bg-background p-3 shadow-sm" @click="handleRowClick(row)">
+    <article v-for="tableRow in tableRows" :key="tableRow.key"
+      class="rounded-2xl border border-secondary bg-background p-3 shadow-sm" @click="handleRowClick(tableRow.row)">
       <div class="flex justify-between items-start gap-3">
         <div class="min-w-0">
           <p v-if="mobileCardHeaderField" class="truncate font-semibold text-text">
-            {{ getNestedValue(row, mobileCardHeaderField) }}
+            {{ tableRow.headerValue }}
           </p>
 
-          <template v-for="column in columns" :key="column.key">
-            <p v-if="column.mobileSecondary" class="mt-0.5 truncate text-xs text-text opacity-70">
-              {{ getCellValue(row, column) }}
+          <template v-for="cell in tableRow.secondaryCells" :key="cell.key">
+            <p class="mt-0.5 truncate text-xs text-text opacity-70">
+              {{ cell.value }}
             </p>
           </template>
         </div>
 
-        <template v-for="column in columns" :key="column.key">
-          <span v-if="column.mobileBadge" :class="[
+        <template v-for="cell in tableRow.badgeCells" :key="cell.key">
+          <span :class="[
             'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 whitespace-nowrap',
-            column.format === 'badge'
-              ? renderCellContent(row, column).classes
+            cell.column.format === 'badge'
+              ? cell.content.classes
               : 'bg-secondary text-text',
           ]">
             {{
-              column.format === 'badge'
-                ? renderCellContent(row, column).label
-                : getCellValue(row, column)
+              cell.column.format === 'badge'
+                ? cell.content.label
+                : cell.value
             }}
           </span>
         </template>
       </div>
 
-      <div v-if="mobileBodyColumns.length" class="mt-3 grid grid-cols-2 gap-3">
-        <template v-for="column in mobileBodyColumns" :key="column.key">
+      <div v-if="tableRow.bodyCells.length" class="mt-3 grid grid-cols-2 gap-3">
+        <template v-for="cell in tableRow.bodyCells" :key="cell.key">
           <div class="min-w-0">
             <p class="text-xs font-medium text-text opacity-50">
-              {{ column.mobileLabel || column.label }}
+              {{ cell.column.mobileLabel || cell.column.label }}
             </p>
 
-            <span v-if="column.format === 'badge'" :class="[
+            <span v-if="cell.column.format === 'badge'" :class="[
               'inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold mt-1',
-              renderCellContent(row, column).classes,
+              cell.content.classes,
             ]">
-              {{ renderCellContent(row, column).label }}
+              {{ cell.content.label }}
             </span>
 
-            <img v-else-if="column.format === 'image' && getCellValue(row, column)" :src="getCellValue(row, column)"
-              :alt="column.formatOptions?.alt || 'Imagen'" class="h-10 w-10 rounded object-cover mt-1" />
+            <img v-else-if="cell.column.format === 'image' && cell.value" :src="cell.value"
+              :alt="cell.column.formatOptions?.alt || 'Imagen'" class="h-10 w-10 rounded object-cover mt-1" />
 
-            <div v-else-if="column.format === 'swatch'" class="mt-1 flex items-center gap-2">
+            <div v-else-if="cell.column.format === 'swatch'" class="mt-1 flex items-center gap-2">
               <span
                 class="h-4 w-4 shrink-0 rounded-full border border-secondary"
-                :style="{ backgroundColor: renderCellContent(row, column).color }"
+                :style="{ backgroundColor: cell.content.color }"
               />
 
               <p class="truncate font-medium text-text">
-                {{ renderCellContent(row, column).label }}
+                {{ cell.content.label }}
               </p>
             </div>
 
             <p v-else class="mt-0.5 truncate font-medium text-text">
-              {{ renderCellContent(row, column).content }}
+              {{ cell.content.content }}
             </p>
           </div>
         </template>
       </div>
 
       <div v-if="canViewActions" class="mt-3 flex justify-end gap-2 flex-wrap">
-        <button v-for="action in actions" v-show="isActionVisible(action, row, { can })" :key="action.id" type="button"
-          :title="action.label" :class="getActionButtonClasses(action)" @click.stop="handleAction(action, row)">
+        <button v-for="action in tableRow.visibleActions" :key="action.id" type="button"
+          :title="action.label" :class="getActionButtonClasses(action)" @click.stop="handleAction(action, tableRow.row)">
           <span v-if="action.icon" class="material-symbols-outlined text-[16px]">
             {{ action.icon }}
           </span>

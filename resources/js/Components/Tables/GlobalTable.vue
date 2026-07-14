@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import TableDesktop from './TableDesktop.vue'
 import TableMobile from './TableMobile.vue'
 
@@ -53,6 +53,10 @@ const emit = defineEmits([
   'update:selectedItems',
   'page-change',
 ])
+
+const isMobileViewport = ref(false)
+let mobileMediaQuery = null
+let handleViewportChange = null
 
 const hasPagination = computed(() => {
   if (!props.showPagination || !props.pagination || Array.isArray(props.pagination)) {
@@ -150,12 +154,31 @@ function normalizePaginationLabel(label) {
     .replace(/\s+/g, ' ')
     .trim()
 }
+
+onMounted(() => {
+  if (typeof window === 'undefined') return
+
+  mobileMediaQuery = window.matchMedia('(max-width: 767px)')
+  handleViewportChange = (event) => {
+    isMobileViewport.value = event.matches
+  }
+
+  isMobileViewport.value = mobileMediaQuery.matches
+  mobileMediaQuery.addEventListener('change', handleViewportChange)
+})
+
+onBeforeUnmount(() => {
+  if (!mobileMediaQuery || !handleViewportChange) return
+
+  mobileMediaQuery.removeEventListener('change', handleViewportChange)
+})
 </script>
 
 <template>
   <section class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
     <div class="max-h-[560px] overflow-y-auto">
       <TableDesktop
+        v-if="!isMobileViewport"
         :items="items"
         :columns="columns"
         :actions="actions"
@@ -173,6 +196,7 @@ function normalizePaginationLabel(label) {
       />
 
       <TableMobile
+        v-else
         :items="items"
         :columns="columns"
         :actions="actions"

@@ -9,6 +9,11 @@ import PwaInstallPrompt from './Components/PwaInstallPrompt.vue';
 
 const appName = 'Super-Kay';
 const themeStorageKey = 'color-theme';
+const themeMetaColors = {
+    dark: '#070304',
+    light: '#e0000f',
+};
+let appliedTheme = null;
 const pages = {
     './Pages/Dashboard.vue': () => import('./Pages/Dashboard.vue'),
     ...import.meta.glob('./Pages/**/*.vue'),
@@ -18,11 +23,22 @@ function applyTheme(theme) {
     if (typeof document === 'undefined') return;
 
     const isDark = theme === 'dark';
-    document.documentElement.classList.toggle('dark', isDark);
+    const resolvedTheme = isDark ? 'dark' : 'light';
+    const root = document.documentElement;
+    const nextMetaColor = themeMetaColors[resolvedTheme];
+
+    if (appliedTheme === resolvedTheme
+        && root.classList.contains('dark') === isDark
+        && document.querySelector('meta[name="theme-color"]')?.getAttribute('content') === nextMetaColor) {
+        return;
+    }
+
+    appliedTheme = resolvedTheme;
+    root.classList.toggle('dark', isDark);
 
     const themeColorMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeColorMeta) {
-        themeColorMeta.setAttribute('content', isDark ? '#070304' : '#e0000f');
+    if (themeColorMeta && themeColorMeta.getAttribute('content') !== nextMetaColor) {
+        themeColorMeta.setAttribute('content', nextMetaColor);
     }
 }
 

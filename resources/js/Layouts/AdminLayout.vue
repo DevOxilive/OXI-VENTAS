@@ -32,6 +32,10 @@ const sidebarOpen = ref(false)
 const desktopSidebarCollapsed = ref(false)
 const desktopSidebarStorageKey = 'desktopSidebarCollapsed'
 const colorThemeStorageKey = 'color-theme'
+const themeMetaColors = {
+    dark: '#070304',
+    light: '#e0000f',
+}
 const collapseEventName = 'sidebar:collapse-all'
 const isDesktopViewport = ref(false)
 const currentTheme = ref('light')
@@ -94,17 +98,36 @@ function logout() {
 function syncTheme(theme) {
     if (typeof window === 'undefined') return
 
-    currentTheme.value = theme === 'dark' ? 'dark' : 'light'
-    window.localStorage.setItem(colorThemeStorageKey, currentTheme.value)
-    document.documentElement.classList.toggle('dark', currentTheme.value === 'dark')
-
+    const nextTheme = theme === 'dark' ? 'dark' : 'light'
+    const root = document.documentElement
+    const shouldUseDarkMode = nextTheme === 'dark'
     const themeColorMeta = document.querySelector('meta[name="theme-color"]')
-    if (themeColorMeta) {
-        themeColorMeta.setAttribute('content', currentTheme.value === 'dark' ? '#070304' : '#e0000f')
+    const nextMetaColor = themeMetaColors[nextTheme]
+    const previousTheme = currentTheme.value
+    const alreadyStored = window.localStorage.getItem(colorThemeStorageKey) === nextTheme
+    const alreadyApplied = root.classList.contains('dark') === shouldUseDarkMode
+    const metaAlreadyApplied = themeColorMeta?.getAttribute('content') === nextMetaColor
+
+    currentTheme.value = nextTheme
+
+    if (alreadyStored && alreadyApplied && metaAlreadyApplied && previousTheme === nextTheme) {
+        return
+    }
+
+    if (!alreadyStored) {
+        window.localStorage.setItem(colorThemeStorageKey, nextTheme)
+    }
+
+    if (!alreadyApplied) {
+        root.classList.toggle('dark', shouldUseDarkMode)
+    }
+
+    if (themeColorMeta && !metaAlreadyApplied) {
+        themeColorMeta.setAttribute('content', nextMetaColor)
     }
 
     window.dispatchEvent(new CustomEvent('oxi-theme-change', {
-        detail: { theme: currentTheme.value },
+        detail: { theme: nextTheme },
     }))
 }
 
