@@ -18,7 +18,7 @@ export function getPhysicalCountReportsToolbarConfig({
         title: 'Reportes de auditoría',
         subtitle: branch?.name
             ? `Sucursal ${branch.name}`
-            : 'Consulta los resultados operativos de auditoría.',
+            : 'Todas las sucursales accesibles',
         backButton: true,
         backLabel: 'Centro de reportes',
         showSearch: false,
@@ -79,13 +79,10 @@ export function getPhysicalCountReportsToolbarConfig({
                 placeholder: 'Todos los resultados',
                 value: form.status,
                 options: [
-                    { label: 'Encontrados', value: 'found' },
-                    { label: 'No encontrados', value: 'not_found' },
-                    { label: 'Contados', value: 'counted' },
+                    { label: 'Macheado', value: 'matched' },
                     { label: 'Faltantes', value: 'missing' },
-                    { label: 'No faltantes', value: 'not_missing' },
                     { label: 'Sobrantes', value: 'surplus' },
-                    { label: 'Correctos', value: 'matched' },
+                    { label: 'No encontrado', value: 'not_found' },
                 ],
             },
             {
@@ -117,12 +114,6 @@ export function getPhysicalCountReportsToolbarConfig({
         ],
         actions: [
             {
-                id: 'filter',
-                label: 'Filtrar',
-                icon: 'filter_alt',
-                variant: 'blue',
-            },
-            {
                 id: 'clear',
                 label: 'Limpiar',
                 icon: 'restart_alt',
@@ -143,6 +134,8 @@ export function getPhysicalCountReportsToolbarConfig({
         ],
         tabs: [
             { key: 'summary', label: 'Resumen', icon: 'dashboard' },
+            { key: 'branches', label: 'Sucursales', icon: 'store' },
+            { key: 'audits', label: 'Auditorias', icon: 'assignment' },
             { key: 'detail', label: 'Detalle', icon: 'list_alt' },
             { key: 'users', label: 'Usuarios', icon: 'group' },
             { key: 'categories', label: 'Categorías', icon: 'category' },

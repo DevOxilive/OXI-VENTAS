@@ -41,62 +41,7 @@ class PhysicalCountSnapshotService
                 'captured_at' => $physicalCount->started_at ?? now(),
             ]);
 
-            $branchProducts = BranchProduct::with([
-                'product.category:id,name',
-                'product.subcategory:id,name,category_id',
-                'batches' => fn ($query) => $query->orderBy('expiration_date')->orderBy('id'),
-            ])
-                ->where('branch_id', $physicalCount->branch_id)
-                ->whereIn('status', [
-                    BranchProduct::STATUS_ACTIVE,
-                    BranchProduct::STATUS_SEASONAL,
-                ])
-                ->orderBy('id')
-                ->get();
-
-            $items = [];
-
-            foreach ($branchProducts as $branchProduct) {
-                $product = $branchProduct->product;
-                $systemStock = (float) $branchProduct->stock;
-                $batches = $branchProduct->batches;
-
-                if ($batches->isEmpty()) {
-                    $items[] = $this->makeSnapshotItemPayload(
-                        $snapshot->id,
-                        $branchProduct,
-                        null,
-                        $product?->name ?? 'Sin producto',
-                        $product?->category?->name,
-                        $product?->subcategory?->name,
-                        $product?->category_id,
-                        $product?->subcategory_id,
-                        $systemStock,
-                        $systemStock
-                    );
-
-                    continue;
-                }
-
-                foreach ($batches as $batch) {
-                    $items[] = $this->makeSnapshotItemPayload(
-                        $snapshot->id,
-                        $branchProduct,
-                        $batch,
-                        $product?->name ?? 'Sin producto',
-                        $product?->category?->name,
-                        $product?->subcategory?->name,
-                        $product?->category_id,
-                        $product?->subcategory_id,
-                        $systemStock,
-                        (float) $batch->quantity
-                    );
-                }
-            }
-
-            if ($items !== []) {
-                $snapshot->items()->createMany($items);
-            }
+            $this->createSnapshotItems($snapshot, $physicalCount);
 
             return $snapshot;
         });
@@ -104,6 +49,27 @@ class PhysicalCountSnapshotService
         $physicalCount->setRelation('snapshot', $snapshot->load('items'));
 
         return $physicalCount->snapshot;
+    }
+
+    public function refreshForAudit(PhysicalCount $physicalCount, string $scope = 'all'): PhysicalCountSnapshot
+    {
+        return DB::transaction(function () use ($physicalCount, $scope) {
+            $snapshot = PhysicalCountSnapshot::updateOrCreate(
+                ['physical_count_id' => $physicalCount->id],
+                [
+                    'branch_id' => $physicalCount->branch_id,
+                    'created_by' => Auth::id() ?? $physicalCount->created_by,
+                    'captured_at' => now(),
+                ]
+            );
+
+            $snapshot->items()->delete();
+            $this->createSnapshotItems($snapshot, $physicalCount, $scope);
+
+            $physicalCount->setRelation('snapshot', $snapshot->load('items'));
+
+            return $physicalCount->snapshot;
+        });
     }
 
     public function buildProductRows(Collection $audits): Collection
@@ -122,6 +88,7 @@ class PhysicalCountSnapshotService
                             'audit_name' => $audit->name ?? 'Sin auditoria',
                             'folio' => $audit->folio ?? 'Sin folio',
                             'audit_date' => optional($audit->started_at)->toDateString(),
+                            'branch_name' => $audit->branch?->name ?? 'Sin sucursal',
                             'branch_product_id' => (int) $branchProductId,
                             'product_id' => $first->product_id,
                             'category_id' => $first->category_id,
@@ -147,6 +114,70 @@ class PhysicalCountSnapshotService
                     ->values();
             })
             ->values();
+    }
+
+    private function createSnapshotItems(
+        PhysicalCountSnapshot $snapshot,
+        PhysicalCount $physicalCount,
+        string $scope = 'all'
+    ): void {
+        $branchProducts = BranchProduct::with([
+            'product.category:id,name',
+            'product.subcategory:id,name,category_id',
+            'batches' => fn ($query) => $query->orderBy('expiration_date')->orderBy('id'),
+        ])
+            ->where('branch_id', $physicalCount->branch_id)
+            ->whereIn('status', [
+                BranchProduct::STATUS_ACTIVE,
+                BranchProduct::STATUS_SEASONAL,
+            ])
+            ->when($scope === 'zero_stock', fn ($query) => $query->where('stock', '<=', 0))
+            ->orderBy('id')
+            ->get();
+
+        $items = [];
+
+        foreach ($branchProducts as $branchProduct) {
+            $product = $branchProduct->product;
+            $systemStock = (float) $branchProduct->stock;
+            $batches = $branchProduct->batches;
+
+            if ($batches->isEmpty()) {
+                $items[] = $this->makeSnapshotItemPayload(
+                    $snapshot->id,
+                    $branchProduct,
+                    null,
+                    $product?->name ?? 'Sin producto',
+                    $product?->category?->name,
+                    $product?->subcategory?->name,
+                    $product?->category_id,
+                    $product?->subcategory_id,
+                    $systemStock,
+                    $systemStock
+                );
+
+                continue;
+            }
+
+            foreach ($batches as $batch) {
+                $items[] = $this->makeSnapshotItemPayload(
+                    $snapshot->id,
+                    $branchProduct,
+                    $batch,
+                    $product?->name ?? 'Sin producto',
+                    $product?->category?->name,
+                    $product?->subcategory?->name,
+                    $product?->category_id,
+                    $product?->subcategory_id,
+                    $systemStock,
+                    (float) $batch->quantity
+                );
+            }
+        }
+
+        if ($items !== []) {
+            $snapshot->items()->createMany($items);
+        }
     }
 
     private function makeSnapshotItemPayload(

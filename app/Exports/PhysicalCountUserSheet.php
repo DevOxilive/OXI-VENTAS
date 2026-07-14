@@ -5,17 +5,20 @@ namespace App\Exports;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class PhysicalCountUserSheet implements FromArray, ShouldAutoSize, WithEvents, WithStyles, WithTitle
+class PhysicalCountUserSheet implements FromArray, ShouldAutoSize, WithColumnFormatting, WithEvents, WithStyles, WithTitle
 {
     protected Collection $entries;
+    protected Collection $reportRows;
 
     public function __construct(
         protected array $payload,
@@ -24,6 +27,7 @@ class PhysicalCountUserSheet implements FromArray, ShouldAutoSize, WithEvents, W
         $this->entries = collect($payload['entries'] ?? [])
             ->where('user_id', $user->id)
             ->values();
+        $this->reportRows = collect($payload['reportRows'] ?? [])->values();
     }
 
     public function array(): array
@@ -44,36 +48,32 @@ class PhysicalCountUserSheet implements FromArray, ShouldAutoSize, WithEvents, W
             'Conteo Fisico',
             'Caducado',
             'NO EXHIBIDO',
-            'Lotes',
-            'Ultima captura',
+            'Sucursal',
+            'Auditoria',
+            'Folio',
         ];
     }
 
     protected function rows(): array
     {
-        return $this->entries
-            ->groupBy('branch_product_id')
-            ->map(function (Collection $group) {
-                $first = $group->first();
-                $branchProduct = $first->branchProduct;
-                $product = $branchProduct?->product;
-                $batches = $group
-                    ->pluck('productBatch.lot_number')
-                    ->filter()
-                    ->unique()
-                    ->values();
+        $entriesByProduct = $this->entries->groupBy('branch_product_id');
+
+        return $this->reportRows
+            ->map(function (array $row) use ($entriesByProduct) {
+                $group = $entriesByProduct->get($row['branch_product_id'] ?? null, collect());
                 $counted = (float) $group->sum('counted_quantity');
 
                 return [
                     $counted > 0,
-                    $first->scanned_code ?: ($branchProduct?->barcode ?? '-'),
-                    $product?->name ?? 'Sin producto',
-                    (float) ($branchProduct?->stock ?? 0),
-                    $counted,
+                    $row['scanned_code'] ?? '-',
+                    $row['product_name'] ?? 'Sin producto',
+                    (float) ($row['system_stock'] ?? 0),
+                    $counted > 0 ? $counted : null,
                     (float) $group->sum('expired_quantity'),
                     false,
-                    $batches->isEmpty() ? 'Sin lote' : $batches->join(', '),
-                    optional($group->sortByDesc('created_at')->first()?->created_at)->format('d/m/Y H:i'),
+                    $row['branch_name'] ?? 'Sin sucursal',
+                    $row['audit_name'] ?? 'Sin auditoria',
+                    $row['folio'] ?? 'Sin folio',
                 ];
             })
             ->values()
@@ -90,6 +90,13 @@ class PhysicalCountUserSheet implements FromArray, ShouldAutoSize, WithEvents, W
         ];
     }
 
+    public function columnFormats(): array
+    {
+        return [
+            'B' => NumberFormat::FORMAT_TEXT,
+        ];
+    }
+
     public function registerEvents(): array
     {
         return [
@@ -97,13 +104,15 @@ class PhysicalCountUserSheet implements FromArray, ShouldAutoSize, WithEvents, W
                 $sheet = $event->sheet->getDelegate();
                 $highestRow = $sheet->getHighestRow();
 
-                $sheet->setAutoFilter("A1:I{$highestRow}");
+                $sheet->setAutoFilter("A1:J{$highestRow}");
                 $sheet->freezePane('A2');
-                $sheet->getStyle("A1:I{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-                $sheet->getStyle("A1:I1")->getAlignment()->setWrapText(true);
+                $sheet->getStyle("A1:J{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle("A1:J1")->getAlignment()->setWrapText(true);
+                $sheet->getStyle("D2:F{$highestRow}")->getNumberFormat()->setFormatCode('#,##0.00');
                 $sheet->getColumnDimension('C')->setWidth(45);
-                $sheet->getColumnDimension('H')->setWidth(28);
-                $sheet->getColumnDimension('I')->setWidth(18);
+                $sheet->getColumnDimension('H')->setWidth(24);
+                $sheet->getColumnDimension('I')->setWidth(30);
+                $sheet->getColumnDimension('J')->setWidth(18);
             },
         ];
     }

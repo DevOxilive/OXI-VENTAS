@@ -4,6 +4,7 @@ export const physicalCountReportDetailTableConfig = {
     columns: [
         { key: 'product_name', label: 'Producto' },
         { key: 'scanned_code', label: 'Código' },
+        { key: 'branch_name', label: 'Sucursal' },
         { key: 'audit_name', label: 'Auditoría' },
         { key: 'status_label', label: 'Resultado' },
         { key: 'system_stock', label: 'Stock sistema', format: 'number' },

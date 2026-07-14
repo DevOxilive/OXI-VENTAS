@@ -62,7 +62,7 @@ export const physicalCountTableConfig = {
             icon: "restart_alt",
             variant: "green",
             permission: "audits.physical-counts.update",
-            hidden: (item) => item.status !== "closed",
+            hidden: (item) => !["closed", "applied"].includes(item.status),
         },
         {
             id: "participants",

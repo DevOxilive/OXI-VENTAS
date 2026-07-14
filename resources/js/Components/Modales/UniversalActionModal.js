@@ -7,15 +7,20 @@ export function UniversalActionModal({
     title = "Confirmar acción",
     message = "¿Deseas continuar con esta acción sobre",
     itemName = "",
+    html = null,
     confirmText = "Confirmar",
     cancelText = "Cancelar",
     icon = "warning",
     confirmButtonColor = "#ef4444",
     cancelButtonColor = "#d1d5db",
+    customClass = {},
+    ...options
 } = {}) {
     return Swal.fire({
         title: title,
-        text: `${message} ${itemName}?`,
+        ...(html
+            ? { html }
+            : { text: itemName ? `${message} ${itemName}?` : message }),
         icon: icon,
         showCancelButton: true,
         confirmButtonText: confirmText,
@@ -24,10 +29,12 @@ export function UniversalActionModal({
         cancelButtonColor: cancelButtonColor,
         reverseButtons: true,
         focusCancel: true,
+        ...options,
         customClass: {
             popup: "rounded-2xl",
             confirmButton: "px-5 py-2 rounded-full",
             cancelButton: "px-5 py-2 rounded-full",
+            ...customClass,
         },
     });
 }

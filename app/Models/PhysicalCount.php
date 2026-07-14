@@ -13,13 +13,18 @@ class PhysicalCount extends Model
     'created_by',
     'name',
     'status',
+    'recapture_scope',
     'started_at',
     'closed_at',
+    'recapture_started_at',
+    'last_applied_at',
 ];
 
     protected $casts = [
         'started_at' => 'datetime',
         'closed_at' => 'datetime',
+        'recapture_started_at' => 'datetime',
+        'last_applied_at' => 'datetime',
     ];
 
     public function branch()
