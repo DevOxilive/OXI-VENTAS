@@ -114,6 +114,7 @@ export async function confirmModalAction({
     confirmText,
     cancelText = 'Cancelar',
     confirmButtonColor,
+    ...modalOptions
 } = {}) {
     const action = getModalActionName(mode)
     const actionText = actionErrorLabels[action] ?? 'continuar'
@@ -124,5 +125,6 @@ export async function confirmModalAction({
         confirmText: confirmText ?? `Sí, ${actionText}`,
         cancelText,
         confirmButtonColor: confirmButtonColor ?? (action === 'delete' ? '#ef4444' : '#1f2937'),
+        ...modalOptions,
     })
 }

@@ -91,7 +91,7 @@ onBeforeUnmount(() => {
             />
         </template>
 
-        <div class="space-y-6">
+        <div class="space-y-4">
             <div
                 v-if="physicalCount.status === 'closed'"
                 class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
@@ -106,9 +106,16 @@ onBeforeUnmount(() => {
                 Esta auditoria ya fue aplicada al inventario. Puedes seguir capturando conteos dentro de la misma auditoria.
             </div>
 
-            <div class="space-y-4">
+            <div
+                v-if="physicalCount.recapture_scope === 'zero_stock'"
+                class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700"
+            >
+                Este conteo fue reactivado solo para productos con stock en cero. La busqueda y captura se limitan a esos productos.
+            </div>
+
+            <div class="space-y-3">
                 <template v-if="canCapture">
-                    <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(260px,0.58fr)_minmax(360px,1.42fr)]">
+                    <div class="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(220px,320px)_minmax(520px,1fr)]">
                         <ProductScanForm :physical-count-id="physicalCount.id" />
 
                         <ProductFoundCard

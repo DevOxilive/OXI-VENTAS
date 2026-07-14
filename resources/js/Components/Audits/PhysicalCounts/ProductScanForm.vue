@@ -103,8 +103,8 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="relative h-full rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-        <h2 class="text-sm font-semibold text-gray-900">
+    <div class="relative h-fit rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm">
+        <h2 class="text-xs font-semibold text-gray-900">
             Buscar producto
         </h2>
 
@@ -112,33 +112,33 @@ onMounted(() => {
             Escanea un código o escribe el nombre del producto.
         </p>
 
-        <form class="mt-2 flex flex-col gap-2 sm:flex-row" @submit.prevent="scan">
+        <form class="mt-1.5 flex flex-col gap-1.5 sm:flex-row" @submit.prevent="scan">
             <div class="relative w-full">
                 <input
                     ref="searchInput"
                     v-model="form.code"
                     type="text"
                     placeholder="Escanea código o escribe el nombre del producto"
-                    class="h-8 w-full rounded-lg border-gray-300 text-xs"
+                    class="h-8 w-full rounded-md border-gray-300 px-2 text-xs"
                     autocomplete="off"
                 >
 
                 <div
                     v-if="results.length"
-                    class="absolute z-30 mt-2 max-h-64 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl"
+                    class="absolute z-30 mt-1.5 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl"
                 >
                     <button
                         v-for="product in results"
                         :key="product.branch_product_id"
                         type="button"
-                        class="block w-full border-b px-4 py-3 text-left hover:bg-slate-50 last:border-b-0"
+                        class="block w-full border-b px-3 py-2 text-left hover:bg-slate-50 last:border-b-0"
                         @click="selectProduct(product)"
                     >
-                        <p class="text-sm font-semibold text-slate-900">
+                        <p class="text-xs font-semibold text-slate-900">
                             {{ product.name }}
                         </p>
 
-                        <p class="mt-1 text-xs text-slate-500">
+                        <p class="mt-0.5 text-[11px] text-slate-500">
                             Código: {{ product.barcode ?? 'Sin código' }}
                         </p>
                     </button>
@@ -147,18 +147,18 @@ onMounted(() => {
 
             <button
                 type="submit"
-                class="h-8 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                class="h-8 rounded-md bg-slate-900 px-3 text-xs font-semibold text-white disabled:opacity-50"
                 :disabled="form.processing"
             >
                 Buscar
             </button>
         </form>
 
-        <p v-if="loading" class="mt-2 text-sm text-gray-500">
+        <p v-if="loading" class="mt-1.5 text-xs text-gray-500">
             Buscando productos...
         </p>
 
-        <p v-if="form.errors.code" class="mt-2 text-sm text-red-600">
+        <p v-if="form.errors.code" class="mt-1.5 text-xs text-red-600">
             {{ form.errors.code }}
         </p>
     </div>
