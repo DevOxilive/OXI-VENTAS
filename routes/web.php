@@ -7,6 +7,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\QzTrayController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TicketTemplateController;
 use App\Http\Controllers\Audits\PhysicalCountController;
 use App\Http\Controllers\Audits\PhysicalCountReportController;
@@ -60,9 +61,7 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/dashboard', function () {
-        return Inertia::render('Dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
     Route::get('/qz/certificate', [QzTrayController::class, 'certificate'])
         ->name('qz.certificate');

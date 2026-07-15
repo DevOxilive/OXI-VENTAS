@@ -2,10 +2,16 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { router, useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
+import PageLayout from "@/Layouts/PageLayout.vue";
+import { GlobalToolbar } from "@/Components/Toolbars";
 import InputField from "@/Components/Forms/InputField.vue";
-import SelectField from "@/Components/Forms/SelectField.vue";
+import EmptyStateCard from "@/Components/Cards/EmptyStateCard.vue";
+import InfoCard from "@/Components/Cards/InfoCard.vue";
+import MetricCard from "@/Components/Cards/MetricCard.vue";
+import SaleCartItemCard from "@/Components/Ventas/SaleCartItemCard.vue";
+import SaleBranchSelectorCard from "@/Components/Ventas/SaleBranchSelectorCard.vue";
+import { getSalesToolbarConfig } from "@/config/ToolbarConfigs/salesToolbarConfig";
 import {
-  printHtmlTicket,
   connectQzTray,
   getDefaultQzPrinter,
   getQzPrinters,
@@ -255,6 +261,33 @@ const canCharge = computed(() => {
 
 const currentBranchLabel = computed(
   () => props.currentBranch?.name || "Sin sucursal"
+);
+
+const selectedPaymentMethodLabel = computed(() => {
+  return (
+    props.paymentMethodsDB.find(
+      (paymentMethod) =>
+        String(paymentMethod.id) === String(saleForm.payment_method_id)
+    )?.name || "Sin seleccionar"
+  );
+});
+
+const toolbarConfig = computed(() =>
+  getSalesToolbarConfig({
+    selectorMode: props.selectorMode,
+    branchName: currentBranchLabel.value,
+    selectorDescription: selectorDescription.value,
+    branches: props.branchesDB,
+    selectedBranchId: selectedBranchId.value,
+    paymentMethods: props.paymentMethodsDB,
+    selectedPaymentMethodId: saleForm.payment_method_id,
+    cashBoxOptions,
+    selectedCashBoxNumber: selectedCashBoxNumber.value,
+    printerOptions: printerOptions.value,
+    selectedPrinterName: selectedPrinterName.value,
+    printerBridgeReady: printerBridgeReady.value,
+    expirationAlertCount: expirationAlertCount.value,
+  })
 );
 
 const selectorDescription = computed(() => {
@@ -725,6 +758,33 @@ function handlePaymentMethodChange(value) {
   saleForm.payment_method_id = value ? Number(value) : "";
 }
 
+function handleToolbarFilterUpdate({ key, value }) {
+  if (key === "branch_id") {
+    handleBranchChange(value);
+    return;
+  }
+
+  if (key === "payment_method_id") {
+    handlePaymentMethodChange(value);
+    return;
+  }
+
+  if (key === "cash_box") {
+    handleCashBoxChange(value);
+    return;
+  }
+
+  if (key === "ticket_printer") {
+    handlePrinterChange(value);
+  }
+}
+
+function handleToolbarAction(actionId) {
+  if (actionId === "toggle-expiration-alerts") {
+    toggleExpirationAlerts();
+  }
+}
+
 function toggleDiscount(item) {
   item.discount_enabled = !item.discount_enabled;
 
@@ -803,14 +863,14 @@ function expirationTone(alert) {
   const days = Number(alert.days_to_expire ?? 999);
 
   if (days <= 3) {
-    return "border-rose-200 bg-rose-50 text-rose-700";
+    return "border-primary bg-secondary text-primary";
   }
 
   if (days <= 7) {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-accent bg-secondary text-accent";
   }
 
-  return "border-sky-200 bg-sky-50 text-sky-700";
+  return "border-secondary bg-background text-text";
 }
 
 function expirationBadgeLabel(alert) {
@@ -919,80 +979,48 @@ function submitSale() {
 </script>
 
 <template>
-  <div class="h-full bg-slate-50">
+  <PageLayout>
+    <template #toolbar>
+      <GlobalToolbar
+        v-bind="toolbarConfig"
+        @update:filter="handleToolbarFilterUpdate"
+        @action="handleToolbarAction"
+      />
+    </template>
     <template v-if="selectorMode">
-      <div class="border-b border-slate-200 bg-white px-5 py-5 md:px-8">
-        <div class="min-w-0">
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            Punto de venta
-          </p>
-          <h1 class="mt-1 text-2xl font-black text-slate-900">
-            Ventas
-          </h1>
-          <p class="mt-1 text-sm text-slate-500">
-            {{ selectorDescription }}
-          </p>
-        </div>
-      </div>
-
-      <div class="px-4 py-5 md:px-6 lg:px-8">
-        <div
-          v-if="branchesDB.length"
-          class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
-        >
-          <button
+      <div
+        v-if="branchesDB.length"
+        class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
+      >
+          <SaleBranchSelectorCard
             v-for="branch in branchesDB"
             :key="branch.id"
-            type="button"
-            class="flex min-h-[220px] flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-[1px] hover:border-slate-300 hover:shadow-md"
-            @click="switchBranch(branch.id)"
-          >
-            <div class="flex items-start justify-between gap-4">
-              <div
-                class="flex h-14 w-14 items-center justify-center rounded-2xl"
-                :style="{ backgroundColor: `${branch.color || '#2563eb'}14`, color: branch.color || '#2563eb' }"
-              >
-                <span class="material-symbols-outlined text-3xl">
-                  storefront
-                </span>
-              </div>
-
-              <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">
-                Abrir venta
-              </span>
-            </div>
-
-            <div class="mt-8">
-              <h2 class="text-xl font-bold text-slate-900">
-                {{ branch.name }}
-              </h2>
-              <p class="mt-2 text-sm text-slate-500">
-                Entra al punto de venta de esta sucursal y registra la operacion con su stock real.
-              </p>
-            </div>
-          </button>
-        </div>
-
-        <div
-          v-else
-          class="flex min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center text-sm text-slate-500"
-        >
-          No hay sucursales activas configuradas para abrir ventas.
-        </div>
+            :branch="branch"
+            @select="switchBranch"
+          />
       </div>
+
+      <EmptyStateCard
+        v-else
+        title="No hay sucursales activas"
+        description="No hay sucursales activas configuradas para abrir ventas."
+        icon="storefront"
+        min-height-class="min-h-[260px]"
+        tone="white"
+      />
     </template>
 
     <template v-else>
-      <div class="border-b border-slate-200 bg-white px-5 py-4 md:px-8">
+      <div v-if="false" class="border-b border-secondary bg-background px-5 py-4 md:px-8">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-text opacity-50">
               Punto de venta
             </p>
-            <h1 class="mt-1 text-2xl font-black text-slate-900">
+            <h1 class="mt-1 text-2xl font-black text-text">
               Ventas
             </h1>
-            <p class="mt-1 text-sm text-slate-500">
+            <p class="mt-1 text-sm text-text opacity-70">
               {{ currentBranchLabel }} · Escanea, agrega productos y cobra una venta real.
             </p>
           </div>
@@ -1004,9 +1032,9 @@ function submitSale() {
                 class="relative flex h-12 w-12 items-center justify-center rounded-2xl border transition"
                 :class="[
                   expirationAlertCount
-                    ? 'border-amber-200 bg-amber-50 text-amber-700 shadow-sm hover:bg-amber-100'
-                    : 'border-slate-200 bg-slate-50 text-slate-400 hover:bg-slate-100',
-                  expirationAlertPulse ? 'scale-105 ring-4 ring-amber-100' : '',
+                    ? 'border-accent bg-secondary text-accent shadow-sm hover:brightness-95'
+                    : 'border-secondary bg-secondary text-text opacity-70 hover:bg-background',
+                  expirationAlertPulse ? 'scale-105 ring-4 ring-secondary' : '',
                 ]"
                 @click="toggleExpirationAlerts"
               >
@@ -1015,7 +1043,7 @@ function submitSale() {
                 </span>
                 <span
                   v-if="expirationAlertCount"
-                  class="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[11px] font-black text-white shadow"
+                  class="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-black text-white shadow"
                 >
                   {{ expirationAlertCount }}
                 </span>
@@ -1023,18 +1051,18 @@ function submitSale() {
 
               <div
                 v-if="expirationAlertPanelOpen"
-                class="absolute right-0 top-[calc(100%+0.75rem)] z-30 w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+                class="absolute right-0 top-[calc(100%+0.75rem)] z-30 w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-secondary bg-background shadow-2xl"
               >
-                <div class="border-b border-slate-200 bg-slate-950 px-4 py-4 text-white">
+                <div class="border-b border-secondary bg-primary px-4 py-4 text-white">
                   <div class="flex items-start justify-between gap-3">
                     <div>
-                      <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-200">
+                      <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-white/80">
                         Alertas de caducidad
                       </p>
                       <h3 class="mt-1 text-lg font-black">
                         {{ expirationAlertCount ? `${expirationAlertCount} lote(s) por atender` : "Sin alertas" }}
                       </h3>
-                      <p v-if="urgentExpirationAlertCount" class="mt-1 text-xs text-rose-100">
+                      <p v-if="urgentExpirationAlertCount" class="mt-1 text-xs text-white/80">
                         {{ urgentExpirationAlertCount }} urgente(s) en 7 dias o menos.
                       </p>
                     </div>
@@ -1049,45 +1077,45 @@ function submitSale() {
                   </div>
                 </div>
 
-                <div v-if="expirationAlertCount" class="max-h-[360px] space-y-2 overflow-y-auto bg-slate-50 p-3">
+                <div v-if="expirationAlertCount" class="max-h-[360px] space-y-2 overflow-y-auto bg-secondary p-3">
                   <article
                     v-for="alert in topExpirationAlerts"
                     :key="expirationAlertKey(alert)"
-                    class="rounded-2xl border bg-white p-3 shadow-sm"
+                    class="rounded-2xl border bg-background p-3 shadow-sm"
                     :class="expirationTone(alert)"
                   >
                     <div class="flex items-start justify-between gap-3">
                       <div class="min-w-0">
-                        <p class="truncate text-sm font-black text-slate-950">
+                        <p class="truncate text-sm font-black text-text">
                           {{ alert.product_name }}
                         </p>
-                        <p class="mt-1 text-xs font-semibold text-slate-600">
+                        <p class="mt-1 text-xs font-semibold text-text opacity-70">
                           Lote {{ alert.lot_number || "sin lote" }} · {{ Number(alert.quantity || 0).toFixed(0) }} pza(s)
                         </p>
                       </div>
 
-                      <span class="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-black shadow-sm">
+                      <span class="shrink-0 rounded-full bg-background px-2.5 py-1 text-[11px] font-black shadow-sm">
                         {{ expirationBadgeLabel(alert) }}
                       </span>
                     </div>
 
-                    <div class="mt-3 rounded-xl bg-white/70 px-3 py-2 text-xs font-semibold text-slate-700">
+                    <div class="mt-3 rounded-xl bg-secondary px-3 py-2 text-xs font-semibold text-text">
                       <p>{{ alert.message || "Producto proximo a vencer" }}</p>
-                      <p v-if="alert.formatted_expiration_date || alert.expiration_date" class="mt-1 text-slate-500">
+                      <p v-if="alert.formatted_expiration_date || alert.expiration_date" class="mt-1 text-text opacity-70">
                         Caduca: {{ alert.formatted_expiration_date || alert.expiration_date }}
                       </p>
                     </div>
                   </article>
                 </div>
 
-                <div v-else class="bg-slate-50 px-5 py-8 text-center">
-                  <span class="material-symbols-outlined text-4xl text-emerald-500">
+                <div v-else class="bg-secondary px-5 py-8 text-center">
+                  <span class="material-symbols-outlined text-4xl text-accent">
                     task_alt
                   </span>
-                  <p class="mt-2 text-sm font-bold text-slate-900">
+                  <p class="mt-2 text-sm font-bold text-text">
                     Todo tranquilo
                   </p>
-                  <p class="mt-1 text-xs text-slate-500">
+                  <p class="mt-1 text-xs text-text opacity-70">
                     No hay lotes por caducar en esta sucursal.
                   </p>
                 </div>
@@ -1137,8 +1165,82 @@ function submitSale() {
         </div>
       </div>
 
-      <div class="grid h-[calc(100vh-10.5rem)] gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1.2fr)_480px] lg:px-6">
-        <section class="min-h-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="relative">
+        <div
+          v-if="expirationAlertPanelOpen"
+          class="absolute right-0 top-0 z-30 w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-secondary bg-background shadow-2xl"
+        >
+          <div class="border-b border-secondary bg-primary px-4 py-4 text-white">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-white/80">
+                  Alertas de caducidad
+                </p>
+                <h3 class="mt-1 text-lg font-black">
+                  {{ expirationAlertCount ? `${expirationAlertCount} lote(s) por atender` : "Sin alertas" }}
+                </h3>
+                <p v-if="urgentExpirationAlertCount" class="mt-1 text-xs text-white/80">
+                  {{ urgentExpirationAlertCount }} urgente(s) en 7 dias o menos.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
+                @click="closeExpirationAlerts"
+              >
+                <span class="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="expirationAlertCount" class="max-h-[360px] space-y-2 overflow-y-auto bg-secondary p-3">
+            <article
+              v-for="alert in topExpirationAlerts"
+              :key="expirationAlertKey(alert)"
+              class="rounded-2xl border bg-background p-3 shadow-sm"
+              :class="expirationTone(alert)"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-black text-text">
+                    {{ alert.product_name }}
+                  </p>
+                  <p class="mt-1 text-xs font-semibold text-text opacity-70">
+                    Lote {{ alert.lot_number || "sin lote" }} · {{ Number(alert.quantity || 0).toFixed(0) }} pza(s)
+                  </p>
+                </div>
+
+                <span class="shrink-0 rounded-full bg-background px-2.5 py-1 text-[11px] font-black shadow-sm">
+                  {{ expirationBadgeLabel(alert) }}
+                </span>
+              </div>
+
+              <div class="mt-3 rounded-xl bg-secondary px-3 py-2 text-xs font-semibold text-text">
+                <p>{{ alert.message || "Producto proximo a vencer" }}</p>
+                <p v-if="alert.formatted_expiration_date || alert.expiration_date" class="mt-1 text-text opacity-70">
+                  Caduca: {{ alert.formatted_expiration_date || alert.expiration_date }}
+                </p>
+              </div>
+            </article>
+          </div>
+
+          <div v-else class="bg-secondary px-5 py-8 text-center">
+            <span class="material-symbols-outlined text-4xl text-accent">
+              task_alt
+            </span>
+            <p class="mt-2 text-sm font-bold text-text">
+              Todo tranquilo
+            </p>
+            <p class="mt-1 text-xs text-text opacity-70">
+              No hay lotes por caducar en esta sucursal.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_480px]">
+        <section class="rounded-2xl border border-secondary bg-background p-4 shadow-sm">
           <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div class="min-w-0 flex-1">
               <div class="relative">
@@ -1154,14 +1256,14 @@ function submitSale() {
 
                 <div
                   v-if="searchSuggestions.length"
-                  class="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                  class="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 overflow-hidden rounded-2xl border border-secondary bg-background shadow-xl"
                 >
                   <button
                     v-for="(product, index) in searchSuggestions"
                     :key="`${product.branch_product_id}-${index}`"
                     type="button"
-                    class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-b-0"
-                    :class="index === highlightedSuggestionIndex ? 'bg-slate-900 text-white' : 'bg-white text-slate-900 hover:bg-slate-50'"
+                    class="flex w-full items-center justify-between gap-3 border-b border-secondary px-4 py-3 text-left last:border-b-0"
+                    :class="index === highlightedSuggestionIndex ? 'bg-primary text-white' : 'bg-background text-text hover:bg-secondary'"
                     @click="selectSuggestion(product)"
                   >
                     <div class="min-w-0">
@@ -1170,7 +1272,7 @@ function submitSale() {
                       </p>
                       <p
                         class="truncate text-xs"
-                        :class="index === highlightedSuggestionIndex ? 'text-slate-200' : 'text-slate-500'"
+                        :class="index === highlightedSuggestionIndex ? 'text-white opacity-80' : 'text-text opacity-70'"
                       >
                         {{ product.barcode || "Sin codigo" }}
                       </p>
@@ -1178,7 +1280,7 @@ function submitSale() {
 
                     <span
                       class="shrink-0 text-sm font-bold"
-                      :class="index === highlightedSuggestionIndex ? 'text-white' : 'text-slate-700'"
+                      :class="index === highlightedSuggestionIndex ? 'text-white' : 'text-text'"
                     >
                       {{ formatMoney(product.price) }}
                     </span>
@@ -1188,41 +1290,43 @@ function submitSale() {
             </div>
 
             <div class="grid grid-cols-2 gap-3 sm:min-w-[280px]">
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                <span class="block text-[11px] uppercase tracking-[0.16em] text-slate-400">Capturados</span>
-                <span class="font-semibold text-slate-900">{{ totalLines }}</span>
-                articulos
-              </div>
+              <MetricCard
+                label="Capturados"
+                :value="totalLines"
+                suffix="articulos"
+                size="sm"
+              />
 
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                <span class="block text-[11px] uppercase tracking-[0.16em] text-slate-400">Coincidencias</span>
-                <span class="font-semibold text-slate-900">{{ filteredProducts.length }}</span>
-                disponibles
-              </div>
+              <MetricCard
+                label="Coincidencias"
+                :value="filteredProducts.length"
+                suffix="disponibles"
+                size="sm"
+              />
             </div>
           </div>
 
-          <div class="mt-4 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+          <div class="mt-4 flex items-center justify-between rounded-2xl border border-secondary bg-secondary px-4 py-3 text-sm">
             <div>
-              <p class="font-semibold text-slate-900">
+              <p class="font-semibold text-text">
                 Productos en la venta actual
               </p>
-              <p class="text-xs text-slate-500">
+              <p class="text-xs text-text opacity-70">
                 Escanea un codigo o escribe el nombre. Al agregarlo, se captura aqui mismo.
               </p>
             </div>
 
             <button
               type="button"
-              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-100"
+              class="rounded-xl border border-secondary bg-background px-3 py-2 text-sm font-semibold text-text transition hover:border-primary hover:bg-secondary"
               @click="clearCart"
             >
               Limpiar
             </button>
           </div>
 
-          <div class="mt-4 min-h-0 overflow-hidden rounded-2xl border border-slate-200">
-            <div class="hidden grid-cols-[minmax(0,1.4fr)_120px_120px_140px_56px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 md:grid">
+          <div class="mt-4 min-h-0 overflow-hidden rounded-2xl border border-secondary">
+            <div class="hidden grid-cols-[minmax(0,1.4fr)_120px_120px_140px_56px] gap-3 border-b border-secondary bg-secondary px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-text opacity-70 md:grid">
               <span>Producto</span>
               <span>Precio</span>
               <span>Cantidad</span>
@@ -1230,184 +1334,40 @@ function submitSale() {
               <span></span>
             </div>
 
-            <div class="max-h-[calc(100vh-20.5rem)] space-y-3 overflow-y-auto bg-white p-3">
-              <article
+            <div class="max-h-[calc(100vh-20.5rem)] space-y-3 overflow-y-auto bg-background p-3">
+              <SaleCartItemCard
                 v-for="(item, index) in cart"
                 :key="`${item.branch_product_id}-${index}`"
-                class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <div class="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_120px_120px_140px_56px] md:items-start">
-                  <div class="min-w-0">
-                    <div class="flex gap-3">
-                      <div class="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                        <img
-                          v-if="item.image"
-                          :src="item.image"
-                          :alt="item.name"
-                          class="h-full w-full object-contain"
-                        />
-                        <div v-else class="flex h-full items-center justify-center">
-                          <span class="material-symbols-outlined text-2xl text-slate-300">
-                            inventory_2
-                          </span>
-                        </div>
-                      </div>
+                :item="item"
+                :format-money="formatMoney"
+                :cart-item-unit-price="cartItemUnitPrice"
+                :cart-item-subtotal="cartItemSubtotal"
+                :cart-item-discount-amount="cartItemDiscountAmount"
+                @increase="increaseQuantity(index)"
+                @decrease="decreaseQuantity(index)"
+                @remove="removeItem(index)"
+                @toggle-discount="toggleDiscount(item)"
+                @normalize-discount="normalizeDiscount(item)"
+              />
 
-                      <div class="min-w-0">
-                        <p class="truncate text-sm font-semibold text-slate-900">
-                          {{ item.name }}
-                        </p>
-                        <p class="mt-1 truncate text-xs text-slate-500">
-                          {{ item.barcode || "Sin codigo" }}
-                        </p>
-                        <p class="mt-2 text-xs text-slate-500">
-                          Stock disponible: {{ Number(item.stock).toFixed(0) }}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="rounded-xl bg-white px-3 py-3 md:bg-transparent md:px-0 md:py-0">
-                    <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400 md:hidden">
-                      Precio
-                    </p>
-                    <p class="mt-1 text-sm font-semibold text-slate-900 md:mt-0">
-                      {{ formatMoney(cartItemUnitPrice(item)) }}
-                    </p>
-                    <p
-                      v-if="item.discount_enabled && Number(item.discount_percentage || 0) > 0"
-                      class="mt-1 text-xs text-rose-700"
-                    >
-                      Rebaja {{ Number(item.discount_percentage || 0).toFixed(0) }}%
-                    </p>
-                  </div>
-
-                  <div class="rounded-xl bg-white px-3 py-3 md:bg-transparent md:px-0 md:py-0">
-                    <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400 md:hidden">
-                      Cantidad
-                    </p>
-                    <div class="mt-1 flex items-center rounded-xl border border-slate-200 bg-white md:mt-0">
-                      <button
-                        type="button"
-                        class="h-9 w-9 text-lg font-bold text-slate-600"
-                        @click="decreaseQuantity(index)"
-                      >
-                        -
-                      </button>
-                      <span class="min-w-10 px-2 text-center text-sm font-semibold text-slate-900">
-                        {{ item.quantity }}
-                      </span>
-                      <button
-                        type="button"
-                        class="h-9 w-9 text-lg font-bold text-slate-600"
-                        @click="increaseQuantity(index)"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  <div class="rounded-xl bg-white px-3 py-3 md:bg-transparent md:px-0 md:py-0">
-                    <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400 md:hidden">
-                      Importe
-                    </p>
-                    <p class="mt-1 text-base font-bold text-slate-900 md:mt-0">
-                      {{ formatMoney(cartItemSubtotal(item)) }}
-                    </p>
-                    <p
-                      v-if="item.discount_enabled && cartItemDiscountAmount(item) > 0"
-                      class="mt-1 text-xs text-rose-700"
-                    >
-                      -{{ formatMoney(cartItemDiscountAmount(item)) }}
-                    </p>
-                  </div>
-
-                  <div class="flex items-start justify-end">
-                    <button
-                      type="button"
-                      class="h-10 w-10 rounded-xl bg-white text-slate-500 transition hover:bg-slate-200"
-                      @click="removeItem(index)"
-                    >
-                      x
-                    </button>
-                  </div>
-                </div>
-
-                <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
-                  <div class="flex items-center justify-between gap-3">
-                    <div>
-                      <p class="text-sm font-semibold text-slate-900">
-                        Descuento
-                      </p>
-                      <p class="text-xs text-slate-500">
-                        Activalo solo si este producto lleva rebaja.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      class="flex h-6 w-11 items-center rounded-full p-1 transition"
-                      :class="item.discount_enabled ? 'bg-emerald-500' : 'bg-slate-300'"
-                      @click="toggleDiscount(item)"
-                    >
-                      <span
-                        class="h-4 w-4 rounded-full bg-white shadow transition"
-                        :class="item.discount_enabled ? 'translate-x-5' : 'translate-x-0'"
-                      />
-                    </button>
-                  </div>
-
-                  <div v-if="item.discount_enabled" class="mt-3 grid gap-3 lg:grid-cols-[180px_minmax(0,1fr)]">
-                    <InputField
-                      v-model="item.discount_percentage"
-                      label="Porcentaje"
-                      field="item_discount_percentage"
-                      type="number"
-                      placeholder="0"
-                      suffix="%"
-                      @validate="normalizeDiscount(item)"
-                    />
-
-                    <div class="grid grid-cols-2 gap-3 text-sm">
-                      <div class="rounded-xl bg-slate-50 px-3 py-2">
-                        <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">
-                          Precio original
-                        </p>
-                        <p class="mt-1 font-semibold text-slate-900">
-                          {{ formatMoney(item.original_price) }}
-                        </p>
-                      </div>
-
-                      <div class="rounded-xl bg-slate-50 px-3 py-2">
-                        <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">
-                          Descuento
-                        </p>
-                        <p class="mt-1 font-semibold text-rose-700">
-                          -{{ formatMoney(cartItemDiscountAmount(item)) }}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </article>
-
-              <div
+              <EmptyStateCard
                 v-if="cart.length === 0"
-                class="flex min-h-[340px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 text-center text-sm text-slate-500"
-              >
-                Todavia no hay productos capturados en la venta. Escanea o busca uno para empezar.
-              </div>
+                title="Todavia no hay productos capturados"
+                description="Escanea o busca uno para empezar."
+                icon="shopping_cart"
+                min-height-class="min-h-[340px]"
+              />
             </div>
           </div>
         </section>
 
-        <aside class="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <aside class="flex min-h-0 flex-col rounded-2xl border border-secondary bg-background p-5 shadow-sm">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-text opacity-50">
                 Resumen
               </p>
-              <h2 class="text-xl font-bold text-slate-900">
+              <h2 class="text-xl font-bold text-text">
                 Venta actual
               </h2>
             </div>
@@ -1415,23 +1375,9 @@ function submitSale() {
 
           <div class="mt-5 flex min-h-0 flex-1 flex-col">
             <div class="grid grid-cols-2 gap-3">
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">
-                  Articulos
-                </p>
-                <p class="mt-2 text-3xl font-black text-slate-900">
-                  {{ totalLines }}
-                </p>
-              </div>
+              <MetricCard label="Articulos" :value="totalLines" />
 
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">
-                  Piezas
-                </p>
-                <p class="mt-2 text-3xl font-black text-slate-900">
-                  {{ totalItems }}
-                </p>
-              </div>
+              <MetricCard label="Piezas" :value="totalItems" />
             </div>
 
             <div class="mt-4 flex flex-1 flex-col">
@@ -1447,77 +1393,56 @@ function submitSale() {
                 />
 
                 <div class="grid grid-cols-2 gap-3">
-                  <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">
-                      Cambio:
-                    </p>
-                    <p class="mt-2 text-xl font-bold text-emerald-700">
-                      {{ formatMoney(changeDue) }}
-                    </p>
-                  </div>
+                  <MetricCard
+                    label="Cambio"
+                    :value="formatMoney(changeDue)"
+                    tone="success"
+                    size="sm"
+                  />
 
-                  <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">
-                      Falta
-                    </p>
-                    <p class="mt-2 text-xl font-bold text-rose-700">
-                      {{ formatMoney(missingAmount) }}
-                    </p>
-                  </div>
+                  <MetricCard
+                    label="Falta"
+                    :value="formatMoney(missingAmount)"
+                    tone="danger"
+                    size="sm"
+                  />
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">
-                    Forma de pago
-                  </p>
-                  <p class="mt-2 text-base font-semibold text-slate-900">
-                    {{
-                      paymentMethodsDB.find(
-                        (paymentMethod) =>
-                          String(paymentMethod.id) === String(saleForm.payment_method_id)
-                      )?.name || "Sin seleccionar"
-                    }}
-                  </p>
-                </div>
+                <InfoCard
+                  label="Forma de pago"
+                  :value="selectedPaymentMethodLabel"
+                />
 
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <div class="flex items-center justify-between gap-3">
-                    <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">
-                      Impresora
-                    </p>
-
+                <InfoCard
+                  label="Impresora"
+                  :value="selectedPrinterName || 'Sin seleccionar'"
+                  :description="printerBridgeMessage"
+                >
+                  <template #action>
                     <button
                       v-if="!printerBridgeReady"
                       type="button"
-                      class="text-[11px] font-semibold text-slate-600 underline underline-offset-2"
+                      class="text-[11px] font-semibold text-text opacity-80 underline underline-offset-2"
                       @click="initializePrinterBridge({ silent: false })"
                     >
                       Reconectar
                     </button>
-                  </div>
-                  <p class="mt-2 text-base font-semibold text-slate-900">
-                    {{ selectedPrinterName || "Sin seleccionar" }}
-                  </p>
-                  <p class="mt-1 text-xs text-slate-500">
-                    {{ printerBridgeMessage }}
-                  </p>
-                </div>
+                  </template>
+                </InfoCard>
 
-                <div class="rounded-3xl bg-[#1f1d2b] px-5 py-6 text-white">
-                  <p class="text-[11px] uppercase tracking-[0.168em] text-slate-300">
-                    Total venta
-                  </p>
-                  <p class="mt-3 text-5xl font-black leading-none">
-                    {{ formatMoney(cartTotal) }}
-                  </p>
-                </div>
+                <MetricCard
+                  label="Total venta"
+                  :value="formatMoney(cartTotal)"
+                  tone="dark"
+                  size="lg"
+                />
               </div>
 
               <div class="mt-auto space-y-3 pt-6">
                 <button
                   v-if="lastPrintJob"
                   type="button"
-                  class="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-base font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                  class="inline-flex w-full items-center justify-center rounded-2xl border border-secondary bg-background px-4 py-3.5 text-base font-bold text-text transition hover:border-primary hover:bg-secondary"
                   @click="reprintLastTicket"
                 >
                   Reimprimir ticket
@@ -1525,7 +1450,7 @@ function submitSale() {
 
                 <button
                   type="button"
-                  class="inline-flex w-full items-center justify-center rounded-2xl bg-[#1f1d2b] px-4 py-4 text-base font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="inline-flex w-full items-center justify-center rounded-2xl border border-primary bg-primary px-4 py-4 text-base font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                   :disabled="saleForm.processing || !canCharge"
                   @click="submitSale"
                 >
@@ -1537,5 +1462,5 @@ function submitSale() {
         </aside>
       </div>
     </template>
-  </div>
+  </PageLayout>
 </template>

@@ -38,14 +38,14 @@ const stats = computed(() => ({
 
 function statusClass(status) {
     return {
-        Pendiente: 'bg-amber-100 text-amber-700',
-        Aprobado: 'bg-green-100 text-green-700',
-        Rechazado: 'bg-red-100 text-red-700'
-    }[status] || 'bg-slate-100 text-slate-700'
+        Pendiente: 'bg-secondary text-accent',
+        Aprobado: 'bg-secondary text-accent',
+        Rechazado: 'bg-secondary text-primary'
+    }[status] || 'bg-secondary text-text'
 }
 
 function differenceClass(value) {
-    return value < 0 ? 'text-red-700' : 'text-green-700'
+    return value < 0 ? 'text-primary' : 'text-accent'
 }
 </script>
 
@@ -53,43 +53,43 @@ function differenceClass(value) {
     <section class="space-y-5">
         <div class="flex items-center justify-between gap-3">
             <div>
-                <h1 class="text-xl font-bold text-slate-800">Ajustes de inventario</h1>
-                <p class="text-sm text-slate-500 mt-1">
+                <h1 class="text-xl font-bold text-text">Ajustes de inventario</h1>
+                <p class="mt-1 text-sm text-text opacity-70">
                     Correcciones auditadas entre stock del sistema y conteo físico.
                 </p>
             </div>
 
-            <button class="bg-[#1f1d2b] text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+            <button class="flex items-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-sm text-white">
                 <span class="material-symbols-outlined text-[18px]">tune</span>
                 Nuevo ajuste
             </button>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Ajustes totales</p>
-                <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ stats.total }}</h2>
+            <div class="rounded-2xl border border-secondary bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">Ajustes totales</p>
+                <h2 class="mt-1 text-2xl font-bold text-text">{{ stats.total }}</h2>
             </div>
-            <div class="bg-white border border-amber-100 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Pendientes</p>
-                <h2 class="text-2xl font-bold text-amber-700 mt-1">{{ stats.pending }}</h2>
+            <div class="rounded-2xl border border-accent bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">Pendientes</p>
+                <h2 class="mt-1 text-2xl font-bold text-accent">{{ stats.pending }}</h2>
             </div>
-            <div class="bg-white border border-green-100 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Aprobados</p>
-                <h2 class="text-2xl font-bold text-green-700 mt-1">{{ stats.approved }}</h2>
+            <div class="rounded-2xl border border-accent bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">Aprobados</p>
+                <h2 class="mt-1 text-2xl font-bold text-accent">{{ stats.approved }}</h2>
             </div>
-            <div class="bg-white border border-red-100 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Rechazados</p>
-                <h2 class="text-2xl font-bold text-red-700 mt-1">{{ stats.rejected }}</h2>
+            <div class="rounded-2xl border border-primary bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">Rechazados</p>
+                <h2 class="mt-1 text-2xl font-bold text-primary">{{ stats.rejected }}</h2>
             </div>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div class="p-4 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
+            <div class="grid grid-cols-1 gap-3 border-b border-secondary p-4 md:grid-cols-2">
                 <input v-model="search" type="text" placeholder="Buscar folio, producto o responsable..."
-                    class="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                    class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary" />
 
-                <select v-model="statusFilter" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <select v-model="statusFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
                     <option value="">Estado</option>
                     <option value="Pendiente">Pendiente</option>
                     <option value="Aprobado">Aprobado</option>
@@ -99,7 +99,7 @@ function differenceClass(value) {
 
             <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                    <thead class="border-b border-secondary bg-secondary text-text opacity-80">
                         <tr>
                             <th class="px-4 py-3 text-left font-semibold">Folio</th>
                             <th class="px-4 py-3 text-left font-semibold">Producto</th>
@@ -115,19 +115,19 @@ function differenceClass(value) {
 
                     <tbody>
                         <tr v-for="item in filteredAdjustments" :key="item.id"
-                            class="border-b border-slate-100 hover:bg-slate-50">
-                            <td class="px-4 py-4 font-bold text-slate-800">{{ item.folio }}</td>
+                            class="border-b border-secondary hover:bg-secondary">
+                            <td class="px-4 py-4 font-bold text-text">{{ item.folio }}</td>
                             <td class="px-4 py-4">
-                                <p class="font-semibold text-slate-800">{{ item.product }}</p>
-                                <p class="text-xs text-slate-400">{{ item.reason }}</p>
+                                <p class="font-semibold text-text">{{ item.product }}</p>
+                                <p class="text-xs text-text opacity-50">{{ item.reason }}</p>
                             </td>
-                            <td class="px-4 py-4 font-bold text-slate-700">{{ item.systemStock }}</td>
-                            <td class="px-4 py-4 font-bold text-slate-700">{{ item.physicalStock }}</td>
+                            <td class="px-4 py-4 font-bold text-text">{{ item.systemStock }}</td>
+                            <td class="px-4 py-4 font-bold text-text">{{ item.physicalStock }}</td>
                             <td class="px-4 py-4 font-bold" :class="differenceClass(item.difference)">
                                 {{ item.difference > 0 ? '+' : '' }}{{ item.difference }}
                             </td>
-                            <td class="px-4 py-4 text-slate-600">{{ item.branch }}</td>
-                            <td class="px-4 py-4 text-slate-600">{{ item.responsible }}</td>
+                            <td class="px-4 py-4 text-text opacity-80">{{ item.branch }}</td>
+                            <td class="px-4 py-4 text-text opacity-80">{{ item.responsible }}</td>
                             <td class="px-4 py-4">
                                 <span class="px-3 py-1 rounded-full text-xs font-bold"
                                     :class="statusClass(item.status)">
@@ -137,17 +137,17 @@ function differenceClass(value) {
                             <td class="px-4 py-4">
                                 <div class="flex justify-center gap-2">
                                     <button
-                                        class="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-xs font-semibold">Ver</button>
+                                        class="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-text">Ver</button>
                                     <button
-                                        class="bg-green-50 text-green-700 px-3 py-2 rounded-lg text-xs font-semibold">Aprobar</button>
+                                        class="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-accent">Aprobar</button>
                                     <button
-                                        class="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-xs font-semibold">Rechazar</button>
+                                        class="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-primary">Rechazar</button>
                                 </div>
                             </td>
                         </tr>
 
                         <tr v-if="!filteredAdjustments.length">
-                            <td colspan="9" class="px-4 py-10 text-center text-slate-500">
+                            <td colspan="9" class="px-4 py-10 text-center text-text opacity-70">
                                 No se encontraron ajustes registrados.
                             </td>
                         </tr>
@@ -156,11 +156,11 @@ function differenceClass(value) {
             </div>
 
             <div class="md:hidden p-4 space-y-4">
-                <div v-for="item in filteredAdjustments" :key="item.id" class="border border-slate-200 rounded-2xl p-4">
+                <div v-for="item in filteredAdjustments" :key="item.id" class="rounded-2xl border border-secondary bg-background p-4">
                     <div class="flex justify-between gap-3">
                         <div>
-                            <p class="font-bold text-slate-800">{{ item.folio }}</p>
-                            <p class="text-sm text-slate-700 mt-1">{{ item.product }}</p>
+                            <p class="font-bold text-text">{{ item.folio }}</p>
+                            <p class="mt-1 text-sm text-text">{{ item.product }}</p>
                         </div>
                         <span class="px-3 py-1 rounded-full text-xs font-bold h-fit" :class="statusClass(item.status)">
                             {{ item.status }}
@@ -169,37 +169,37 @@ function differenceClass(value) {
 
                     <div class="grid grid-cols-2 gap-3 text-sm mt-4">
                         <div>
-                            <p class="text-xs text-slate-400">Sistema</p>
-                            <p class="font-bold text-slate-800">{{ item.systemStock }}</p>
+                            <p class="text-xs text-text opacity-50">Sistema</p>
+                            <p class="font-bold text-text">{{ item.systemStock }}</p>
                         </div>
                         <div>
-                            <p class="text-xs text-slate-400">Físico</p>
-                            <p class="font-bold text-slate-800">{{ item.physicalStock }}</p>
+                            <p class="text-xs text-text opacity-50">Físico</p>
+                            <p class="font-bold text-text">{{ item.physicalStock }}</p>
                         </div>
                         <div>
-                            <p class="text-xs text-slate-400">Diferencia</p>
+                            <p class="text-xs text-text opacity-50">Diferencia</p>
                             <p class="font-bold" :class="differenceClass(item.difference)">
                                 {{ item.difference > 0 ? '+' : '' }}{{ item.difference }}
                             </p>
                         </div>
                         <div>
-                            <p class="text-xs text-slate-400">Sucursal</p>
-                            <p class="font-medium text-slate-700">{{ item.branch }}</p>
+                            <p class="text-xs text-text opacity-50">Sucursal</p>
+                            <p class="font-medium text-text">{{ item.branch }}</p>
                         </div>
                     </div>
 
-                    <div class="mt-4 pt-3 border-t border-slate-100">
-                        <p class="text-xs text-slate-400">Motivo</p>
-                        <p class="text-sm text-slate-700 mt-1">{{ item.reason }}</p>
+                    <div class="mt-4 border-t border-secondary pt-3">
+                        <p class="text-xs text-text opacity-50">Motivo</p>
+                        <p class="mt-1 text-sm text-text">{{ item.reason }}</p>
                     </div>
 
-                    <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100">
+                    <div class="mt-4 flex flex-wrap gap-2 border-t border-secondary pt-3">
                         <button
-                            class="flex-1 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-xs font-semibold">Ver</button>
+                            class="flex-1 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-text">Ver</button>
                         <button
-                            class="flex-1 bg-green-50 text-green-700 px-3 py-2 rounded-lg text-xs font-semibold">Aprobar</button>
+                            class="flex-1 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-accent">Aprobar</button>
                         <button
-                            class="flex-1 bg-red-50 text-red-700 px-3 py-2 rounded-lg text-xs font-semibold">Rechazar</button>
+                            class="flex-1 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-primary">Rechazar</button>
                     </div>
                 </div>
             </div>

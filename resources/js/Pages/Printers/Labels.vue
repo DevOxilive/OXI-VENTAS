@@ -4,7 +4,9 @@ import { useForm } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
+import GlobalToolbar from "@/Components/Toolbars/GlobalToolbar.vue";
 import { ToastAlert, WarningAlert } from "@/Components/Modales/UniversalActionModal";
+import { getPrinterLabelsToolbarConfig } from "@/config/ToolbarConfigs/printerLabelsToolbarConfig";
 import {
   buildLabelPngBase64,
   buildLabelPreviewBlocks,
@@ -93,6 +95,12 @@ const selectedProduct = computed(() => ({
   name: editableProductName.value.trim() || baseSelectedProduct.value?.name || "",
 }));
 const previewBlocks = computed(() => buildLabelPreviewBlocks(previewTemplate.value, selectedProduct.value));
+const toolbarConfig = computed(() =>
+  getPrinterLabelsToolbarConfig({
+    processing: form.processing,
+    printing: printing.value,
+  })
+);
 const configurableBlocks = computed(() => (
   form.settings.blocks
     .map((block, originalIndex) => ({ ...block, originalIndex }))
@@ -209,6 +217,22 @@ function saveTemplate() {
         form.transform((data) => data);
       },
     });
+}
+
+function handleToolbarAction(actionId) {
+  if (actionId === "reset") {
+    resetTemplate();
+    return;
+  }
+
+  if (actionId === "print" && !printing.value) {
+    printTestLabel();
+    return;
+  }
+
+  if (actionId === "save" && !form.processing) {
+    saveTemplate();
+  }
 }
 
 function startDrag(index) {
@@ -411,71 +435,37 @@ async function printTestLabel() {
 </script>
 
 <template>
-  <PageLayout :padded="false">
-    <div class="px-4 py-4 2xl:px-6">
-      <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Impresoras
-            </p>
-            <h1 class="mt-1 text-xl font-black text-slate-900">
-              Etiquetas
-            </h1>
-            <p class="mt-1 text-[13px] text-slate-500">
-              Edita etiquetas de producto con codigo de barras, categoria, nombre, precio y variables.
-            </p>
-          </div>
+  <PageLayout>
+    <template #toolbar>
+      <GlobalToolbar
+        v-bind="toolbarConfig"
+        @action="handleToolbarAction"
+      />
+    </template>
 
-          <div class="flex flex-wrap gap-3">
-            <label class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-              <span class="text-xs font-bold uppercase text-slate-500">Cantidad</span>
-              <input
-                v-model.number="printCopies"
-                type="number"
-                min="1"
-                max="100"
-                class="w-16 rounded-xl border border-slate-200 px-2 py-1 text-center text-sm font-bold text-slate-900 outline-none focus:border-slate-400"
-              >
-            </label>
+    <div class="flex justify-end">
+      <label class="flex items-center gap-2 rounded-2xl border border-secondary bg-background px-3 py-2">
+          <span class="text-xs font-bold uppercase text-text opacity-70">Cantidad</span>
+          <input
+            v-model.number="printCopies"
+            type="number"
+            min="1"
+            max="100"
+            class="w-16 rounded-xl border border-secondary bg-background px-2 py-1 text-center text-sm font-bold text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+          >
+      </label>
+    </div>
 
-            <button
-              type="button"
-              class="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-              @click="resetTemplate"
-            >
-              Restablecer
-            </button>
-
-            <button
-              type="button"
-              class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="printing"
-              @click="printTestLabel"
-            >
-              {{ printing ? "Imprimiendo..." : "Probar impresion" }}
-            </button>
-
-            <button
-              type="button"
-              class="rounded-2xl bg-[#1f1d2b] px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="form.processing"
-              @click="saveTemplate"
-            >
-              {{ form.processing ? "Guardando..." : "Guardar" }}
-            </button>
-          </div>
-        </div>
-
-        <div class="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.72fr)]">
+    <section class="rounded-2xl border border-secondary bg-background p-4 shadow-sm">
+      <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.72fr)]">
           <div
             class="min-w-0 space-y-4 overflow-y-auto pr-1"
             style="max-height: calc(100vh - 2rem);"
           >
-            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div class="rounded-lg border border-secondary bg-secondary p-3">
               <div class="mb-3">
-                <h3 class="text-sm font-bold text-slate-900">Producto para imprimir</h3>
-                <p class="mt-1 text-xs text-slate-500">
+                <h3 class="text-sm font-bold text-text">Producto para imprimir</h3>
+                <p class="mt-1 text-xs text-text opacity-70">
                   La etiqueta usa el nombre, precio y codigo del producto seleccionado.
                 </p>
               </div>
@@ -483,13 +473,13 @@ async function printTestLabel() {
               <input
                 v-model="productSearch"
                 type="search"
-                class="mb-2 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                class="mb-2 w-full rounded-lg border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                 placeholder="Buscar producto por nombre"
               >
 
               <select
                 v-model="selectedProductId"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                class="w-full rounded-lg border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
               >
                 <option value="" disabled>
                   Selecciona un producto
@@ -503,7 +493,7 @@ async function printTestLabel() {
                 </option>
               </select>
               <label class="mt-3 block">
-  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">
     Nombre que saldrá en la etiqueta
   </span>
 
@@ -511,53 +501,53 @@ async function printTestLabel() {
     v-model="editableProductName"
     type="text"
     maxlength="240"
-    class="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+    class="mt-2 w-full rounded-lg border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
     placeholder="Nombre personalizado para imprimir"
   >
 
-  <p class="mt-1 text-xs text-slate-500">
+  <p class="mt-1 text-xs text-text opacity-70">
     Se carga desde el producto seleccionado, pero puedes modificarlo antes de imprimir.
   </p>
 </label>
             </div>
 
             <div class="grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
-              <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Plantilla</span>
+              <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Plantilla</span>
                 <input
                   v-model="form.name"
                   type="text"
-                  class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                  class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                   placeholder="Etiqueta de producto"
                 >
               </label>
 
-              <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Activa</span>
+              <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Activa</span>
                 <div class="mt-2 flex justify-end">
                   <input
                     v-model="form.is_active"
                     type="checkbox"
-                    class="h-5 w-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400"
+                    class="h-5 w-5 rounded border-secondary text-primary focus:ring-primary"
                   >
                 </div>
               </label>
 
-              <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Marca</span>
+              <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Marca</span>
                 <input
                   v-model="form.settings.header_text"
                   type="text"
-                  class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                  class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                 >
               </label>
 
-              <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Pie</span>
+              <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Pie</span>
                 <input
                   v-model="form.settings.footer_text"
                   type="text"
-                  class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                  class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                 >
               </label>
             </div>
@@ -565,49 +555,49 @@ async function printTestLabel() {
          
 
             <div class="grid gap-3 lg:grid-cols-3">
-              <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Medida</span>
-                <div class="mt-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-black text-slate-900">
+              <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Medida</span>
+                <div class="mt-2 rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm font-black text-text">
             {{ previewTemplate.label_width_mm }} x {{ previewTemplate.label_height_mm }} mm
                 </div>
               </label>
 
-              <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Alto codigo</span>
+              <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Alto codigo</span>
                 <input
                   v-model.number="form.settings.barcode_height_mm"
                   type="number"
                   min="6"
                   max="28"
-                  class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                  class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                 >
               </label>
 
-              <label class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Ancho codigo</span>
+              <label class="rounded-2xl border border-secondary bg-secondary p-3">
+                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Ancho codigo</span>
                 <input
                   v-model.number="form.settings.barcode_width_percent"
                   type="number"
                   min="45"
                   max="100"
-                  class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                  class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
                 >
               </label>
             </div>
 
-            <label class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3">
-              <span class="text-sm font-bold text-slate-900">Borde de etiqueta</span>
+            <label class="flex items-center justify-between rounded-2xl border border-secondary bg-secondary p-3">
+              <span class="text-sm font-bold text-text">Borde de etiqueta</span>
               <input
                 v-model="form.settings.show_border"
                 type="checkbox"
-                class="h-5 w-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-400"
+                class="h-5 w-5 rounded border-secondary text-primary focus:ring-primary"
               >
             </label>
 
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div class="rounded-2xl border border-secondary bg-secondary p-3">
               <div class="mb-3 flex items-center justify-between">
-                <h3 class="text-sm font-bold text-slate-900">Bloques</h3>
-                <span class="text-xs text-slate-400">Arrastra para ordenar</span>
+                <h3 class="text-sm font-bold text-text">Bloques</h3>
+                <span class="text-xs text-text opacity-50">Arrastra para ordenar</span>
               </div>
 
               <div class="grid gap-3 lg:grid-cols-3">
@@ -615,7 +605,7 @@ async function printTestLabel() {
               v-for="block in configurableBlocks"
                   :key="block.key"
                   draggable="true"
-                  class="rounded-2xl border border-slate-200 bg-white p-3"
+                  class="rounded-2xl border border-secondary bg-background p-3"
                 
                   @dragstart="startDrag(block.originalIndex)"
                      @dragover.prevent
@@ -624,7 +614,7 @@ async function printTestLabel() {
             
                 >
                   <div class="space-y-3">
-                    <p class="text-sm font-bold text-slate-900">
+                    <p class="text-sm font-bold text-text">
                       {{ blockCatalog.find((item) => item.key === block.key)?.label || block.key }}
                     </p>
 
@@ -632,7 +622,7 @@ async function printTestLabel() {
                       <button
                         type="button"
                         class="flex h-9 w-9 items-center justify-center rounded-xl border transition"
-                        :class="block.enabled ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-slate-200 bg-slate-50 text-slate-400'"
+                        :class="block.enabled ? 'border-primary bg-secondary text-primary' : 'border-secondary bg-secondary text-text opacity-60'"
                  @click="updateBlock(block.originalIndex, 'enabled', !block.enabled)"
                       >
                         <span class="material-symbols-outlined text-[18px]">visibility</span>
@@ -644,7 +634,7 @@ async function printTestLabel() {
   min="50"
   max="2000"
   step="10"
-  class="w-24 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm text-slate-900 outline-none transition focus:border-slate-400"
+  class="w-24 rounded-2xl border border-secondary bg-secondary px-3 py-2 text-center text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
 @input="updateBlock(block.originalIndex, 'size_percent', clampNumber($event.target.value, 50, 2000))"
 >
                     </div>
@@ -656,24 +646,24 @@ async function printTestLabel() {
           </div>
 
           <aside class="sticky top-4 h-fit self-start">
-            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div class="border-b border-slate-200 pb-4">
+            <div class="rounded-2xl border border-secondary bg-background p-4 shadow-sm">
+              <div class="border-b border-secondary pb-4">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-text opacity-50">
                       Etiqueta en vivo
                     </p>
-                    <h2 class="mt-1 text-lg font-black text-slate-900 lg:text-xl">
+                    <h2 class="mt-1 text-lg font-black text-text lg:text-xl">
                       Vista previa
                     </h2>
-                    <p class="mt-1 text-xs text-slate-500 lg:text-sm">
+                    <p class="mt-1 text-xs text-text opacity-70 lg:text-sm">
                       {{ previewTemplate.label_width_mm }} x {{ previewTemplate.label_height_mm }} mm
                     </p>
                   </div>
 
                   <button
                     type="button"
-                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                    class="rounded-xl border border-secondary bg-background px-3 py-2 text-xs font-bold text-text transition hover:bg-secondary"
                     @click="initializePrinterBridge({ silent: false })"
                   >
                     Conectar
@@ -683,7 +673,7 @@ async function printTestLabel() {
                 <div class="mt-3 grid gap-2">
                   <select
                     :value="selectedPrinterName"
-                    class="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 disabled:bg-slate-100"
+                    class="w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary disabled:bg-secondary"
                     :disabled="!printerOptions.length"
                     @change="handlePrinterChange"
                   >
@@ -698,17 +688,17 @@ async function printTestLabel() {
                       {{ option.label }}
                     </option>
                   </select>
-                  <p class="text-xs text-slate-500">
+                  <p class="text-xs text-text opacity-70">
                     {{ printerBridgeMessage }}
                   </p>
                 </div>
               </div>
 
-        <div class="mt-4 overflow-auto rounded-2xl bg-slate-100 p-4">
+        <div class="mt-4 overflow-auto rounded-2xl bg-secondary p-4">
   <div
     ref="previewLabel"
-    class="mx-auto flex shrink-0 flex-col justify-center overflow-hidden bg-white px-1 py-[2px] text-slate-950 shadow-sm"
-    :class="previewTemplate.show_border ? 'border border-slate-950' : 'border border-slate-200'"
+    class="mx-auto flex shrink-0 flex-col justify-center overflow-hidden bg-background px-1 py-[2px] text-text shadow-sm"
+    :class="previewTemplate.show_border ? 'border border-text' : 'border border-secondary'"
     :style="previewStyle"
   >
     <article
@@ -718,8 +708,8 @@ async function printTestLabel() {
       draggable="true"
       class="relative cursor-move rounded border border-transparent px-0.5 transition"
       :class="[
-        activeHorizontalKey === previewBlock.key ? 'bg-slate-50 ring-1 ring-slate-200' : 'hover:border-slate-200 hover:bg-slate-50/70',
-        dragIndex === index ? 'border-slate-300 bg-slate-50/80 opacity-70' : '',
+        activeHorizontalKey === previewBlock.key ? 'bg-secondary ring-1 ring-primary' : 'hover:border-secondary hover:bg-secondary',
+        dragIndex === index ? 'border-primary bg-secondary opacity-70' : '',
       ]"
       @dragstart="startDrag(index)"
       @dragover.prevent
@@ -755,8 +745,7 @@ async function printTestLabel() {
                </div>
             </div>
           </aside>
-        </div>
-      </section>
-    </div>
+      </div>
+    </section>
   </PageLayout>
 </template>

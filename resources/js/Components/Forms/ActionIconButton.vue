@@ -23,56 +23,54 @@ defineProps({
 
 const buttonVariants = {
     blue: `
-        hover:bg-blue-50
-        hover:border-blue-200
-        hover:shadow-blue-100
+        hover:bg-secondary
+        hover:border-primary
+        hover:shadow-sm
     `,
 
     amber: `
-        hover:bg-amber-50
-        hover:border-amber-200
-        hover:shadow-amber-100
+        hover:bg-secondary
+        hover:border-accent
+        hover:shadow-sm
     `,
 
     red: `
-        hover:bg-red-50
-        hover:border-red-200
-        hover:shadow-red-100
+        hover:bg-secondary
+        hover:border-primary
+        hover:shadow-sm
     `,
 
     green: `
-        bg-emerald-50
-        border-emerald-200
-        text-emerald-600
+        bg-secondary
+        border-secondary
+        text-accent
         shadow-sm
-        shadow-emerald-100/50
 
-        hover:bg-emerald-100
-        hover:border-emerald-300
+        hover:bg-secondary
+        hover:border-accent
         hover:shadow-md
-        hover:shadow-emerald-200/60
         hover:-translate-y-[1px]
     `,
 
     slate: `
-        hover:bg-slate-50
-        hover:border-slate-300
+        hover:bg-secondary
+        hover:border-secondary
     `
 }
 
 const iconVariants = {
-    blue: 'group-hover:text-blue-600',
+    blue: 'group-hover:text-primary',
 
-    amber: 'group-hover:text-amber-600',
+    amber: 'group-hover:text-accent',
 
-    red: 'group-hover:text-red-600',
+    red: 'group-hover:text-primary',
 
     green: `
-        text-emerald-600
-        group-hover:text-emerald-700
+        text-accent
+        group-hover:text-accent
     `,
 
-    slate: 'group-hover:text-slate-700'
+    slate: 'group-hover:text-text'
 }
 </script>
 
@@ -86,14 +84,15 @@ const iconVariants = {
             justify-center
             rounded-xl
             border
-            bg-white
+            border-secondary
+            bg-background
             transition-all
             duration-200
         " :class="buttonVariants[variant] || buttonVariants.blue">
         <span class="
                 material-symbols-outlined
                 text-[20px]
-                text-slate-500
+                text-text opacity-70
                 transition-all
                 duration-200
             " :class="iconVariants[variant] || iconVariants.blue">

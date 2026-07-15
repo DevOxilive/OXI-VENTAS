@@ -120,11 +120,11 @@ function blockExtraInput(e) {
 
 <template>
     <div class="relative">
-        <label v-if="!hideLabel" :for="inputId" class="block text-sm font-semibold mb-1 text-slate-700">
+        <label v-if="!hideLabel" :for="inputId" class="mb-1 block text-sm font-semibold text-text">
             {{ label }}
         </label>
         <span v-if="hasLeftAddon"
-            class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">
+            class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-text opacity-60">
             <span v-if="prefix">
                 {{ prefix }}
             </span>
@@ -136,22 +136,22 @@ function blockExtraInput(e) {
         <input ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
             :readonly="readonly" @keydown="(e) => { blockExtraInput(e); emit('keydown', e) }"
             @wheel="preventNumberWheel" @input="handleInput" @blur="emit('validate', field)" :class="[
-                'w-full py-3 rounded-xl border outline-none transition text-sm',
+                'w-full rounded-xl border py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
                 hasLeftAddon ? 'pl-11 pr-4' : 'px-4',
                 hasRightAddon ? 'pr-12' : '',
-                readonly ? 'bg-slate-100 cursor-not-allowed' : 'bg-white',
-                error ? 'border-red-500 bg-red-50' : 'border-slate-300 focus:border-[#1f1d2b]'
+                readonly ? 'cursor-not-allowed border-secondary bg-secondary text-text opacity-60' : 'bg-background text-text',
+                error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'
             ]" />
         <span v-if="suffix"
-            class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold pointer-events-none">
+            class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-text opacity-60">
             {{ suffix }}
         </span>
         <div class="flex justify-between items-center mt-1">
-            <p v-if="error" class="text-red-500 text-xs">
+            <p v-if="error" class="text-xs text-primary">
                 {{ error }}
             </p>
 
-            <p v-if="normalizedFieldConfig?.max" class="text-[11px] text-slate-400 ml-auto">
+            <p v-if="normalizedFieldConfig?.max" class="ml-auto text-[11px] text-text opacity-50">
                 {{ (modelValue || '').toString().length }}/{{ normalizedFieldConfig.max }}
             </p>
         </div>

@@ -23,7 +23,7 @@ const gridClass = {
 
 <template>
     <main
-        class="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white p-4 touch-pan-y sm:p-5 md:p-6"
+        class="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-background p-4 touch-pan-y sm:p-5 md:p-6"
         :class="[
             scrollMode === 'controlled' ? 'overflow-hidden' : '',
             contentClass,

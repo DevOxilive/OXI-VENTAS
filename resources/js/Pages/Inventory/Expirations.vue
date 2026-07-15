@@ -42,11 +42,11 @@ const stats = computed(() => ({
 
 function statusClass(status) {
     return {
-        Estable: 'bg-green-100 text-green-700',
-        Próximo: 'bg-amber-100 text-amber-700',
-        Crítico: 'bg-orange-100 text-orange-700',
-        Vencido: 'bg-red-100 text-red-700'
-    }[status] || 'bg-slate-100 text-slate-700'
+        Estable: 'bg-secondary text-accent',
+        Próximo: 'bg-secondary text-accent',
+        Crítico: 'bg-secondary text-primary',
+        Vencido: 'bg-secondary text-primary'
+    }[status] || 'bg-secondary text-text'
 }
 
 function markForReview(item) {
@@ -62,43 +62,43 @@ function removeLot(item) {
     <section class="space-y-5">
         <div class="flex items-center justify-between gap-3">
             <div>
-                <h1 class="text-xl font-bold text-slate-800">Caducidades</h1>
-                <p class="text-sm text-slate-500 mt-1">
+                <h1 class="text-xl font-bold text-text">Caducidades</h1>
+                <p class="mt-1 text-sm text-text opacity-70">
                     Control visual de lotes próximos a vencer, vencidos y responsables por sucursal.
                 </p>
             </div>
 
-            <button class="bg-[#1f1d2b] text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+            <button class="flex items-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-sm text-white">
                 <span class="material-symbols-outlined text-[18px]">add_alert</span>
                 Nueva alerta
             </button>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Lotes monitoreados</p>
-                <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ stats.total }}</h2>
+            <div class="rounded-2xl border border-secondary bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">Lotes monitoreados</p>
+                <h2 class="mt-1 text-2xl font-bold text-text">{{ stats.total }}</h2>
             </div>
-            <div class="bg-white border border-orange-100 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Críticos</p>
-                <h2 class="text-2xl font-bold text-orange-700 mt-1">{{ stats.critical }}</h2>
+            <div class="rounded-2xl border border-primary bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">Críticos</p>
+                <h2 class="mt-1 text-2xl font-bold text-primary">{{ stats.critical }}</h2>
             </div>
-            <div class="bg-white border border-red-100 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Vencidos</p>
-                <h2 class="text-2xl font-bold text-red-700 mt-1">{{ stats.expired }}</h2>
+            <div class="rounded-2xl border border-primary bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">Vencidos</p>
+                <h2 class="mt-1 text-2xl font-bold text-primary">{{ stats.expired }}</h2>
             </div>
-            <div class="bg-white border border-green-100 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Estables</p>
-                <h2 class="text-2xl font-bold text-green-700 mt-1">{{ stats.stable }}</h2>
+            <div class="rounded-2xl border border-accent bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">Estables</p>
+                <h2 class="mt-1 text-2xl font-bold text-accent">{{ stats.stable }}</h2>
             </div>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div class="p-4 border-b border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
+            <div class="grid grid-cols-1 gap-3 border-b border-secondary p-4 md:grid-cols-3">
                 <input v-model="search" type="text" placeholder="Buscar producto o lote..."
-                    class="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                    class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary" />
 
-                <select v-model="urgencyFilter" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <select v-model="urgencyFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
                     <option value="">Urgencia</option>
                     <option value="Estable">Estable</option>
                     <option value="Próximo">Próximo</option>
@@ -106,7 +106,7 @@ function removeLot(item) {
                     <option value="Vencido">Vencido</option>
                 </select>
 
-                <select v-model="branchFilter" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <select v-model="branchFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
                     <option value="">Sucursal</option>
                     <option value="Sucursal Centro">Sucursal Centro</option>
                     <option value="Sucursal Norte">Sucursal Norte</option>
@@ -116,7 +116,7 @@ function removeLot(item) {
 
             <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                    <thead class="border-b border-secondary bg-secondary text-text opacity-80">
                         <tr>
                             <th class="px-4 py-3 text-left font-semibold">Producto</th>
                             <th class="px-4 py-3 text-left font-semibold">Lote</th>
@@ -131,26 +131,26 @@ function removeLot(item) {
 
                     <tbody>
                         <tr v-for="item in filteredExpirations" :key="item.id"
-                            class="border-b border-slate-100 hover:bg-slate-50">
-                            <td class="px-4 py-4 font-semibold text-slate-800">{{ item.product }}</td>
-                            <td class="px-4 py-4 text-slate-600">{{ item.lot }}</td>
-                            <td class="px-4 py-4 text-slate-600">{{ item.branch }}</td>
-                            <td class="px-4 py-4 font-bold text-slate-800">{{ item.stock }}</td>
-                            <td class="px-4 py-4 text-slate-600">{{ item.expirationDate }}</td>
+                            class="border-b border-secondary hover:bg-secondary">
+                            <td class="px-4 py-4 font-semibold text-text">{{ item.product }}</td>
+                            <td class="px-4 py-4 text-text opacity-80">{{ item.lot }}</td>
+                            <td class="px-4 py-4 text-text opacity-80">{{ item.branch }}</td>
+                            <td class="px-4 py-4 font-bold text-text">{{ item.stock }}</td>
+                            <td class="px-4 py-4 text-text opacity-80">{{ item.expirationDate }}</td>
                             <td class="px-4 py-4">
-                                <span class="font-bold" :class="item.daysLeft <= 0 ? 'text-red-700' : 'text-slate-800'">
+                                <span class="font-bold" :class="item.daysLeft <= 0 ? 'text-primary' : 'text-text'">
                                     {{ item.daysLeft }} días
                                 </span>
                             </td>
-                            <td class="px-4 py-4 text-slate-600">{{ item.responsible }}</td>
+                            <td class="px-4 py-4 text-text opacity-80">{{ item.responsible }}</td>
                             <td class="px-4 py-4">
                                 <div class="flex justify-center gap-2">
                                     <button @click="markForReview(item)"
-                                        class="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                                        class="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-text">
                                         Revisar
                                     </button>
                                     <button @click="removeLot(item)"
-                                        class="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                                        class="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-primary">
                                         Retirar
                                     </button>
                                 </div>
@@ -158,7 +158,7 @@ function removeLot(item) {
                         </tr>
 
                         <tr v-if="!filteredExpirations.length">
-                            <td colspan="8" class="px-4 py-10 text-center text-slate-500">
+                            <td colspan="8" class="px-4 py-10 text-center text-text opacity-70">
                                 No se encontraron lotes registrados.
                             </td>
                         </tr>
@@ -167,11 +167,11 @@ function removeLot(item) {
             </div>
 
             <div class="md:hidden p-4 space-y-4">
-                <div v-for="item in filteredExpirations" :key="item.id" class="border border-slate-200 rounded-2xl p-4">
+                <div v-for="item in filteredExpirations" :key="item.id" class="rounded-2xl border border-secondary bg-background p-4">
                     <div class="flex justify-between gap-3">
                         <div>
-                            <p class="font-bold text-slate-800">{{ item.product }}</p>
-                            <p class="text-xs text-slate-400 mt-1">{{ item.lot }} · {{ item.branch }}</p>
+                            <p class="font-bold text-text">{{ item.product }}</p>
+                            <p class="mt-1 text-xs text-text opacity-50">{{ item.lot }} · {{ item.branch }}</p>
                         </div>
                         <span class="px-3 py-1 rounded-full text-xs font-bold h-fit" :class="statusClass(item.status)">
                             {{ item.status }}
@@ -180,32 +180,32 @@ function removeLot(item) {
 
                     <div class="grid grid-cols-2 gap-3 text-sm mt-4">
                         <div>
-                            <p class="text-xs text-slate-400">Stock</p>
-                            <p class="font-bold text-slate-800">{{ item.stock }}</p>
+                            <p class="text-xs text-text opacity-50">Stock</p>
+                            <p class="font-bold text-text">{{ item.stock }}</p>
                         </div>
                         <div>
-                            <p class="text-xs text-slate-400">Días restantes</p>
-                            <p class="font-bold" :class="item.daysLeft <= 0 ? 'text-red-700' : 'text-slate-800'">
+                            <p class="text-xs text-text opacity-50">Días restantes</p>
+                            <p class="font-bold" :class="item.daysLeft <= 0 ? 'text-primary' : 'text-text'">
                                 {{ item.daysLeft }} días
                             </p>
                         </div>
                         <div>
-                            <p class="text-xs text-slate-400">Caducidad</p>
-                            <p class="font-medium text-slate-700">{{ item.expirationDate }}</p>
+                            <p class="text-xs text-text opacity-50">Caducidad</p>
+                            <p class="font-medium text-text">{{ item.expirationDate }}</p>
                         </div>
                         <div>
-                            <p class="text-xs text-slate-400">Responsable</p>
-                            <p class="font-medium text-slate-700">{{ item.responsible }}</p>
+                            <p class="text-xs text-text opacity-50">Responsable</p>
+                            <p class="font-medium text-text">{{ item.responsible }}</p>
                         </div>
                     </div>
 
-                    <div class="flex gap-2 mt-4 pt-3 border-t border-slate-100">
+                    <div class="mt-4 flex gap-2 border-t border-secondary pt-3">
                         <button @click="markForReview(item)"
-                            class="flex-1 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                            class="flex-1 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-text">
                             Revisar
                         </button>
                         <button @click="removeLot(item)"
-                            class="flex-1 bg-red-50 text-red-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                            class="flex-1 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-primary">
                             Retirar
                         </button>
                     </div>

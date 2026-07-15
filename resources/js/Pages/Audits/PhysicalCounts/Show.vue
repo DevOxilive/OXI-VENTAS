@@ -94,21 +94,21 @@ onBeforeUnmount(() => {
         <div class="space-y-4">
             <div
                 v-if="physicalCount.status === 'closed'"
-                class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                class="rounded-2xl border border-secondary bg-secondary px-4 py-3 text-sm text-text opacity-80"
             >
                 Esta auditoría ya fue finalizada. La captura está bloqueada.
             </div>
 
             <div
                 v-if="physicalCount.status === 'applied'"
-                class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+                class="rounded-xl border border-accent bg-secondary px-4 py-3 text-sm text-accent"
             >
                 Esta auditoria ya fue aplicada al inventario. Puedes seguir capturando conteos dentro de la misma auditoria.
             </div>
 
             <div
                 v-if="physicalCount.recapture_scope === 'zero_stock'"
-                class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700"
+                class="rounded-xl border border-accent bg-secondary px-4 py-3 text-sm text-accent"
             >
                 Este conteo fue reactivado solo para productos con stock en cero. La busqueda y captura se limitan a esos productos.
             </div>
@@ -133,7 +133,7 @@ onBeforeUnmount(() => {
 
                     <div
                         v-else
-                        class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-500"
+                        class="rounded-xl border border-dashed border-secondary bg-secondary p-6 text-sm text-text opacity-70"
                     >
                         Selecciona un producto para habilitar la captura de conteo.
                     </div>
@@ -141,7 +141,7 @@ onBeforeUnmount(() => {
 
                 <div
                     v-else
-                    class="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600"
+                    class="rounded-2xl border border-secondary bg-secondary p-6 text-sm text-text opacity-80"
                 >
                     Esta auditoría está cerrada. Solo puede consultarse desde reportes.
                 </div>

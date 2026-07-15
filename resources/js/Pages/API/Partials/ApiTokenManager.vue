@@ -6,6 +6,7 @@ import ActionSection from '@/Components/Cards/ActionSection.vue';
 import FormSection from '@/Components/Cards/FormSection.vue';
 import InputField from '@/Components/Forms/InputField.vue';
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue';
+import SelectionGridSection from '@/Components/Forms/SelectionGridSection.vue';
 import SectionBorder from '@/Components/Layout/SectionBorder.vue';
 import GlobalModal from '@/Components/Modales/GlobalModal.vue';
 import { SuccessAlert } from '@/Components/Modales/UniversalActionModal';
@@ -127,12 +128,14 @@ const toggleUpdatePermission = (permission) => {
                 </div>
 
                 <!-- Token Permissions -->
-                <div v-if="availablePermissions.length > 0" class="col-span-6">
-                    <label for="permissions" class="mb-1 block text-sm font-semibold text-slate-700">
-                        Permissions
-                    </label>
-
-                    <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SelectionGridSection
+                    v-if="availablePermissions.length > 0"
+                    title="Permissions"
+                    description="Select the actions this token will be allowed to perform."
+                    wrapper-class="col-span-6"
+                    grid-class="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2"
+                >
+                    <template #default>
                         <SelectionCheckboxCard
                             v-for="permission in availablePermissions"
                             :key="permission"
@@ -141,8 +144,8 @@ const toggleUpdatePermission = (permission) => {
                             :title="permission"
                             @toggle="toggleCreatePermission(permission)"
                         />
-                    </div>
-                </div>
+                    </template>
+                </SelectionGridSection>
             </template>
 
             <template #actions>
@@ -239,7 +242,12 @@ const toggleUpdatePermission = (permission) => {
             @close="managingPermissionsFor = null"
         >
             <template #content>
-                <div class="grid grid-cols-1 gap-4 px-5 py-5 md:grid-cols-2 md:px-6">
+                <SelectionGridSection
+                    title="Permissions"
+                    description="Adjust the abilities that will remain active for this token."
+                    wrapper-class="px-5 py-5 md:px-6"
+                    grid-class="grid grid-cols-1 gap-4 md:grid-cols-2"
+                >
                     <SelectionCheckboxCard
                         v-for="permission in availablePermissions"
                         :key="permission"
@@ -248,7 +256,7 @@ const toggleUpdatePermission = (permission) => {
                         :title="permission"
                         @toggle="toggleUpdatePermission(permission)"
                     />
-                </div>
+                </SelectionGridSection>
             </template>
 
             <template #footer="{ close }">

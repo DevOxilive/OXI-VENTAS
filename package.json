@@ -32,8 +32,10 @@
         "vue": "^3.3.13"
     },
     "dependencies": {
+        "apexcharts": "^5.16.0",
         "qz-tray": "^2.2.6",
         "sweetalert2": "^11.26.24",
+        "vue3-apexcharts": "^1.11.1",
         "zod": "^4.4.3"
     }
 }

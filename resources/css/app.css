@@ -2,6 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+    :root {
+        --text: #0f0001;
+        --background: #fcf7f8;
+        --primary: #e0000f;
+        --secondary: #f9e7e9;
+        --accent: #996b00;
+        color-scheme: light;
+    }
+
+    .dark {
+        --text: #fff0f1;
+        --background: #070304;
+        --primary: #ff1f2e;
+        --secondary: #180608;
+        --accent: #ffd166;
+        color-scheme: dark;
+    }
+
+    html,
+    body {
+        @apply bg-background text-text;
+    }
+}
+
 [x-cloak] {
     display: none;
 }

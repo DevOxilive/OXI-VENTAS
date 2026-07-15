@@ -38,11 +38,11 @@ const stats = computed(() => ({
 
 function statusClass(status) {
     return {
-        Pendiente: 'bg-amber-100 text-amber-700',
-        'En tránsito': 'bg-blue-100 text-blue-700',
-        Completada: 'bg-green-100 text-green-700',
-        Cancelada: 'bg-red-100 text-red-700'
-    }[status] || 'bg-slate-100 text-slate-700'
+        Pendiente: 'bg-secondary text-accent',
+        'En tránsito': 'bg-secondary text-text',
+        Completada: 'bg-secondary text-accent',
+        Cancelada: 'bg-secondary text-primary'
+    }[status] || 'bg-secondary text-text'
 }
 </script>
 
@@ -50,43 +50,43 @@ function statusClass(status) {
     <section class="space-y-5">
         <div class="flex items-center justify-between gap-3">
             <div>
-                <h1 class="text-xl font-bold text-slate-800">Transferencias</h1>
-                <p class="text-sm text-slate-500 mt-1">
+                <h1 class="text-xl font-bold text-text">Transferencias</h1>
+                <p class="mt-1 text-sm text-text opacity-70">
                     Control visual de movimientos de stock entre sucursales.
                 </p>
             </div>
 
-            <button class="bg-[#1f1d2b] text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+            <button class="flex items-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-sm text-white">
                 <span class="material-symbols-outlined text-[18px]">compare_arrows</span>
                 Nueva transferencia
             </button>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Transferencias</p>
-                <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ stats.total }}</h2>
+            <div class="rounded-2xl border border-secondary bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">Transferencias</p>
+                <h2 class="mt-1 text-2xl font-bold text-text">{{ stats.total }}</h2>
             </div>
-            <div class="bg-white border border-amber-100 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Pendientes</p>
-                <h2 class="text-2xl font-bold text-amber-700 mt-1">{{ stats.pending }}</h2>
+            <div class="rounded-2xl border border-accent bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">Pendientes</p>
+                <h2 class="mt-1 text-2xl font-bold text-accent">{{ stats.pending }}</h2>
             </div>
-            <div class="bg-white border border-blue-100 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">En tránsito</p>
-                <h2 class="text-2xl font-bold text-blue-700 mt-1">{{ stats.transit }}</h2>
+            <div class="rounded-2xl border border-secondary bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">En tránsito</p>
+                <h2 class="mt-1 text-2xl font-bold text-text">{{ stats.transit }}</h2>
             </div>
-            <div class="bg-white border border-green-100 rounded-2xl p-5 shadow-sm">
-                <p class="text-sm text-slate-500">Completadas</p>
-                <h2 class="text-2xl font-bold text-green-700 mt-1">{{ stats.completed }}</h2>
+            <div class="rounded-2xl border border-accent bg-background p-5 shadow-sm">
+                <p class="text-sm text-text opacity-70">Completadas</p>
+                <h2 class="mt-1 text-2xl font-bold text-accent">{{ stats.completed }}</h2>
             </div>
         </div>
 
-        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <div class="p-4 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
+            <div class="grid grid-cols-1 gap-3 border-b border-secondary p-4 md:grid-cols-2">
                 <input v-model="search" type="text" placeholder="Buscar folio, producto o responsable..."
-                    class="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                    class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary" />
 
-                <select v-model="statusFilter" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <select v-model="statusFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
                     <option value="">Estado</option>
                     <option value="Pendiente">Pendiente</option>
                     <option value="En tránsito">En tránsito</option>
@@ -97,7 +97,7 @@ function statusClass(status) {
 
             <div class="hidden md:block overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
+                    <thead class="border-b border-secondary bg-secondary text-text opacity-80">
                         <tr>
                             <th class="px-4 py-3 text-left font-semibold">Folio</th>
                             <th class="px-4 py-3 text-left font-semibold">Producto</th>
@@ -112,13 +112,13 @@ function statusClass(status) {
 
                     <tbody>
                         <tr v-for="item in filteredTransfers" :key="item.id"
-                            class="border-b border-slate-100 hover:bg-slate-50">
-                            <td class="px-4 py-4 font-bold text-slate-800">{{ item.folio }}</td>
-                            <td class="px-4 py-4 text-slate-700">{{ item.product }}</td>
-                            <td class="px-4 py-4 font-bold text-slate-800">{{ item.quantity }}</td>
-                            <td class="px-4 py-4 text-slate-600">{{ item.origin }}</td>
-                            <td class="px-4 py-4 text-slate-600">{{ item.destination }}</td>
-                            <td class="px-4 py-4 text-slate-600">{{ item.responsible }}</td>
+                            class="border-b border-secondary hover:bg-secondary">
+                            <td class="px-4 py-4 font-bold text-text">{{ item.folio }}</td>
+                            <td class="px-4 py-4 text-text">{{ item.product }}</td>
+                            <td class="px-4 py-4 font-bold text-text">{{ item.quantity }}</td>
+                            <td class="px-4 py-4 text-text opacity-80">{{ item.origin }}</td>
+                            <td class="px-4 py-4 text-text opacity-80">{{ item.destination }}</td>
+                            <td class="px-4 py-4 text-text opacity-80">{{ item.responsible }}</td>
                             <td class="px-4 py-4">
                                 <span class="px-3 py-1 rounded-full text-xs font-bold"
                                     :class="statusClass(item.status)">
@@ -127,14 +127,14 @@ function statusClass(status) {
                             </td>
                             <td class="px-4 py-4">
                                 <div class="flex justify-center gap-2">
-                                    <button class="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                                    <button class="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-text">
                                         Ver
                                     </button>
                                     <button
-                                        class="bg-green-50 text-green-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                                        class="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-accent">
                                         Completar
                                     </button>
-                                    <button class="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                                    <button class="rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-primary">
                                         Cancelar
                                     </button>
                                 </div>
@@ -142,7 +142,7 @@ function statusClass(status) {
                         </tr>
 
                         <tr v-if="!filteredTransfers.length">
-                            <td colspan="8" class="px-4 py-10 text-center text-slate-500">
+                            <td colspan="8" class="px-4 py-10 text-center text-text opacity-70">
                                 No se encontraron transferencias.
                             </td>
                         </tr>
@@ -151,11 +151,11 @@ function statusClass(status) {
             </div>
 
             <div class="md:hidden p-4 space-y-4">
-                <div v-for="item in filteredTransfers" :key="item.id" class="border border-slate-200 rounded-2xl p-4">
+                <div v-for="item in filteredTransfers" :key="item.id" class="rounded-2xl border border-secondary bg-background p-4">
                     <div class="flex justify-between gap-3">
                         <div>
-                            <p class="font-bold text-slate-800">{{ item.folio }}</p>
-                            <p class="text-sm text-slate-700 mt-1">{{ item.product }}</p>
+                            <p class="font-bold text-text">{{ item.folio }}</p>
+                            <p class="mt-1 text-sm text-text">{{ item.product }}</p>
                         </div>
 
                         <span class="px-3 py-1 rounded-full text-xs font-bold h-fit" :class="statusClass(item.status)">
@@ -165,31 +165,31 @@ function statusClass(status) {
 
                     <div class="grid grid-cols-2 gap-3 text-sm mt-4">
                         <div>
-                            <p class="text-xs text-slate-400">Cantidad</p>
-                            <p class="font-bold text-slate-800">{{ item.quantity }}</p>
+                            <p class="text-xs text-text opacity-50">Cantidad</p>
+                            <p class="font-bold text-text">{{ item.quantity }}</p>
                         </div>
                         <div>
-                            <p class="text-xs text-slate-400">Responsable</p>
-                            <p class="font-medium text-slate-700">{{ item.responsible }}</p>
+                            <p class="text-xs text-text opacity-50">Responsable</p>
+                            <p class="font-medium text-text">{{ item.responsible }}</p>
                         </div>
                         <div>
-                            <p class="text-xs text-slate-400">Origen</p>
-                            <p class="font-medium text-slate-700">{{ item.origin }}</p>
+                            <p class="text-xs text-text opacity-50">Origen</p>
+                            <p class="font-medium text-text">{{ item.origin }}</p>
                         </div>
                         <div>
-                            <p class="text-xs text-slate-400">Destino</p>
-                            <p class="font-medium text-slate-700">{{ item.destination }}</p>
+                            <p class="text-xs text-text opacity-50">Destino</p>
+                            <p class="font-medium text-text">{{ item.destination }}</p>
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100">
-                        <button class="flex-1 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                    <div class="mt-4 flex flex-wrap gap-2 border-t border-secondary pt-3">
+                        <button class="flex-1 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-text">
                             Ver
                         </button>
-                        <button class="flex-1 bg-green-50 text-green-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                        <button class="flex-1 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-accent">
                             Completar
                         </button>
-                        <button class="flex-1 bg-red-50 text-red-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                        <button class="flex-1 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-primary">
                             Cancelar
                         </button>
                     </div>

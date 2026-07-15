@@ -8,10 +8,55 @@ import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import PwaInstallPrompt from './Components/PwaInstallPrompt.vue';
 
 const appName = 'Super-Kay';
+const themeStorageKey = 'color-theme';
+const themeMetaColors = {
+    dark: '#070304',
+    light: '#e0000f',
+};
+let appliedTheme = null;
+const pages = {
+    './Pages/Dashboard.vue': () => import('./Pages/Dashboard.vue'),
+    ...import.meta.glob('./Pages/**/*.vue'),
+};
+
+function applyTheme(theme) {
+    if (typeof document === 'undefined') return;
+
+    const isDark = theme === 'dark';
+    const resolvedTheme = isDark ? 'dark' : 'light';
+    const root = document.documentElement;
+    const nextMetaColor = themeMetaColors[resolvedTheme];
+
+    if (appliedTheme === resolvedTheme
+        && root.classList.contains('dark') === isDark
+        && document.querySelector('meta[name="theme-color"]')?.getAttribute('content') === nextMetaColor) {
+        return;
+    }
+
+    appliedTheme = resolvedTheme;
+    root.classList.toggle('dark', isDark);
+
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta && themeColorMeta.getAttribute('content') !== nextMetaColor) {
+        themeColorMeta.setAttribute('content', nextMetaColor);
+    }
+}
+
+if (typeof window !== 'undefined') {
+    const storedTheme = window.localStorage.getItem(themeStorageKey);
+    const resolvedTheme = storedTheme
+        || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+    applyTheme(resolvedTheme);
+
+    window.addEventListener('oxi-theme-change', (event) => {
+        applyTheme(event.detail?.theme === 'dark' ? 'dark' : 'light');
+    });
+}
 
 createInertiaApp({
     title: (title) => title ? `${title} - ${appName}` : appName,
-    resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
+    resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, pages),
     setup({ el, App, props, plugin }) {
         return createApp({ render: () => h(App, props) })
             .use(plugin)

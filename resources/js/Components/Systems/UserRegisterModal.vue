@@ -1,9 +1,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 
+import FormPanel from '@/Components/Cards/FormPanel.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
+import SelectionGridSection from '@/Components/Forms/SelectionGridSection.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import { getUserModalConfig } from '@/config/ModalConfigs/userModalConfig'
 
@@ -155,19 +157,13 @@ function closeModal() {
         @close="closeModal"
     >
         <template #content>
-            <div class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-slate-50/80 p-4 pb-24 sm:p-5 sm:pb-28 md:p-6">
+            <div class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-secondary/80 p-4 pb-24 sm:p-5 sm:pb-28 md:p-6">
                 <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
-                    <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6 xl:col-span-3">
-                        <div class="mb-4 border-b pb-3">
-                            <h3 class="text-base font-bold">
-                                Cuenta de acceso
-                            </h3>
-
-                            <p class="mt-1 text-sm text-slate-500">
-                                {{ isEditing ? 'Edita el usuario y su acceso al sistema.' : 'Crea el usuario y define su acceso al sistema.' }}
-                            </p>
-                        </div>
-
+                    <FormPanel
+                        title="Cuenta de acceso"
+                        :description="isEditing ? 'Edita el usuario y su acceso al sistema.' : 'Crea el usuario y define su acceso al sistema.'"
+                        panel-class="rounded-3xl bg-background shadow-sm sm:p-5 md:p-6 xl:col-span-3"
+                    >
                         <div class="grid grid-cols-1 gap-4">
                             <InputField
                                 v-model="form.name"
@@ -214,44 +210,43 @@ function closeModal() {
                                 :error="errors.password_confirmation"
                             />
                         </div>
-                    </section>
+                    </FormPanel>
 
-                    <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:max-h-[calc(90dvh-13rem)] md:overflow-y-auto md:pr-3 md:p-6 xl:col-span-5">
-                        <h3 class="mb-4 border-b pb-3 text-base font-bold">
-                            Modulos de acceso
-                        </h3>
-
+                    <FormPanel
+                        title="Modulos de acceso"
+                        panel-class="rounded-3xl bg-background shadow-sm sm:p-5 md:max-h-[calc(90dvh-13rem)] md:overflow-y-auto md:pr-3 md:p-6 xl:col-span-5"
+                        body-class="space-y-4"
+                    >
                         <div class="space-y-4">
-                                <div v-if="canAssignBranches" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <p class="mb-3 text-sm font-semibold text-slate-700">
-                                        Sucursales asignadas
-                                    </p>
+                            <div v-if="canAssignBranches" class="rounded-2xl border border-secondary bg-secondary p-4">
+                                <SelectionGridSection
+                                    title="Sucursales asignadas"
+                                    description="Estas sucursales definen a cuales puede entrar el usuario cuando tenga permisos relacionados con sucursales, stock, auditorias o ventas."
+                                    grid-class="grid grid-cols-1 gap-2"
+                                >
+                                    <template #default>
+                                        <p v-if="!form.role_id" class="mb-3 text-xs text-accent">
+                                            Primero selecciona un rol para definir si estas sucursales seran obligatorias para este usuario.
+                                        </p>
 
-                                    <p class="mb-3 text-xs text-slate-500">
-                                        Estas sucursales definen a cuales puede entrar el usuario cuando tenga permisos relacionados con sucursales, stock, auditorias o ventas.
-                                    </p>
+                                        <p v-else-if="!requiresBranchAccess" class="mb-3 text-xs text-text opacity-70">
+                                            Para el rol y permisos actuales, esta asignacion queda guardada como alcance disponible, aunque todavia no sea obligatoria.
+                                        </p>
 
-                                    <p v-if="!form.role_id" class="mb-3 text-xs text-amber-600">
-                                        Primero selecciona un rol para definir si estas sucursales seran obligatorias para este usuario.
-                                    </p>
+                                        <SelectionCheckboxCard
+                                            v-for="branch in branches"
+                                            :key="branch.id"
+                                            compact
+                                            variant="soft"
+                                            :checked="form.branch_ids.includes(branch.id)"
+                                            :title="branch.name"
+                                            description="Haz clic para asignar esta sucursal"
+                                            @toggle="toggleAssignedBranch(branch.id)"
+                                        />
+                                    </template>
+                                </SelectionGridSection>
 
-                                    <p v-else-if="!requiresBranchAccess" class="mb-3 text-xs text-slate-500">
-                                        Para el rol y permisos actuales, esta asignacion queda guardada como alcance disponible, aunque todavia no sea obligatoria.
-                                    </p>
-
-                                <div class="grid grid-cols-1 gap-2">
-                                    <SelectionCheckboxCard
-                                        v-for="branch in branches"
-                                        :key="branch.id"
-                                        compact
-                                        :checked="form.branch_ids.includes(branch.id)"
-                                        :title="branch.name"
-                                        description="Haz clic para asignar esta sucursal"
-                                        @toggle="toggleAssignedBranch(branch.id)"
-                                    />
-                                </div>
-
-                                <p v-if="requiresBranchAccess" class="mt-2 text-xs text-slate-500">
+                                <p v-if="requiresBranchAccess" class="mt-2 text-xs text-text opacity-70">
                                     Para la combinacion actual de rol y permisos, este usuario necesita al menos una sucursal asignada.
                                 </p>
 
@@ -264,49 +259,46 @@ function closeModal() {
                                 </p>
                             </div>
 
-                            <div class="flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-700">
-                                        Modulos principales
-                                    </p>
-                                </div>
+                            <SelectionGridSection
+                                title="Modulos principales"
+                                grid-class="grid grid-cols-1 gap-2"
+                            >
+                                <template #aside>
+                                    <span class="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-text opacity-80">
+                                        {{ form.permissions.length }} seleccionados
+                                    </span>
+                                </template>
 
-                                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                                    {{ form.permissions.length }} seleccionados
-                                </span>
-                            </div>
-
-                            <div class="grid grid-cols-1 gap-2">
                                 <button
                                     v-for="section in availableSections"
                                     :key="section.key"
                                     type="button"
                                     class="rounded-2xl border px-3 py-3 text-left transition"
                                     :class="activePermissionSection === section.key
-                                        ? 'border-emerald-300 bg-emerald-50 shadow-sm'
-                                        : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'"
+                                        ? 'border-primary bg-background shadow-sm'
+                                        : 'border-secondary bg-secondary hover:border-primary hover:bg-background'"
                                     @click="selectPermissionSection(section.key)"
                                 >
                                     <div class="flex items-start justify-between gap-3">
                                         <div>
-                                            <p class="text-sm font-medium text-slate-800">
+                                            <p class="text-sm font-medium text-text">
                                                 {{ sectionLabel(section.key) }}
                                             </p>
 
-                                            <p class="mt-1 text-sm text-slate-500">
+                                            <p class="mt-1 text-sm text-text opacity-70">
                                                 {{ getSectionSelectedCount(section) }} de {{ getSectionPermissionCount(section) }} permisos activos
                                             </p>
                                         </div>
                                     </div>
                                 </button>
-                            </div>
+                            </SelectionGridSection>
 
                             <div
                                 v-if="activeSection"
-                                class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                                class="rounded-2xl border border-secondary bg-secondary p-4"
                             >
                                 <div class="mb-3">
-                                    <p class="text-sm font-semibold text-slate-700">
+                                    <p class="text-sm font-semibold text-text">
                                         Submodulos de {{ sectionLabel(activeSection.key) }}
                                     </p>
                                 </div>
@@ -318,35 +310,37 @@ function closeModal() {
                                         type="button"
                                         class="rounded-2xl border px-3 py-3 text-left transition"
                                         :class="activePermissionModule === module.key
-                                            ? 'border-emerald-300 bg-white shadow-sm'
-                                            : 'border-slate-200 bg-white hover:border-slate-300'"
+                                            ? 'border-primary bg-background shadow-sm'
+                                            : 'border-secondary bg-background hover:border-primary'"
                                         @click="selectPermissionModule(module.key)"
                                     >
-                                        <p class="text-sm font-medium text-slate-800">
+                                        <p class="text-sm font-medium text-text">
                                             {{ moduleLabel(module.key) }}
                                         </p>
 
-                                        <p class="mt-1 text-sm text-slate-500">
+                                        <p class="mt-1 text-sm text-text opacity-70">
                                             {{ getSelectedCount(module.permissions) }} de {{ module.permissions.length }} permisos activos
                                         </p>
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    </section>
+                    </FormPanel>
 
-                    <section class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6 xl:col-span-4">
+                    <FormPanel
+                        panel-class="rounded-3xl bg-background shadow-sm sm:p-5 md:p-6 xl:col-span-4"
+                    >
                         <div
                             v-if="activeModule"
                             class="space-y-4"
                         >
                             <div class="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
                                 <div>
-                                    <h3 class="text-base font-bold text-slate-900">
+                                    <h3 class="text-base font-bold text-text">
                                         {{ moduleLabel(activeModule.key) }}
                                     </h3>
 
-                                    <p class="mt-1 text-sm text-slate-500">
+                                    <p class="mt-1 text-sm text-text opacity-70">
                                         {{ getSelectedCount(activeModule.permissions) }} de {{ activeModule.permissions.length }} permisos activos en este submodulo
                                     </p>
                                 </div>
@@ -354,7 +348,7 @@ function closeModal() {
                                 <div class="flex flex-wrap gap-2">
                                     <button
                                         type="button"
-                                        class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
+                                        class="rounded-full border border-primary bg-secondary px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-background"
                                         @click="$emit('enable-module', activeModule.key)"
                                     >
                                         Activar submodulo
@@ -362,7 +356,7 @@ function closeModal() {
 
                                     <button
                                         type="button"
-                                        class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+                                        class="rounded-full border border-secondary bg-background px-3 py-1.5 text-sm font-medium text-text transition hover:bg-secondary"
                                         @click="$emit('disable-module', activeModule.key)"
                                     >
                                         Limpiar submodulo
@@ -371,61 +365,26 @@ function closeModal() {
                             </div>
 
                             <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                                <button
+                                <SelectionCheckboxCard
                                     v-for="permission in activeModule.permissions"
                                     :key="permission.id"
-                                    type="button"
-                                    class="flex min-h-[72px] items-center justify-between gap-3 rounded-2xl border px-4 py-4 text-left transition"
-                                    :class="form.permissions.includes(permission.id)
-                                        ? 'border-emerald-300 bg-emerald-50 shadow-sm'
-                                        : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'"
-                                    @click="$emit('toggle-permission', permission.id)"
-                                >
-                                    <div class="min-w-0">
-                                        <p class="text-sm font-medium text-slate-800">
-                                            {{ permissionLabel(permission.name) }}
-                                        </p>
-                                    </div>
-
-                                    <div class="flex shrink-0 items-center gap-2">
-                                        <span
-                                            v-if="isPermissionLocked(permission.id)"
-                                            class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600"
-                                        >
-                                            Rol
-                                        </span>
-
-                                        <div
-                                            class="flex h-6 w-6 items-center justify-center rounded-full border transition"
-                                            :class="form.permissions.includes(permission.id)
-                                                ? 'border-emerald-500 bg-emerald-500 text-white'
-                                                : 'border-slate-300 bg-white text-transparent'"
-                                        >
-                                            <svg
-                                                class="h-3.5 w-3.5"
-                                                viewBox="0 0 20 20"
-                                                fill="currentColor"
-                                                aria-hidden="true"
-                                            >
-                                                <path
-                                                    fill-rule="evenodd"
-                                                    d="M16.704 5.29a1 1 0 010 1.42l-7.25 7.25a1 1 0 01-1.415 0l-3.25-3.25a1 1 0 111.414-1.42l2.543 2.544 6.543-6.544a1 1 0 011.415 0z"
-                                                    clip-rule="evenodd"
-                                                />
-                                            </svg>
-                                        </div>
-                                    </div>
-                                </button>
+                                    compact
+                                    variant="soft"
+                                    :checked="form.permissions.includes(permission.id)"
+                                    :title="permissionLabel(permission.name)"
+                                    :badge="isPermissionLocked(permission.id) ? 'Rol' : ''"
+                                    @toggle="$emit('toggle-permission', permission.id)"
+                                />
                             </div>
                         </div>
 
                         <div
                             v-else
-                            class="flex min-h-[18rem] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500"
+                            class="flex min-h-[18rem] items-center justify-center rounded-2xl border border-dashed border-secondary bg-secondary px-4 py-6 text-center text-sm text-text opacity-70"
                         >
                             Selecciona un modulo y despues un submodulo para ver sus permisos.
                         </div>
-                    </section>
+                    </FormPanel>
                 </div>
             </div>
         </template>

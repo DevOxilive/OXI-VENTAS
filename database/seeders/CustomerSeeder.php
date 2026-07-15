@@ -12,9 +12,44 @@ class CustomerSeeder extends Seeder
         $customers = [
             [
                 'id' => 1,
-                'name' => 'GeneralCustomer',
+                'name' => 'Cliente mostrador',
                 'phone' => '0000000000',
-                'email' => 'general@customer.com',
+                'email' => 'mostrador@oxilive.com.mx',
+                'active' => true,
+            ],
+            [
+                'id' => 2,
+                'name' => 'Restaurante La Terraza',
+                'phone' => '5511023344',
+                'email' => 'compras@laterraza.mx',
+                'active' => true,
+            ],
+            [
+                'id' => 3,
+                'name' => 'Abarrotes San Miguel',
+                'phone' => '5522046688',
+                'email' => 'sanmiguel.compras@example.com',
+                'active' => true,
+            ],
+            [
+                'id' => 4,
+                'name' => 'Cafeteria Punto Lago',
+                'phone' => '5533067799',
+                'email' => 'administracion@puntolago.mx',
+                'active' => true,
+            ],
+            [
+                'id' => 5,
+                'name' => 'Hotel Ajusco Express',
+                'phone' => '5544089911',
+                'email' => 'operaciones@ajuscoexpress.mx',
+                'active' => true,
+            ],
+            [
+                'id' => 6,
+                'name' => 'Eventos Cecilia',
+                'phone' => '5555102244',
+                'email' => 'eventos.cecilia@example.com',
                 'active' => true,
             ],
         ];

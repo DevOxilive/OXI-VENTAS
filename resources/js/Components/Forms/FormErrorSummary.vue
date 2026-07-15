@@ -5,9 +5,9 @@ defineProps({
 </script>
 
 <template>
-    <div v-if="errores.length" class="mb-5 bg-red-50 border border-red-300 rounded-2xl p-4">
-        <h3 class="font-bold text-red-700 mb-2">Se detectaron errores:</h3>
-        <ul class="list-disc ml-5 text-sm text-red-600">
+    <div v-if="errores.length" class="mb-5 rounded-2xl border border-primary bg-secondary p-4">
+        <h3 class="mb-2 font-bold text-primary">Se detectaron errores:</h3>
+        <ul class="ml-5 list-disc text-sm text-primary">
             <li v-for="(error, index) in errores" :key="index">{{ error }}</li>
         </ul>
     </div>

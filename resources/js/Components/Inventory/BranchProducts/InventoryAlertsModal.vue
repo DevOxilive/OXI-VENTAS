@@ -67,90 +67,90 @@ const emptyText = computed(() => {
 
 const productCardClass = computed(() => {
     if (isInactiveCandidates.value) {
-        return 'border-purple-200 bg-purple-50'
+        return 'border-secondary bg-secondary'
     }
 
     if (isLowStock.value) {
-        return 'border-amber-200 bg-amber-50'
+        return 'border-accent bg-secondary'
     }
 
     if (props.type === 'nearExpiration') {
-        return 'border-orange-200 bg-orange-50'
+        return 'border-accent bg-secondary'
     }
 
     if (props.type === 'expired') {
-        return 'border-red-200 bg-red-50'
+        return 'border-primary bg-secondary'
     }
 
-    return 'border-slate-200 bg-white'
+    return 'border-secondary bg-background'
 })
 
 const detailCellClass = computed(() => {
     if (isInactiveCandidates.value) {
-        return 'border-purple-100 bg-white'
+        return 'border-secondary bg-background'
     }
 
     if (isLowStock.value) {
-        return 'border-amber-100 bg-white'
+        return 'border-secondary bg-background'
     }
 
     if (props.type === 'nearExpiration') {
-        return 'border-orange-100 bg-orange-100/60'
+        return 'border-accent bg-background'
     }
 
     if (props.type === 'expired') {
-        return 'border-red-100 bg-red-100/60'
+        return 'border-primary bg-background'
     }
 
-    return 'border-slate-100 bg-slate-50/80'
+    return 'border-secondary bg-secondary'
 })
 
 const detailLabelClass = computed(() => {
     if (isInactiveCandidates.value) {
-        return 'text-purple-500'
+        return 'text-text'
     }
 
     if (isLowStock.value) {
-        return 'text-amber-500'
+        return 'text-accent'
     }
 
     if (props.type === 'nearExpiration') {
-        return 'text-orange-500'
+        return 'text-accent'
     }
 
     if (props.type === 'expired') {
-        return 'text-red-500'
+        return 'text-primary'
     }
 
-    return 'text-slate-400'
+    return 'text-text opacity-50'
 })
 
 function cardToneStyle() {
     if (isInactiveCandidates.value) {
         return {
-            backgroundColor: '#faf5ff',
-            borderColor: '#d8b4fe',
+            backgroundColor: 'var(--secondary)',
+            borderColor: 'var(--secondary)',
         }
     }
 
     if (isLowStock.value) {
         return {
-            backgroundColor: '#fffbeb',
-            borderColor: '#fcd34d',
+            backgroundColor: 'var(--secondary)',
+            borderColor: 'var(--accent)',
         }
     }
 
     if (props.type === 'nearExpiration') {
         return {
-            backgroundColor: '#fff7ed',
-            borderColor: '#fdba74',
+            backgroundColor: 'var(--secondary)',
+            borderColor: 'var(--accent)',
         }
     }
 
     if (props.type === 'expired') {
         return {
-            backgroundColor: '#fef2f2',
-            borderColor: '#fca5a5',
+            backgroundColor: 'var(--secondary)',
+            borderColor: 'var(--primary)',
         }
     }
 
@@ -160,29 +160,29 @@ function cardToneStyle() {
 function detailToneStyle() {
     if (isInactiveCandidates.value) {
         return {
-            backgroundColor: '#ffffff',
-            borderColor: '#e9d5ff',
+            backgroundColor: 'var(--background)',
+            borderColor: 'var(--secondary)',
         }
     }
 
     if (isLowStock.value) {
         return {
-            backgroundColor: '#ffffff',
-            borderColor: '#fde68a',
+            backgroundColor: 'var(--background)',
+            borderColor: 'var(--secondary)',
         }
     }
 
     if (props.type === 'nearExpiration') {
         return {
-            backgroundColor: '#fffaf5',
-            borderColor: '#fed7aa',
+            backgroundColor: 'var(--background)',
+            borderColor: 'var(--accent)',
         }
     }
 
     if (props.type === 'expired') {
         return {
-            backgroundColor: '#fff5f5',
-            borderColor: '#fecaca',
+            backgroundColor: 'var(--background)',
+            borderColor: 'var(--primary)',
         }
     }
 
@@ -309,7 +309,7 @@ function batchStatus(batch) {
                 <div class="space-y-3">
                     <template v-if="isProductAlert">
                         <article v-for="product in batches" :key="product.id"
-                            class="rounded-2xl border p-3 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+                            class="rounded-2xl border p-3 shadow-sm transition hover:border-primary hover:shadow-md"
                             :class="productCardClass" :style="cardToneStyle()">
                             <div class="inventory-alert-row">
                                 <div class="min-w-0 px-1 py-1">
@@ -317,7 +317,7 @@ function batchStatus(batch) {
                                         Producto
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ productName(product) }}
                                     </p>
                                 </div>
@@ -327,7 +327,7 @@ function batchStatus(batch) {
                                         Código
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ productCode(product) }}
                                     </p>
                                 </div>
@@ -337,7 +337,7 @@ function batchStatus(batch) {
                                         {{ isInactiveCandidates ? 'Rotacion' : 'Minimo' }}
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ isInactiveCandidates ? productInactiveDays(product) : productMinStock(product) }}
                                     </p>
                                 </div>
@@ -347,7 +347,7 @@ function batchStatus(batch) {
                                         Stock
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ productStock(product) }}
                                     </p>
                                 </div>
@@ -357,7 +357,7 @@ function batchStatus(batch) {
                                         {{ isInactiveCandidates ? 'Ultimo surtido' : 'Fecha' }}
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ isInactiveCandidates ? productLastRestockedAt(product) : 'Revisar resurtido' }}
                                     </p>
                                 </div>
@@ -367,7 +367,7 @@ function batchStatus(batch) {
                                         Estado
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ productStatus(product) }}
                                     </p>
                                 </div>
@@ -377,7 +377,7 @@ function batchStatus(batch) {
 
                     <template v-else>
                         <article v-for="batch in batches" :key="batch.id"
-                            class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+                            class="rounded-2xl border border-secondary bg-background p-3 shadow-sm transition hover:border-primary hover:shadow-md"
                             :style="cardToneStyle()">
                             <div class="inventory-alert-row">
                                 <div class="min-w-0 px-1 py-1">
@@ -385,7 +385,7 @@ function batchStatus(batch) {
                                         Producto
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ productName(batch) }}
                                     </p>
                                 </div>
@@ -395,7 +395,7 @@ function batchStatus(batch) {
                                         Código
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ productCode(batch) }}
                                     </p>
                                 </div>
@@ -405,7 +405,7 @@ function batchStatus(batch) {
                                         Lote
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ batchLotNumber(batch) }}
                                     </p>
                                 </div>
@@ -415,7 +415,7 @@ function batchStatus(batch) {
                                         Stock
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ batchQuantity(batch) }}
                                     </p>
                                 </div>
@@ -425,7 +425,7 @@ function batchStatus(batch) {
                                         Fecha
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ batchExpirationDate(batch) }}
                                     </p>
                                 </div>
@@ -435,7 +435,7 @@ function batchStatus(batch) {
                                         Estado
                                     </p>
 
-                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-slate-900">
+                                    <p class="mt-1 break-words text-xs font-semibold leading-5 text-text">
                                         {{ batchStatus(batch) }}
                                     </p>
                                 </div>
@@ -445,8 +445,8 @@ function batchStatus(batch) {
                 </div>
             </div>
 
-            <div v-else class="rounded-2xl border border-dashed border-slate-300 p-8 text-center">
-                <p class="text-sm font-bold text-slate-600">
+            <div v-else class="rounded-2xl border border-dashed border-secondary bg-secondary p-8 text-center">
+                <p class="text-sm font-bold text-text">
                     {{ emptyText }}
                 </p>
             </div>

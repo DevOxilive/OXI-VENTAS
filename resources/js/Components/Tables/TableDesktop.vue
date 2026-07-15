@@ -33,6 +33,28 @@ const canViewActions = computed(() =>
   props.actions?.some(action => isActionVisible(action, {}, { can }))
 )
 
+const tableRows = computed(() =>
+  props.items.map((row, index) => ({
+    row,
+    index,
+    key: row[props.rowKey] || index,
+    cells: visibleColumns.value.map((column) => {
+      const value = getCellValue(row, column)
+
+      return {
+        key: column.key,
+        column,
+        value,
+        subValue: column.subKey ? getNestedValue(row, column.subKey) : null,
+        content: renderCellContentFromValue(value, column),
+      }
+    }),
+    visibleActions: canViewActions.value
+      ? props.actions.filter((action) => isActionVisible(action, row, { can }))
+      : [],
+  }))
+)
+
 const allSelected = computed({
   get: () => props.items.length > 0 && props.items.every(item => props.selectedItems?.[item[props.rowKey]]),
   set: (value) => {
@@ -75,8 +97,7 @@ function handleRowClick(row) {
   emit('row-click', row)
 }
 
-function renderCellContent(row, column) {
-  const value = getCellValue(row, column)
+function renderCellContentFromValue(value, column) {
   const formatted = formatCellValue(value, column)
 
   if (column.format === 'badge') {
@@ -116,10 +137,10 @@ function renderCellContent(row, column) {
   <div class="hidden md:block">
     <div class="overflow-x-auto">
       <table class="w-full text-sm border-collapse">
-        <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
+        <thead class="border-b border-secondary bg-secondary text-text">
           <tr>
             <th v-if="selectable" class="px-4 py-3 w-10">
-              <input v-model="allSelected" type="checkbox" class="w-4 h-4 border-slate-300 rounded cursor-pointer" />
+              <input v-model="allSelected" type="checkbox" class="h-4 w-4 cursor-pointer rounded border-secondary text-primary focus:ring-primary" />
             </th>
 
             <th v-for="column in visibleColumns" :key="column.key"
@@ -134,85 +155,85 @@ function renderCellContent(row, column) {
           </tr>
         </thead>
 
-        <tbody class="divide-y divide-slate-100 bg-white">
-          <tr v-for="(row, index) in items" :key="row[rowKey] || index" :class="[
+        <tbody class="divide-y divide-secondary bg-background">
+          <tr v-for="tableRow in tableRows" :key="tableRow.key" :class="[
             'transition-colors',
-            hoverEffect ? 'hover:bg-slate-50' : '',
-            striped && index % 2 === 1 ? 'bg-slate-50/60' : '',
-          ]" @click="handleRowClick(row)">
+            hoverEffect ? 'hover:bg-secondary' : '',
+            striped && tableRow.index % 2 === 1 ? 'bg-secondary' : '',
+          ]" @click="handleRowClick(tableRow.row)">
             <td v-if="selectable" class="px-4 py-3 w-10">
-              <input type="checkbox" :checked="isRowSelected(row)"
-                class="w-4 h-4 border-slate-300 rounded cursor-pointer" @click.stop @change="toggleRowSelection(row)" />
+              <input type="checkbox" :checked="isRowSelected(tableRow.row)"
+                class="h-4 w-4 cursor-pointer rounded border-secondary text-primary focus:ring-primary" @click.stop @change="toggleRowSelection(tableRow.row)" />
             </td>
 
-            <td v-for="column in visibleColumns" :key="column.key" class="px-4 py-3 align-middle"
-              :class="column.cellClass || ''">
-              <template v-if="column.format === 'badge'">
+            <td v-for="cell in tableRow.cells" :key="cell.key" class="px-4 py-3 align-middle"
+              :class="cell.column.cellClass || ''">
+              <template v-if="cell.column.format === 'badge'">
                 <span :class="[
                   'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap',
-                  renderCellContent(row, column).classes,
+                  cell.content.classes,
                 ]">
-                  {{ renderCellContent(row, column).label }}
+                  {{ cell.content.label }}
                 </span>
               </template>
 
-              <template v-else-if="column.format === 'image'">
-                <img v-if="getCellValue(row, column)" :src="getCellValue(row, column)"
-                  :alt="column.formatOptions?.alt || 'Imagen'" class="h-8 w-8 rounded object-cover" />
+              <template v-else-if="cell.column.format === 'image'">
+                <img v-if="cell.value" :src="cell.value"
+                  :alt="cell.column.formatOptions?.alt || 'Imagen'" class="h-8 w-8 rounded object-cover" />
 
-                <span v-else class="text-slate-400 text-xs">
-                  {{ column.formatOptions?.fallback || 'Sin imagen' }}
+                <span v-else class="text-xs text-text opacity-50">
+                  {{ cell.column.formatOptions?.fallback || 'Sin imagen' }}
                 </span>
               </template>
 
-              <template v-else-if="column.format === 'swatch'">
+              <template v-else-if="cell.column.format === 'swatch'">
                 <div class="flex items-center gap-3">
                   <span
-                    class="h-4 w-4 shrink-0 rounded-full border border-slate-200"
-                    :style="{ backgroundColor: renderCellContent(row, column).color }"
+                    class="h-4 w-4 shrink-0 rounded-full border border-secondary"
+                    :style="{ backgroundColor: cell.content.color }"
                   />
 
-                  <span class="font-medium text-slate-700">
-                    {{ renderCellContent(row, column).label }}
+                  <span class="font-medium text-text">
+                    {{ cell.content.label }}
                   </span>
                 </div>
               </template>
 
               <template v-else>
-                <div v-if="column.formatOptions?.multiline || column.subKey" class="space-y-0.5">
-                  <div class="font-medium text-slate-800 truncate">
-                    {{ getCellValue(row, column) }}
+                <div v-if="cell.column.formatOptions?.multiline || cell.column.subKey" class="space-y-0.5">
+                  <div class="truncate font-medium text-text">
+                    {{ cell.value }}
                   </div>
 
-                  <div v-if="column.subKey" class="text-xs text-slate-400 truncate">
-                    {{ getNestedValue(row, column.subKey) }}
+                  <div v-if="cell.column.subKey" class="truncate text-xs text-text opacity-50">
+                    {{ cell.subValue }}
                   </div>
                 </div>
 
-                <span v-else class="block truncate" :class="column.textClass || 'text-slate-700'">
-                  {{ renderCellContent(row, column).content }}
+                <span v-else class="block truncate" :class="cell.column.textClass || 'text-text opacity-80'">
+                  {{ cell.content.content }}
                 </span>
               </template>
             </td>
 
             <td v-if="canViewActions" class="px-4 py-3">
               <div class="flex items-center justify-center gap-2">
-                <template v-for="action in actions" :key="action.id">
-                  <ActionIconButton v-if="isActionVisible(action, row, { can })" :icon="action.icon"
-                    :title="action.label" :variant="action.variant || 'blue'" @click.stop="handleAction(action, row)" />
+                <template v-for="action in tableRow.visibleActions" :key="action.id">
+                  <ActionIconButton :icon="action.icon"
+                    :title="action.label" :variant="action.variant || 'blue'" @click.stop="handleAction(action, tableRow.row)" />
                 </template>
               </div>
             </td>
           </tr>
 
           <tr v-if="items.length === 0 && !loading">
-            <td :colspan="totalColumns" class="px-4 py-10 text-center text-slate-500">
+            <td :colspan="totalColumns" class="px-4 py-10 text-center text-text opacity-70">
               {{ noDataMessage }}
             </td>
           </tr>
 
           <tr v-if="loading">
-            <td :colspan="totalColumns" class="px-4 py-10 text-center text-slate-500">
+            <td :colspan="totalColumns" class="px-4 py-10 text-center text-text opacity-70">
               Cargando...
             </td>
           </tr>
