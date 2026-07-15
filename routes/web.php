@@ -330,6 +330,14 @@ Route::middleware([
             ->middleware('permission:inventory.purchase-reports.update')
             ->name('branches.purchase-reports.generate');
 
+        Route::post('/branches/{branch}/purchase-reports/{purchaseReport}/complete', [PurchaseReportController::class, 'complete'])
+            ->middleware('permission:inventory.purchase-reports.update')
+            ->name('branches.purchase-reports.complete');
+
+        Route::delete('/branches/{branch}/purchase-reports/{purchaseReport}', [PurchaseReportController::class, 'destroy'])
+            ->middleware('permission:inventory.purchase-reports.delete')
+            ->name('branches.purchase-reports.destroy');
+
         /*
         |--------------------------------------------------------------------------
         | INVENTARIO - REPORTES / CADUCIDADES / TRANSFERENCIAS / AJUSTES

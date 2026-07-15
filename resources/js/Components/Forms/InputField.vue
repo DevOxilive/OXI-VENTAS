@@ -10,6 +10,7 @@ defineOptions({
 const props = defineProps({
     label: String,
     field: String,
+    validationField: String,
     modelValue: [String, Number],
     error: String,
     hideLabel: Boolean,
@@ -33,7 +34,7 @@ const inputId = computed(() =>
     props.field || props.label?.toLowerCase().replace(/\s+/g, '-')
 )
 
-const fieldConfig = computed(() => fieldRegistry[props.field])
+const fieldConfig = computed(() => fieldRegistry[props.validationField || props.field])
 const normalizedFieldConfig = computed(() => {
     const config = fieldConfig.value ?? {}
     const effectiveType = config.type ?? props.type
@@ -57,6 +58,7 @@ const isDateField = computed(() =>
 const hasLeftAddon = computed(() => props.icon || props.prefix)
 const hasRightAddon = computed(() => props.suffix
 )
+const isDisabled = computed(() => Boolean(attrs.disabled))
 
 function preventNumberWheel(e) {
     if (props.type !== 'number') return
@@ -123,29 +125,31 @@ function blockExtraInput(e) {
         <label v-if="!hideLabel" :for="inputId" class="mb-1 block text-sm font-semibold text-text">
             {{ label }}
         </label>
-        <span v-if="hasLeftAddon"
-            class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-text opacity-60">
-            <span v-if="prefix">
-                {{ prefix }}
-            </span>
+        <div class="relative">
+            <span v-if="hasLeftAddon"
+                class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-text opacity-60">
+                <span v-if="prefix">
+                    {{ prefix }}
+                </span>
 
-            <span v-else class="material-symbols-outlined text-[20px]">
-                {{ icon }}
+                <span v-else class="material-symbols-outlined text-[20px]">
+                    {{ icon }}
+                </span>
             </span>
-        </span>
-        <input ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
-            :readonly="readonly" @keydown="(e) => { blockExtraInput(e); emit('keydown', e) }"
-            @wheel="preventNumberWheel" @input="handleInput" @blur="emit('validate', field)" :class="[
-                'w-full rounded-xl border py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
-                hasLeftAddon ? 'pl-11 pr-4' : 'px-4',
-                hasRightAddon ? 'pr-12' : '',
-                readonly ? 'cursor-not-allowed border-secondary bg-secondary text-text opacity-60' : 'bg-background text-text',
-                error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'
-            ]" />
-        <span v-if="suffix"
-            class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-text opacity-60">
-            {{ suffix }}
-        </span>
+            <input ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
+                :readonly="readonly" @keydown="(e) => { blockExtraInput(e); emit('keydown', e) }"
+                @wheel="preventNumberWheel" @input="handleInput" @blur="emit('validate', field)" :class="[
+                    'w-full rounded-xl border py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
+                    hasLeftAddon ? 'pl-11 pr-4' : 'px-4',
+                    hasRightAddon ? 'pr-12' : '',
+                    readonly || isDisabled ? 'cursor-not-allowed border-secondary bg-secondary text-text opacity-60' : 'bg-background text-text',
+                    error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'
+                ]" />
+            <span v-if="suffix"
+                class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-text opacity-60">
+                {{ suffix }}
+            </span>
+        </div>
         <div class="flex justify-between items-center mt-1">
             <p v-if="error" class="text-xs text-primary">
                 {{ error }}

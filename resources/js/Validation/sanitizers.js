@@ -39,6 +39,19 @@ export function sanitizeField(value, config = {}) {
 
     if (config.type === "decimal") {
         clean = clean.replace(/(\..*)\./g, "$1");
+
+        const hasDecimalPoint = clean.includes(".");
+        const [integerPart = "", decimalPart = ""] = clean.split(".");
+        const boundedInteger = config.maxIntegerDigits
+            ? integerPart.slice(0, config.maxIntegerDigits)
+            : integerPart;
+        const boundedDecimal = config.maxDecimalDigits !== undefined
+            ? decimalPart.slice(0, config.maxDecimalDigits)
+            : decimalPart;
+
+        clean = hasDecimalPoint
+            ? `${boundedInteger || "0"}.${boundedDecimal}`
+            : boundedInteger;
     }
 
     if (config.uppercase) {

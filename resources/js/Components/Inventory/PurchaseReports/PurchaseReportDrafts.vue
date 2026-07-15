@@ -1,4 +1,6 @@
 <script setup>
+import SectionHeading from '@/Components/Cards/SectionHeading.vue'
+
 defineProps({
     reports: {
         type: Array,
@@ -6,82 +8,93 @@ defineProps({
     },
 })
 
-defineEmits(['open'])
+defineEmits(["open"])
 
 function statusLabel(status) {
     return {
-        DRAFT: 'Borrador',
-        GENERATED: 'Generado',
-        CANCELLED: 'Cancelado',
+        DRAFT: "Borrador",
+        GENERATED: "Generada",
+        COMPLETED: "Completada",
+        CANCELLED: "Cancelada",
     }[status] ?? status
 }
 
 function formatDate(date) {
-    if (!date) return 'Sin fecha'
+    if (!date) return "Sin fecha"
 
-    return new Intl.DateTimeFormat('es-MX', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
+    return new Intl.DateTimeFormat("es-MX", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
     }).format(new Date(date))
+}
+
+function statusClasses(status) {
+    if (status === "COMPLETED") {
+        return "border-accent text-accent";
+    }
+
+    if (status === "GENERATED") {
+        return "border-primary text-primary";
+    }
+
+    if (status === "CANCELLED") {
+        return "border-red-500/40 text-red-600";
+    }
+
+    return "border-secondary text-text";
 }
 </script>
 
 <template>
-    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="mb-4">
-            <h2 class="text-sm font-bold text-slate-900">
-                Borradores recientes
-            </h2>
-            <p class="text-xs text-slate-500">
-                Últimas listas de abastecimiento creadas para esta sucursal.
-            </p>
+    <section class="rounded-[28px] border border-secondary bg-background p-4 shadow-sm">
+        <SectionHeading
+            title="Borradores y compras recientes"
+            description="Consulta o continua una orden guardada."
+            spacing="sm"
+        />
+
+        <div
+            v-if="!reports.length"
+            class="mt-4 rounded-2xl border border-dashed border-secondary bg-secondary px-4 py-5 text-sm text-text opacity-70"
+        >
+            Todavia no hay ordenes guardadas.
         </div>
 
-        <div v-if="!reports.length" class="rounded-xl border border-dashed border-slate-300 p-5 text-center">
-            <p class="text-sm font-semibold text-slate-700">
-                Todavía no hay borradores.
-            </p>
-            <p class="mt-1 text-xs text-slate-500">
-                Crea una lista seleccionando productos del inventario.
-            </p>
-        </div>
-
-        <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <article v-for="report in reports" :key="report.id"
-                class="rounded-xl border border-slate-200 p-4 transition hover:bg-slate-50">
+        <div
+            v-else
+            class="mt-4 flex gap-3 overflow-x-auto pb-1"
+        >
+            <button
+                v-for="report in reports"
+                :key="report.id"
+                type="button"
+                class="min-w-[220px] rounded-2xl border border-secondary bg-secondary px-4 py-3 text-left transition hover:bg-background"
+                @click="$emit('open', report)"
+            >
                 <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <p class="text-sm font-bold text-slate-900">
-                            Borrador #{{ report.id }}
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-semibold text-text">
+                            {{ report.folio || `Orden #${report.id}` }}
                         </p>
-                        <p class="text-xs text-slate-500">
+                        <p class="mt-1 text-xs text-text opacity-70">
                             {{ formatDate(report.created_at) }}
                         </p>
                     </div>
 
                     <span
-                        class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                        class="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                        :class="statusClasses(report.status)"
+                    >
                         {{ statusLabel(report.status) }}
                     </span>
                 </div>
 
-                <p class="mt-3 text-sm text-slate-600">
-                    Productos: <b>{{ report.items_count ?? report.items?.length ?? 0 }}</b>
-                </p>
-
-                <p class="mt-2 line-clamp-2 text-xs text-slate-500">
-                    {{ report.notes || 'Sin notas generales' }}
-                </p>
-
-                <button type="button"
-                    class="mt-4 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                    @click="$emit('open', report)">
-                    Abrir borrador
-                </button>
-            </article>
+                <div class="mt-3 flex items-center justify-between text-xs text-text opacity-70">
+                    <span>{{ report.items_count ?? report.items?.length ?? 0 }} producto(s)</span>
+                    <span class="font-semibold text-text">Abrir</span>
+                </div>
+            </button>
         </div>
     </section>
 </template>

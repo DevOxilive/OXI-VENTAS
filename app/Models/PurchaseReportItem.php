@@ -14,7 +14,6 @@ class PurchaseReportItem extends Model
         'requested_quantity',
         'estimated_price',
         'estimated_total',
-        'notes',
     ];
 
     protected $casts = [
