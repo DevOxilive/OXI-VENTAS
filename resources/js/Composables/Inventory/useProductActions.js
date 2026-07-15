@@ -34,8 +34,8 @@ export function useProductActions() {
             mode: "delete",
             entityName: "producto",
             title: "Eliminar producto",
-            message: `?Deseas eliminar ${product.name}?`,
-            confirmText: "S?, eliminar",
+            message: `¿Deseas eliminar ${product.name}?`,
+            confirmText: "Sí, eliminar",
         });
 
         if (!result.isConfirmed) return;

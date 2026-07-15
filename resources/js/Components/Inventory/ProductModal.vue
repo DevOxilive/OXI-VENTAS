@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { router, useForm } from "@inertiajs/vue3";
 import { watch, computed, ref, onBeforeUnmount } from "vue";
 import GlobalModal from "@/Components/Modales/GlobalModal.vue";

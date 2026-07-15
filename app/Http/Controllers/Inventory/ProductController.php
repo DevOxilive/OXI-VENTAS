@@ -264,7 +264,7 @@ class ProductController extends Controller
         });
 
         broadcast(new ProductChanged('created', $product->id, $branchIds))->toOthers();
-        event(RealtimeActivityLogged::message('creÃ³', 'el producto', $product->name, 'Inventario', 'created'));
+        event(RealtimeActivityLogged::message('creó', 'el producto', $product->name, 'Inventario', 'created'));
 
         return back()->with('success', 'Producto creado correctamente');
     }
@@ -311,7 +311,7 @@ class ProductController extends Controller
 
         if ($duplicatedBarcode) {
             return back()->withErrors([
-                'barcodes.0' => 'Este cÃ³digo de barras ya pertenece a otro producto.',
+                'barcodes.0' => 'Este código de barras ya pertenece a otro producto.',
             ]);
         }
 
@@ -397,7 +397,7 @@ class ProductController extends Controller
             ->all();
 
         broadcast(new ProductChanged('updated', $product->id, $affectedBranchIds))->toOthers();
-        event(RealtimeActivityLogged::message('actualizÃ³', 'el producto', $product->name, 'Inventario', 'updated'));
+        event(RealtimeActivityLogged::message('actualizó', 'el producto', $product->name, 'Inventario', 'updated'));
 
         return back()->with('success', 'Producto actualizado correctamente');
     }
@@ -434,7 +434,7 @@ class ProductController extends Controller
         });
 
         broadcast(new ProductChanged('deleted', $productId, $branchIds))->toOthers();
-        event(RealtimeActivityLogged::message('eliminÃ³', 'el producto', $productName, 'Inventario', 'deleted'));
+        event(RealtimeActivityLogged::message('eliminó', 'el producto', $productName, 'Inventario', 'deleted'));
 
         return back()->with('success', 'Producto eliminado correctamente');
     }
@@ -477,14 +477,14 @@ class ProductController extends Controller
             'branch_slug' => $branchProduct->branch?->slug,
             'branch_ids' => collect($branchIds)->map(fn ($id) => (int) $id)->values()->all(),
             'barcodes' => $product?->barcodes?->pluck('code')->values() ?? [],
-            'barcode' => $product?->barcodes?->first()?->code ?? 'Sin cÃ³digo',
+            'barcode' => $product?->barcodes?->first()?->code ?? 'Sin código',
             'unit' => $product?->unit ?? '',
             'name' => $product?->name ?? 'Producto sin nombre',
             'image' => $imageUrl,
             'image_path' => $product?->image,
             'category_id' => $product?->category_id,
-            'category_name' => $product?->category?->name ?? 'Sin categorÃ­a',
-            'category' => $product?->category?->name ?? 'Sin categorÃ­a',
+            'category_name' => $product?->category?->name ?? 'Sin categoría',
+            'category' => $product?->category?->name ?? 'Sin categoría',
             'min_stock' => $branchProduct->min_stock ?? 0,
             'cost' => $product?->cost ?? 0,
             'price' => $product?->sale_price ?? 0,

@@ -329,7 +329,7 @@ export function useAdjustStockForm(props, emit) {
             entityName: "Movimiento de stock",
             close: () => emit("close"),
             successTitle: "Movimiento registrado correctamente",
-            errorTitle: "Error en la operaci?n",
+            errorTitle: "Error en la operación",
             errorMessage: "No fue posible registrar el movimiento de stock",
             onSuccess: () => {
                 resetForm();
