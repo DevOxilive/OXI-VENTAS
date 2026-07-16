@@ -77,8 +77,8 @@ const activeModule = computed(() => {
 
 const passwordPlaceholder = computed(() => {
     return props.isEditing
-        ? 'Nueva contrasena (opcional)'
-        : 'Contrasena'
+        ? 'Nueva contraseña (opcional)'
+        : 'Contraseña'
 })
 
 watch(availableSections, (sections) => {
@@ -175,10 +175,10 @@ function closeModal() {
 
                             <InputField
                                 v-model="form.email"
-                                label="Correo electronico"
+                                label="Correo electrónico"
                                 field="email"
                                 type="email"
-                                placeholder="Correo electronico"
+                                placeholder="Correo electrónico"
                                 :error="errors.email"
                             />
 
@@ -194,7 +194,7 @@ function closeModal() {
 
                             <InputField
                                 v-model="form.password"
-                                label="Contrasena"
+                                label="Contraseña"
                                 field="password"
                                 type="password"
                                 :placeholder="passwordPlaceholder"
@@ -203,17 +203,17 @@ function closeModal() {
 
                             <InputField
                                 v-model="form.password_confirmation"
-                                label="Confirmar contrasena"
+                                label="Confirmar contraseña"
                                 field="password_confirmation"
                                 type="password"
-                                placeholder="Confirmar contrasena"
+                                placeholder="Confirmar contraseña"
                                 :error="errors.password_confirmation"
                             />
                         </div>
                     </FormPanel>
 
                     <FormPanel
-                        title="Modulos de acceso"
+                        title="Módulos de acceso"
                         panel-class="rounded-3xl bg-background shadow-sm sm:p-5 md:max-h-[calc(90dvh-13rem)] md:overflow-y-auto md:pr-3 md:p-6 xl:col-span-5"
                         body-class="space-y-4"
                     >
@@ -226,11 +226,11 @@ function closeModal() {
                                 >
                                     <template #default>
                                         <p v-if="!form.role_id" class="mb-3 text-xs text-accent">
-                                            Primero selecciona un rol para definir si estas sucursales seran obligatorias para este usuario.
+                                            Primero selecciona un rol para definir si estas sucursales serán obligatorias para este usuario.
                                         </p>
 
                                         <p v-else-if="!requiresBranchAccess" class="mb-3 text-xs text-text opacity-70">
-                                            Para el rol y permisos actuales, esta asignacion queda guardada como alcance disponible, aunque todavia no sea obligatoria.
+                                            Para el rol y permisos actuales, esta asignación queda guardada como alcance disponible, aunque todavía no sea obligatoria.
                                         </p>
 
                                         <SelectionCheckboxCard
@@ -247,7 +247,7 @@ function closeModal() {
                                 </SelectionGridSection>
 
                                 <p v-if="requiresBranchAccess" class="mt-2 text-xs text-text opacity-70">
-                                    Para la combinacion actual de rol y permisos, este usuario necesita al menos una sucursal asignada.
+                                    Para la combinación actual de rol y permisos, este usuario necesita al menos una sucursal asignada.
                                 </p>
 
                                 <p v-if="errors.branch_ids" class="mt-2 text-xs text-red-500">
@@ -260,7 +260,7 @@ function closeModal() {
                             </div>
 
                             <SelectionGridSection
-                                title="Modulos principales"
+                                title="Módulos principales"
                                 grid-class="grid grid-cols-1 gap-2"
                             >
                                 <template #aside>
@@ -382,7 +382,7 @@ function closeModal() {
                             v-else
                             class="flex min-h-[18rem] items-center justify-center rounded-2xl border border-dashed border-secondary bg-secondary px-4 py-6 text-center text-sm text-text opacity-70"
                         >
-                            Selecciona un modulo y despues un submodulo para ver sus permisos.
+                            Selecciona un modulo y después un submodulo para ver sus permisos.
                         </div>
                     </FormPanel>
                 </div>
