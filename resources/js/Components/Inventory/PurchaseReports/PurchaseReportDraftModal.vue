@@ -7,7 +7,7 @@ import FormPanel from '@/Components/Cards/FormPanel.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
-import { UniversalActionModal } from '@/Components/Modales/UniversalActionModal'
+import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { getPurchaseReportDraftModalConfig } from '@/config/ModalConfigs/purchaseReportDraftModalConfig'
 
 const props = defineProps({
@@ -117,38 +117,88 @@ function updateReport() {
     router.put(
         route('inventory.branches.purchase-reports.update', routeParams()),
         payload(),
-        { preserveScroll: true, onSuccess: () => emit('close') },
+        getModalRequestOptions({
+            mode: 'update',
+            entityName: 'Orden de compra',
+            successTitle: 'Orden de compra actualizada correctamente',
+            errorTitle: 'No se pudo actualizar la orden',
+            errorMessage: 'Revisa las cantidades, costos y descuentos capturados.',
+            onSuccess: () => emit('close'),
+        }),
     )
 }
 
-function generateReport() {
+async function generateReport() {
+    const result = await confirmModalAction({
+        mode: 'create',
+        entityName: 'orden de compra',
+        title: 'Generar orden de compra',
+        message: 'El borrador pasará al seguimiento de órdenes de compra. ¿Deseas continuar?',
+        confirmText: 'Generar orden',
+    })
+
+    if (!result.isConfirmed) return
+
     router.post(
         route('inventory.branches.purchase-reports.generate', routeParams()),
-        {},
-        { preserveScroll: true, onSuccess: () => emit('close') },
+        payload(),
+        getModalRequestOptions({
+            mode: 'create',
+            entityName: 'Orden de compra',
+            successTitle: 'Orden de compra generada correctamente',
+            errorTitle: 'No se pudo generar la orden',
+            errorMessage: 'Revisa la información de la lista y vuelve a intentarlo.',
+            onSuccess: () => emit('close'),
+        }),
     )
 }
 
-function completeReport() {
+async function completeReport() {
+    const result = await confirmModalAction({
+        mode: 'update',
+        entityName: 'orden de compra',
+        title: 'Completar compra',
+        message: 'La orden quedará cerrada con las cantidades y costos capturados. ¿Deseas continuar?',
+        confirmText: 'Completar compra',
+    })
+
+    if (!result.isConfirmed) return
+
     router.post(
         route('inventory.branches.purchase-reports.complete', routeParams()),
         payload(),
-        { preserveScroll: true, onSuccess: () => emit('close') },
+        getModalRequestOptions({
+            mode: 'update',
+            entityName: 'Orden de compra',
+            successTitle: 'Compra completada correctamente',
+            errorTitle: 'No se pudo completar la compra',
+            errorMessage: 'Revisa las cantidades, costos y descuentos capturados.',
+            onSuccess: () => emit('close'),
+        }),
     )
 }
 
 async function deleteDraft() {
-    const result = await UniversalActionModal({
+    const result = await confirmModalAction({
+        mode: 'delete',
+        entityName: 'borrador',
         title: 'Eliminar borrador',
-        message: 'Esta accion eliminara la orden de compra guardada.',
-        confirmText: 'Eliminar',
+        message: 'Esta acción eliminará el borrador y sus productos. No se puede deshacer.',
+        confirmText: 'Eliminar borrador',
     })
 
     if (!result.isConfirmed) return
 
     router.delete(
         route('inventory.branches.purchase-reports.destroy', routeParams()),
-        { preserveScroll: true, onSuccess: () => emit('close') },
+        getModalRequestOptions({
+            mode: 'delete',
+            entityName: 'Borrador',
+            successTitle: 'Borrador eliminado correctamente',
+            errorTitle: 'No se pudo eliminar el borrador',
+            errorMessage: 'Actualiza la página y vuelve a intentarlo.',
+            onSuccess: () => emit('close'),
+        }),
     )
 }
 </script>

@@ -1,9 +1,10 @@
 <script setup>
 import { computed, ref } from "vue";
-import { Head } from "@inertiajs/vue3";
+import { Head, router } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
+import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import GlobalToolbar from "@/Components/Toolbars/GlobalToolbar.vue";
 import GlobalTable from "@/Components/Tables/GlobalTable.vue";
 import AppButton from "@/Components/Buttons/AppButton.vue";
@@ -11,16 +12,17 @@ import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
 import QuantityStepper from "@/Components/Forms/QuantityStepper.vue";
 import EmptyStateCard from "@/Components/Cards/EmptyStateCard.vue";
-import MetricCard from "@/Components/Cards/MetricCard.vue";
 import SectionHeading from "@/Components/Cards/SectionHeading.vue";
+import FormPanel from "@/Components/Cards/FormPanel.vue";
 import TextareaField from "@/Components/Forms/TextareaField.vue";
+import { confirmModalAction, getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 import { useGlobalTablePagination } from "@/Composables/useGlobalTablePagination";
 import { usePurchaseReport } from "@/Composables/Inventory/usePurchaseReport";
+import { usePermissions } from "@/Composables/usePermissions";
 import { getPurchaseReportProductsTableConfig } from "@/config/TableConfigs/purchaseReportProductsTableConfig";
 import { getPurchaseReportToolbarConfig } from "@/config/ToolbarConfigs/purchaseReportToolbarConfig";
 
 import PurchaseReportDrafts from "@/Components/Inventory/PurchaseReports/PurchaseReportDrafts.vue";
-import PurchaseReportDraftModal from "@/Components/Inventory/PurchaseReports/PurchaseReportDraftModal.vue";
 
 const props = defineProps({
     currentBranch: Object,
@@ -28,14 +30,23 @@ const props = defineProps({
     filters: Object,
     categoriesDB: Array,
     reportsDB: {
-        type: Array,
-        default: () => [],
+        type: Object,
+        default: () => ({}),
+    },
+    listFilters: {
+        type: Object,
+        default: () => ({}),
+    },
+    listCounts: {
+        type: Object,
+        default: () => ({}),
     },
 });
 
 const report = usePurchaseReport(props);
 const { handlePageChange } = useGlobalTablePagination();
-const selectedDraft = ref(null);
+const { can } = usePermissions();
+const selectedList = ref(null);
 
 const tableConfig = getPurchaseReportProductsTableConfig();
 const stockOptions = [
@@ -57,13 +68,7 @@ const toolbarConfig = computed(() => getPurchaseReportToolbarConfig({
 const tableRows = computed(() => report.tableRows.value);
 const pagination = computed(() => report.paginator.value);
 const selectedProducts = computed(() => report.selectedProducts.value);
-
-function formatMoney(value) {
-    return new Intl.NumberFormat("es-MX", {
-        style: "currency",
-        currency: "MXN",
-    }).format(Number(value || 0));
-}
+const purchaseLists = computed(() => props.reportsDB?.data ?? []);
 
 function handleTableAction({ action, row }) {
     if (action === "add") {
@@ -80,16 +85,22 @@ function handleTableRowClick(row) {
     report.toggleProduct(row);
 }
 
-function openDraft(draft) {
-    selectedDraft.value = draft;
-}
+async function openDraft(draft) {
+    if (Number(report.editingOrder.value?.id) === Number(draft?.id)) return;
 
-function closeDraft() {
-    selectedDraft.value = null;
-}
+    if (report.selectedCount.value > 0) {
+        const result = await confirmModalAction({
+            mode: "update",
+            entityName: "borrador",
+            title: "Abrir borrador",
+            message: "Ya tienes productos en la lista actual. Al abrir este borrador serán reemplazados por sus productos. ¿Deseas continuar?",
+            confirmText: "Abrir borrador",
+            cancelText: "Conservar lista",
+        });
 
-function editDraft(draft) {
-    closeDraft();
+        if (!result.isConfirmed) return;
+    }
+
     report.editDraft(draft);
 }
 
@@ -98,52 +109,160 @@ function handleToolbarAction(action) {
         report.clearWorkspace();
     }
 }
+
+async function generateOrder() {
+    const result = await confirmModalAction({
+        mode: "create",
+        entityName: "orden de compra",
+        title: "Generar orden de compra",
+        message: "La lista dejará de ser un borrador y pasará al seguimiento de órdenes de compra. ¿Deseas continuar?",
+        confirmText: "Generar orden",
+        cancelText: "Cancelar",
+    });
+
+    if (result.isConfirmed) report.generateOrder();
+}
+
+async function deleteDraft(draft) {
+    const result = await confirmModalAction({
+        mode: "delete",
+        entityName: "borrador",
+        title: "Eliminar borrador",
+        message: `Se eliminará ${draft.folio || `la lista #${draft.id}`} y sus productos. Esta acción no se puede deshacer.`,
+        confirmText: "Eliminar borrador",
+    });
+
+    if (!result.isConfirmed) return;
+
+    router.delete(
+        route("inventory.branches.purchase-reports.destroy", {
+            branch: props.currentBranch.id,
+            purchaseReport: draft.id,
+        }),
+        getModalRequestOptions({
+            mode: "delete",
+            entityName: "Borrador",
+            successTitle: "Borrador eliminado correctamente",
+            errorTitle: "No se pudo eliminar el borrador",
+            errorMessage: "Actualiza la página y vuelve a intentarlo.",
+            onSuccess: () => {
+                if (Number(report.editingOrder.value?.id) === Number(draft.id)) {
+                    report.clearDraft();
+                }
+            },
+        }),
+    );
+}
+
+function listStatusLabel(status) {
+    if (status === "COMPLETED") return "Compra completada";
+    if (status === "GENERATED") return "En seguimiento";
+    return "Borrador";
+}
+
+function itemResultLabel(item) {
+    if (item.status === "UNAVAILABLE") return "No encontrado";
+    if (selectedList.value?.status === "COMPLETED") {
+        return `Compradas: ${Number(item.purchased_quantity || 0)} pzas.`;
+    }
+    return `Solicitadas: ${Number(item.requested_quantity || 0)} pzas.`;
+}
+
+function changeListStatus(status) {
+    selectedList.value = null;
+
+    router.get(
+        route("inventory.branches.purchase-reports.index", {
+            branch: props.currentBranch.id,
+        }),
+        {
+            search: report.localFilters.value.search || undefined,
+            category_id: report.localFilters.value.category_id || undefined,
+            stock: report.localFilters.value.stock || undefined,
+            per_page: report.localFilters.value.per_page || 25,
+            list_status: status,
+        },
+        {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        },
+    );
+}
+
+function paginateLists(url) {
+    if (!url) return;
+
+    router.get(url, {}, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+}
+
 </script>
 
 <template>
-    <Head title="Lista de abastecimiento" />
+    <Head title="Generar lista de compra" />
 
     <AdminLayout>
         <PageLayout>
             <template #toolbar>
-                <GlobalToolbar v-bind="toolbarConfig" @action="handleToolbarAction" />
+                <GlobalToolbar
+                    v-bind="toolbarConfig"
+                    @action="handleToolbarAction"
+                />
             </template>
 
-            <div class="space-y-5">
-                <section class="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)_320px]">
+            <div>
+                <section class="grid min-w-0 gap-5 xl:grid-cols-[230px_minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+                    <PurchaseReportDrafts
+                        :reports="purchaseLists"
+                        :counts="listCounts"
+                        :pagination="reportsDB"
+                        :active-status="listFilters.status || 'DRAFT'"
+                        :active-draft-id="report.editingOrder.value?.id"
+                        :can-delete="can('inventory.purchase-reports.delete')"
+                        @open="openDraft"
+                        @view="selectedList = $event"
+                        @delete="deleteDraft"
+                        @status-change="changeListStatus"
+                        @paginate="paginateLists"
+                    />
+
                     <article class="min-w-0 rounded-[28px] border border-secondary bg-background p-5 shadow-sm">
-                        <div class="grid gap-3 2xl:grid-cols-[minmax(0,1.3fr)_180px_180px_150px]">
-                                <InputField
-                                    v-model="report.localFilters.value.search"
-                                    label="Buscar productos"
-                                    field="toolbar_search"
-                                    icon="barcode_scanner"
-                                    placeholder="Codigo, codigo alterno, nombre o categoria"
-                                />
+                        <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-[minmax(0,1.3fr)_180px_180px_150px]">
+                            <InputField
+                                v-model="report.localFilters.value.search"
+                                label="Buscar productos"
+                                field="toolbar_search"
+                                icon="barcode_scanner"
+                                placeholder="Codigo, codigo alterno, nombre o categoria"
+                            />
 
-                                <SelectField
-                                    v-model="report.localFilters.value.category_id"
-                                    label="Categoria"
-                                    field="purchase_report_category"
-                                    :options="categoriesDB"
-                                    placeholder="Todas"
-                                />
+                            <SelectField
+                                v-model="report.localFilters.value.category_id"
+                                label="Categoria"
+                                field="purchase_report_category"
+                                :options="categoriesDB"
+                                placeholder="Todas"
+                            />
 
-                                <SelectField
-                                    v-model="report.localFilters.value.stock"
-                                    label="Stock"
-                                    field="purchase_report_stock"
-                                    :options="stockOptions"
-                                    placeholder="Todo"
-                                />
+                            <SelectField
+                                v-model="report.localFilters.value.stock"
+                                label="Stock"
+                                field="purchase_report_stock"
+                                :options="stockOptions"
+                                placeholder="Todo"
+                            />
 
-                                <SelectField
-                                    v-model="report.localFilters.value.per_page"
-                                    label="Registros"
-                                    field="purchase_report_per_page"
-                                    :options="perPageOptions"
-                                    placeholder="25 por pagina"
-                                />
+                            <SelectField
+                                v-model="report.localFilters.value.per_page"
+                                label="Registros"
+                                field="purchase_report_per_page"
+                                :options="perPageOptions"
+                                placeholder="25 por pagina"
+                            />
                         </div>
 
                         <div class="mt-4">
@@ -159,19 +278,25 @@ function handleToolbarAction(action) {
                         </div>
                     </article>
 
-                    <article class="min-w-0 rounded-[28px] border border-secondary bg-background p-5 shadow-sm">
-                        <div class="rounded-2xl border border-secondary bg-secondary px-4 py-3">
-                            <div>
-                                <p class="text-sm font-semibold text-text">
-                                    {{ report.isEditing.value ? `Productos de ${report.editingOrder.value?.folio}` : "Productos de la compra actual" }}
-                                </p>
-                                <p class="text-xs text-text opacity-70">
-                                    Aqui defines cuantas piezas vas a pedir antes de guardar el borrador.
-                                </p>
+                    <article class="flex min-h-0 min-w-0 flex-col rounded-[28px] border border-secondary bg-background p-5 shadow-sm">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <SectionHeading
+                                :title="report.isEditing.value ? `Productos de ${report.editingOrder.value?.folio}` : 'Productos de la lista'"
+                                description="Define las piezas necesarias antes de guardar la lista."
+                                spacing="sm"
+                            />
+
+                            <div class="flex shrink-0 gap-2 text-xs font-semibold text-text">
+                                <span class="rounded-full border border-secondary bg-secondary px-3 py-1.5">
+                                    {{ report.selectedCount.value }} {{ report.selectedCount.value === 1 ? "producto" : "productos" }}
+                                </span>
+                                <span class="rounded-full border border-secondary bg-secondary px-3 py-1.5">
+                                    {{ report.totalQuantity.value }} {{ report.totalQuantity.value === 1 ? "pieza" : "piezas" }}
+                                </span>
                             </div>
                         </div>
 
-                        <div class="mt-4 max-h-[calc(100vh-22rem)] space-y-3 overflow-y-auto pr-1">
+                        <div class="mt-4 max-h-[calc(100vh-27rem)] min-h-[260px] space-y-3 overflow-y-auto pr-1">
                             <article
                                 v-for="item in selectedProducts"
                                 :key="item.branch_product_id"
@@ -201,89 +326,102 @@ function handleToolbarAction(action) {
                                         @decrease="report.decreaseQuantity(item.branch_product_id)"
                                         @increase="report.increaseQuantity(item.branch_product_id)"
                                     />
-
-                                    <p class="min-w-0 truncate text-xs text-text opacity-70">
-                                        Unit. <strong class="text-text">{{ formatMoney(item.price) }}</strong>
-                                    </p>
-
-                                    <p class="ml-auto min-w-0 truncate text-right text-xs text-text opacity-70">
-                                        Importe <strong class="text-text">{{ formatMoney(Number(item.price || 0) * Number(item.requested_quantity || 0)) }}</strong>
-                                    </p>
                                 </div>
                             </article>
 
                             <EmptyStateCard
                                 v-if="selectedProducts.length === 0"
                                 title="Todavia no hay productos en la lista"
-                                description="Usa la tabla de la izquierda para ir agregando productos a la compra."
+                                description="Usa la tabla de productos para agregar lo que necesitas solicitar."
                                 icon="shopping_cart"
-                                min-height-class="min-h-[360px]"
+                                min-height-class="min-h-[260px]"
                                 tone="white"
                             />
                         </div>
-                    </article>
 
-                    <aside class="flex min-h-0 min-w-0 flex-col rounded-[28px] border border-secondary bg-background p-5 shadow-sm">
-                        <SectionHeading
-                            title="Compra actual"
-                            description="Resumen y acciones de la lista."
-                            spacing="sm"
-                        />
-
-                        <div class="mt-5 space-y-4">
-                            <div class="grid grid-cols-2 gap-3">
-                                <MetricCard
-                                    label="Articulos"
-                                    :value="report.selectedCount.value"
-                                />
-
-                                <MetricCard
-                                    label="Piezas"
-                                    :value="report.totalQuantity.value"
-                                />
-                            </div>
-
+                        <div class="mt-4 space-y-4 border-t border-secondary pt-4">
                             <TextareaField
                                 v-model="report.notes.value"
                                 label="Notas generales"
                                 field="purchase_report_notes"
-                                placeholder="Observaciones generales para la compra"
-                                :rows="3"
+                                placeholder="Observaciones generales para la lista"
+                                :rows="2"
                             />
 
-                            <MetricCard
-                                label="Aproximado a pagar"
-                                :value="formatMoney(report.estimatedTotal.value)"
-                                tone="dark"
-                                size="lg"
-                            />
-                        </div>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <AppButton
+                                    block
+                                    :disabled="report.selectedCount.value === 0"
+                                    variant="secondary"
+                                    @click="report.saveDraft"
+                                >
+                                    {{ report.isEditing.value ? "Actualizar lista" : "Guardar lista" }}
+                                </AppButton>
 
-                        <div class="mt-auto space-y-3 pt-6">
-                            <AppButton
-                                block
-                                :disabled="report.selectedCount.value === 0"
-                                @click="report.saveDraft"
-                            >
-                                {{ report.isEditing.value ? "Guardar cambios" : "Guardar borrador" }}
-                            </AppButton>
+                                <AppButton
+                                    block
+                                    :disabled="report.selectedCount.value === 0"
+                                    @click="generateOrder"
+                                >
+                                    Generar orden de compra
+                                </AppButton>
+                            </div>
                         </div>
-                    </aside>
+                    </article>
                 </section>
-
-                <PurchaseReportDrafts
-                    :reports="reportsDB"
-                    @open="openDraft"
-                />
             </div>
 
-            <PurchaseReportDraftModal
-                v-if="selectedDraft"
-                :report="selectedDraft"
-                :branch-name="branchLabel"
-                @close="closeDraft"
-                @edit="editDraft"
-            />
+            <GlobalModal
+                v-if="selectedList"
+                :title="selectedList.folio || `Lista #${selectedList.id}`"
+                :subtitle="`${listStatusLabel(selectedList.status)} · ${selectedList.items_count || selectedList.items?.length || 0} productos`"
+                mode="view"
+                size="xl"
+                height="auto"
+                :show-save="false"
+                close-button-text="Cerrar"
+                @close="selectedList = null"
+            >
+                <FormPanel
+                    title="Productos solicitados"
+                    description="Seguimiento de la lista sin información de costos."
+                    panel-class="shadow-none"
+                >
+                    <div class="space-y-2">
+                        <article
+                            v-for="item in selectedList.items"
+                            :key="item.branch_product_id"
+                            class="flex flex-col gap-2 rounded-2xl border border-secondary bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-bold text-text">{{ item.name }}</p>
+                                <p class="truncate text-xs text-text opacity-60">{{ item.code || "Sin código" }}</p>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-text">
+                                <span class="rounded-full border border-secondary bg-secondary px-3 py-1.5">
+                                    Solicitadas: {{ Number(item.requested_quantity || 0) }} pzas.
+                                </span>
+                                <span
+                                    v-if="selectedList.status === 'COMPLETED'"
+                                    class="rounded-full border px-3 py-1.5"
+                                    :class="item.status === 'UNAVAILABLE'
+                                        ? 'border-primary bg-secondary text-primary'
+                                        : 'border-secondary bg-secondary'"
+                                >
+                                    {{ itemResultLabel(item) }}
+                                </span>
+                            </div>
+                        </article>
+                    </div>
+                </FormPanel>
+
+                <FormPanel title="Notas generales" panel-class="shadow-none">
+                    <p class="whitespace-pre-wrap text-sm text-text" :class="selectedList.notes ? '' : 'opacity-60'">
+                        {{ selectedList.notes || "Sin notas generales." }}
+                    </p>
+                </FormPanel>
+            </GlobalModal>
         </PageLayout>
     </AdminLayout>
 </template>

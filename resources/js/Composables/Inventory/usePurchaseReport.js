@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { router } from "@inertiajs/vue3";
+import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 
 function resolveStockStatus(product) {
     const stock = Number(product.stock || 0);
@@ -47,10 +48,6 @@ export function usePurchaseReport(props) {
         (total, item) => total + Number(item.requested_quantity || 0),
         0
     ));
-    const estimatedTotal = computed(() => selectedProducts.value.reduce(
-        (total, item) => total + Number(item.requested_quantity || 0) * Number(item.price || 0),
-        0
-    ));
 
     watch(localFilters, () => {
         clearTimeout(filterTimer);
@@ -70,7 +67,6 @@ export function usePurchaseReport(props) {
                 code: product.primary_code || product.main_barcode || product.code || "",
                 stock: Number(product.stock || 0),
                 min_stock: Number(product.min_stock || 0),
-                price: Number(product.price || 0),
                 requested_quantity: 1,
             },
         };
@@ -140,6 +136,7 @@ export function usePurchaseReport(props) {
                 category_id: localFilters.value.category_id || undefined,
                 stock: localFilters.value.stock || undefined,
                 per_page: localFilters.value.per_page || 25,
+                list_status: props.listFilters?.status || "DRAFT",
                 ...overrides,
             },
             {
@@ -179,7 +176,6 @@ export function usePurchaseReport(props) {
                 code: product.barcodes?.[0]?.code || branchProduct.barcode || "",
                 stock: Number(item.current_stock || branchProduct.stock || 0),
                 min_stock: Number(item.min_stock || branchProduct.min_stock || 0),
-                price: Number(item.estimated_price || product.cost || 0),
                 requested_quantity: Number(item.requested_quantity || 1),
             };
         }
@@ -190,17 +186,31 @@ export function usePurchaseReport(props) {
         window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    function saveDraft() {
-        const payload = {
+    function buildPayload() {
+        return {
             notes: notes.value,
             items: selectedProducts.value.map((item) => ({
                 branch_product_id: item.branch_product_id,
                 requested_quantity: Number(item.requested_quantity || 0),
             })),
         };
-        const options = { onSuccess: clearDraft };
+    }
 
-        if (editingOrder.value) {
+    function saveDraft() {
+        const payload = buildPayload();
+        const updating = Boolean(editingOrder.value);
+        const options = getModalRequestOptions({
+            mode: updating ? "update" : "save",
+            entityName: "Lista de compra",
+            successTitle: updating
+                ? "Lista de compra actualizada correctamente"
+                : "Borrador guardado correctamente",
+            errorTitle: "No se pudo guardar la lista",
+            errorMessage: "Revisa los productos y cantidades antes de intentarlo nuevamente.",
+            onSuccess: clearDraft,
+        });
+
+        if (updating) {
             router.put(
                 route("inventory.branches.purchase-reports.update", {
                     branch: props.currentBranch.id,
@@ -221,6 +231,37 @@ export function usePurchaseReport(props) {
         );
     }
 
+    function generateOrder() {
+        const options = getModalRequestOptions({
+            mode: "create",
+            entityName: "Orden de compra",
+            successTitle: "Orden de compra generada correctamente",
+            errorTitle: "No se pudo generar la orden",
+            errorMessage: "Revisa los productos y cantidades antes de intentarlo nuevamente.",
+            onSuccess: clearDraft,
+        });
+
+        if (!editingOrder.value) {
+            router.post(
+                route("inventory.branches.purchase-reports.store", {
+                    branch: props.currentBranch.id,
+                }),
+                { ...buildPayload(), generate_order: true },
+                options
+            );
+            return;
+        }
+
+        router.post(
+            route("inventory.branches.purchase-reports.generate", {
+                branch: props.currentBranch.id,
+                purchaseReport: editingOrder.value.id,
+            }),
+            buildPayload(),
+            options
+        );
+    }
+
     return {
         notes,
         selectedItems,
@@ -233,7 +274,6 @@ export function usePurchaseReport(props) {
         selectedProducts,
         selectedCount,
         totalQuantity,
-        estimatedTotal,
         addProduct,
         toggleProduct,
         updateItem,
@@ -246,5 +286,6 @@ export function usePurchaseReport(props) {
         resetFilters,
         editDraft,
         saveDraft,
+        generateOrder,
     };
 }

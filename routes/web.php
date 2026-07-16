@@ -348,6 +348,14 @@ Route::middleware([
             ->middleware('permission:inventory.view,inventory.branches.view')
             ->name('branches.reports');
 
+        Route::get('/branches/{branch}/reports/purchases', [PurchaseReportController::class, 'reportsIndex'])
+            ->middleware('permission:inventory.purchase-reports.view,inventory.purchase-reports.update')
+            ->name('branches.reports.purchases');
+
+        Route::get('/branches/{branch}/reports/purchase-orders', [PurchaseReportController::class, 'orders'])
+            ->middleware('permission:inventory.purchase-reports.view,inventory.purchase-reports.update')
+            ->name('branches.reports.purchase-orders');
+
         Route::get('/branches/{branch}/reports/audits', function (\App\Models\Branch $branch) {
             return redirect()->route('audits.physical-counts.reports', [
                 'branch' => $branch->slug,
