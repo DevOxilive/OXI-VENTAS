@@ -41,6 +41,15 @@ const reportGroups = [
         disabled: true,
     },
     {
+        key: 'cash-closures',
+        title: 'Reportes de cortes',
+        description: 'Cortes de caja registrados, efectivo contado, diferencias y usuario responsable.',
+        icon: 'summarize',
+        disabled: false,
+        routeName: 'ventas.cash-closures.reports',
+        usesBranch: false,
+    },
+    {
         key: 'inventory',
         title: 'Reportes de inventario',
         description: 'Caducidades, stock bajo, rotación e inventario general.',
@@ -83,7 +92,14 @@ const toolbarConfig = computed(() => ({
 }))
 
 function openReportGroup(group) {
-    if (group.disabled || !group.routeName || !props.currentBranch?.id) return
+    if (group.disabled || !group.routeName) return
+
+    if (group.usesBranch === false) {
+        router.get(route(group.routeName))
+        return
+    }
+
+    if (!props.currentBranch?.id) return
 
     router.get(route(group.routeName, {
         branch: props.currentBranch.id,
@@ -99,7 +115,7 @@ function openReportGroup(group) {
             <GlobalToolbar v-bind="toolbarConfig" />
         </template>
 
-        <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
             <GlobalCard
                 v-for="group in visibleReportGroups"
                 :key="group.key"

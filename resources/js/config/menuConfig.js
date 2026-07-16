@@ -172,6 +172,8 @@ export function generateMenu(role, permissions = [], branches = []) {
 
         ...(isAdmin ||
         can("audits.physical-counts.reports") ||
+        can("sales.cash-closures.view") ||
+        can("sales.cash-closures.create") ||
         can("inventory.view") ||
         can("inventory.branches.view")
             ? [
@@ -207,6 +209,8 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("audits.physical-counts.create") ||
         can("audits.physical-counts.update") ||
         can("audits.physical-counts.delete") ||
+        can("sales.cash-closures.view") ||
+        can("sales.cash-closures.create") ||
         can("inventory.view") ||
         can("inventory.branches.view");
 
@@ -239,13 +243,35 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("sales.create") ||
         can("sales.update") ||
         can("sales.delete") ||
-        can("sales.reports")
+        can("sales.reports") ||
+        can("sales.cash-closures.view") ||
+        can("sales.cash-closures.create")
     ) {
         menu.push({
             text: "Ventas",
             key: "sales",
             icon: "point_of_sale",
-            url: route("ventas.home"),
+            isOpen: false,
+            children: [
+                {
+                    text: "Punto de venta",
+                    key: "sales.pos",
+                    icon: "point_of_sale",
+                    url: route("ventas.home"),
+                },
+                ...(isAdmin ||
+                can("sales.cash-closures.view") ||
+                can("sales.cash-closures.create")
+                    ? [
+                          {
+                              text: "Corte de caja",
+                              key: "sales.cash-closures",
+                              icon: "payments",
+                              url: route("ventas.cash-closures.index"),
+                          },
+                      ]
+                    : []),
+            ],
         });
     }
 
@@ -267,6 +293,12 @@ export function generateMenu(role, permissions = [], branches = []) {
                     key: "printers.tickets",
                     icon: "receipt_long",
                     url: route("printers.tickets.index"),
+                },
+                {
+                    text: "Tickets de corte",
+                    key: "printers.cash-closure-tickets",
+                    icon: "payments",
+                    url: route("printers.cash-closure-tickets.index"),
                 },
                 ...(isAdmin ||
                 can("systems.labels.view") ||

@@ -74,6 +74,53 @@ class TicketTemplateController extends Controller
         ]);
     }
 
+    public function cashClosures()
+    {
+        $template = TicketTemplate::cashClosureTemplate();
+
+        return Inertia::render('Printers/Tickets', [
+            'template' => [
+                'id' => $template->id,
+                'name' => $template->name,
+                'slug' => $template->slug,
+                'is_active' => $template->is_active,
+                'settings' => $this->resolvedSettings($template),
+            ],
+            'samplePrintJob' => $this->sampleCashClosurePrintJob(),
+            'templateContext' => [
+                'title' => 'Tickets de corte',
+                'subtitle' => 'Configura la impresion del cierre de caja con vista previa.',
+                'defaultName' => 'Ticket de corte',
+                'defaultSubheader' => 'CORTE DE CAJA',
+                'defaultFooter' => 'Corte realizado correctamente',
+                'fieldLabels' => [
+                    'name' => 'Plantilla de corte',
+                    'header' => 'Encabezado',
+                    'subheader' => 'Titulo del corte',
+                    'cashBox' => 'Caja detectada',
+                    'footer' => 'Mensaje final',
+                ],
+                'blockLabels' => [
+                    'cash_box' => 'Caja detectada',
+                    'brand_title' => 'Encabezado',
+                    'divider_header' => 'Linea despues del encabezado',
+                    'folio' => 'Folio de corte',
+                    'date' => 'Fecha del corte',
+                    'divider_folio' => 'Linea despues del folio/fecha',
+                    'document_title' => 'Titulo del corte',
+                    'seller_user' => 'Usuario',
+                    'payment_method' => 'Metodo de pago',
+                    'divider_items' => 'Linea antes de denominaciones',
+                    'items' => 'Denominaciones',
+                    'divider_totals' => 'Linea antes del resumen',
+                    'totals' => 'Resumen del corte',
+                    'divider_footer' => 'Linea antes del mensaje final',
+                    'footer_text' => 'Mensaje final',
+                ],
+            ],
+        ]);
+    }
+
     public function update(Request $request, TicketTemplate $ticketTemplate)
     {
         $data = $request->validate([
@@ -97,10 +144,14 @@ class TicketTemplateController extends Controller
             'settings.blocks.*.size_percent' => ['required', 'integer', 'min:60', 'max:180'],
         ]);
 
+        $defaults = $ticketTemplate->slug === 'cash-closure-ticket'
+            ? TicketTemplate::cashClosureDefaultSettings()
+            : TicketTemplate::defaultSettings();
+
         $ticketTemplate->update([
             'name' => $data['name'],
             'is_active' => $data['is_active'],
-            'settings' => TicketTemplate::sanitizeSettings($data['settings']),
+            'settings' => TicketTemplate::sanitizeSettings($data['settings'], $defaults),
         ]);
 
         return back()->with('success', 'Plantilla de ticket actualizada correctamente.');
@@ -177,6 +228,39 @@ class TicketTemplateController extends Controller
                     'discount_amount' => 0,
                 ],
             ],
+        ];
+    }
+
+    private function sampleCashClosurePrintJob(): array
+    {
+        return [
+            'type' => 'cash_closure',
+            'folio' => 'CC-20260716-000123',
+            'date' => now()->format('d/m/Y H:i'),
+            'branch_name' => 'Ajusco',
+            'user_name' => 'Usuario de sesion',
+            'cash_box_number' => '1',
+            'cash_box_text' => 'CAJA #1',
+            'sales_count' => 24,
+            'sales_total' => 2450.50,
+            'expected_cash' => 1450.50,
+            'counted_cash' => 1450.50,
+            'cash_left' => 500.00,
+            'cash_withdrawal' => 950.50,
+            'cash_difference' => 0,
+            'card_total' => 1000.00,
+            'counted_card' => 1000.00,
+            'card_difference' => 0,
+            'denomination_breakdown' => [
+                '500' => 1,
+                '200' => 2,
+                '100' => 3,
+                '50' => 3,
+                '20b' => 5,
+                '10' => 5,
+                '0.5' => 1,
+            ],
+            'notes' => 'Corte cuadrado sin incidencias.',
         ];
     }
 

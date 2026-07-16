@@ -18,6 +18,7 @@ use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\Inventory\PurchaseReportController;
 use App\Http\Controllers\Inventory\BranchInventoryController;
 use App\Http\Controllers\Inventory\CategoryController;
+use App\Http\Controllers\Ventas\CashRegisterClosureController;
 use App\Http\Controllers\Ventas\SalesController;
 
 /*
@@ -102,6 +103,10 @@ Route::middleware([
             ->middleware('permission:systems.tickets.update')
             ->name('tickets.update');
 
+        Route::get('/cash-closure-tickets', [TicketTemplateController::class, 'cashClosures'])
+            ->middleware('permission:systems.tickets.view,systems.tickets.update')
+            ->name('cash-closure-tickets.index');
+
         Route::get('/labels', function () {
             return redirect()->route('printers.labels.index');
         })
@@ -175,6 +180,26 @@ Route::middleware([
             Route::post('/', [SalesController::class, 'store'])
                 ->middleware('permission:sales.create')
                 ->name('store');
+
+            Route::get('/cortes', [CashRegisterClosureController::class, 'index'])
+                ->middleware('permission:sales.cash-closures.view,sales.cash-closures.create')
+                ->name('cash-closures.index');
+
+            Route::post('/cortes', [CashRegisterClosureController::class, 'store'])
+                ->middleware('permission:sales.cash-closures.create')
+                ->name('cash-closures.store');
+
+            Route::put('/cortes/{closure}', [CashRegisterClosureController::class, 'update'])
+                ->middleware('permission:sales.cash-closures.update')
+                ->name('cash-closures.update');
+
+            Route::delete('/cortes/{closure}', [CashRegisterClosureController::class, 'destroy'])
+                ->middleware('permission:sales.cash-closures.delete')
+                ->name('cash-closures.destroy');
+
+            Route::get('/cortes/reportes', [CashRegisterClosureController::class, 'reports'])
+                ->middleware('permission:sales.cash-closures.view,sales.cash-closures.create')
+                ->name('cash-closures.reports');
         });
 
     /*
@@ -191,6 +216,10 @@ Route::middleware([
         Route::put('/tickets/{ticketTemplate}', [TicketTemplateController::class, 'update'])
             ->middleware('permission:systems.tickets.update')
             ->name('tickets.update');
+
+        Route::get('/cash-closure-tickets', [TicketTemplateController::class, 'cashClosures'])
+            ->middleware('permission:systems.tickets.view,systems.tickets.update')
+            ->name('cash-closure-tickets.index');
 
         Route::get('/labels', [TicketTemplateController::class, 'labels'])
             ->middleware('permission:systems.labels.view,systems.labels.update')
@@ -345,7 +374,7 @@ Route::middleware([
         */
 
         Route::get('/branches/{branch}/reports', [ReportController::class, 'index'])
-            ->middleware('permission:inventory.view,inventory.branches.view')
+            ->middleware('permission:inventory.view,inventory.branches.view,sales.cash-closures.view,sales.cash-closures.create')
             ->name('branches.reports');
 
         Route::get('/branches/{branch}/reports/purchases', [PurchaseReportController::class, 'reportsIndex'])
@@ -363,6 +392,10 @@ Route::middleware([
         })
             ->middleware('permission:audits.physical-counts.reports')
             ->name('branches.reports.audits');
+
+        Route::get('/branches/{branch}/reports/cash-closures', [CashRegisterClosureController::class, 'reports'])
+            ->middleware('permission:sales.cash-closures.view,sales.cash-closures.create')
+            ->name('branches.reports.cash-closures');
 
         Route::get('/reports', fn() => Inertia::render('Inventory/Reports/Index'))
             ->middleware('permission:inventory.view')

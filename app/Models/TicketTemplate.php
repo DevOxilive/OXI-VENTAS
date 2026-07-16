@@ -111,6 +111,53 @@ class TicketTemplate extends Model
         return $template->fresh();
     }
 
+    public static function cashClosureTemplate(): self
+    {
+        $template = static::query()->firstOrCreate(
+            ['slug' => 'cash-closure-ticket'],
+            [
+                'name' => 'Ticket de corte',
+                'is_active' => true,
+                'settings' => static::cashClosureDefaultSettings(),
+            ]
+        );
+
+        $normalizedSettings = static::sanitizeSettings($template->settings ?? static::cashClosureDefaultSettings(), static::cashClosureDefaultSettings());
+
+        if (!$template->settings || $normalizedSettings !== ($template->settings ?? [])) {
+            $template->update([
+                'settings' => $normalizedSettings,
+            ]);
+        }
+
+        return $template->fresh();
+    }
+
+    public static function cashClosureDefaultSettings(): array
+    {
+        return array_replace(static::defaultSettings(), [
+            'subheader_text' => 'CORTE DE CAJA',
+            'footer_text' => 'Corte realizado correctamente',
+            'blocks' => [
+                ['key' => 'cash_box', 'enabled' => true, 'position_percent' => 100, 'size_percent' => 104],
+                ['key' => 'brand_title', 'enabled' => true, 'position_percent' => 50, 'size_percent' => 118],
+                ['key' => 'divider_header', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 90],
+                ['key' => 'folio', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 104],
+                ['key' => 'date', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 104],
+                ['key' => 'divider_folio', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 90],
+                ['key' => 'document_title', 'enabled' => true, 'position_percent' => 50, 'size_percent' => 108],
+                ['key' => 'seller_user', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 90],
+                ['key' => 'payment_method', 'enabled' => false, 'position_percent' => 0, 'size_percent' => 90],
+                ['key' => 'divider_items', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 90],
+                ['key' => 'items', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 88],
+                ['key' => 'divider_totals', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 90],
+                ['key' => 'totals', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 96],
+                ['key' => 'divider_footer', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 90],
+                ['key' => 'footer_text', 'enabled' => true, 'position_percent' => 50, 'size_percent' => 96],
+            ],
+        ]);
+    }
+
     public static function productLabelTemplate(): self
     {
         $template = static::query()->firstOrCreate(
@@ -133,10 +180,11 @@ class TicketTemplate extends Model
         return $template->fresh();
     }
 
-    public static function sanitizeSettings(array $settings = []): array
+    public static function sanitizeSettings(array $settings = [], ?array $customDefaults = null): array
     {
-        $defaults = static::defaultSettings();
+        $defaults = $customDefaults ?? static::defaultSettings();
         $allowedBlockKeys = collect($defaults['blocks'])->pluck('key')->all();
+        $defaultBlocks = collect($defaults['blocks'])->keyBy('key');
 
         foreach (self::LEGACY_SETTING_KEYS as $key) {
             unset($settings[$key]);
@@ -144,11 +192,16 @@ class TicketTemplate extends Model
 
         $incomingBlocks = collect($settings['blocks'] ?? [])
             ->filter(fn ($block) => is_array($block) && in_array($block['key'] ?? null, $allowedBlockKeys, true))
-            ->keyBy('key');
+            ->unique('key')
+            ->values();
 
-        $settings['blocks'] = collect($defaults['blocks'])
-            ->map(function (array $defaultBlock) use ($incomingBlocks) {
-                $incoming = $incomingBlocks->get($defaultBlock['key'], []);
+        $settings['blocks'] = $incomingBlocks
+            ->concat(
+                collect($defaults['blocks'])
+                    ->reject(fn (array $block) => $incomingBlocks->contains('key', $block['key']))
+            )
+            ->map(function (array $incoming) use ($defaultBlocks) {
+                $defaultBlock = $defaultBlocks->get($incoming['key']);
 
                 return [
                     'key' => $defaultBlock['key'],

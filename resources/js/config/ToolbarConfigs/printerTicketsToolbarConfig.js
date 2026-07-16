@@ -1,7 +1,11 @@
-export function getPrinterTicketsToolbarConfig({ processing = false } = {}) {
+export function getPrinterTicketsToolbarConfig({
+  processing = false,
+  title = "Tickets",
+  subtitle = "Ajusta el ticket con una plantilla visual y libre para impresion.",
+} = {}) {
   return {
-    title: "Tickets",
-    subtitle: "Ajusta el ticket con una plantilla visual y libre para impresion.",
+    title,
+    subtitle,
     showSearch: false,
     showRecordsPerPage: false,
     showCounter: false,

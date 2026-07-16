@@ -31,6 +31,10 @@ class PermissionSeeder extends Seeder
             'sales.update',
             'sales.delete',
             'sales.reports',
+            'sales.cash-closures.view',
+            'sales.cash-closures.create',
+            'sales.cash-closures.update',
+            'sales.cash-closures.delete',
 
             'inventory.view',
             'inventory.create',
@@ -73,6 +77,10 @@ class PermissionSeeder extends Seeder
             'sales.update',
             'sales.delete',
             'sales.reports',
+            'sales.cash-closures.view',
+            'sales.cash-closures.create',
+            'sales.cash-closures.update',
+            'sales.cash-closures.delete',
 
             // Impresoras
             'systems.tickets.view',

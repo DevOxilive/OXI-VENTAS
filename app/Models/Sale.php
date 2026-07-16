@@ -12,6 +12,7 @@ class Sale extends Model
         'employee_id',
         'customer_id',
         'branch_id',
+        'cash_box_number',
         'payment_method_id',
         'total',
         'cash_received',
