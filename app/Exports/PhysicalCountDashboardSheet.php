@@ -32,16 +32,17 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
     public function array(): array
     {
         $lastRow = max(2, count($this->payload['reportRows'] ?? []) + 1);
+        $formulaLastRow = max(6000, $lastRow);
         $sheet = $this->quotedSheetTitle();
 
         return [
-            ['Total Productos', "=COUNTA({$sheet}!B2:B{$lastRow})"],
-            ['Avance', "=IFERROR(1-(COUNTIF({$sheet}!D2:D{$lastRow},\"S/D\")/COUNTA({$sheet}!B2:B{$lastRow})),0)"],
+            ['📦 Total Productos', "=COUNTA({$sheet}!B2:B1001)"],
+            ['📈 Avance', "=IFERROR(1-(COUNTIF({$sheet}!E2:E{$formulaLastRow},\"S/D\")/COUNTA({$sheet}!B2:B{$formulaLastRow})),0)"],
             [null, null],
-            ['Macheados', "=SUMPRODUCT(({$sheet}!C2:C{$lastRow}={$sheet}!D2:D{$lastRow})*({$sheet}!D2:D{$lastRow}<>\"S/D\"))"],
-            ['Sobrantes', "=SUMPRODUCT(({$sheet}!D2:D{$lastRow}>{$sheet}!C2:C{$lastRow})*({$sheet}!D2:D{$lastRow}<>\"S/D\"))"],
-            ['Faltantes', "=SUMPRODUCT(({$sheet}!D2:D{$lastRow}<{$sheet}!C2:C{$lastRow})*({$sheet}!D2:D{$lastRow}<>\"S/D\"))"],
-            ['No encontrados', "=COUNTIF({$sheet}!D2:D{$lastRow},\"S/D\")"],
+            ['🟢 Stock Mach', "=SUMPRODUCT(({$sheet}!D2:D{$formulaLastRow}={$sheet}!E2:E{$formulaLastRow})*({$sheet}!E2:E{$formulaLastRow}<>\"S/D\"))"],
+            ['🟡 Diferencias', "=SUMPRODUCT(({$sheet}!E2:E{$formulaLastRow}>{$sheet}!D2:D{$formulaLastRow})*({$sheet}!E2:E{$formulaLastRow}<>\"S/D\"))"],
+            ['🔴Stock Bajo al actual', "=SUMPRODUCT(({$sheet}!E2:E{$formulaLastRow}<{$sheet}!D2:D{$formulaLastRow})*({$sheet}!E2:E{$formulaLastRow}<>\"S/D\"))"],
+            ['⚪ Sin revisar', "=COUNTIF({$sheet}!E2:E{$formulaLastRow},\"S/D\")"],
             [null, null],
             ['TOTAL', '=SUM(B4:B6)'],
             ['Descontando el total producto - Total mach,dif,stock bajo', '=B1-B9'],
@@ -93,26 +94,10 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
     public function styles(Worksheet $sheet): array
     {
         return [
-            1 => [
-                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '111827']],
-            ],
-            4 => [
-                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '16A34A']],
-            ],
-            5 => [
-                'font' => ['bold' => true, 'color' => ['rgb' => '111827']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FDE047']],
-            ],
-            6 => [
-                'font' => ['bold' => true, 'color' => ['rgb' => '111827']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FB923C']],
-            ],
-            7 => [
-                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '2563EB']],
-            ],
+            'A1:A7' => ['font' => ['size' => 20]],
+            'B1:B7' => ['font' => ['size' => 20]],
+            9 => ['font' => ['bold' => true]],
+            10 => ['font' => ['bold' => true]],
         ];
     }
 
@@ -122,13 +107,14 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
                 $sheet->mergeCells('C1:P10');
-                $sheet->mergeCells('A11:P16');
-                $sheet->getStyle('A1:B16')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-                $sheet->getStyle('A1:B10')->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
-                $sheet->getStyle('A12:B16')->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
+                $sheet->mergeCells('A11:P32');
+                $sheet->getStyle('A1:B32')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('A1:B10')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+                $sheet->getStyle('A11:P32')->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
                 $sheet->getStyle('B2')->getNumberFormat()->setFormatCode('0.00%');
-                $sheet->getColumnDimension('A')->setWidth(48);
-                $sheet->getColumnDimension('B')->setWidth(18);
+                $sheet->getStyle('B1:B10')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getColumnDimension('A')->setWidth(35.38);
+                $sheet->getColumnDimension('B')->setWidth(17.63);
                 $sheet->setShowGridlines(false);
             },
         ];

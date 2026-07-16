@@ -48,9 +48,6 @@ class PhysicalCountUserSheet implements FromArray, ShouldAutoSize, WithColumnFor
             'Conteo Fisico',
             'Caducado',
             'NO EXHIBIDO',
-            'Sucursal',
-            'Auditoria',
-            'Folio',
         ];
     }
 
@@ -71,9 +68,6 @@ class PhysicalCountUserSheet implements FromArray, ShouldAutoSize, WithColumnFor
                     $counted > 0 ? $counted : null,
                     (float) $group->sum('expired_quantity'),
                     false,
-                    $row['branch_name'] ?? 'Sin sucursal',
-                    $row['audit_name'] ?? 'Sin auditoria',
-                    $row['folio'] ?? 'Sin folio',
                 ];
             })
             ->values()
@@ -85,7 +79,7 @@ class PhysicalCountUserSheet implements FromArray, ShouldAutoSize, WithColumnFor
         return [
             1 => [
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1F2937']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '5B3F86']],
             ],
         ];
     }
@@ -104,15 +98,18 @@ class PhysicalCountUserSheet implements FromArray, ShouldAutoSize, WithColumnFor
                 $sheet = $event->sheet->getDelegate();
                 $highestRow = $sheet->getHighestRow();
 
-                $sheet->setAutoFilter("A1:J{$highestRow}");
                 $sheet->freezePane('A2');
-                $sheet->getStyle("A1:J{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-                $sheet->getStyle("A1:J1")->getAlignment()->setWrapText(true);
+                $sheet->getStyle("A1:G{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle("A1:G1")->getAlignment()->setWrapText(true);
+                $sheet->getStyle("A1:G{$highestRow}")->getBorders()->getAllBorders()->setBorderStyle('thin');
                 $sheet->getStyle("D2:F{$highestRow}")->getNumberFormat()->setFormatCode('#,##0.00');
+                $sheet->getColumnDimension('A')->setWidth(15);
+                $sheet->getColumnDimension('B')->setWidth(21.25);
                 $sheet->getColumnDimension('C')->setWidth(45);
-                $sheet->getColumnDimension('H')->setWidth(24);
-                $sheet->getColumnDimension('I')->setWidth(30);
-                $sheet->getColumnDimension('J')->setWidth(18);
+                $sheet->getColumnDimension('D')->setWidth(8);
+                $sheet->getColumnDimension('E')->setWidth(10);
+                $sheet->getColumnDimension('F')->setWidth(7);
+                $sheet->getColumnDimension('G')->setWidth(15);
             },
         ];
     }

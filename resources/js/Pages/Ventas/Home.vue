@@ -80,6 +80,7 @@ const selectedBranchId = ref(props.currentBranch?.id ?? "");
 const selectedCashBoxNumber = ref("1");
 const cart = ref([]);
 const lastPrintJob = ref(null);
+const cardPaymentConfirmed = ref(false);
 const initialAlertBranchId = ref(null);
 const expirationAlerts = ref([]);
 const expirationAlertPanelOpen = ref(false);
@@ -93,6 +94,7 @@ let printerRetryInterval = null;
 
 const saleForm = useForm({
   branch_id: props.currentBranch?.id ?? "",
+  cash_box_number: selectedCashBoxNumber.value,
   payment_method_id: props.defaultPaymentMethodId ?? "",
   cash_received: "",
   items: [],
@@ -119,6 +121,7 @@ watch(
     cart.value = [];
     search.value = "";
     saleForm.cash_received = "";
+    cardPaymentConfirmed.value = false;
     lastPrintJob.value = null;
     expirationAlertPanelOpen.value = false;
     highlightedSuggestionIndex.value = 0;
@@ -256,20 +259,59 @@ const topExpirationAlerts = computed(() =>
 );
 
 const canCharge = computed(() => {
-  return cart.value.length > 0 && receivedAmount.value >= cartTotal.value;
+  if (cart.value.length === 0 || !saleForm.payment_method_id) {
+    return false;
+  }
+
+  if (!isCashPayment.value) {
+    return cardPaymentConfirmed.value;
+  }
+
+  return receivedAmount.value >= cartTotal.value;
 });
 
 const currentBranchLabel = computed(
   () => props.currentBranch?.name || "Sin sucursal"
 );
 
-const selectedPaymentMethodLabel = computed(() => {
-  return (
-    props.paymentMethodsDB.find(
-      (paymentMethod) =>
-        String(paymentMethod.id) === String(saleForm.payment_method_id)
-    )?.name || "Sin seleccionar"
-  );
+const selectedPaymentMethod = computed(() =>
+  props.paymentMethodsDB.find(
+    (paymentMethod) =>
+      String(paymentMethod.id) === String(saleForm.payment_method_id)
+  ) || null
+);
+
+const selectedPaymentMethodLabel = computed(() =>
+  selectedPaymentMethod.value?.name || "Sin seleccionar"
+);
+
+const selectedPaymentMethodType = computed(() => {
+  const methodName = String(selectedPaymentMethod.value?.name || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (methodName.includes("tarjeta") || methodName.includes("card") || methodName.includes("credito") || methodName.includes("debito")) {
+    return "card";
+  }
+
+  if (methodName.includes("efectivo") || methodName.includes("cash")) {
+    return "cash";
+  }
+
+  return "cash";
+});
+
+const isCashPayment = computed(() => selectedPaymentMethodType.value === "cash");
+const isAdminUser = computed(() => page.props.auth?.user?.role?.name === "Administrador");
+const canReturnToBranchSelector = computed(() =>
+  isAdminUser.value && !props.selectorMode && props.branchesDB.length > 1
+);
+
+watch(cartTotal, (total) => {
+  if (!isCashPayment.value && saleForm.payment_method_id) {
+    saleForm.cash_received = Number(total || 0).toFixed(2);
+  }
 });
 
 const toolbarConfig = computed(() =>
@@ -287,6 +329,7 @@ const toolbarConfig = computed(() =>
     selectedPrinterName: selectedPrinterName.value,
     printerBridgeReady: printerBridgeReady.value,
     expirationAlertCount: expirationAlertCount.value,
+    backButton: canReturnToBranchSelector.value,
   })
 );
 
@@ -731,6 +774,7 @@ function clearCart() {
   cart.value = [];
   search.value = "";
   saleForm.cash_received = "";
+  cardPaymentConfirmed.value = false;
   highlightedSuggestionIndex.value = 0;
   focusSearch();
 }
@@ -748,6 +792,21 @@ function switchBranch(branchId) {
   );
 }
 
+function returnToBranchSelector() {
+  if (!canReturnToBranchSelector.value) {
+    return;
+  }
+
+  router.get(
+    route("ventas.home"),
+    {},
+    {
+      preserveScroll: true,
+      replace: true,
+    }
+  );
+}
+
 function handleBranchChange(value) {
   selectedBranchId.value = value;
   loadCashBoxForBranch(value);
@@ -756,6 +815,14 @@ function handleBranchChange(value) {
 
 function handlePaymentMethodChange(value) {
   saleForm.payment_method_id = value ? Number(value) : "";
+  cardPaymentConfirmed.value = false;
+
+  if (!isCashPayment.value) {
+    saleForm.cash_received = Number(cartTotal.value || 0).toFixed(2);
+    return;
+  }
+
+  saleForm.cash_received = "";
 }
 
 function handleToolbarFilterUpdate({ key, value }) {
@@ -917,7 +984,15 @@ function submitSale() {
     return;
   }
 
-  if (receivedAmount.value < cartTotal.value) {
+  if (!saleForm.payment_method_id) {
+    ErrorAlert({
+      title: "Forma de pago requerida",
+      message: "Selecciona efectivo o pago con tarjeta antes de cobrar.",
+    });
+    return;
+  }
+
+  if (isCashPayment.value && receivedAmount.value < cartTotal.value) {
     ErrorAlert({
       title: "Efectivo insuficiente",
       message: "El monto recibido debe cubrir el total de la venta.",
@@ -925,7 +1000,19 @@ function submitSale() {
     return;
   }
 
+  if (!isCashPayment.value && !cardPaymentConfirmed.value) {
+    ErrorAlert({
+      title: "Confirma el pago con tarjeta",
+      message: "Marca que la terminal aprobo el cobro antes de registrar la venta.",
+    });
+    return;
+  }
+
   saleForm.branch_id = selectedBranchId.value || props.currentBranch?.id || "";
+  saleForm.cash_box_number = String(selectedCashBoxNumber.value || "1");
+  saleForm.cash_received = isCashPayment.value
+    ? Number(saleForm.cash_received || 0)
+    : Number(cartTotal.value || 0);
   saleForm.items = cart.value.map((item) => ({
     branch_product_id: item.branch_product_id,
     product_id: item.product_id,
@@ -983,6 +1070,7 @@ function submitSale() {
     <template #toolbar>
       <GlobalToolbar
         v-bind="toolbarConfig"
+        @back="returnToBranchSelector"
         @update:filter="handleToolbarFilterUpdate"
         @action="handleToolbarAction"
       />
@@ -1382,30 +1470,75 @@ function submitSale() {
 
             <div class="mt-4 flex flex-1 flex-col">
               <div class="space-y-4">
-                <InputField
-                  v-model="saleForm.cash_received"
-                  label="Efectivo recibido"
-                  field="cash_received"
-                  type="number"
-                  placeholder="0.00"
-                  :error="saleForm.errors.cash_received"
-                  prefix="$"
-                />
+                <template v-if="isCashPayment">
+                  <InputField
+                    v-model="saleForm.cash_received"
+                    label="Efectivo recibido"
+                    field="cash_received"
+                    type="number"
+                    placeholder="0.00"
+                    :error="saleForm.errors.cash_received"
+                    prefix="$"
+                  />
 
-                <div class="grid grid-cols-2 gap-3">
+                  <div class="grid grid-cols-2 gap-3">
+                    <MetricCard
+                      label="Cambio"
+                      :value="formatMoney(changeDue)"
+                      tone="success"
+                      size="sm"
+                    />
+
+                    <MetricCard
+                      label="Falta"
+                      :value="formatMoney(missingAmount)"
+                      tone="danger"
+                      size="sm"
+                    />
+                  </div>
+                </template>
+
+                <div v-else class="grid grid-cols-1 gap-3">
                   <MetricCard
-                    label="Cambio"
-                    :value="formatMoney(changeDue)"
-                    tone="success"
+                    label="Total en tarjeta"
+                    :value="formatMoney(cartTotal)"
+                    tone="neutral"
                     size="sm"
                   />
 
-                  <MetricCard
-                    label="Falta"
-                    :value="formatMoney(missingAmount)"
-                    tone="danger"
-                    size="sm"
-                  />
+                  <button
+                    type="button"
+                    class="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition"
+                    :class="cardPaymentConfirmed
+                      ? 'border-accent bg-secondary text-accent'
+                      : 'border-primary bg-secondary text-primary hover:bg-background'"
+                    @click="cardPaymentConfirmed = !cardPaymentConfirmed"
+                  >
+                    <span class="flex min-w-0 items-center gap-3">
+                      <span
+                        class="material-symbols-outlined text-[22px]"
+                        :class="cardPaymentConfirmed ? 'text-accent' : 'text-primary'"
+                      >
+                        {{ cardPaymentConfirmed ? 'task_alt' : 'credit_score' }}
+                      </span>
+                      <span class="min-w-0">
+                        <span class="block text-sm font-black">
+                          Terminal aprobada
+                        </span>
+                        <span class="block text-xs font-semibold opacity-75">
+                          Confirma que el pago con tarjeta ya fue aceptado.
+                        </span>
+                      </span>
+                    </span>
+                    <span
+                      class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border"
+                      :class="cardPaymentConfirmed
+                        ? 'border-accent bg-accent text-white'
+                        : 'border-primary bg-background text-transparent'"
+                    >
+                      <span class="material-symbols-outlined text-[16px]">check</span>
+                    </span>
+                  </button>
                 </div>
 
                 <InfoCard

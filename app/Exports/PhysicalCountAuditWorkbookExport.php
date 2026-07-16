@@ -25,7 +25,7 @@ class PhysicalCountAuditWorkbookExport implements WithMultipleSheets
             ->filter()
             ->unique()
             ->values();
-        $this->statusFilter = $this->filters['status'] ?: null;
+        $this->statusFilter = ($this->filters['status'] ?? '') ?: null;
         $this->mainSheetTitle = $this->statusSheetTitle($this->statusFilter) ?? 'Concentrado';
 
         $this->users = $entries
@@ -35,7 +35,6 @@ class PhysicalCountAuditWorkbookExport implements WithMultipleSheets
             ->when($selectedUserIds->isNotEmpty(), fn ($users) => $users
                 ->filter(fn ($user) => $selectedUserIds->contains((int) $user->id)))
             ->unique('id')
-            ->sortBy('name')
             ->values();
     }
 
@@ -43,18 +42,8 @@ class PhysicalCountAuditWorkbookExport implements WithMultipleSheets
     {
         $sheets = [
             new PhysicalCountDashboardSheet($this->payload, $this->filterLabels, $this->branchName, $this->mainSheetTitle),
-            new PhysicalCountBranchSummarySheet($this->payload),
-            new PhysicalCountAuditSummarySheet($this->payload),
-            new PhysicalCountDifferencesSheet($this->payload),
             new PhysicalCountConcentratedSheet($this->payload, $this->users, $this->mainSheetTitle, $this->statusFilter),
         ];
-
-        if ($this->statusFilter === null) {
-            $sheets[] = new PhysicalCountConcentratedSheet($this->payload, $this->users, 'Macheado', 'matched');
-            $sheets[] = new PhysicalCountConcentratedSheet($this->payload, $this->users, 'Faltante', 'missing');
-            $sheets[] = new PhysicalCountConcentratedSheet($this->payload, $this->users, 'Sobrante', 'surplus');
-            $sheets[] = new PhysicalCountConcentratedSheet($this->payload, $this->users, 'No encontrado', 'not_found');
-        }
 
         foreach ($this->users as $user) {
             $sheets[] = new PhysicalCountUserSheet($this->payload, $user);

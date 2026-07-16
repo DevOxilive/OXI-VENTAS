@@ -29,9 +29,13 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  templateContext: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
-const blockCatalog = getTicketBlockCatalog();
+const baseBlockCatalog = getTicketBlockCatalog();
 const paperWidthOptions = [
   { label: "58 mm / 5.8 cm", value: 32 },
   { label: "80 mm compacto", value: 42 },
@@ -49,9 +53,25 @@ const form = useForm({
 });
 
 const previewTemplate = computed(() => normalizeTicketTemplate({ ...form.settings }));
+const fieldLabels = computed(() => ({
+  name: "Plantilla",
+  header: "Marca",
+  subheader: "Titulo",
+  cashBox: "Caja #",
+  footer: "Pie",
+  ...(props.templateContext?.fieldLabels || {}),
+}));
+const blockCatalog = computed(() =>
+  baseBlockCatalog.map((block) => ({
+    ...block,
+    label: props.templateContext?.blockLabels?.[block.key] || block.label,
+  }))
+);
 const toolbarConfig = computed(() =>
   getPrinterTicketsToolbarConfig({
     processing: form.processing,
+    title: props.templateContext?.title || "Tickets",
+    subtitle: props.templateContext?.subtitle || "Ajusta el ticket con una plantilla visual y libre para impresion.",
   })
 );
 
@@ -81,15 +101,20 @@ function updateBlockByKey(key, field, value) {
 
 function resetTemplate() {
   const nextSettings = normalizeTicketTemplate(createDefaultTicketTemplate());
+  const contextSettings = {
+    ...nextSettings,
+    subheader_text: props.templateContext?.defaultSubheader || nextSettings.subheader_text,
+    footer_text: props.templateContext?.defaultFooter || nextSettings.footer_text,
+  };
 
   form.defaults({
-    name: "Ticket principal",
+    name: props.templateContext?.defaultName || "Ticket principal",
     is_active: true,
-    settings: nextSettings,
+    settings: contextSettings,
   });
 
   form.reset();
-  saveStoredTicketTemplateSettings(nextSettings);
+  saveStoredTicketTemplateSettings(contextSettings);
 
   ToastAlert({
     title: "Plantilla restablecida",
@@ -217,9 +242,11 @@ function updatePreviewBlockPosition(event, blockKey) {
   });
 
   const currentIndex = form.settings.blocks.findIndex((block) => block.key === blockKey);
+  const targetBlockKey = previewBlocks.value[hoverIndex]?.key;
+  const targetIndex = form.settings.blocks.findIndex((block) => block.key === targetBlockKey);
 
-  if (hoverIndex >= 0 && currentIndex >= 0 && hoverIndex !== currentIndex) {
-    form.settings.blocks = reorderTicketBlocks(form.settings.blocks, currentIndex, hoverIndex);
+  if (targetIndex >= 0 && currentIndex >= 0 && targetIndex !== currentIndex) {
+    form.settings.blocks = reorderTicketBlocks(form.settings.blocks, currentIndex, targetIndex);
   }
 }
 
@@ -245,7 +272,7 @@ onBeforeUnmount(() => {
             >
               <div class="grid gap-3 lg:grid-cols-2">
                 <label class="rounded-2xl border border-secondary bg-secondary p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Plantilla</span>
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">{{ fieldLabels.name }}</span>
                   <input
                     v-model="form.name"
                     type="text"
@@ -266,7 +293,7 @@ onBeforeUnmount(() => {
                 </label>
 
                 <label class="rounded-2xl border border-secondary bg-secondary p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Marca</span>
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">{{ fieldLabels.header }}</span>
                   <input
                     v-model="form.settings.header_text"
                     type="text"
@@ -275,7 +302,7 @@ onBeforeUnmount(() => {
                 </label>
 
                 <label class="rounded-2xl border border-secondary bg-secondary p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Titulo</span>
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">{{ fieldLabels.subheader }}</span>
                   <input
                     v-model="form.settings.subheader_text"
                     type="text"
@@ -284,7 +311,7 @@ onBeforeUnmount(() => {
                 </label>
 
                 <label class="rounded-2xl border border-secondary bg-secondary p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Caja #</span>
+                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">{{ fieldLabels.cashBox }}</span>
                   <input
                     v-model="form.settings.cash_box_text"
                     type="text"
@@ -295,7 +322,7 @@ onBeforeUnmount(() => {
               </div>
 
               <label class="block rounded-2xl border border-secondary bg-secondary p-3">
-                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Pie</span>
+                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">{{ fieldLabels.footer }}</span>
                 <textarea
                   v-model="form.settings.footer_text"
                   rows="3"

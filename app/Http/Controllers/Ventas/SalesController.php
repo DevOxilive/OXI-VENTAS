@@ -68,6 +68,8 @@ class SalesController extends Controller
 
         $ticketTemplate = TicketTemplate::salesTemplate();
 
+        $paymentMethods = $this->allowedPaymentMethods();
+
         return Inertia::render('Ventas/Home', [
             'selectorMode' => $selectorMode,
             'currentBranch' => $branch ? [
@@ -78,11 +80,8 @@ class SalesController extends Controller
             ] : null,
             'branchesDB' => $allowedBranches,
             'productsDB' => $mappedProducts,
-            'paymentMethodsDB' => PaymentMethod::query()
-                ->where('active', true)
-                ->orderBy('name')
-                ->get(['id', 'name']),
-            'defaultPaymentMethodId' => $this->defaultPaymentMethodId(),
+            'paymentMethodsDB' => $paymentMethods,
+            'defaultPaymentMethodId' => $this->defaultPaymentMethodId($paymentMethods),
             'nearExpirationAlerts' => $selectorMode
                 ? []
                 : $this->buildNearExpirationAlerts($products)->take(12)->values(),
@@ -99,6 +98,7 @@ class SalesController extends Controller
     {
         $data = $request->validate([
             'branch_id' => ['required', 'exists:branches,id'],
+            'cash_box_number' => ['nullable', 'string', 'max:10'],
             'payment_method_id' => ['required', 'exists:payment_methods,id'],
             'cash_received' => ['required', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
@@ -114,6 +114,14 @@ class SalesController extends Controller
 
         $user = $request->user()->loadMissing(['branches', 'role']);
         $branch = $this->resolveBranchById($data['branch_id'], $user);
+        $paymentMethod = $this->allowedPaymentMethods()
+            ->firstWhere('id', (int) $data['payment_method_id']);
+
+        if (!$paymentMethod) {
+            throw ValidationException::withMessages([
+                'payment_method_id' => 'La forma de pago debe ser efectivo o pago con tarjeta.',
+            ]);
+        }
 
         if (!$user->employee_id) {
             throw ValidationException::withMessages([
@@ -121,12 +129,13 @@ class SalesController extends Controller
             ]);
         }
 
-        $sale = DB::transaction(function () use ($data, $user, $branch, $stockService) {
+        $sale = DB::transaction(function () use ($data, $user, $branch, $paymentMethod, $stockService) {
             $sale = Sale::create([
                 'date' => now(),
                 'employee_id' => $user->employee_id,
                 'customer_id' => null,
                 'branch_id' => $branch->id,
+                'cash_box_number' => (string) ($data['cash_box_number'] ?? '1'),
                 'payment_method_id' => $data['payment_method_id'],
                 'total' => 0,
                 'cash_received' => 0,
@@ -242,10 +251,13 @@ class SalesController extends Controller
                 ]);
             }
 
-            $cashReceived = round((float) $data['cash_received'], 2);
             $total = round($total, 2);
+            $isCashPayment = $this->isCashPaymentMethod($paymentMethod->name);
+            $cashReceived = $isCashPayment
+                ? round((float) $data['cash_received'], 2)
+                : $total;
 
-            if ($cashReceived < $total) {
+            if ($isCashPayment && $cashReceived < $total) {
                 throw ValidationException::withMessages([
                     'cash_received' => 'El efectivo recibido no puede ser menor al total de la venta.',
                 ]);
@@ -255,7 +267,7 @@ class SalesController extends Controller
                 'folio' => 'V-' . str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
                 'total' => $total,
                 'cash_received' => $cashReceived,
-                'change_due' => round($cashReceived - $total, 2),
+                'change_due' => $isCashPayment ? round($cashReceived - $total, 2) : 0,
             ]);
 
             return $sale;
@@ -412,12 +424,67 @@ class SalesController extends Controller
         ];
     }
 
-    private function defaultPaymentMethodId(): ?int
+    private function allowedPaymentMethods(): Collection
     {
         return PaymentMethod::query()
             ->where('active', true)
+            ->where(function ($query) {
+                $query
+                    ->whereRaw('LOWER(name) LIKE ?', ['%efectivo%'])
+                    ->orWhereRaw('LOWER(name) LIKE ?', ['%cash%'])
+                    ->orWhereRaw('LOWER(name) LIKE ?', ['%tarjeta%'])
+                    ->orWhereRaw('LOWER(name) LIKE ?', ['%card%'])
+                    ->orWhereRaw('LOWER(name) LIKE ?', ['%credito%'])
+                    ->orWhereRaw('LOWER(name) LIKE ?', ['%debito%']);
+            })
             ->orderBy('id')
-            ->value('id');
+            ->get(['id', 'name'])
+            ->map(function (PaymentMethod $method) {
+                $method->name = $this->displayPaymentMethodName($method->name);
+
+                return $method;
+            });
+    }
+
+    private function defaultPaymentMethodId(?Collection $paymentMethods = null): ?int
+    {
+        return ($paymentMethods ?? $this->allowedPaymentMethods())->first()?->id;
+    }
+
+    private function isCashPaymentMethod(string $methodName): bool
+    {
+        $normalized = $this->normalizedPaymentMethodName($methodName);
+
+        return str_contains($normalized, 'efectivo') || str_contains($normalized, 'cash');
+    }
+
+    private function displayPaymentMethodName(string $methodName): string
+    {
+        $normalized = $this->normalizedPaymentMethodName($methodName);
+
+        if (str_contains($normalized, 'tarjeta') || str_contains($normalized, 'card') || str_contains($normalized, 'credito') || str_contains($normalized, 'debito')) {
+            return 'Tarjeta';
+        }
+
+        return 'Efectivo';
+    }
+
+    private function normalizedPaymentMethodName(string $methodName): string
+    {
+        $normalized = mb_strtolower($methodName);
+
+        return strtr($normalized, [
+            'á' => 'a',
+            'é' => 'e',
+            'í' => 'i',
+            'ó' => 'o',
+            'ú' => 'u',
+            'Á' => 'a',
+            'É' => 'e',
+            'Í' => 'i',
+            'Ó' => 'o',
+            'Ú' => 'u',
+        ]);
     }
 
     private function buildNearExpirationAlerts(Collection $branchProducts): Collection
@@ -487,7 +554,9 @@ class SalesController extends Controller
             'folio' => $sale->folio,
             'date' => optional($sale->date)->format('d/m/Y H:i'),
             'branch_name' => $sale->branch?->name ?? 'Sucursal',
-            'payment_method' => $sale->paymentMethod?->name ?? 'Sin metodo',
+            'payment_method' => $sale->paymentMethod
+                ? $this->displayPaymentMethodName($sale->paymentMethod->name)
+                : 'Sin metodo',
             'employee_name' => trim(
                 ($sale->employee?->first_name ?? '') . ' ' . ($sale->employee?->last_name ?? '')
             ) ?: 'Sin empleado',

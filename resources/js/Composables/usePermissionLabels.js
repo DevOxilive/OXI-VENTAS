@@ -98,6 +98,10 @@ const permissionLabels = {
     "sales.update": "Editar ventas",
     "sales.delete": "Eliminar ventas",
     "sales.reports": "Ver reportes de ventas",
+    "sales.cash-closures.view": "Ver cortes de caja",
+    "sales.cash-closures.create": "Crear cortes de caja",
+    "sales.cash-closures.update": "Editar cortes de caja",
+    "sales.cash-closures.delete": "Eliminar cortes de caja",
 
     "inventory.products.view": "Ver productos",
     "inventory.products.create": "Crear productos",

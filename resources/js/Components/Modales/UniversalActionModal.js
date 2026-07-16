@@ -30,6 +30,15 @@ export function UniversalActionModal({
         reverseButtons: true,
         focusCancel: true,
         ...options,
+        didOpen: (...args) => {
+            const container = document.querySelector(".swal2-container")
+
+            if (container) {
+                container.style.zIndex = "999999"
+            }
+
+            options.didOpen?.(...args)
+        },
         customClass: {
             popup: "rounded-2xl",
             confirmButton: "px-5 py-2 rounded-full",
@@ -55,6 +64,13 @@ export function SuccessAlert({
         showConfirmButton: false,
         timer: 2500,
         timerProgressBar: true,
+        didOpen: () => {
+            const container = document.querySelector(".swal2-container")
+
+            if (container) {
+                container.style.zIndex = "999999"
+            }
+        },
     });
 }
 

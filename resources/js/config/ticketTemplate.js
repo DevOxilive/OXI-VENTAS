@@ -150,11 +150,6 @@ export function normalizeTicketTemplate(input = {}) {
     });
   });
 
-  normalizedBlocks.sort((left, right) => (
-    BLOCK_CATALOG.findIndex((item) => item.key === left.key)
-    - BLOCK_CATALOG.findIndex((item) => item.key === right.key)
-  ));
-
   return {
     paper_width: 48,
     print_engine: "raw",
@@ -497,7 +492,7 @@ function buildRowsForBlock(template, printJob, block) {
       if (sellerName) {
         rows.push({
           type: "pair",
-          label: "Atendio",
+          label: printJob.type === "cash_closure" ? "Usuario" : "Atendio",
           value: sellerName,
           block_key: block.key,
           position_percent: block.position_percent,
@@ -580,6 +575,73 @@ function buildRowsForBlock(template, printJob, block) {
       rows.push({ type: "pair", label: "Pago", value: printJob.payment_method, block_key: block.key, position_percent: block.position_percent, size_percent: block.size_percent });
       break;
     case "items":
+      if (printJob.type === "cash_closure") {
+        const labels = {
+          "1000": "$1000",
+          "500": "$500",
+          "200": "$200",
+          "100": "$100",
+          "50": "$50",
+          "20b": "$20 billete",
+          "20m": "$20 moneda",
+          "10": "$10",
+          "5": "$5",
+          "2": "$2",
+          "1": "$1",
+          "0.5": "$0.50",
+        };
+        const values = {
+          "1000": 1000,
+          "500": 500,
+          "200": 200,
+          "100": 100,
+          "50": 50,
+          "20b": 20,
+          "20m": 20,
+          "10": 10,
+          "5": 5,
+          "2": 2,
+          "1": 1,
+          "0.5": 0.5,
+        };
+
+        rows.push({
+          type: "text",
+          text: "Denominaciones",
+          block_key: block.key,
+          position_percent: block.position_percent,
+          size_percent: Math.max(82, block.size_percent),
+          bold: true,
+        });
+
+        const activeDenominations = Object.entries(printJob.denomination_breakdown || {}).filter(([, quantity]) => Number(quantity || 0) > 0);
+
+        if (activeDenominations.length === 0) {
+          rows.push({
+            type: "text",
+            text: "Sin denominaciones capturadas",
+            block_key: block.key,
+            position_percent: block.position_percent,
+            size_percent: Math.max(76, block.size_percent - 10),
+          });
+          break;
+        }
+
+        activeDenominations.forEach(([key, quantity]) => {
+          const count = Number(quantity || 0);
+
+          rows.push({
+            type: "columns",
+            left: `${labels[key] || key} x ${count}`,
+            right: `$${Number(count * (values[key] || 0)).toFixed(2)}`,
+            block_key: block.key,
+            position_percent: block.position_percent,
+            size_percent: block.size_percent,
+          });
+        });
+        break;
+      }
+
       (printJob.items || []).forEach((item) => {
         rows.push({
           type: "text",
@@ -610,6 +672,24 @@ function buildRowsForBlock(template, printJob, block) {
       });
       break;
     case "totals":
+      if (printJob.type === "cash_closure") {
+        rows.push({ type: "text", text: "Resumen del corte", block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(84, block.size_percent), bold: true });
+        rows.push({ type: "columns", left: "Ventas realizadas:", right: Number(printJob.sales_count || 0).toFixed(0), block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
+        rows.push({ type: "columns", left: "Venta total:", right: `$${Number(printJob.sales_total || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
+        rows.push({ type: "columns", left: "Efectivo sistema:", right: `$${Number(printJob.expected_cash || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
+        rows.push({ type: "columns", left: "Efectivo contado:", right: `$${Number(printJob.counted_cash || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
+        rows.push({ type: "columns", left: "Se deja en caja:", right: `$${Number(printJob.cash_left || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
+        rows.push({ type: "columns", left: "Retiro efectivo:", right: `$${Number(printJob.cash_withdrawal || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
+        rows.push({ type: "columns", left: "Dif. efectivo:", right: `$${Number(printJob.cash_difference || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
+        rows.push({ type: "columns", left: "Tarjeta sistema:", right: `$${Number(printJob.card_total || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
+        rows.push({ type: "columns", left: "Tarjeta registrada:", right: `$${Number(printJob.counted_card || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
+        rows.push({ type: "columns", left: "Dif. tarjeta:", right: `$${Number(printJob.card_difference || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: block.size_percent, bold: true });
+        if (normalizeText(printJob.notes)) {
+          rows.push({ type: "text", text: `Observaciones: ${printJob.notes}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(76, block.size_percent - 12) });
+        }
+        break;
+      }
+
       rows.push({ type: "columns", left: "Recibido:", right: `$${Number(printJob.cash_received || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
       rows.push({ type: "columns", left: "Cambio:", right: `$${Number(printJob.change_due || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
       rows.push({ type: "columns", left: "TOTAL:", right: `$${Number(printJob.total || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: block.size_percent, bold: true });

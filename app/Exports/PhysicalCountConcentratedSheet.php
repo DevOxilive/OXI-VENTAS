@@ -40,6 +40,7 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
     public function headings(): array
     {
         $headings = [
+            null,
             'Codigo de barras',
             'Descripcion Producto',
             'Stock Actual',
@@ -58,9 +59,6 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
             'Ventas del dia',
             'Diferencias Total',
             'Validado',
-            'Sucursal',
-            'Auditoria',
-            'Folio',
         ];
     }
 
@@ -77,12 +75,13 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
             ->values()
             ->map(function (array $row, int $index) use ($entriesByProductUser) {
                 $sheetRow = $index + 2;
-                $countCells = $this->userColumnCells($sheetRow, 5);
-                $expiredCells = $this->userColumnCells($sheetRow, 6);
-                $totalCountColumn = Coordinate::stringFromColumnIndex(5 + ($this->users->count() * 2));
-                $totalExpiredColumn = Coordinate::stringFromColumnIndex(6 + ($this->users->count() * 2));
+                $countCells = $this->userColumnCells($sheetRow, 6);
+                $expiredCells = $this->userColumnCells($sheetRow, 7);
+                $totalCountColumn = Coordinate::stringFromColumnIndex(6 + ($this->users->count() * 2));
+                $totalExpiredColumn = Coordinate::stringFromColumnIndex(7 + ($this->users->count() * 2));
 
                 $line = [
+                    null,
                     $row['scanned_code'] ?? '-',
                     $row['product_name'] ?? 'Sin producto',
                     (float) ($row['system_stock'] ?? 0),
@@ -104,11 +103,8 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
                     $this->users->isEmpty() ? 'S/TF' : '=IF(COUNT(' . implode(',', $countCells) . ')=0,"S/TF",SUM(' . implode(',', $countCells) . '))',
                     $this->users->isEmpty() ? 'S/TC' : '=IF(COUNT(' . implode(',', $countCells) . ')=0,"S/TC",SUM(' . implode(',', $expiredCells) . '))',
                     0,
-                    "=IF(C{$sheetRow}=\"\",\"----\",IFERROR({$totalCountColumn}{$sheetRow}-C{$sheetRow},\"S/DIF\"))",
+                    "=IF(D{$sheetRow}=\"\",\"----\",IFERROR({$totalCountColumn}{$sheetRow}-D{$sheetRow},\"S/DIF\"))",
                     false,
-                    $row['branch_name'] ?? 'Sin sucursal',
-                    $row['audit_name'] ?? 'Sin auditoria',
-                    $row['folio'] ?? 'Sin folio',
                 ];
             })
             ->values()
@@ -157,7 +153,7 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
     public function columnFormats(): array
     {
         return [
-            'A' => NumberFormat::FORMAT_TEXT,
+            'B' => NumberFormat::FORMAT_TEXT,
         ];
     }
 
@@ -174,8 +170,8 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
                 $sheet->getTabColor()->setRGB($this->headerColor());
                 $sheet->getStyle("A1:{$highestColumn}1")->getAlignment()->setWrapText(true);
                 $sheet->getStyle("A1:{$highestColumn}{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-                $lastNumericColumn = Coordinate::stringFromColumnIndex(max(3, Coordinate::columnIndexFromString($highestColumn) - 3));
-                $sheet->getStyle("C2:{$lastNumericColumn}{$highestRow}")->getNumberFormat()->setFormatCode('#,##0.00');
+                $lastNumericColumn = Coordinate::stringFromColumnIndex(max(4, Coordinate::columnIndexFromString($highestColumn) - 1));
+                $sheet->getStyle("D2:{$lastNumericColumn}{$highestRow}")->getNumberFormat()->setFormatCode('#,##0.00');
 
                 $this->applyResultColors($sheet, $highestColumn);
 
@@ -183,7 +179,8 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
                     $letter = Coordinate::stringFromColumnIndex($column);
                     $sheet->getColumnDimension($letter)->setWidth(match ($column) {
                         1 => 20,
-                        2 => 48,
+                        2 => 36,
+                        3 => 44,
                         default => 16,
                     });
                 }

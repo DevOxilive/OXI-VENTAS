@@ -12,6 +12,7 @@ export function getSalesToolbarConfig({
   selectedPrinterName = "",
   printerBridgeReady = false,
   expirationAlertCount = 0,
+  backButton = false,
 } = {}) {
   if (selectorMode) {
     return {
@@ -34,6 +35,8 @@ export function getSalesToolbarConfig({
     showSearch: false,
     showRecordsPerPage: false,
     showCounter: false,
+    backButton,
+    backLabel: "Sucursales",
     compactFilters: true,
     filters: [
       {
