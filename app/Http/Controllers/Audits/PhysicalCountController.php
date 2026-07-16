@@ -390,7 +390,7 @@ class PhysicalCountController extends Controller
 
         if (! $this->canRecaptureBranchProduct($physicalCount, $branchProduct)) {
             return back()->withErrors([
-                'branch_product_id' => 'Esta auditorÃ­a estÃ¡ reactivada solo para productos con stock en cero.',
+                'branch_product_id' => 'Esta auditoría está reactivada solo para productos con stock en cero.',
             ]);
         }
 
@@ -604,7 +604,7 @@ class PhysicalCountController extends Controller
 
         if (! $this->canRecaptureBranchProduct($physicalCount, $branchProduct)) {
             return back()->withErrors([
-                'code' => 'Esta auditorÃ­a estÃ¡ reactivada solo para productos con stock en cero.',
+                'code' => 'Esta auditoría está reactivada solo para productos con stock en cero.',
             ]);
         }
 
@@ -639,7 +639,7 @@ class PhysicalCountController extends Controller
 
         if (! $this->canRecaptureBranchProduct($physicalCount, $branchProduct)) {
             return back()->withErrors([
-                'branch_product_id' => 'Esta auditorÃ­a estÃ¡ reactivada solo para productos con stock en cero.',
+                'branch_product_id' => 'Esta auditoría está reactivada solo para productos con stock en cero.',
             ]);
         }
 

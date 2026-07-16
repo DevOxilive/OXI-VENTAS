@@ -302,8 +302,8 @@ async function deleteProduct(selectedProduct) {
   const result = await confirmModalAction({
     mode: 'delete',
     title: 'Eliminar producto',
-    message: `?Deseas eliminar ${selectedProduct.name}?`,
-    confirmText: 'S?, eliminar',
+    message: `¿Deseas eliminar ${selectedProduct.name}?`,
+    confirmText: 'Sí, eliminar',
     cancelText: 'Cancelar',
     confirmButtonColor: '#ef4444',
   })

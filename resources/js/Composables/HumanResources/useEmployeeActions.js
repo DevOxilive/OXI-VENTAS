@@ -43,9 +43,9 @@ export function useEmployeeActions() {
         confirmModalAction({
             mode: "delete",
             entityName: "empleado",
-            title: "Confirmar eliminaci�n",
-            message: `?Deseas eliminar permanentemente a ${employee.firstName} ${employee.lastName}?`,
-            confirmText: "S?, eliminar",
+            title: "Confirmar eliminación",
+            message: `¿Deseas eliminar permanentemente a ${employee.firstName} ${employee.lastName}?`,
+            confirmText: "Sí, eliminar",
         }).then((result) => {
             if (!result.isConfirmed) return;
 

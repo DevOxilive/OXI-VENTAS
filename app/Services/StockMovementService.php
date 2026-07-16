@@ -11,6 +11,7 @@ use App\Models\StockMovementBatch;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Throwable;
 
 class StockMovementService
 {
@@ -495,14 +496,18 @@ class StockMovementService
             return;
         }
 
-        event(new InventoryStockUpdated($branchProduct));
-        event(RealtimeActivityLogged::message(
-            $this->activityActionLabel($movementType),
-            'stock del producto',
-            $branchProduct->product?->name,
-            'Inventario',
-            $movementType,
-        ));
+        try {
+            event(new InventoryStockUpdated($branchProduct));
+            event(RealtimeActivityLogged::message(
+                $this->activityActionLabel($movementType),
+                'stock del producto',
+                $branchProduct->product?->name,
+                'Inventario',
+                $movementType,
+            ));
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function resolveTargetBranchProduct(

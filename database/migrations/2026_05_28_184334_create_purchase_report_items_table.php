@@ -30,8 +30,6 @@ return new class extends Migration
             $table->decimal('estimated_price', 10, 2)->nullable();
             $table->decimal('estimated_total', 10, 2)->nullable();
 
-            $table->text('notes')->nullable();
-
             $table->timestamps();
 
             $table->unique(

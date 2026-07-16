@@ -424,6 +424,33 @@ export const fieldRegistry = {
         message: "La cantidad debe ser un número válido.",
     },
 
+    purchase_order_quantity: {
+        required: true,
+        type: "decimal",
+        max: 7,
+        maxIntegerDigits: 4,
+        maxDecimalDigits: 2,
+        message: "La cantidad comprada permite maximo 4 enteros y 2 decimales.",
+    },
+
+    purchase_order_cost: {
+        required: true,
+        type: "decimal",
+        max: 7,
+        maxIntegerDigits: 4,
+        maxDecimalDigits: 2,
+        message: "El costo permite maximo 4 enteros y 2 decimales.",
+    },
+
+    purchase_order_discount: {
+        required: false,
+        type: "decimal",
+        max: 7,
+        maxIntegerDigits: 4,
+        maxDecimalDigits: 2,
+        message: "El descuento permite maximo 4 enteros y 2 decimales.",
+    },
+
     notes: {
         required: false,
         type: "text",

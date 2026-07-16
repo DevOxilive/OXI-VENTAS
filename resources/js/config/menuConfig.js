@@ -142,7 +142,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("inventory.purchase-reports.delete")
             ? [
                   {
-                      text: "Reporte de compra",
+                      text: "Listas de compra",
                       key: `inventory.${branch.slug}.purchase-report`,
                       icon: "shopping_cart",
                       url: route("inventory.branches.purchase-reports.index", {

@@ -330,6 +330,14 @@ Route::middleware([
             ->middleware('permission:inventory.purchase-reports.update')
             ->name('branches.purchase-reports.generate');
 
+        Route::post('/branches/{branch}/purchase-reports/{purchaseReport}/complete', [PurchaseReportController::class, 'complete'])
+            ->middleware('permission:inventory.purchase-reports.update')
+            ->name('branches.purchase-reports.complete');
+
+        Route::delete('/branches/{branch}/purchase-reports/{purchaseReport}', [PurchaseReportController::class, 'destroy'])
+            ->middleware('permission:inventory.purchase-reports.delete')
+            ->name('branches.purchase-reports.destroy');
+
         /*
         |--------------------------------------------------------------------------
         | INVENTARIO - REPORTES / CADUCIDADES / TRANSFERENCIAS / AJUSTES
@@ -339,6 +347,14 @@ Route::middleware([
         Route::get('/branches/{branch}/reports', [ReportController::class, 'index'])
             ->middleware('permission:inventory.view,inventory.branches.view')
             ->name('branches.reports');
+
+        Route::get('/branches/{branch}/reports/purchases', [PurchaseReportController::class, 'reportsIndex'])
+            ->middleware('permission:inventory.purchase-reports.view,inventory.purchase-reports.update')
+            ->name('branches.reports.purchases');
+
+        Route::get('/branches/{branch}/reports/purchase-orders', [PurchaseReportController::class, 'orders'])
+            ->middleware('permission:inventory.purchase-reports.view,inventory.purchase-reports.update')
+            ->name('branches.reports.purchase-orders');
 
         Route::get('/branches/{branch}/reports/audits', function (\App\Models\Branch $branch) {
             return redirect()->route('audits.physical-counts.reports', [

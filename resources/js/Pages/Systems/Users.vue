@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { usePage, useForm, router } from '@inertiajs/vue3'
 import { requiresBranchAssignments, usePermissionLabels } from '@/Composables/usePermissionLabels'
@@ -462,8 +462,8 @@ function deleteUser(id) {
     mode: 'delete',
     entityName: 'usuario',
     title: 'Confirmar eliminación',
-    message: '?Deseas eliminar permanentemente este usuario?',
-    confirmText: 'S?, eliminar',
+    message: '¿Deseas eliminar permanentemente este usuario?',
+    confirmText: 'Sí, eliminar',
     cancelText: 'Cancelar',
     confirmButtonColor: '#ef4444',
   }).then((result) => {

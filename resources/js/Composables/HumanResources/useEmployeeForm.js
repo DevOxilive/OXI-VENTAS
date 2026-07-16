@@ -286,7 +286,7 @@ export function useEmployeeForm(props, emit) {
             successTitle: isCreating
                 ? "Empleado registrado correctamente"
                 : "Empleado actualizado correctamente",
-            errorTitle: "Error en la operaci?n",
+            errorTitle: "Error en la operación",
             errorMessage: isCreating
                 ? "No fue posible registrar el empleado"
                 : "No fue posible actualizar el empleado",
