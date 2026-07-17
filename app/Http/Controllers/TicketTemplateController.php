@@ -123,6 +123,14 @@ class TicketTemplateController extends Controller
 
     public function update(Request $request, TicketTemplate $ticketTemplate)
     {
+        $routeName = (string) $request->route()?->getName();
+
+        if (str_contains($routeName, 'cash-closure-tickets.')) {
+            abort_unless($ticketTemplate->slug === 'cash-closure-ticket', 404);
+        } else {
+            abort_unless($ticketTemplate->slug === 'sales-ticket', 404);
+        }
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'is_active' => ['required', 'boolean'],

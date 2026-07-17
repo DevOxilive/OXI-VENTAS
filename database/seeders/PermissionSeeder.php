@@ -10,6 +10,9 @@ class PermissionSeeder extends Seeder
     public function run(): void
     {
         $permissions = [
+            // Inicio
+            'dashboard.executive.view',
+
             // Capital Humano
             'employees.view',
             'employees.create',
@@ -23,6 +26,8 @@ class PermissionSeeder extends Seeder
             'users.delete',
             'systems.tickets.view',
             'systems.tickets.update',
+            'systems.cash-closure-tickets.view',
+            'systems.cash-closure-tickets.update',
             'systems.labels.view',
             'systems.labels.update',
 
@@ -85,9 +90,13 @@ class PermissionSeeder extends Seeder
             // Impresoras
             'systems.tickets.view',
             'systems.tickets.update',
+            'systems.cash-closure-tickets.view',
+            'systems.cash-closure-tickets.update',
+            'systems.labels.view',
+            'systems.labels.update',
         ];
 
-        foreach ($permissions as $permission) {
+        foreach (array_unique($permissions) as $permission) {
             DB::table('permissions')->updateOrInsert(
                 ['name' => $permission],
                 [

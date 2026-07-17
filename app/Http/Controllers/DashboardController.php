@@ -17,10 +17,14 @@ class DashboardController extends Controller
 {
     public function __invoke(Request $request)
     {
-        $user = $request->user()->loadMissing(['role', 'branches']);
+        $user = $request->user()->loadMissing(['role', 'role.permissions', 'permissions', 'branches']);
         $accessibleBranches = $user->accessibleBranchesQuery()
             ->orderBy('branches.name')
-            ->get(['branches.id', 'branches.name', 'branches.slug']);
+            ->get(['branches.id', 'branches.name', 'branches.slug', 'branches.color']);
+
+        if (!$user->hasPermission('dashboard.executive.view')) {
+            return Inertia::render('RoleDashboard', $this->roleDashboardPayload($user, $accessibleBranches));
+        }
 
         $accessibleBranchIds = $accessibleBranches
             ->pluck('id')
@@ -90,6 +94,24 @@ class DashboardController extends Controller
             'inventoryCoverage' => $this->inventoryCoverage($branchIds, $filters['end']),
             'annualSummary' => $this->annualSummary($branchIds, $filters['end']->year),
         ]);
+    }
+
+    private function roleDashboardPayload($user, Collection $accessibleBranches): array
+    {
+        return [
+            'dashboardUser' => [
+                'name' => $user->name,
+                'role' => $user->role?->name ?? 'Usuario',
+            ],
+            'assignedBranches' => $accessibleBranches
+                ->map(fn (Branch $branch) => [
+                    'id' => (int) $branch->id,
+                    'name' => $branch->name,
+                    'slug' => $branch->slug,
+                    'color' => $branch->color,
+                ])
+                ->values(),
+        ];
     }
 
     private function resolveFilters(Request $request, Collection $accessibleBranchIds, Carbon $maxDate): array

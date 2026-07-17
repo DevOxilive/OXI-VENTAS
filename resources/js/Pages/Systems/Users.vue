@@ -142,17 +142,17 @@ const canAssignBranches = computed(() => {
 
 function getPermissionsByRole(roleId) {
   const role = roles.value.find((role) => String(role.id) === String(roleId))
-  return role?.permissions?.map((permission) => permission.id) || []
+  return role?.permissions?.map((permission) => Number(permission.id)) || []
 }
 
 function getEffectivePermissionIds(userLike) {
-  const rolePermissionIds = userLike?.role?.permissions?.map((permission) => permission.id) || []
+  const rolePermissionIds = userLike?.role?.permissions?.map((permission) => Number(permission.id)) || []
   const allowedPermissionIds = userLike?.permissions
     ?.filter((permission) => (permission.pivot?.mode || 'allow') === 'allow')
-    .map((permission) => permission.id) || []
+    .map((permission) => Number(permission.id)) || []
   const deniedPermissionIds = userLike?.permissions
     ?.filter((permission) => permission.pivot?.mode === 'deny')
-    .map((permission) => permission.id) || []
+    .map((permission) => Number(permission.id)) || []
 
   return [...new Set([
     ...rolePermissionIds,
@@ -316,12 +316,15 @@ function closeUserDetail() {
 }
 
 function togglePermission(id) {
-  if (form.permissions.includes(id)) {
-    form.permissions = form.permissions.filter((permissionId) => permissionId !== id)
+  const permissionId = Number(id)
+  const selectedPermissionIds = form.permissions.map((item) => Number(item))
+
+  if (selectedPermissionIds.includes(permissionId)) {
+    form.permissions = selectedPermissionIds.filter((item) => item !== permissionId)
     return
   }
 
-  form.permissions = [...form.permissions, id]
+  form.permissions = [...new Set([...selectedPermissionIds, permissionId])]
 }
 
 function enableModule(module) {
@@ -329,11 +332,11 @@ function enableModule(module) {
     .flatMap((section) => section.modules)
     .find((item) => item.key === module)
 
-  const ids = selectedModule?.permissions?.map((permission) => permission.id) || []
+  const ids = selectedModule?.permissions?.map((permission) => Number(permission.id)) || []
 
   form.permissions = [
     ...new Set([
-      ...form.permissions,
+      ...form.permissions.map((id) => Number(id)),
       ...ids,
     ]),
   ]
@@ -344,9 +347,11 @@ function disableModule(module) {
     .flatMap((section) => section.modules)
     .find((item) => item.key === module)
 
-  const ids = selectedModule?.permissions?.map((permission) => permission.id) || []
+  const ids = selectedModule?.permissions?.map((permission) => Number(permission.id)) || []
 
-  form.permissions = form.permissions.filter((id) => !ids.includes(id))
+  form.permissions = form.permissions
+    .map((id) => Number(id))
+    .filter((id) => !ids.includes(id))
 }
 
 function openModal(item = null) {
@@ -516,7 +521,7 @@ onMounted(() => {
     ) {
       const updatedPermissions = permissions.value
         .filter((permission) => event.permissions.includes(permission.name))
-        .map((permission) => permission.id)
+        .map((permission) => Number(permission.id))
 
       form.permissions = updatedPermissions
     }

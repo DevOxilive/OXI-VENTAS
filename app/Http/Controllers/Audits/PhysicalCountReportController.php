@@ -410,7 +410,7 @@ class PhysicalCountReportController extends Controller
                 $countedStock = (float) $group->sum('counted_quantity');
                 $damagedStock = (float) $group->sum('damaged_quantity');
                 $expiredStock = (float) $group->sum('expired_quantity');
-                $newStock = max(0, $countedStock - $expiredStock);
+                $newStock = max(0, $countedStock - $damagedStock - $expiredStock);
                 $difference = $newStock - $systemStock;
 
                 return [
