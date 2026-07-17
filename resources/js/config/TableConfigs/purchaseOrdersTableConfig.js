@@ -1,24 +1,13 @@
-export function getPurchaseOrdersTableConfig() {
+export function getPurchaseOrdersTableConfig({ mode = 'view' } = {}) {
+    const completed = mode === 'history'
+
     return {
         columns: [
             {
                 key: 'folio',
-                label: 'Orden de compra',
+                label: 'Orden general',
                 width: '190px',
                 mobileSecondary: false,
-            },
-            {
-                key: 'status_label',
-                label: 'Estado',
-                format: 'badge',
-                formatOptions: {
-                    statusMap: {
-                        Generada: 'blue',
-                        Completada: 'green',
-                        Cancelada: 'red',
-                    },
-                },
-                mobileBadge: true,
             },
             {
                 key: 'items_count',
@@ -28,19 +17,19 @@ export function getPurchaseOrdersTableConfig() {
                 mobileDisplay: true,
             },
             {
-                key: 'estimated_total',
-                label: 'Estimado',
-                format: 'currency',
-                mobileLabel: 'Estimado',
+                key: 'branches_count',
+                label: 'Sucursales',
+                format: 'number',
+                mobileLabel: 'Sucursales',
                 mobileDisplay: true,
             },
-            {
+            ...(completed ? [{
                 key: 'actual_total',
-                label: 'Total real',
+                label: 'Total pagado',
                 format: 'currency',
-                mobileLabel: 'Total real',
+                mobileLabel: 'Total pagado',
                 mobileDisplay: true,
-            },
+            }] : []),
             {
                 key: 'display_date',
                 label: 'Fecha',
@@ -52,13 +41,15 @@ export function getPurchaseOrdersTableConfig() {
         actions: [
             {
                 id: 'open',
-                label: 'Abrir',
-                icon: 'visibility',
+                label: mode === 'tracking' ? 'Capturar compra' : 'Ver detalle',
+                icon: mode === 'tracking' ? 'edit_note' : 'visibility',
                 variant: 'blue',
             },
         ],
         mobileCardHeaderField: 'folio',
-        noDataMessage: 'No hay órdenes de compra que coincidan con los filtros.',
+        noDataMessage: completed
+            ? 'Todavia no hay compras generales completadas.'
+            : 'Todavia no hay ordenes generales de compra.',
         rowKey: 'id',
         striped: true,
         hoverEffect: true,

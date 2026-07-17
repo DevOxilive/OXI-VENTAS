@@ -24,6 +24,10 @@ const props = defineProps({
     prefix: String,
     suffix: String,
     placeholder: String,
+    showCounter: {
+        type: Boolean,
+        default: true,
+    },
 })
 
 const emit = defineEmits(['update:modelValue', 'validate', 'keydown'])
@@ -155,7 +159,7 @@ function blockExtraInput(e) {
                 {{ error }}
             </p>
 
-            <p v-if="normalizedFieldConfig?.max" class="ml-auto text-[11px] text-text opacity-50">
+            <p v-if="showCounter && normalizedFieldConfig?.max" class="ml-auto text-[11px] text-text opacity-50">
                 {{ (modelValue || '').toString().length }}/{{ normalizedFieldConfig.max }}
             </p>
         </div>

@@ -15,11 +15,6 @@ const props = defineProps({
 })
 
 const { canAny } = usePermissions()
-const purchasePermissions = [
-    'inventory.purchase-reports.view',
-    'inventory.purchase-reports.update',
-]
-
 const pageTitle = computed(() => {
     return `Centro de reportes - ${props.currentBranch?.name ?? 'Sucursal'}`
 })
@@ -66,13 +61,31 @@ const reportGroups = [
         routeName: 'inventory.branches.reports.movements',
     },
     {
-        key: 'purchases',
-        title: 'Reportes de compras',
-        description: 'Consulta órdenes generadas y compras completadas.',
-        icon: 'shopping_cart_checkout',
+        key: 'purchase-orders',
+        title: 'Ordenes generales',
+        description: 'Consulta las solicitudes consolidadas del ciclo actual.',
+        icon: 'receipt_long',
         disabled: false,
         routeName: 'inventory.branches.reports.purchase-orders',
-        permissions: purchasePermissions,
+        permissions: ['inventory.purchase-orders.view', 'inventory.purchase-orders.create'],
+    },
+    {
+        key: 'purchase-tracking',
+        title: 'Seguimiento de compras',
+        description: 'Captura bultos, promociones y costos al regresar de Central.',
+        icon: 'local_shipping',
+        disabled: false,
+        routeName: 'inventory.branches.reports.purchase-orders.tracking',
+        permissions: ['inventory.purchase-orders.update'],
+    },
+    {
+        key: 'purchase-history',
+        title: 'Compras completadas',
+        description: 'Consulta el historial de compras generales cerradas.',
+        icon: 'history',
+        disabled: false,
+        routeName: 'inventory.branches.reports.purchase-orders.history',
+        permissions: ['inventory.purchase-orders.history'],
     },
 ]
 

@@ -9,6 +9,7 @@ use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Services\PurchaseCycleService;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
 use Illuminate\Http\Request;
@@ -48,43 +49,46 @@ class PurchaseReportController extends Controller
         ]);
 
         $generateOrder = (bool) ($validated['generate_order'] ?? false);
-        $report = PurchaseOrder::create([
-            'branch_id' => $branch->id,
-            'user_id' => $request->user()?->id,
-            'source' => PurchaseOrder::SOURCE_CENTRAL,
-            'status' => $generateOrder
-                ? PurchaseOrder::STATUS_GENERATED
-                : PurchaseOrder::STATUS_DRAFT,
-            'notes' => $validated['notes'] ?? null,
-            'generated_at' => $generateOrder ? now() : null,
-        ]);
-
-        foreach ($validated['items'] as $item) {
-            $product = BranchProduct::query()
-                ->with('product')
-                ->where('branch_id', $branch->id)
-                ->findOrFail($item['branch_product_id']);
-
-            $estimatedPrice = (float) ($product->product?->cost ?? 0);
-            $requestedQuantity = (float) $item['requested_quantity'];
-
-            $report->items()->create([
-                'branch_product_id' => $product->id,
-                'product_id' => $product->product_id,
-                'current_stock' => $product->stock,
-                'min_stock' => $product->min_stock,
-                'requested_quantity' => $requestedQuantity,
-                'estimated_price' => $estimatedPrice,
-                'estimated_total' => $estimatedPrice * $requestedQuantity,
-                'status' => PurchaseOrderItem::STATUS_REQUESTED,
+        DB::transaction(function () use ($branch, $generateOrder, $request, $validated) {
+            $report = PurchaseOrder::create([
+                'branch_id' => $branch->id,
+                'user_id' => $request->user()?->id,
+                'source' => PurchaseOrder::SOURCE_CENTRAL,
+                'status' => $generateOrder
+                    ? PurchaseOrder::STATUS_GENERATED
+                    : PurchaseOrder::STATUS_DRAFT,
+                'notes' => $validated['notes'] ?? null,
+                'generated_at' => $generateOrder ? now() : null,
             ]);
-        }
 
-        $report->update([
-            'folio' => $this->makeFolio($report),
-        ]);
+            foreach ($validated['items'] as $item) {
+                $product = BranchProduct::query()
+                    ->with('product')
+                    ->where('branch_id', $branch->id)
+                    ->findOrFail($item['branch_product_id']);
 
-        $this->refreshTotals($report);
+                $estimatedPrice = (float) ($product->product?->cost ?? 0);
+                $requestedQuantity = (float) $item['requested_quantity'];
+
+                $report->items()->create([
+                    'branch_product_id' => $product->id,
+                    'product_id' => $product->product_id,
+                    'current_stock' => $product->stock,
+                    'min_stock' => $product->min_stock,
+                    'requested_quantity' => $requestedQuantity,
+                    'estimated_price' => $estimatedPrice,
+                    'estimated_total' => $estimatedPrice * $requestedQuantity,
+                    'status' => PurchaseOrderItem::STATUS_REQUESTED,
+                ]);
+            }
+
+            $report->update(['folio' => $this->makeFolio($report)]);
+            $this->refreshTotals($report);
+
+            if ($generateOrder) {
+                app(PurchaseCycleService::class)->registerOrder($report, $request->user());
+            }
+        });
 
         return redirect()->route('inventory.branches.purchase-reports.index', [
             'branch' => $branch->id,
@@ -105,6 +109,7 @@ class PurchaseReportController extends Controller
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
         abort_if($purchaseReport->status === PurchaseOrder::STATUS_COMPLETED, 422, 'La orden completada ya no se puede modificar.');
+        abort_if($purchaseReport->general_purchase_order_id, 422, 'La solicitud ya forma parte de una orden general.');
         $this->abortIfDraftDoesNotBelongToUser($request, $purchaseReport);
 
         $validated = $this->validateOrderPayload($request, $purchaseReport);
@@ -134,7 +139,7 @@ class PurchaseReportController extends Controller
 
         $validated = $this->validateOrderPayload($request, $purchaseReport);
 
-        DB::transaction(function () use ($branch, $purchaseReport, $validated) {
+        DB::transaction(function () use ($branch, $purchaseReport, $request, $validated) {
             $purchaseReport->update([
                 'notes' => $validated['notes'] ?? null,
             ]);
@@ -146,6 +151,8 @@ class PurchaseReportController extends Controller
                 'status' => PurchaseOrder::STATUS_GENERATED,
                 'generated_at' => now(),
             ]);
+
+            app(PurchaseCycleService::class)->registerOrder($purchaseReport, $request->user());
         });
 
         return redirect()->route('inventory.branches.purchase-reports.index', [
@@ -165,6 +172,7 @@ class PurchaseReportController extends Controller
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
         abort_unless($purchaseReport->status === PurchaseOrder::STATUS_GENERATED, 422);
+        abort_if($purchaseReport->purchase_cycle_id, 422, 'Esta solicitud debe completarse desde su orden general.');
 
         $validated = $this->validateOrderPayload($request, $purchaseReport);
 
@@ -231,6 +239,21 @@ class PurchaseReportController extends Controller
         return redirect()->back()->with('success', 'Borrador eliminado correctamente.');
     }
 
+    public function submitEmpty(
+        Request $request,
+        Branch $branch,
+        PurchaseCycleService $cycles
+    ) {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
+        $cycles->registerEmptyBranch($branch, $request->user());
+
+        return redirect()->back()->with(
+            'success',
+            'La sucursal confirmó que no necesita productos en este ciclo.'
+        );
+    }
+
     public function index(Request $request, Branch $branch)
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
@@ -262,30 +285,9 @@ class PurchaseReportController extends Controller
                 'stock' => (float) $item->stock,
                 'min_stock' => (float) $item->min_stock,
                 'label' => trim(($item->product?->name ?? 'Producto sin nombre')
-                    . ' - '
-                    . ($item->product?->barcodes?->first()?->code ?: ($item->barcode ?: 'Sin codigo'))),
+                    .' - '
+                    .($item->product?->barcodes?->first()?->code ?: ($item->barcode ?: 'Sin codigo'))),
             ]);
-
-        $listStatuses = [
-            PurchaseOrder::STATUS_DRAFT,
-            PurchaseOrder::STATUS_GENERATED,
-            PurchaseOrder::STATUS_COMPLETED,
-        ];
-        $listStatus = strtoupper((string) $request->input('list_status', PurchaseOrder::STATUS_DRAFT));
-
-        if (! in_array($listStatus, $listStatuses, true)) {
-            $listStatus = PurchaseOrder::STATUS_DRAFT;
-        }
-
-        $ownedListsQuery = PurchaseOrder::query()
-            ->where('branch_id', $branch->id)
-            ->where('user_id', $request->user()?->id)
-            ->whereIn('status', $listStatuses);
-
-        $listCounts = (clone $ownedListsQuery)
-            ->selectRaw('status, COUNT(*) as aggregate')
-            ->groupBy('status')
-            ->pluck('aggregate', 'status');
 
         $reports = PurchaseOrder::query()
             ->with([
@@ -294,7 +296,7 @@ class PurchaseReportController extends Controller
             ->withCount('items')
             ->where('branch_id', $branch->id)
             ->where('user_id', $request->user()?->id)
-            ->where('status', $listStatus)
+            ->where('status', PurchaseOrder::STATUS_DRAFT)
             ->latest()
             ->paginate(12, ['*'], 'lists_page')
             ->withQueryString()
@@ -338,73 +340,23 @@ class PurchaseReportController extends Controller
                 })->values(),
             ]);
 
+        $cycle = app(PurchaseCycleService::class)->currentOpenCycle($request->user());
+        $cycle->load(['branches' => fn ($query) => $query->where('branch_id', $branch->id)]);
+        $participation = $cycle->branches->first();
+
         return Inertia::render('Inventory/PurchaseReport', [
             'currentBranch' => $branch,
             'productsDB' => $products,
             'reportsDB' => $reports,
-            'listFilters' => [
-                'status' => $listStatus,
-            ],
-            'listCounts' => collect($listStatuses)->mapWithKeys(fn ($status) => [
-                $status => (int) ($listCounts[$status] ?? 0),
-            ]),
             'filters' => $filters,
             'categoriesDB' => $this->categoryOptions($branch),
-        ]);
-    }
-
-    public function orders(Request $request, Branch $branch)
-    {
-        $this->abortIfUserCannotAccessBranch($request, $branch);
-
-        $perPage = TablePagination::resolvePerPage($request, 25);
-        $status = $request->input('status', '');
-        $allowedStatuses = [
-            PurchaseOrder::STATUS_GENERATED,
-            PurchaseOrder::STATUS_COMPLETED,
-            PurchaseOrder::STATUS_CANCELLED,
-        ];
-
-        if (! in_array($status, $allowedStatuses, true)) {
-            $status = '';
-        }
-
-        $filters = [
-            'search' => trim((string) $request->input('search', '')),
-            'status' => $status,
-            'per_page' => $perPage,
-        ];
-
-        $orders = PurchaseOrder::query()
-            ->with([
-                'items.branchProduct.product.barcodes',
-                'items.branchProduct.product.category',
-            ])
-            ->withCount('items')
-            ->where('branch_id', $branch->id)
-            ->whereIn('status', $allowedStatuses)
-            ->when($filters['status'], fn ($query, $selectedStatus) => $query->where('status', $selectedStatus));
-
-        FlexibleSearch::apply($orders, $filters['search'], function ($query, $phrase, $terms) {
-            FlexibleSearch::orWhereColumns($query, ['purchase_orders.folio'], $phrase, $terms);
-            FlexibleSearch::orWhereHasColumns($query, 'items.product', ['name'], $phrase, $terms);
-            FlexibleSearch::orWhereHasColumns($query, 'items.product.barcodes', ['code'], $phrase, $terms);
-        });
-
-        $orders = $orders
-            ->latest('generated_at')
-            ->latest('id')
-            ->paginate($filters['per_page'])
-            ->withQueryString()
-            ->through(fn (PurchaseOrder $order) => array_merge($order->toArray(), [
-                'status_label' => $this->orderStatusLabel($order->status),
-                'display_date' => $order->completed_at ?? $order->generated_at ?? $order->created_at,
-            ]));
-
-        return Inertia::render('Inventory/PurchaseOrders', [
-            'currentBranch' => $branch,
-            'ordersDB' => $orders,
-            'filters' => $filters,
+            'purchaseCycle' => [
+                'id' => $cycle->id,
+                'folio' => $cycle->folio,
+                'submitted' => (bool) $participation?->submitted_at,
+                'without_items' => (bool) $participation?->submitted_without_items,
+                'order_id' => $participation?->purchase_order_id,
+            ],
         ]);
     }
 
@@ -473,16 +425,6 @@ class PurchaseReportController extends Controller
             ->distinct()
             ->orderBy('categories.name')
             ->get();
-    }
-
-    private function orderStatusLabel(string $status): string
-    {
-        return match ($status) {
-            PurchaseOrder::STATUS_GENERATED => 'Generada',
-            PurchaseOrder::STATUS_COMPLETED => 'Completada',
-            PurchaseOrder::STATUS_CANCELLED => 'Cancelada',
-            default => $status,
-        };
     }
 
     private function abortIfDraftDoesNotBelongToUser(

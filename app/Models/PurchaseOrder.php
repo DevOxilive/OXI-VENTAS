@@ -9,12 +9,17 @@ class PurchaseOrder extends Model
     public const SOURCE_CENTRAL = 'CENTRAL';
 
     public const STATUS_DRAFT = 'DRAFT';
+
     public const STATUS_GENERATED = 'GENERATED';
+
     public const STATUS_COMPLETED = 'COMPLETED';
+
     public const STATUS_CANCELLED = 'CANCELLED';
 
     protected $fillable = [
         'branch_id',
+        'purchase_cycle_id',
+        'general_purchase_order_id',
         'user_id',
         'completed_by',
         'folio',
@@ -40,6 +45,16 @@ class PurchaseOrder extends Model
     public function branch()
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function cycle()
+    {
+        return $this->belongsTo(PurchaseCycle::class, 'purchase_cycle_id');
+    }
+
+    public function generalOrder()
+    {
+        return $this->belongsTo(GeneralPurchaseOrder::class, 'general_purchase_order_id');
     }
 
     public function user()

@@ -1,10 +1,9 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { Head, router } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
-import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import GlobalToolbar from "@/Components/Toolbars/GlobalToolbar.vue";
 import GlobalTable from "@/Components/Tables/GlobalTable.vue";
 import AppButton from "@/Components/Buttons/AppButton.vue";
@@ -13,7 +12,6 @@ import SelectField from "@/Components/Forms/SelectField.vue";
 import QuantityStepper from "@/Components/Forms/QuantityStepper.vue";
 import EmptyStateCard from "@/Components/Cards/EmptyStateCard.vue";
 import SectionHeading from "@/Components/Cards/SectionHeading.vue";
-import FormPanel from "@/Components/Cards/FormPanel.vue";
 import TextareaField from "@/Components/Forms/TextareaField.vue";
 import { confirmModalAction, getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 import { useGlobalTablePagination } from "@/Composables/useGlobalTablePagination";
@@ -33,11 +31,7 @@ const props = defineProps({
         type: Object,
         default: () => ({}),
     },
-    listFilters: {
-        type: Object,
-        default: () => ({}),
-    },
-    listCounts: {
+    purchaseCycle: {
         type: Object,
         default: () => ({}),
     },
@@ -46,7 +40,6 @@ const props = defineProps({
 const report = usePurchaseReport(props);
 const { handlePageChange } = useGlobalTablePagination();
 const { can } = usePermissions();
-const selectedList = ref(null);
 
 const tableConfig = getPurchaseReportProductsTableConfig();
 const stockOptions = [
@@ -61,9 +54,13 @@ const perPageOptions = [
 ];
 
 const branchLabel = computed(() => props.currentBranch?.name || "Sin sucursal");
+const cycleSubmitted = computed(() => Boolean(props.purchaseCycle?.submitted));
 const toolbarConfig = computed(() => getPurchaseReportToolbarConfig({
     branchName: branchLabel.value,
     editingFolio: report.editingOrder.value?.folio || "",
+    cycleFolio: props.purchaseCycle?.folio || "",
+    cycleSubmitted: cycleSubmitted.value,
+    hasProducts: report.selectedCount.value > 0,
 }));
 const tableRows = computed(() => report.tableRows.value);
 const pagination = computed(() => report.paginator.value);
@@ -71,6 +68,8 @@ const selectedProducts = computed(() => report.selectedProducts.value);
 const purchaseLists = computed(() => props.reportsDB?.data ?? []);
 
 function handleTableAction({ action, row }) {
+    if (cycleSubmitted.value) return;
+
     if (action === "add") {
         report.addProduct(row);
         return;
@@ -82,6 +81,7 @@ function handleTableAction({ action, row }) {
 }
 
 function handleTableRowClick(row) {
+    if (cycleSubmitted.value) return;
     report.toggleProduct(row);
 }
 
@@ -108,9 +108,39 @@ function handleToolbarAction(action) {
     if (action === "clear") {
         report.clearWorkspace();
     }
+
+    if (action === "submit-empty") submitWithoutProducts();
+}
+
+async function submitWithoutProducts() {
+    const result = await confirmModalAction({
+        mode: "create",
+        entityName: "solicitud",
+        title: "Confirmar sin productos",
+        message: `Se registrará que ${branchLabel.value} no necesita productos en ${props.purchaseCycle?.folio || "el ciclo actual"}.`,
+        confirmText: "Confirmar solicitud",
+    });
+
+    if (!result.isConfirmed) return;
+
+    router.post(
+        route("inventory.branches.purchase-reports.submit-empty", {
+            branch: props.currentBranch.id,
+        }),
+        {},
+        getModalRequestOptions({
+            mode: "create",
+            entityName: "Solicitud",
+            successTitle: "Solicitud registrada correctamente",
+            errorTitle: "No se pudo registrar la solicitud",
+            errorMessage: "Actualiza la página y revisa el ciclo de compra actual.",
+        }),
+    );
 }
 
 async function generateOrder() {
+    if (cycleSubmitted.value) return;
+
     const result = await confirmModalAction({
         mode: "create",
         entityName: "orden de compra",
@@ -154,42 +184,6 @@ async function deleteDraft(draft) {
     );
 }
 
-function listStatusLabel(status) {
-    if (status === "COMPLETED") return "Compra completada";
-    if (status === "GENERATED") return "En seguimiento";
-    return "Borrador";
-}
-
-function itemResultLabel(item) {
-    if (item.status === "UNAVAILABLE") return "No encontrado";
-    if (selectedList.value?.status === "COMPLETED") {
-        return `Compradas: ${Number(item.purchased_quantity || 0)} pzas.`;
-    }
-    return `Solicitadas: ${Number(item.requested_quantity || 0)} pzas.`;
-}
-
-function changeListStatus(status) {
-    selectedList.value = null;
-
-    router.get(
-        route("inventory.branches.purchase-reports.index", {
-            branch: props.currentBranch.id,
-        }),
-        {
-            search: report.localFilters.value.search || undefined,
-            category_id: report.localFilters.value.category_id || undefined,
-            stock: report.localFilters.value.stock || undefined,
-            per_page: report.localFilters.value.per_page || 25,
-            list_status: status,
-        },
-        {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        },
-    );
-}
-
 function paginateLists(url) {
     if (!url) return;
 
@@ -215,18 +209,14 @@ function paginateLists(url) {
             </template>
 
             <div>
-                <section class="grid min-w-0 gap-5 xl:grid-cols-[230px_minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+                <section class="grid min-w-0 gap-5 xl:grid-cols-[280px_minmax(0,1.15fr)_minmax(340px,0.85fr)]">
                     <PurchaseReportDrafts
                         :reports="purchaseLists"
-                        :counts="listCounts"
                         :pagination="reportsDB"
-                        :active-status="listFilters.status || 'DRAFT'"
                         :active-draft-id="report.editingOrder.value?.id"
                         :can-delete="can('inventory.purchase-reports.delete')"
                         @open="openDraft"
-                        @view="selectedList = $event"
                         @delete="deleteDraft"
-                        @status-change="changeListStatus"
                         @paginate="paginateLists"
                     />
 
@@ -351,7 +341,7 @@ function paginateLists(url) {
                             <div class="grid gap-3 sm:grid-cols-2">
                                 <AppButton
                                     block
-                                    :disabled="report.selectedCount.value === 0"
+                                    :disabled="report.selectedCount.value === 0 || cycleSubmitted"
                                     variant="secondary"
                                     @click="report.saveDraft"
                                 >
@@ -360,7 +350,7 @@ function paginateLists(url) {
 
                                 <AppButton
                                     block
-                                    :disabled="report.selectedCount.value === 0"
+                                    :disabled="report.selectedCount.value === 0 || cycleSubmitted"
                                     @click="generateOrder"
                                 >
                                     Generar orden de compra
@@ -371,57 +361,6 @@ function paginateLists(url) {
                 </section>
             </div>
 
-            <GlobalModal
-                v-if="selectedList"
-                :title="selectedList.folio || `Lista #${selectedList.id}`"
-                :subtitle="`${listStatusLabel(selectedList.status)} · ${selectedList.items_count || selectedList.items?.length || 0} productos`"
-                mode="view"
-                size="xl"
-                height="auto"
-                :show-save="false"
-                close-button-text="Cerrar"
-                @close="selectedList = null"
-            >
-                <FormPanel
-                    title="Productos solicitados"
-                    description="Seguimiento de la lista sin información de costos."
-                    panel-class="shadow-none"
-                >
-                    <div class="space-y-2">
-                        <article
-                            v-for="item in selectedList.items"
-                            :key="item.branch_product_id"
-                            class="flex flex-col gap-2 rounded-2xl border border-secondary bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                            <div class="min-w-0">
-                                <p class="truncate text-sm font-bold text-text">{{ item.name }}</p>
-                                <p class="truncate text-xs text-text opacity-60">{{ item.code || "Sin código" }}</p>
-                            </div>
-
-                            <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-text">
-                                <span class="rounded-full border border-secondary bg-secondary px-3 py-1.5">
-                                    Solicitadas: {{ Number(item.requested_quantity || 0) }} pzas.
-                                </span>
-                                <span
-                                    v-if="selectedList.status === 'COMPLETED'"
-                                    class="rounded-full border px-3 py-1.5"
-                                    :class="item.status === 'UNAVAILABLE'
-                                        ? 'border-primary bg-secondary text-primary'
-                                        : 'border-secondary bg-secondary'"
-                                >
-                                    {{ itemResultLabel(item) }}
-                                </span>
-                            </div>
-                        </article>
-                    </div>
-                </FormPanel>
-
-                <FormPanel title="Notas generales" panel-class="shadow-none">
-                    <p class="whitespace-pre-wrap text-sm text-text" :class="selectedList.notes ? '' : 'opacity-60'">
-                        {{ selectedList.notes || "Sin notas generales." }}
-                    </p>
-                </FormPanel>
-            </GlobalModal>
         </PageLayout>
     </AdminLayout>
 </template>

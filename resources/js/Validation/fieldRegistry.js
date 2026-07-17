@@ -451,6 +451,14 @@ export const fieldRegistry = {
         message: "El descuento permite maximo 4 enteros y 2 decimales.",
     },
 
+    purchase_promotion: {
+        required: false,
+        type: "text",
+        max: 255,
+        preserveCase: true,
+        message: "La promoción permite un máximo de 255 caracteres.",
+    },
+
     notes: {
         required: false,
         type: "text",

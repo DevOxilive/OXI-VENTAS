@@ -16,6 +16,7 @@ const permissionModuleOrder = [
     "inventory.products",
     "inventory.branches",
     "inventory.purchase-reports",
+    "inventory.purchase-orders",
     "audits",
     "inventory",
     "sales",
@@ -56,7 +57,11 @@ const permissionModules = {
         section: "branches",
     },
     "inventory.purchase-reports": {
-        label: "Reporte de compra",
+        label: "Listas de compra",
+        section: "branches",
+    },
+    "inventory.purchase-orders": {
+        label: "Ordenes generales",
         section: "branches",
     },
     audits: {
@@ -125,6 +130,10 @@ const permissionLabels = {
     "inventory.purchase-reports.create": "Crear reportes de compra",
     "inventory.purchase-reports.update": "Editar reportes de compra",
     "inventory.purchase-reports.delete": "Eliminar reportes de compra",
+    "inventory.purchase-orders.view": "Consultar ordenes generales",
+    "inventory.purchase-orders.create": "Generar ordenes generales",
+    "inventory.purchase-orders.update": "Dar seguimiento a compras",
+    "inventory.purchase-orders.history": "Consultar compras completadas",
 
     "inventory.view": "Ver reportes de inventario",
     "inventory.create": "Crear reportes de inventario",
@@ -158,6 +167,10 @@ function getPermissionModule(permissionName = "") {
 
     if (permissionName.startsWith("inventory.purchase-reports.")) {
         return "inventory.purchase-reports";
+    }
+
+    if (permissionName.startsWith("inventory.purchase-orders.")) {
+        return "inventory.purchase-orders";
     }
 
     if (permissionName.startsWith("audits.")) {
@@ -206,6 +219,7 @@ export function requiresBranchAssignments(roleName = "", permissionNames = []) {
             permissionName.startsWith("inventory.products.") ||
             permissionName.startsWith("inventory.branches.") ||
             permissionName.startsWith("inventory.purchase-reports.") ||
+            permissionName.startsWith("inventory.purchase-orders.") ||
             permissionName.startsWith("audits.physical-counts.") ||
             branchScopedPermissionNames.includes(permissionName)
         );

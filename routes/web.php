@@ -16,6 +16,7 @@ use App\Http\Controllers\Inventory\ProductController;
 use App\Http\Controllers\Inventory\ProductBatchController;
 use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\Inventory\PurchaseReportController;
+use App\Http\Controllers\Inventory\GeneralPurchaseOrderController;
 use App\Http\Controllers\Inventory\BranchInventoryController;
 use App\Http\Controllers\Inventory\CategoryController;
 use App\Http\Controllers\Ventas\CashRegisterClosureController;
@@ -347,6 +348,10 @@ Route::middleware([
             ->middleware('permission:inventory.purchase-reports.create')
             ->name('branches.purchase-reports.store');
 
+        Route::post('/branches/{branch}/purchase-reports/submit-empty', [PurchaseReportController::class, 'submitEmpty'])
+            ->middleware('permission:inventory.purchase-reports.create')
+            ->name('branches.purchase-reports.submit-empty');
+
         Route::get('/branches/{branch}/purchase-reports/{purchaseReport}', [PurchaseReportController::class, 'show'])
             ->middleware('permission:inventory.purchase-reports.view,inventory.purchase-reports.update')
             ->name('branches.purchase-reports.show');
@@ -374,16 +379,44 @@ Route::middleware([
         */
 
         Route::get('/branches/{branch}/reports', [ReportController::class, 'index'])
-            ->middleware('permission:inventory.view,inventory.branches.view,sales.cash-closures.view,sales.cash-closures.create')
+            ->middleware('permission:inventory.view,inventory.branches.view,sales.cash-closures.view,sales.cash-closures.create,inventory.purchase-orders.view,inventory.purchase-orders.create,inventory.purchase-orders.update,inventory.purchase-orders.history')
             ->name('branches.reports');
 
         Route::get('/branches/{branch}/reports/purchases', [PurchaseReportController::class, 'reportsIndex'])
             ->middleware('permission:inventory.purchase-reports.view,inventory.purchase-reports.update')
             ->name('branches.reports.purchases');
 
-        Route::get('/branches/{branch}/reports/purchase-orders', [PurchaseReportController::class, 'orders'])
-            ->middleware('permission:inventory.purchase-reports.view,inventory.purchase-reports.update')
+        Route::get('/branches/{branch}/reports/purchase-orders', [GeneralPurchaseOrderController::class, 'index'])
+            ->middleware('permission:inventory.purchase-orders.view,inventory.purchase-orders.create')
             ->name('branches.reports.purchase-orders');
+
+        Route::post('/branches/{branch}/reports/purchase-orders/consolidate', [GeneralPurchaseOrderController::class, 'consolidate'])
+            ->middleware('permission:inventory.purchase-orders.create')
+            ->name('branches.reports.purchase-orders.consolidate');
+
+        Route::get('/branches/{branch}/reports/purchase-orders/tracking', [GeneralPurchaseOrderController::class, 'tracking'])
+            ->middleware('permission:inventory.purchase-orders.update')
+            ->name('branches.reports.purchase-orders.tracking');
+
+        Route::get('/branches/{branch}/reports/purchase-orders/history', [GeneralPurchaseOrderController::class, 'history'])
+            ->middleware('permission:inventory.purchase-orders.history')
+            ->name('branches.reports.purchase-orders.history');
+
+        Route::get('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}/capture', [GeneralPurchaseOrderController::class, 'edit'])
+            ->middleware('permission:inventory.purchase-orders.update')
+            ->name('branches.reports.purchase-orders.capture');
+
+        Route::get('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}', [GeneralPurchaseOrderController::class, 'show'])
+            ->middleware('permission:inventory.purchase-orders.view,inventory.purchase-orders.update,inventory.purchase-orders.history')
+            ->name('branches.reports.purchase-orders.show');
+
+        Route::put('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}', [GeneralPurchaseOrderController::class, 'update'])
+            ->middleware('permission:inventory.purchase-orders.update')
+            ->name('branches.reports.purchase-orders.update');
+
+        Route::post('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}/complete', [GeneralPurchaseOrderController::class, 'complete'])
+            ->middleware('permission:inventory.purchase-orders.update')
+            ->name('branches.reports.purchase-orders.complete');
 
         Route::get('/branches/{branch}/reports/audits', function (\App\Models\Branch $branch) {
             return redirect()->route('audits.physical-counts.reports', [

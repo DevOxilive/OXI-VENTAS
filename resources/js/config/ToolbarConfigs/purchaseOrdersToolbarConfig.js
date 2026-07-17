@@ -1,34 +1,29 @@
-export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0 } = {}) {
+export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, cycle = {}, mode = 'view', canConsolidate = false, canGenerate = false } = {}) {
+    const headings = {
+        view: ['Ordenes generales', 'Consulta los productos solicitados por todas las sucursales.'],
+        tracking: ['Seguimiento de compras', 'Registra lo comprado al regresar de Central.'],
+        history: ['Compras completadas', 'Consulta las compras generales que ya fueron cerradas.'],
+    }
+    const [title, subtitle] = headings[mode] || headings.view
+
     return {
-        title: 'Órdenes de compra',
-        subtitle: 'Consulta órdenes generadas y captura los productos que realmente se compraron.',
-        backButton: true,
-        backLabel: 'Centro de reportes',
+        title,
+        subtitle,
+        backButton: false,
         search: filters.search ?? '',
-        searchPlaceholder: 'Buscar por OC, producto o código',
+        searchPlaceholder: 'Buscar por OCG, producto, codigo o sucursal',
         showSearch: true,
         compactFilters: true,
-        filters: [
+        filters: [],
+        actions: mode === 'view' && canConsolidate ? [
             {
-                key: 'status',
-                label: '',
-                placeholder: 'Todos los estados',
-                value: filters.status ?? '',
-                options: [
-                    { label: 'Generadas', value: 'GENERATED' },
-                    { label: 'Completadas', value: 'COMPLETED' },
-                    { label: 'Canceladas', value: 'CANCELLED' },
-                ],
-            },
-        ],
-        actions: [
-            {
-                id: 'new-list',
-                label: 'Nueva lista',
-                icon: 'add_shopping_cart',
+                id: 'consolidate',
+                label: canGenerate ? 'Generar orden general' : 'Selecciona sucursales',
+                icon: canGenerate ? 'merge_type' : 'hourglass_top',
                 variant: 'primary',
+                disabled: !canGenerate,
             },
-        ],
+        ] : [],
         tabs: [],
         recordsPerPage: Number(filters.per_page ?? 25),
         recordsPerPageOptions: [15, 25, 50],

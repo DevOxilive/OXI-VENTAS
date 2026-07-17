@@ -1,6 +1,4 @@
 <script setup>
-import { computed } from 'vue'
-
 import SectionHeading from '@/Components/Cards/SectionHeading.vue'
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
 
@@ -9,17 +7,9 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
-    counts: {
-        type: Object,
-        default: () => ({}),
-    },
     pagination: {
         type: Object,
         default: () => ({}),
-    },
-    activeStatus: {
-        type: String,
-        default: 'DRAFT',
     },
     activeDraftId: {
         type: [Number, String],
@@ -31,13 +21,7 @@ const props = defineProps({
     },
 })
 
-const emit = defineEmits(['open', 'view', 'delete', 'status-change', 'paginate'])
-
-const tabs = computed(() => [
-    { status: 'DRAFT', label: 'Borradores', count: Number(props.counts.DRAFT || 0) },
-    { status: 'GENERATED', label: 'Seguimiento', count: Number(props.counts.GENERATED || 0) },
-    { status: 'COMPLETED', label: 'Histórico', count: Number(props.counts.COMPLETED || 0) },
-])
+const emit = defineEmits(['open', 'delete', 'paginate'])
 
 function formatDate(date) {
     if (!date) return 'Sin fecha'
@@ -54,46 +38,23 @@ function itemCount(report) {
 }
 
 function openReport(report) {
-    emit(report.status === 'DRAFT' ? 'open' : 'view', report)
-}
-
-function emptyMessage() {
-    if (props.activeStatus === 'GENERATED') return 'No tienes listas en seguimiento.'
-    if (props.activeStatus === 'COMPLETED') return 'Todavía no tienes compras completadas.'
-    return 'Todavía no hay borradores guardados.'
+    emit('open', report)
 }
 </script>
 
 <template>
     <aside class="min-w-0 rounded-[28px] border border-secondary bg-background p-4 shadow-sm">
         <SectionHeading
-            title="Mis listas"
-            description="Consulta el avance de tus solicitudes."
+            title="Borradores"
+            description="Continua una lista guardada."
             spacing="sm"
         />
-
-        <div class="mt-4 grid grid-cols-3 gap-1 rounded-2xl border border-secondary bg-secondary p-1">
-            <button
-                v-for="tab in tabs"
-                :key="tab.status"
-                type="button"
-                class="min-w-0 rounded-xl px-1 py-2 text-center transition"
-                :class="activeStatus === tab.status
-                    ? 'bg-background text-primary shadow-sm'
-                    : 'text-text opacity-65 hover:opacity-100'"
-                :title="tab.label"
-                @click="emit('status-change', tab.status)"
-            >
-                <strong class="block text-sm">{{ tab.count }}</strong>
-                <span class="block truncate text-[10px] font-semibold">{{ tab.label }}</span>
-            </button>
-        </div>
 
         <div
             v-if="!reports.length"
             class="mt-4 rounded-2xl border border-dashed border-secondary bg-secondary px-4 py-5 text-center text-xs text-text opacity-70"
         >
-            {{ emptyMessage() }}
+            Todavia no hay borradores guardados.
         </div>
 
         <div

@@ -175,7 +175,11 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("sales.cash-closures.view") ||
         can("sales.cash-closures.create") ||
         can("inventory.view") ||
-        can("inventory.branches.view")
+        can("inventory.branches.view") ||
+        can("inventory.purchase-orders.view") ||
+        can("inventory.purchase-orders.create") ||
+        can("inventory.purchase-orders.update") ||
+        can("inventory.purchase-orders.history")
             ? [
                   {
                       text: "Reportes",
@@ -203,6 +207,10 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("inventory.purchase-reports.create") ||
         can("inventory.purchase-reports.update") ||
         can("inventory.purchase-reports.delete") ||
+        can("inventory.purchase-orders.view") ||
+        can("inventory.purchase-orders.create") ||
+        can("inventory.purchase-orders.update") ||
+        can("inventory.purchase-orders.history") ||
         can("audits.physical-counts.view") ||
         can("audits.physical-counts.count") ||
         can("audits.physical-counts.reports") ||

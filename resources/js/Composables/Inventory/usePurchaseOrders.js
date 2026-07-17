@@ -1,16 +1,16 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
 
-export function usePurchaseOrders(props) {
+export function usePurchaseOrders(props, routeName = 'inventory.branches.reports.purchase-orders') {
     const localFilters = ref({
         search: props.filters?.search ?? '',
-        status: props.filters?.status ?? '',
         per_page: Number(props.filters?.per_page ?? 25),
     })
     let filterTimer = null
 
     const rows = computed(() => props.ordersDB?.data ?? [])
     const pagination = computed(() => props.ordersDB ?? {})
+    const loadingOrder = ref(false)
 
     watch(localFilters, () => {
         clearTimeout(filterTimer)
@@ -21,12 +21,11 @@ export function usePurchaseOrders(props) {
 
     function applyFilters(overrides = {}) {
         router.get(
-            route('inventory.branches.reports.purchase-orders', {
+            route(routeName, {
                 branch: props.currentBranch.id,
             }),
             {
                 search: localFilters.value.search || undefined,
-                status: localFilters.value.status || undefined,
                 per_page: localFilters.value.per_page,
                 ...overrides,
             },
@@ -56,6 +55,23 @@ export function usePurchaseOrders(props) {
         }))
     }
 
+    async function fetchOrder(orderId) {
+        loadingOrder.value = true
+
+        try {
+            const { data } = await window.axios.get(
+                route('inventory.branches.reports.purchase-orders.show', {
+                    branch: props.currentBranch.id,
+                    generalPurchaseOrder: orderId,
+                }),
+            )
+
+            return data
+        } finally {
+            loadingOrder.value = false
+        }
+    }
+
     return {
         localFilters,
         rows,
@@ -63,5 +79,7 @@ export function usePurchaseOrders(props) {
         updateFilter,
         backToReportsCenter,
         createPurchaseList,
+        fetchOrder,
+        loadingOrder,
     }
 }
