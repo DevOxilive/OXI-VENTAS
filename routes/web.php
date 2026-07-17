@@ -421,8 +421,6 @@ Route::middleware([
 
         Route::get('/branches/{branch}/reports/purchase-orders', [GeneralPurchaseOrderController::class, 'index'])
             ->middleware('permission:inventory.purchase-orders.view,inventory.purchase-orders.create')
-        Route::get('/branches/{branch}/reports/purchase-orders', [PurchaseReportController::class, 'orders'])
-            ->middleware($purchaseReportsAccess)
             ->name('branches.reports.purchase-orders');
 
         Route::post('/branches/{branch}/reports/purchase-orders/consolidate', [GeneralPurchaseOrderController::class, 'consolidate'])
