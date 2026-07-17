@@ -75,6 +75,10 @@ const activeModule = computed(() => {
     return activeSection.value?.modules?.find((module) => module.key === activePermissionModule.value) || null
 })
 
+const selectedPermissionIds = computed(() => {
+    return new Set((props.form?.permissions || []).map((permissionId) => Number(permissionId)))
+})
+
 const passwordPlaceholder = computed(() => {
     return props.isEditing
         ? 'Nueva contraseña (opcional)'
@@ -109,7 +113,11 @@ watch(activeSection, (section) => {
 }, { immediate: true })
 
 function getSelectedCount(permissions = []) {
-    return permissions.filter((permission) => props.form.permissions.includes(permission.id)).length
+    return permissions.filter((permission) => selectedPermissionIds.value.has(Number(permission.id))).length
+}
+
+function hasSelectedPermissions(permissions = []) {
+    return getSelectedCount(permissions) > 0
 }
 
 function getSectionSelectedCount(section) {
@@ -133,7 +141,11 @@ function selectPermissionModule(moduleKey) {
 }
 
 function isPermissionLocked(permissionId) {
-    return props.lockedPermissionIds.includes(permissionId)
+    return props.lockedPermissionIds.map((id) => Number(id)).includes(Number(permissionId))
+}
+
+function isPermissionSelected(permissionId) {
+    return selectedPermissionIds.value.has(Number(permissionId))
 }
 
 function toggleAssignedBranch(branchId) {
@@ -265,7 +277,7 @@ function closeModal() {
                             >
                                 <template #aside>
                                     <span class="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-text opacity-80">
-                                        {{ form.permissions.length }} seleccionados
+                                        {{ selectedPermissionIds.size }} seleccionados
                                     </span>
                                 </template>
 
@@ -309,9 +321,12 @@ function closeModal() {
                                         :key="module.key"
                                         type="button"
                                         class="rounded-2xl border px-3 py-3 text-left transition"
-                                        :class="activePermissionModule === module.key
-                                            ? 'border-primary bg-background shadow-sm'
-                                            : 'border-secondary bg-background hover:border-primary'"
+                                        :class="[
+                                            activePermissionModule === module.key || hasSelectedPermissions(module.permissions)
+                                                ? 'border-primary bg-secondary shadow-sm'
+                                                : 'border-secondary bg-background hover:border-primary',
+                                            activePermissionModule === module.key ? 'ring-1 ring-primary' : '',
+                                        ]"
                                         @click="selectPermissionModule(module.key)"
                                     >
                                         <p class="text-sm font-medium text-text">
@@ -370,7 +385,7 @@ function closeModal() {
                                     :key="permission.id"
                                     compact
                                     variant="soft"
-                                    :checked="form.permissions.includes(permission.id)"
+                                    :checked="isPermissionSelected(permission.id)"
                                     :title="permissionLabel(permission.name)"
                                     :badge="isPermissionLocked(permission.id) ? 'Rol' : ''"
                                     @toggle="$emit('toggle-permission', permission.id)"

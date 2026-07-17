@@ -47,6 +47,7 @@ class RoleSeeder extends Seeder
             if (
                 str_starts_with($permission->name, 'users.')
                 || str_starts_with($permission->name, 'systems.tickets.')
+                || str_starts_with($permission->name, 'systems.cash-closure-tickets.')
                 || str_starts_with($permission->name, 'systems.labels.')
             ) {
                 DB::table('role_permission')->updateOrInsert([
@@ -75,7 +76,11 @@ class RoleSeeder extends Seeder
         }
 
         foreach ($permissions as $permission) {
-            if (str_starts_with($permission->name, 'inventory.')) {
+            if (
+                str_starts_with($permission->name, 'inventory.')
+                || str_starts_with($permission->name, 'audits.physical-counts.')
+                || $permission->name === 'files.export'
+            ) {
                 DB::table('role_permission')->updateOrInsert([
                     'role_id' => $inventoryRole->id,
                     'permission_id' => $permission->id,

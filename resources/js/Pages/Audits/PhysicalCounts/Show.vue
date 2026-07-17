@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { router } from '@inertiajs/vue3'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -30,7 +30,11 @@ const props = defineProps({
 
 const { can } = usePermissions()
 
-const canCapture = computed(() => ['open', 'applied'].includes(props.physicalCount.status))
+const isCaptureStatus = computed(() => ['open', 'applied'].includes(props.physicalCount.status))
+const canCapture = computed(() =>
+    isCaptureStatus.value &&
+    (can('audits.physical-counts.count') || can('audits.physical-counts.update'))
+)
 const canViewAuditStock = computed(() => can('audits.physical-counts.view-stock'))
 
 const toolbarConfig = computed(() =>
@@ -44,7 +48,6 @@ function handleToolbarAction(action) {
         router.visit(route('audits.physical-counts.index', {
             branch: props.physicalCount.branch.slug,
         }))
-        return
     }
 }
 
@@ -96,7 +99,7 @@ onBeforeUnmount(() => {
                 v-if="physicalCount.status === 'closed'"
                 class="rounded-2xl border border-secondary bg-secondary px-4 py-3 text-sm text-text opacity-80"
             >
-                Esta auditoría ya fue finalizada. La captura está bloqueada.
+                Esta auditoria ya fue finalizada. La captura esta bloqueada.
             </div>
 
             <div
@@ -143,7 +146,11 @@ onBeforeUnmount(() => {
                     v-else
                     class="rounded-2xl border border-secondary bg-secondary p-6 text-sm text-text opacity-80"
                 >
-                    Esta auditoría está cerrada. Solo puede consultarse desde reportes.
+                    {{
+                        isCaptureStatus
+                            ? 'No tienes permiso para capturar conteos en esta auditoria.'
+                            : 'Esta auditoria esta cerrada. Solo puede consultarse desde reportes.'
+                    }}
                 </div>
             </div>
         </div>

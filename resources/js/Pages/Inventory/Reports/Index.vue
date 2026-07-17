@@ -32,6 +32,7 @@ const reportGroups = [
         icon: 'fact_check',
         disabled: false,
         routeName: 'inventory.branches.reports.audits',
+        permissions: ['audits.physical-counts.reports'],
     },
     {
         key: 'sales',
@@ -48,6 +49,7 @@ const reportGroups = [
         disabled: false,
         routeName: 'ventas.cash-closures.reports',
         usesBranch: false,
+        permissions: ['sales.cash-closures.view'],
     },
     {
         key: 'inventory',
@@ -56,6 +58,7 @@ const reportGroups = [
         icon: 'inventory_2',
         disabled: false,
         routeName: 'inventory.branches.reports.inventory',
+        permissions: ['inventory.view', 'inventory.branches.view'],
     },
     {
         key: 'movements',
@@ -64,6 +67,7 @@ const reportGroups = [
         icon: 'sync_alt',
         disabled: false,
         routeName: 'inventory.branches.reports.movements',
+        permissions: ['inventory.view', 'inventory.branches.view'],
     },
     {
         key: 'purchases',

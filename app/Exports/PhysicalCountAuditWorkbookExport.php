@@ -18,8 +18,6 @@ class PhysicalCountAuditWorkbookExport implements WithMultipleSheets
         protected string $branchName
     ) {
         $entries = collect($this->payload['entries'] ?? []);
-        $auditParticipants = collect($this->payload['audits'] ?? [])
-            ->flatMap(fn ($audit) => $audit->participants ?? collect());
         $selectedUserIds = collect($this->filters['user_ids'] ?? [])
             ->map(fn ($id) => (int) $id)
             ->filter()
@@ -28,10 +26,20 @@ class PhysicalCountAuditWorkbookExport implements WithMultipleSheets
         $this->statusFilter = ($this->filters['status'] ?? '') ?: null;
         $this->mainSheetTitle = $this->statusSheetTitle($this->statusFilter) ?? 'Concentrado';
 
-        $this->users = $entries
+        $visibleEntryKeys = collect($this->payload['reportRows'] ?? [])
+            ->where('row_type', 'counted')
+            ->map(fn (array $row) => ($row['physical_count_id'] ?? null) . ':' . ($row['branch_product_id'] ?? null))
+            ->filter(fn (string $key) => ! str_starts_with($key, ':') && ! str_ends_with($key, ':'))
+            ->unique()
+            ->values();
+
+        $visibleEntries = $visibleEntryKeys->isEmpty()
+            ? collect()
+            : $entries->filter(fn ($entry) => $visibleEntryKeys->contains($entry->physical_count_id . ':' . $entry->branch_product_id));
+
+        $this->users = $visibleEntries
             ->pluck('user')
             ->filter()
-            ->merge($auditParticipants)
             ->when($selectedUserIds->isNotEmpty(), fn ($users) => $users
                 ->filter(fn ($user) => $selectedUserIds->contains((int) $user->id)))
             ->unique('id')
@@ -41,12 +49,12 @@ class PhysicalCountAuditWorkbookExport implements WithMultipleSheets
     public function sheets(): array
     {
         $sheets = [
-            new PhysicalCountDashboardSheet($this->payload, $this->filterLabels, $this->branchName, $this->mainSheetTitle),
+            new PhysicalCountDashboardSheet($this->payload, $this->filterLabels, $this->branchName, $this->mainSheetTitle, $this->users, $this->statusFilter),
             new PhysicalCountConcentratedSheet($this->payload, $this->users, $this->mainSheetTitle, $this->statusFilter),
         ];
 
         foreach ($this->users as $user) {
-            $sheets[] = new PhysicalCountUserSheet($this->payload, $user);
+            $sheets[] = new PhysicalCountUserSheet($this->payload, $user, $this->mainSheetTitle);
         }
 
         return $sheets;

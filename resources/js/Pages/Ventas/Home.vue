@@ -31,6 +31,7 @@ import {
   getStoredTicketTemplateSettings,
   normalizeTicketTemplate,
 } from "@/config/ticketTemplate";
+import { usePermissions } from "@/Composables/usePermissions";
 
 defineOptions({
   layout: AdminLayout,
@@ -72,6 +73,7 @@ const props = defineProps({
 });
 
 const page = usePage();
+const { can } = usePermissions();
 const CASH_BOX_STORAGE_KEY = "ventas_cash_box_by_branch";
 
 const search = ref("");
@@ -259,6 +261,10 @@ const topExpirationAlerts = computed(() =>
 );
 
 const canCharge = computed(() => {
+  if (!canCreateSale.value) {
+    return false;
+  }
+
   if (cart.value.length === 0 || !saleForm.payment_method_id) {
     return false;
   }
@@ -304,6 +310,7 @@ const selectedPaymentMethodType = computed(() => {
 
 const isCashPayment = computed(() => selectedPaymentMethodType.value === "cash");
 const isAdminUser = computed(() => page.props.auth?.user?.role?.name === "Administrador");
+const canCreateSale = computed(() => can("sales.create"));
 const canReturnToBranchSelector = computed(() =>
   isAdminUser.value && !props.selectorMode && props.branchesDB.length > 1
 );
@@ -617,6 +624,14 @@ function cartItemSubtotal(item) {
 }
 
 function addProduct(product) {
+  if (!canCreateSale.value) {
+    WarningAlert({
+      title: "Sin permiso para vender",
+      message: "Puedes consultar el punto de venta, pero no tienes permiso para generar ventas.",
+    });
+    return;
+  }
+
   if (!product) return;
 
   const existing = cart.value.find(
@@ -976,6 +991,14 @@ function showExpirationAlert(alerts) {
 }
 
 function submitSale() {
+  if (!canCreateSale.value) {
+    WarningAlert({
+      title: "Sin permiso para cobrar",
+      message: "No tienes permiso para registrar ventas.",
+    });
+    return;
+  }
+
   if (cart.value.length === 0) {
     ErrorAlert({
       title: "Venta vacia",
@@ -1125,7 +1148,7 @@ function submitSale() {
                   expirationAlertPulse ? 'scale-105 ring-4 ring-secondary' : '',
                 ]"
                 @click="toggleExpirationAlerts"
-              >
+              > 
                 <span class="material-symbols-outlined text-[24px]">
                   notifications
                 </span>
@@ -1587,7 +1610,7 @@ function submitSale() {
                   :disabled="saleForm.processing || !canCharge"
                   @click="submitSale"
                 >
-                  {{ saleForm.processing ? "Guardando..." : "Cobrar venta" }}
+                  {{ !canCreateSale ? "Sin permiso para cobrar" : saleForm.processing ? "Guardando..." : "Cobrar venta" }}
                 </button>
               </div>
             </div>

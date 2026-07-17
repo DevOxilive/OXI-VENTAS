@@ -49,16 +49,17 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
 
         foreach ($this->users as $user) {
             $headings[] = 'Conteo Fisico ' . $user->name;
+            $headings[] = 'Dañado detec. ' . $user->name;
             $headings[] = 'Caducado detec. ' . $user->name;
         }
 
         return [
             ...$headings,
             'Total Conteo fisico',
+            'Total Dañado',
             'Total Caducado',
             'Ventas del dia',
             'Diferencias Total',
-            'Validado',
         ];
     }
 
@@ -68,6 +69,7 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
             ->groupBy(fn ($entry) => $entry->branch_product_id . ':' . $entry->user_id)
             ->map(fn ($group) => [
                 'counted' => (float) $group->sum('counted_quantity'),
+                'damaged' => (float) $group->sum('damaged_quantity'),
                 'expired' => (float) $group->sum('expired_quantity'),
             ]);
 
@@ -76,10 +78,8 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
             ->map(function (array $row, int $index) use ($entriesByProductUser) {
                 $sheetRow = $index + 2;
                 $countCells = $this->userColumnCells($sheetRow, 6);
-                $expiredCells = $this->userColumnCells($sheetRow, 7);
-                $totalCountColumn = Coordinate::stringFromColumnIndex(6 + ($this->users->count() * 2));
-                $totalExpiredColumn = Coordinate::stringFromColumnIndex(7 + ($this->users->count() * 2));
-
+                $damagedCells = $this->userColumnCells($sheetRow, 7);
+                $expiredCells = $this->userColumnCells($sheetRow, 8);
                 $line = [
                     null,
                     $row['scanned_code'] ?? '-',
@@ -87,24 +87,25 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
                     (float) ($row['system_stock'] ?? 0),
                     $this->users->isEmpty()
                         ? 'S/D'
-                        : '=IF(COUNT(' . implode(',', $countCells) . ')=0,"S/D",SUM(' . implode(',', $countCells) . ')-SUM(' . implode(',', $expiredCells) . '))',
+                        : '=IF(COUNT(' . implode(',', $countCells) . ')=0,"S/D",SUM(' . implode(',', $countCells) . ')-SUM(' . implode(',', $damagedCells) . ')-SUM(' . implode(',', $expiredCells) . '))',
                 ];
 
                 foreach ($this->users as $user) {
                     $key = ($row['branch_product_id'] ?? 0) . ':' . $user->id;
-                    $userCount = $entriesByProductUser->get($key, ['counted' => '', 'expired' => '']);
+                    $userCount = $entriesByProductUser->get($key, ['counted' => '', 'damaged' => '', 'expired' => '']);
 
                     $line[] = $userCount['counted'] === 0.0 ? '' : $userCount['counted'];
+                    $line[] = $userCount['damaged'] === 0.0 ? '' : $userCount['damaged'];
                     $line[] = $userCount['expired'] === 0.0 ? '' : $userCount['expired'];
                 }
 
                 return [
                     ...$line,
                     $this->users->isEmpty() ? 'S/TF' : '=IF(COUNT(' . implode(',', $countCells) . ')=0,"S/TF",SUM(' . implode(',', $countCells) . '))',
+                    $this->users->isEmpty() ? 'S/TD' : '=IF(COUNT(' . implode(',', $countCells) . ')=0,"S/TD",SUM(' . implode(',', $damagedCells) . '))',
                     $this->users->isEmpty() ? 'S/TC' : '=IF(COUNT(' . implode(',', $countCells) . ')=0,"S/TC",SUM(' . implode(',', $expiredCells) . '))',
                     0,
-                    "=IF(D{$sheetRow}=\"\",\"----\",IFERROR({$totalCountColumn}{$sheetRow}-D{$sheetRow},\"S/DIF\"))",
-                    false,
+                    "=IF(D{$sheetRow}=\"\",\"----\",IFERROR(E{$sheetRow}-D{$sheetRow},\"S/DIF\"))",
                 ];
             })
             ->values()
@@ -115,8 +116,14 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
     {
         $rows = collect($this->payload['reportRows'] ?? []);
 
+        if ($this->statusFilter === 'not_found') {
+            return collect();
+        }
+
         if (! $this->statusFilter) {
-            return $rows;
+            return $rows
+                ->where('row_type', 'counted')
+                ->values();
         }
 
         return $rows
@@ -125,7 +132,6 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
                     'matched' => ($row['row_type'] ?? null) === 'counted' && ($row['status'] ?? null) === 'matched',
                     'missing' => ($row['row_type'] ?? null) === 'counted' && ($row['status'] ?? null) === 'missing',
                     'surplus' => ($row['row_type'] ?? null) === 'counted' && ($row['status'] ?? null) === 'surplus',
-                    'not_found' => ($row['row_type'] ?? null) === 'pending',
                     default => true,
                 };
             })
@@ -136,7 +142,7 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
     {
         return $this->users
             ->values()
-            ->map(fn ($user, int $index) => Coordinate::stringFromColumnIndex($firstColumn + ($index * 2)) . $row)
+            ->map(fn ($user, int $index) => Coordinate::stringFromColumnIndex($firstColumn + ($index * 3)) . $row)
             ->all();
     }
 
@@ -144,7 +150,7 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
     {
         return [
             1 => [
-                'font' => ['bold' => true, 'color' => ['rgb' => $this->headerFontColor()]],
+                'font' => ['bold' => false, 'color' => ['rgb' => $this->headerFontColor()]],
                 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $this->headerColor()]],
             ],
         ];
@@ -171,17 +177,19 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
                 $sheet->getStyle("A1:{$highestColumn}1")->getAlignment()->setWrapText(true);
                 $sheet->getStyle("A1:{$highestColumn}{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
                 $lastNumericColumn = Coordinate::stringFromColumnIndex(max(4, Coordinate::columnIndexFromString($highestColumn) - 1));
-                $sheet->getStyle("D2:{$lastNumericColumn}{$highestRow}")->getNumberFormat()->setFormatCode('#,##0.00');
+                $sheet->getStyle("D2:{$lastNumericColumn}{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
 
                 $this->applyResultColors($sheet, $highestColumn);
 
                 for ($column = 1; $column <= Coordinate::columnIndexFromString($highestColumn); $column++) {
                     $letter = Coordinate::stringFromColumnIndex($column);
                     $sheet->getColumnDimension($letter)->setWidth(match ($column) {
-                        1 => 20,
-                        2 => 36,
-                        3 => 44,
-                        default => 16,
+                        1 => 12.63,
+                        2 => 36.38,
+                        3 => 43.88,
+                        4 => 15.88,
+                        5 => 15.38,
+                        default => $column % 2 === 0 ? 16.75 : 13,
                     });
                 }
             },
