@@ -179,6 +179,16 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
+        ...(isAdmin ||
+        can("audits.physical-counts.reports") ||
+        can("sales.cash-closures.view") ||
+        can("sales.cash-closures.create") ||
+        can("inventory.view") ||
+        can("inventory.branches.view") ||
+        can("inventory.purchase-orders.view") ||
+        can("inventory.purchase-orders.create") ||
+        can("inventory.purchase-orders.update") ||
+        can("inventory.purchase-orders.history")
         ...(canUse("audits") ||
         canUse("cashClosures") ||
         canUse("inventoryReports") ||
@@ -198,6 +208,33 @@ export function generateMenu(role, permissions = [], branches = []) {
     ];
 
     const canSeeBranchesSection =
+        isAdmin ||
+        can("inventory.products.view") ||
+        can("inventory.products.create") ||
+        can("inventory.products.update") ||
+        can("inventory.products.delete") ||
+        can("inventory.branches.view") ||
+        can("inventory.branches.create") ||
+        can("inventory.branches.update") ||
+        can("inventory.branches.delete") ||
+        can("inventory.purchase-reports.view") ||
+        can("inventory.purchase-reports.create") ||
+        can("inventory.purchase-reports.update") ||
+        can("inventory.purchase-reports.delete") ||
+        can("inventory.purchase-orders.view") ||
+        can("inventory.purchase-orders.create") ||
+        can("inventory.purchase-orders.update") ||
+        can("inventory.purchase-orders.history") ||
+        can("audits.physical-counts.view") ||
+        can("audits.physical-counts.count") ||
+        can("audits.physical-counts.reports") ||
+        can("audits.physical-counts.create") ||
+        can("audits.physical-counts.update") ||
+        can("audits.physical-counts.delete") ||
+        can("sales.cash-closures.view") ||
+        can("sales.cash-closures.create") ||
+        can("inventory.view") ||
+        can("inventory.branches.view");
         canUse("products") ||
         canUse("branchInventory") ||
         canUse("purchaseReports") ||
