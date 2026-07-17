@@ -26,6 +26,12 @@ export function generateMenu(role, permissions = [], branches = []) {
             "inventory.purchase-reports.update",
             "inventory.purchase-reports.delete",
         ],
+        purchaseOrders: [
+            "inventory.purchase-orders.view",
+            "inventory.purchase-orders.create",
+            "inventory.purchase-orders.update",
+            "inventory.purchase-orders.history",
+        ],
         audits: [
             "audits.physical-counts.view",
             "audits.physical-counts.count",
@@ -179,21 +185,12 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        ...(isAdmin ||
-        can("audits.physical-counts.reports") ||
-        can("sales.cash-closures.view") ||
-        can("sales.cash-closures.create") ||
-        can("inventory.view") ||
-        can("inventory.branches.view") ||
-        can("inventory.purchase-orders.view") ||
-        can("inventory.purchase-orders.create") ||
-        can("inventory.purchase-orders.update") ||
-        can("inventory.purchase-orders.history")
         ...(canUse("audits") ||
         canUse("cashClosures") ||
         canUse("inventoryReports") ||
         canUse("branchInventory") ||
-        canUse("purchaseReports")
+        canUse("purchaseReports") ||
+        canUse("purchaseOrders")
             ? [
                   {
                       text: "Reportes",
@@ -234,10 +231,11 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("sales.cash-closures.view") ||
         can("sales.cash-closures.create") ||
         can("inventory.view") ||
-        can("inventory.branches.view");
+        can("inventory.branches.view") ||
         canUse("products") ||
         canUse("branchInventory") ||
         canUse("purchaseReports") ||
+        canUse("purchaseOrders") ||
         canUse("audits") ||
         canUse("cashClosures") ||
         canUse("inventoryReports");
