@@ -1,5 +1,6 @@
 export function getPrinterTicketsToolbarConfig({
   processing = false,
+  canSave = true,
   title = "Tickets",
   subtitle = "Ajusta el ticket con una plantilla visual y libre para impresion.",
 } = {}) {
@@ -18,12 +19,16 @@ export function getPrinterTicketsToolbarConfig({
         icon: "restart_alt",
         variant: "slate",
       },
-      {
-        id: "save",
-        label: processing ? "Guardando..." : "Guardar",
-        icon: "save",
-        variant: "primary",
-      },
+      ...(canSave
+        ? [
+            {
+              id: "save",
+              label: processing ? "Guardando..." : "Guardar",
+              icon: "save",
+              variant: "primary",
+            },
+          ]
+        : []),
     ],
   }
 }

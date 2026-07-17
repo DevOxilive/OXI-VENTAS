@@ -15,6 +15,7 @@ import {
   reorderTicketBlocks,
   saveStoredTicketTemplateSettings,
 } from "@/config/ticketTemplate";
+import { usePermissions } from "@/Composables/usePermissions";
 
 defineOptions({
   layout: AdminLayout,
@@ -45,6 +46,7 @@ const dragIndex = ref(null);
 const previewPaper = ref(null);
 const activeHorizontalKey = ref(null);
 const activePointerBlockKey = ref(null);
+const { can } = usePermissions();
 
 const form = useForm({
   name: props.template?.name || "Ticket principal",
@@ -67,15 +69,27 @@ const blockCatalog = computed(() =>
     label: props.templateContext?.blockLabels?.[block.key] || block.label,
   }))
 );
+
+const previewBlocks = computed(() => buildTicketPreviewBlocks(previewTemplate.value, props.samplePrintJob));
+const updateRouteName = computed(() =>
+  props.template?.slug === "cash-closure-ticket"
+    ? "printers.cash-closure-tickets.update"
+    : "printers.tickets.update"
+);
+const updatePermission = computed(() =>
+  props.template?.slug === "cash-closure-ticket"
+    ? "systems.cash-closure-tickets.update"
+    : "systems.tickets.update"
+);
+const canUpdateTemplate = computed(() => can(updatePermission.value));
 const toolbarConfig = computed(() =>
   getPrinterTicketsToolbarConfig({
     processing: form.processing,
+    canSave: canUpdateTemplate.value,
     title: props.templateContext?.title || "Tickets",
     subtitle: props.templateContext?.subtitle || "Ajusta el ticket con una plantilla visual y libre para impresion.",
   })
 );
-
-const previewBlocks = computed(() => buildTicketPreviewBlocks(previewTemplate.value, props.samplePrintJob));
 const paperClass = computed(() => {
   const width = Number(previewTemplate.value.paper_width || 32);
 
@@ -122,6 +136,14 @@ function resetTemplate() {
 }
 
 function saveTemplate() {
+  if (!canUpdateTemplate.value) {
+    WarningAlert({
+      title: "Sin permiso para guardar",
+      message: "Puedes consultar la plantilla, pero no tienes permiso para editarla.",
+    });
+    return;
+  }
+
   form.settings = normalizeTicketTemplate({
     ...form.settings,
   });
@@ -131,7 +153,7 @@ function saveTemplate() {
       ...data,
       _method: "put",
     }))
-    .post(route("printers.tickets.update", props.template.id), {
+    .post(route(updateRouteName.value, props.template.id), {
       preserveScroll: true,
       forceFormData: true,
       onSuccess: () => {

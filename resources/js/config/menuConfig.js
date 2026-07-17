@@ -2,6 +2,56 @@ export function generateMenu(role, permissions = [], branches = []) {
     const isAdmin = role === "Administrador";
 
     const can = (permission) => permissions.includes(permission);
+    const canAny = (permissionList) => permissionList.some((permission) => can(permission));
+
+    const modulePermissions = {
+        employees: ["employees.view", "employees.create", "employees.update", "employees.delete"],
+        users: ["users.view", "users.create", "users.update", "users.delete"],
+        branches: ["branches.view", "branches.create", "branches.update", "branches.delete"],
+        products: [
+            "inventory.products.view",
+            "inventory.products.create",
+            "inventory.products.update",
+            "inventory.products.delete",
+        ],
+        branchInventory: [
+            "inventory.branches.view",
+            "inventory.branches.create",
+            "inventory.branches.update",
+            "inventory.branches.delete",
+        ],
+        purchaseReports: [
+            "inventory.purchase-reports.view",
+            "inventory.purchase-reports.create",
+            "inventory.purchase-reports.update",
+            "inventory.purchase-reports.delete",
+        ],
+        audits: [
+            "audits.physical-counts.view",
+            "audits.physical-counts.count",
+            "audits.physical-counts.reports",
+            "audits.physical-counts.view-stock",
+            "audits.physical-counts.create",
+            "audits.physical-counts.update",
+            "audits.physical-counts.delete",
+        ],
+        sales: ["sales.view", "sales.create", "sales.update", "sales.delete", "sales.reports"],
+        cashClosures: [
+            "sales.cash-closures.view",
+            "sales.cash-closures.create",
+            "sales.cash-closures.update",
+            "sales.cash-closures.delete",
+        ],
+        tickets: ["systems.tickets.view", "systems.tickets.update"],
+        cashClosureTickets: [
+            "systems.cash-closure-tickets.view",
+            "systems.cash-closure-tickets.update",
+        ],
+        labels: ["systems.labels.view", "systems.labels.update"],
+        inventoryReports: ["inventory.view", "inventory.create", "inventory.update", "inventory.delete"],
+    };
+
+    const canUse = (moduleKey) => isAdmin || canAny(modulePermissions[moduleKey] || []);
 
     const menu = [];
 
@@ -17,13 +67,7 @@ export function generateMenu(role, permissions = [], branches = []) {
     | CAPITAL HUMANO
     |--------------------------------------------------------------------------
     */
-    if (
-        isAdmin ||
-        can("employees.view") ||
-        can("employees.create") ||
-        can("employees.update") ||
-        can("employees.delete")
-    ) {
+    if (canUse("employees")) {
         menu.push({
             text: "Capital Humano",
             key: "human-resources",
@@ -45,28 +89,14 @@ export function generateMenu(role, permissions = [], branches = []) {
     | SISTEMAS
     |--------------------------------------------------------------------------
     */
-    if (
-        isAdmin ||
-        can("users.view") ||
-        can("users.create") ||
-        can("users.update") ||
-        can("users.delete") ||
-        can("branches.view") ||
-        can("branches.create") ||
-        can("branches.update") ||
-        can("branches.delete")
-    ) {
+    if (canUse("users") || canUse("branches")) {
         menu.push({
             text: "Sistemas",
             key: "systems",
             icon: "settings",
             isOpen: false,
             children: [
-                ...(isAdmin ||
-                can("users.view") ||
-                can("users.create") ||
-                can("users.update") ||
-                can("users.delete")
+                ...(canUse("users")
                     ? [
                           {
                               text: "Registro de Usuarios",
@@ -77,11 +107,7 @@ export function generateMenu(role, permissions = [], branches = []) {
                       ]
                     : []),
 
-                ...(isAdmin ||
-                can("branches.view") ||
-                can("branches.create") ||
-                can("branches.update") ||
-                can("branches.delete")
+                ...(canUse("branches")
                     ? [
                           {
                               text: "Registro de Sucursales",
@@ -101,11 +127,7 @@ export function generateMenu(role, permissions = [], branches = []) {
     |--------------------------------------------------------------------------
     */
     const inventoryOptions = (branch) => [
-        ...(isAdmin ||
-        can("inventory.products.view") ||
-        can("inventory.products.create") ||
-        can("inventory.products.update") ||
-        can("inventory.products.delete")
+        ...(canUse("products")
             ? [
                   {
                       text: "Productos",
@@ -118,11 +140,7 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        ...(isAdmin ||
-        can("inventory.branches.view") ||
-        can("inventory.branches.create") ||
-        can("inventory.branches.update") ||
-        can("inventory.branches.delete")
+        ...(canUse("branchInventory")
             ? [
                   {
                       text: "Inventario",
@@ -135,11 +153,7 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        ...(isAdmin ||
-        can("inventory.purchase-reports.view") ||
-        can("inventory.purchase-reports.create") ||
-        can("inventory.purchase-reports.update") ||
-        can("inventory.purchase-reports.delete")
+        ...(canUse("purchaseReports")
             ? [
                   {
                       text: "Listas de compra",
@@ -152,12 +166,7 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        ...(isAdmin ||
-        can("audits.physical-counts.view") ||
-        can("audits.physical-counts.count") ||
-        can("audits.physical-counts.create") ||
-        can("audits.physical-counts.update") ||
-        can("audits.physical-counts.delete")
+        ...(canUse("audits")
             ? [
                   {
                       text: "Auditorías",
@@ -180,6 +189,11 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("inventory.purchase-orders.create") ||
         can("inventory.purchase-orders.update") ||
         can("inventory.purchase-orders.history")
+        ...(canUse("audits") ||
+        canUse("cashClosures") ||
+        canUse("inventoryReports") ||
+        canUse("branchInventory") ||
+        canUse("purchaseReports")
             ? [
                   {
                       text: "Reportes",
@@ -221,6 +235,12 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("sales.cash-closures.create") ||
         can("inventory.view") ||
         can("inventory.branches.view");
+        canUse("products") ||
+        canUse("branchInventory") ||
+        canUse("purchaseReports") ||
+        canUse("audits") ||
+        canUse("cashClosures") ||
+        canUse("inventoryReports");
 
     if (canSeeBranchesSection) {
         menu.push({
@@ -246,14 +266,8 @@ export function generateMenu(role, permissions = [], branches = []) {
     }
 
     if (
-        isAdmin ||
-        can("sales.view") ||
-        can("sales.create") ||
-        can("sales.update") ||
-        can("sales.delete") ||
-        can("sales.reports") ||
-        can("sales.cash-closures.view") ||
-        can("sales.cash-closures.create")
+        canUse("sales") ||
+        canUse("cashClosures")
     ) {
         menu.push({
             text: "Ventas",
@@ -267,9 +281,7 @@ export function generateMenu(role, permissions = [], branches = []) {
                     icon: "point_of_sale",
                     url: route("ventas.home"),
                 },
-                ...(isAdmin ||
-                can("sales.cash-closures.view") ||
-                can("sales.cash-closures.create")
+                ...(canUse("cashClosures")
                     ? [
                           {
                               text: "Corte de caja",
@@ -284,11 +296,9 @@ export function generateMenu(role, permissions = [], branches = []) {
     }
 
     if (
-        isAdmin ||
-        can("systems.tickets.view") ||
-        can("systems.tickets.update") ||
-        can("systems.labels.view") ||
-        can("systems.labels.update")
+        canUse("tickets") ||
+        canUse("cashClosureTickets") ||
+        canUse("labels")
     ) {
         menu.push({
             text: "Impresoras",
@@ -296,21 +306,27 @@ export function generateMenu(role, permissions = [], branches = []) {
             icon: "print",
             isOpen: false,
             children: [
-                {
-                    text: "Tickets",
-                    key: "printers.tickets",
-                    icon: "receipt_long",
-                    url: route("printers.tickets.index"),
-                },
-                {
-                    text: "Tickets de corte",
-                    key: "printers.cash-closure-tickets",
-                    icon: "payments",
-                    url: route("printers.cash-closure-tickets.index"),
-                },
-                ...(isAdmin ||
-                can("systems.labels.view") ||
-                can("systems.labels.update")
+                ...(canUse("tickets")
+                    ? [
+                          {
+                              text: "Tickets",
+                              key: "printers.tickets",
+                              icon: "receipt_long",
+                              url: route("printers.tickets.index"),
+                          },
+                      ]
+                    : []),
+                ...(canUse("cashClosureTickets")
+                    ? [
+                          {
+                              text: "Tickets de corte",
+                              key: "printers.cash-closure-tickets",
+                              icon: "payments",
+                              url: route("printers.cash-closure-tickets.index"),
+                          },
+                      ]
+                    : []),
+                ...(canUse("labels")
                     ? [
                           {
                               text: "Etiquetas",

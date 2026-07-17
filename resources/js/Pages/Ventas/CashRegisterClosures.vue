@@ -27,6 +27,7 @@ import {
   createDefaultTicketTemplate,
   normalizeTicketTemplate,
 } from "@/config/ticketTemplate";
+import { usePermissions } from "@/Composables/usePermissions";
 
 defineOptions({
   layout: AdminLayout,
@@ -39,6 +40,8 @@ const props = defineProps({
   current: { type: Object, default: null },
   ticketTemplate: { type: Object, default: null },
 });
+
+const { can } = usePermissions();
 
 const showClosureModal = ref(false);
 const availablePrinters = ref([]);
@@ -102,6 +105,7 @@ const cashToWithdraw = computed(() => Math.max(0, countedCashTotal.value - Numbe
 const isBalanced = computed(() => {
   return Math.abs(cashDifferencePreview.value) < 0.01 && Math.abs(cardDifferencePreview.value) < 0.01;
 });
+const canCreateClosure = computed(() => can("sales.cash-closures.create"));
 const summaryCards = computed(() => [
   { label: "Ventas", value: props.current?.sales_count ?? 0, tone: "neutral" },
   { label: "Venta total", value: money(props.current?.sales_total), tone: "dark" },
@@ -130,14 +134,16 @@ const toolbarConfig = computed(() => {
     showRecordsPerPage: false,
     showCounter: false,
     filters: [],
-    actions: [
-      {
-        id: "new-closure",
-        label: "Registrar corte",
-        icon: "payments",
-        variant: "primary",
-      },
-    ],
+    actions: canCreateClosure.value
+      ? [
+          {
+            id: "new-closure",
+            label: "Registrar corte",
+            icon: "payments",
+            variant: "primary",
+          },
+        ]
+      : [],
     tabs: [],
   };
 });
@@ -167,6 +173,8 @@ function switchBranch(branchId) {
 }
 
 function openClosureModal() {
+  if (!canCreateClosure.value) return;
+
   form.branch_id = props.branch?.id ?? "";
   form.cash_box_number = props.current?.cash_box_number ?? "1";
   form.counted_cash = countedCashTotal.value;
@@ -268,6 +276,8 @@ async function printClosureJobs(jobs = []) {
 }
 
 function saveClosure() {
+  if (!canCreateClosure.value) return;
+
   form.counted_cash = Number(countedCashTotal.value || 0);
   form.cash_left = Number(form.cash_left || 0);
   form.counted_card = Number(form.counted_card || 0);
