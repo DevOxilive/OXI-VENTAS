@@ -47,7 +47,9 @@ const selectedBranchIds = ref(
         .filter((branch) => branch.submitted)
         .map((branch) => Number(branch.id)),
 )
-const tableConfig = getPurchaseOrdersTableConfig({ mode: 'view' })
+const activeStatus = computed(() => orders.localFilters.value.status || 'PURCHASING')
+const tableMode = computed(() => activeStatus.value === 'COMPLETED' ? 'history' : 'tracking')
+const tableConfig = computed(() => getPurchaseOrdersTableConfig({ mode: tableMode.value }))
 const progress = computed(() => {
     const total = Number(props.purchaseCycle?.total_branches || 0)
     const submitted = Number(props.purchaseCycle?.submitted_count || 0)
@@ -57,7 +59,9 @@ const selectedBranches = computed(() => {
     return (props.purchaseCycle?.branches ?? []).filter((branch) => isSelectedBranch(branch.id))
 })
 const canGenerateOrder = computed(() => {
-    return selectedBranches.value.length > 0 && can('inventory.purchase-orders.create')
+    return activeStatus.value === 'PURCHASING'
+        && selectedBranches.value.length > 0
+        && can('inventory.purchase-orders.create')
 })
 
 const toolbarConfig = computed(() => getPurchaseOrdersToolbarConfig({
@@ -72,6 +76,14 @@ const toolbarConfig = computed(() => getPurchaseOrdersToolbarConfig({
 async function openOrder(order) {
     if (!order?.id || orders.loadingOrder.value) return
 
+    if (activeStatus.value === 'PURCHASING' && can('inventory.purchase-orders.update')) {
+        router.get(route('inventory.branches.reports.purchase-orders.capture', {
+            branch: props.currentBranch.id,
+            generalPurchaseOrder: order.id,
+        }))
+        return
+    }
+
     try {
         selectedOrder.value = await orders.fetchOrder(order.id)
     } catch {
@@ -84,6 +96,12 @@ async function openOrder(order) {
 
 function handleTableAction({ action, row }) {
     if (action === 'open') openOrder(row)
+}
+
+function updateStatus(status) {
+    if (!status || status === orders.localFilters.value.status) return
+
+    orders.localFilters.value.status = status
 }
 
 function isSelectedBranch(branchId) {
@@ -157,14 +175,17 @@ function handleToolbarAction(action) {
         <template #toolbar>
             <GlobalToolbar
                 v-bind="toolbarConfig"
+                @back="orders.backToReportsCenter"
                 @update:search="orders.localFilters.value.search = $event"
                 @update:filter="orders.updateFilter"
                 @update:records-per-page="orders.localFilters.value.per_page = $event"
+                @update:active-tab="updateStatus"
                 @action="handleToolbarAction"
             />
         </template>
 
         <FormPanel
+            v-if="activeStatus === 'PURCHASING'"
             :title="`Ciclo ${purchaseCycle.folio || 'actual'}`"
             description="Selecciona las sucursales que entraran en esta orden general. Las pendientes no bloquean la compra."
             panel-class="mb-5 bg-background shadow-sm"

@@ -50,6 +50,7 @@ function handleTableAction({ action, row }) {
         <template #toolbar>
             <GlobalToolbar
                 v-bind="toolbarConfig"
+                @back="orders.backToReportsCenter"
                 @update:search="orders.localFilters.value.search = $event"
                 @update:records-per-page="orders.localFilters.value.per_page = $event"
             />

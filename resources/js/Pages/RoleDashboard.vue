@@ -624,12 +624,12 @@ onBeforeUnmount(() => {
 .hero-panel {
     align-items: stretch;
     background:
-        radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--primary) 26%, transparent), transparent 24rem),
-        radial-gradient(circle at 12% 0%, rgba(255, 60, 74, 0.16), transparent 18rem),
-        linear-gradient(135deg, #120001 0%, #050101 58%, #100003 100%);
-    border: 1px solid rgba(230, 0, 18, 0.28);
+        radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 24rem),
+        radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--primary) 9%, transparent), transparent 18rem),
+        linear-gradient(135deg, var(--background) 0%, color-mix(in srgb, var(--secondary) 74%, var(--background)) 58%, var(--background) 100%);
+    border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--secondary));
     border-radius: 1.5rem;
-    box-shadow: 0 28px 70px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 22px 58px color-mix(in srgb, var(--text) 10%, transparent);
     display: grid;
     gap: 1.5rem;
     grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
@@ -637,6 +637,15 @@ onBeforeUnmount(() => {
     overflow: hidden;
     padding: clamp(1.25rem, 3vw, 2.25rem);
     position: relative;
+}
+
+:global(.dark) .hero-panel {
+    background:
+        radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--primary) 26%, transparent), transparent 24rem),
+        radial-gradient(circle at 12% 0%, rgba(255, 60, 74, 0.16), transparent 18rem),
+        linear-gradient(135deg, #120001 0%, #050101 58%, #100003 100%);
+    border-color: rgba(230, 0, 18, 0.28);
+    box-shadow: 0 28px 70px rgba(0, 0, 0, 0.3);
 }
 
 .hero-copy {
@@ -648,10 +657,10 @@ onBeforeUnmount(() => {
 
 .role-pill {
     align-items: center;
-    background: rgba(230, 0, 18, 0.14);
-    border: 1px solid rgba(255, 45, 62, 0.34);
+    background: color-mix(in srgb, var(--primary) 10%, var(--background));
+    border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--secondary));
     border-radius: 999px;
-    color: #ff4b58;
+    color: var(--primary);
     display: inline-flex;
     font-size: 0.78rem;
     font-weight: 800;
@@ -666,7 +675,7 @@ onBeforeUnmount(() => {
 }
 
 h1 {
-    color: #ffffff;
+    color: var(--text);
     font-size: clamp(2.1rem, 5vw, 4.7rem);
     font-weight: 950;
     letter-spacing: 0;
@@ -675,14 +684,14 @@ h1 {
 }
 
 .hero-subtitle {
-    color: #ffffff;
+    color: var(--text);
     font-size: clamp(1.15rem, 2vw, 1.65rem);
     font-weight: 850;
     margin-top: 1rem;
 }
 
 .hero-description {
-    color: rgba(255, 255, 255, 0.72);
+    color: color-mix(in srgb, var(--text) 72%, transparent);
     font-size: 1rem;
     line-height: 1.7;
     margin-top: 0.7rem;
@@ -698,14 +707,14 @@ h1 {
 }
 
 .hero-meta div {
-    background: rgba(255, 255, 255, 0.045);
-    border: 1px solid rgba(255, 45, 62, 0.24);
+    background: color-mix(in srgb, var(--secondary) 62%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--secondary));
     border-radius: 1rem;
     padding: 0.95rem 1rem;
 }
 
 .hero-meta span {
-    color: rgba(255, 255, 255, 0.52);
+    color: color-mix(in srgb, var(--text) 52%, transparent);
     display: block;
     font-size: 0.72rem;
     font-weight: 800;
@@ -714,10 +723,35 @@ h1 {
 }
 
 .hero-meta strong {
-    color: #ffffff;
+    color: var(--text);
     display: block;
     font-size: 1.05rem;
     margin-top: 0.35rem;
+}
+
+:global(.dark) .role-pill {
+    background: rgba(230, 0, 18, 0.14);
+    border-color: rgba(255, 45, 62, 0.34);
+    color: #ff4b58;
+}
+
+:global(.dark) h1,
+:global(.dark) .hero-subtitle,
+:global(.dark) .hero-meta strong {
+    color: #ffffff;
+}
+
+:global(.dark) .hero-description {
+    color: rgba(255, 255, 255, 0.72);
+}
+
+:global(.dark) .hero-meta div {
+    background: rgba(255, 255, 255, 0.045);
+    border-color: rgba(255, 45, 62, 0.24);
+}
+
+:global(.dark) .hero-meta span {
+    color: rgba(255, 255, 255, 0.52);
 }
 
 .mascot-stage {
@@ -729,7 +763,7 @@ h1 {
 }
 
 .mascot-stage::before {
-    background: radial-gradient(circle, rgba(230, 0, 18, 0.18), transparent 68%);
+    background: radial-gradient(circle, color-mix(in srgb, var(--primary) 14%, transparent), transparent 68%);
     border-radius: 999px;
     content: "";
     height: min(90%, 28rem);
@@ -745,12 +779,12 @@ h1 {
 
 .mascot-card {
     align-items: center;
-    background: #0b0304;
-    border: 1px solid rgba(255, 45, 62, 0.34);
+    background: var(--background);
+    border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--secondary));
     border-radius: 2rem;
     box-shadow:
-        0 28px 70px rgba(0, 0, 0, 0.46),
-        0 0 56px rgba(230, 0, 18, 0.18);
+        0 28px 70px color-mix(in srgb, var(--text) 16%, transparent),
+        0 0 56px color-mix(in srgb, var(--primary) 14%, transparent);
     display: flex;
     height: clamp(11rem, 22vw, 15rem);
     justify-content: center;
@@ -772,19 +806,36 @@ h1 {
 
 .scene-prop {
     align-items: center;
-    background: rgba(25, 2, 5, 0.84);
-    border: 1px solid rgba(255, 45, 62, 0.32);
+    background: color-mix(in srgb, var(--secondary) 80%, var(--background));
+    border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--secondary));
     border-radius: 1.35rem;
     box-shadow:
-        0 20px 48px rgba(0, 0, 0, 0.34),
-        inset 0 0 24px rgba(230, 0, 18, 0.08);
-    color: #ff2d3d;
+        0 20px 48px color-mix(in srgb, var(--text) 14%, transparent),
+        inset 0 0 24px color-mix(in srgb, var(--primary) 8%, transparent);
+    color: var(--primary);
     display: flex;
     height: 4.8rem;
     justify-content: center;
     position: absolute;
     width: 4.8rem;
     z-index: 4;
+}
+
+:global(.dark) .mascot-card {
+    background: #0b0304;
+    border-color: rgba(255, 45, 62, 0.34);
+    box-shadow:
+        0 28px 70px rgba(0, 0, 0, 0.46),
+        0 0 56px rgba(230, 0, 18, 0.18);
+}
+
+:global(.dark) .scene-prop {
+    background: rgba(25, 2, 5, 0.84);
+    border-color: rgba(255, 45, 62, 0.32);
+    box-shadow:
+        0 20px 48px rgba(0, 0, 0, 0.34),
+        inset 0 0 24px rgba(230, 0, 18, 0.08);
+    color: #ff2d3d;
 }
 
 .scene-prop .material-symbols-outlined {
