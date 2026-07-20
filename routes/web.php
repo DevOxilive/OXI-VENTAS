@@ -419,6 +419,10 @@ Route::middleware([
             ->middleware($purchaseReportsAccess)
             ->name('branches.reports.purchases');
 
+        Route::get('/branches/{branch}/reports/purchases/{purchaseReport}', [PurchaseReportController::class, 'reportOrder'])
+            ->middleware($purchaseReportsAccess)
+            ->name('branches.reports.purchases.show');
+
         Route::get('/branches/{branch}/reports/purchase-orders', [GeneralPurchaseOrderController::class, 'index'])
             ->middleware('permission:inventory.purchase-orders.view,inventory.purchase-orders.create')
             ->name('branches.reports.purchase-orders');

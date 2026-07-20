@@ -7,6 +7,7 @@ import { GlobalToolbar } from "@/Components/Toolbars";
 import { GlobalTable } from "@/Components/Tables";
 import { GlobalModal, confirmModalAction } from "@/Components/Modales";
 import { ErrorAlert, ToastAlert } from "@/Components/Modales/UniversalActionModal";
+import GlobalCard from "@/Components/Cards/GlobalCard.vue";
 import FormPanel from "@/Components/Cards/FormPanel.vue";
 import MetricCard from "@/Components/Cards/MetricCard.vue";
 import InputField from "@/Components/Forms/InputField.vue";
@@ -361,30 +362,16 @@ function backToReportsCenter() {
         v-if="selectorMode"
         class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
       >
-        <button
+        <GlobalCard
           v-for="branch in branchesDB"
           :key="branch.id"
-          type="button"
-          class="group flex min-h-32 items-center gap-4 rounded-2xl border border-secondary bg-background p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-primary hover:shadow-md"
-          :style="{ borderLeftColor: branch.color || '#e60012', borderLeftWidth: '8px' }"
+          :title="branch.name"
+          subtitle="Sucursal"
+          description="Consulta el historial de cortes de caja de esta sucursal."
+          icon="history"
+          class="min-h-32"
           @click="openBranchReport(branch)"
-        >
-          <span
-            class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-secondary bg-secondary"
-            :style="{ color: branch.color || '#e60012' }"
-          >
-            <span class="material-symbols-outlined text-[28px]">storefront</span>
-          </span>
-
-          <div class="min-w-0">
-            <p class="text-xs font-black uppercase tracking-[0.18em] text-text opacity-50">
-              Sucursal
-            </p>
-            <h2 class="mt-1 truncate text-xl font-black text-text">
-              {{ branch.name }}
-            </h2>
-          </div>
-        </button>
+        />
       </section>
 
       <template v-else>

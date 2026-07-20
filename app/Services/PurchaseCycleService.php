@@ -74,17 +74,10 @@ class PurchaseCycleService
             $cycle = $this->currentOpenCycle($user);
             $participation = $this->participationFor($cycle, $order->branch_id);
 
-            if ($participation->purchase_order_id
-                && (int) $participation->purchase_order_id !== (int) $order->id) {
-                throw ValidationException::withMessages([
-                    'cycle' => 'Esta sucursal ya envió su solicitud para el ciclo de compra actual.',
-                ]);
-            }
-
             $participation->update([
-                'purchase_order_id' => $order->id,
+                'purchase_order_id' => $participation->purchase_order_id ?: $order->id,
                 'submitted_without_items' => false,
-                'submitted_at' => now(),
+                'submitted_at' => $participation->submitted_at ?: now(),
             ]);
 
             $order->update(['purchase_cycle_id' => $cycle->id]);
@@ -156,7 +149,12 @@ class PurchaseCycleService
                 ]);
             }
 
-            $orderIds = $selectedBranches->pluck('purchase_order_id')->filter()->values();
+            $orderIds = PurchaseOrder::query()
+                ->where('purchase_cycle_id', $cycle->id)
+                ->whereIn('branch_id', $selectedBranchIds)
+                ->where('status', PurchaseOrder::STATUS_GENERATED)
+                ->whereNull('general_purchase_order_id')
+                ->pluck('id');
 
             if ($orderIds->isEmpty()) {
                 $cycle->update([

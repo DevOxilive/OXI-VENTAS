@@ -26,9 +26,14 @@ class GeneralPurchaseOrderController extends Controller
 
         $cycle = $this->cycles->currentOpenCycle($request->user());
         $cycle->load(['branches.branch', 'branches.order']);
+        $status = $request->input('status', GeneralPurchaseOrder::STATUS_PURCHASING);
+
+        if (! in_array($status, [GeneralPurchaseOrder::STATUS_PURCHASING, GeneralPurchaseOrder::STATUS_COMPLETED], true)) {
+            $status = GeneralPurchaseOrder::STATUS_PURCHASING;
+        }
 
         return Inertia::render('Inventory/PurchaseOrders', array_merge(
-            $this->listPayload($request, $branch, GeneralPurchaseOrder::STATUS_PURCHASING),
+            $this->listPayload($request, $branch, $status),
             ['purchaseCycle' => $this->cyclePayload($cycle)]
         ));
     }
@@ -77,6 +82,7 @@ class GeneralPurchaseOrderController extends Controller
 
         $filters = [
             'search' => trim((string) $request->input('search', '')),
+            'status' => $status,
             'per_page' => $perPage,
         ];
 

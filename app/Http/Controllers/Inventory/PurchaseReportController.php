@@ -24,8 +24,54 @@ class PurchaseReportController extends Controller
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
-        return redirect()->route('inventory.branches.reports.purchase-orders', [
-            'branch' => $branch->id,
+        $perPage = TablePagination::resolvePerPage($request, 25);
+        $status = $request->input('status', PurchaseOrder::STATUS_DRAFT);
+        $allowedStatuses = [
+            PurchaseOrder::STATUS_DRAFT,
+            PurchaseOrder::STATUS_GENERATED,
+            PurchaseOrder::STATUS_COMPLETED,
+        ];
+
+        if (! in_array($status, $allowedStatuses, true)) {
+            $status = PurchaseOrder::STATUS_DRAFT;
+        }
+
+        $filters = [
+            'search' => trim((string) $request->input('search', '')),
+            'status' => $status,
+            'per_page' => $perPage,
+        ];
+
+        $orders = PurchaseOrder::query()
+            ->withCount('items')
+            ->where('branch_id', $branch->id)
+            ->where('status', $filters['status']);
+
+        FlexibleSearch::apply($orders, $filters['search'], function ($query, $phrase, $terms) {
+            FlexibleSearch::orWhereColumns($query, ['purchase_orders.folio', 'purchase_orders.notes'], $phrase, $terms);
+            FlexibleSearch::orWhereHasColumns($query, 'items.branchProduct.product', ['name'], $phrase, $terms);
+            FlexibleSearch::orWhereHasColumns($query, 'items.branchProduct.product.barcodes', ['code'], $phrase, $terms);
+        });
+
+        $orders = $orders
+            ->latest('id')
+            ->paginate($filters['per_page'])
+            ->withQueryString()
+            ->through(fn (PurchaseOrder $order) => [
+                'id' => $order->id,
+                'folio' => $order->folio,
+                'status' => $order->status,
+                'status_label' => $this->statusLabel($order->status),
+                'items_count' => $order->items_count,
+                'estimated_total' => $order->estimated_total,
+                'actual_total' => $order->actual_total,
+                'display_date' => $order->completed_at ?? $order->generated_at ?? $order->created_at,
+            ]);
+
+        return Inertia::render('Inventory/BranchPurchaseOrders', [
+            'currentBranch' => $branch,
+            'ordersDB' => $orders,
+            'filters' => $filters,
         ]);
     }
 
@@ -378,6 +424,52 @@ class PurchaseReportController extends Controller
         ]);
     }
 
+    public function reportOrder(Request $request, Branch $branch, PurchaseOrder $purchaseReport)
+    {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
+        abort_unless($purchaseReport->branch_id === $branch->id, 404);
+
+        $purchaseReport->load([
+            'items.branchProduct.product.barcodes',
+            'items.branchProduct.product.category',
+        ]);
+
+        return response()->json([
+            'id' => $purchaseReport->id,
+            'folio' => $purchaseReport->folio,
+            'status' => $purchaseReport->status,
+            'status_label' => $this->statusLabel($purchaseReport->status),
+            'notes' => $purchaseReport->notes,
+            'estimated_total' => $purchaseReport->estimated_total,
+            'actual_total' => $purchaseReport->actual_total,
+            'created_at' => $purchaseReport->created_at,
+            'generated_at' => $purchaseReport->generated_at,
+            'completed_at' => $purchaseReport->completed_at,
+            'items' => $purchaseReport->items->map(function (PurchaseOrderItem $item) {
+                $branchProduct = $item->branchProduct;
+                $product = $branchProduct?->product;
+
+                return [
+                    'id' => $item->id,
+                    'product_name' => $product?->name ?? 'Producto sin nombre',
+                    'product_code' => $product?->barcodes?->first()?->code ?: ($branchProduct?->barcode ?? ''),
+                    'category_name' => $product?->category?->name ?? 'Sin categoria',
+                    'current_stock' => (float) $item->current_stock,
+                    'min_stock' => (float) $item->min_stock,
+                    'requested_quantity' => (float) $item->requested_quantity,
+                    'purchased_quantity' => (float) $item->purchased_quantity,
+                    'estimated_price' => (float) $item->estimated_price,
+                    'estimated_total' => (float) $item->estimated_total,
+                    'actual_price' => (float) $item->actual_price,
+                    'actual_total' => (float) $item->actual_total,
+                    'status' => $item->status,
+                    'status_label' => $this->itemStatusLabel($item->status),
+                ];
+            })->values(),
+        ]);
+    }
+
     private function productsQuery(Branch $branch, array $filters)
     {
         return BranchProduct::query()
@@ -570,5 +662,27 @@ class PurchaseReportController extends Controller
     private function makeFolio(PurchaseOrder $purchaseOrder): string
     {
         return sprintf('OC-%s-%04d', now()->format('Ymd'), $purchaseOrder->id);
+    }
+
+    private function statusLabel(string $status): string
+    {
+        return match ($status) {
+            PurchaseOrder::STATUS_DRAFT => 'Borrador',
+            PurchaseOrder::STATUS_GENERATED => 'Generada',
+            PurchaseOrder::STATUS_COMPLETED => 'Completada',
+            PurchaseOrder::STATUS_CANCELLED => 'Cancelada',
+            default => $status,
+        };
+    }
+
+    private function itemStatusLabel(string $status): string
+    {
+        return match ($status) {
+            PurchaseOrderItem::STATUS_REQUESTED => 'Solicitado',
+            PurchaseOrderItem::STATUS_PURCHASED => 'Comprado',
+            PurchaseOrderItem::STATUS_ADJUSTED => 'Ajustado',
+            PurchaseOrderItem::STATUS_UNAVAILABLE => 'No disponible',
+            default => $status,
+        };
     }
 }

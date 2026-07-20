@@ -8,7 +8,7 @@ export function getPurchaseReportToolbarConfig({
     return {
         title: editingFolio ? `Editando ${editingFolio}` : 'Generar lista de compra',
         subtitle: cycleSubmitted
-            ? `${branchName || 'La sucursal'} ya respondió en ${cycleFolio || 'el ciclo actual'}.`
+            ? `${branchName || 'La sucursal'} ya tiene solicitudes enviadas en ${cycleFolio || 'el ciclo actual'}, pero puede crear otra lista.`
             : editingFolio
                 ? `Actualiza los productos y cantidades de la lista creada desde ${branchName || 'Sin sucursal'}.`
                 : `Solicitud de ${branchName || 'Sin sucursal'} para ${cycleFolio || 'el ciclo actual'}.`,

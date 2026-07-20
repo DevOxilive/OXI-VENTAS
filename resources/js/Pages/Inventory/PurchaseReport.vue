@@ -68,8 +68,6 @@ const selectedProducts = computed(() => report.selectedProducts.value);
 const purchaseLists = computed(() => props.reportsDB?.data ?? []);
 
 function handleTableAction({ action, row }) {
-    if (cycleSubmitted.value) return;
-
     if (action === "add") {
         report.addProduct(row);
         return;
@@ -81,7 +79,6 @@ function handleTableAction({ action, row }) {
 }
 
 function handleTableRowClick(row) {
-    if (cycleSubmitted.value) return;
     report.toggleProduct(row);
 }
 
@@ -139,8 +136,6 @@ async function submitWithoutProducts() {
 }
 
 async function generateOrder() {
-    if (cycleSubmitted.value) return;
-
     const result = await confirmModalAction({
         mode: "create",
         entityName: "orden de compra",
@@ -341,7 +336,7 @@ function paginateLists(url) {
                             <div class="grid gap-3 sm:grid-cols-2">
                                 <AppButton
                                     block
-                                    :disabled="report.selectedCount.value === 0 || cycleSubmitted"
+                                    :disabled="report.selectedCount.value === 0"
                                     variant="secondary"
                                     @click="report.saveDraft"
                                 >
@@ -350,7 +345,7 @@ function paginateLists(url) {
 
                                 <AppButton
                                     block
-                                    :disabled="report.selectedCount.value === 0 || cycleSubmitted"
+                                    :disabled="report.selectedCount.value === 0"
                                     @click="generateOrder"
                                 >
                                     Generar orden de compra
