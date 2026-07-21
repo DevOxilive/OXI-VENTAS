@@ -7,6 +7,8 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Auth\Events\Failed;
 use App\Services\SystemAuditService;
+use App\Actions\GeneratePlatformPasskeyRegistrationOptions;
+use Laravel\Passkeys\Actions\GenerateRegistrationOptions;
 use App\Observers\SystemAuditObserver;
 use App\Models\{CashRegisterClosure, PhysicalCount, PhysicalCountEntry};
 use App\Support\TrashRegistry;
@@ -21,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(GenerateRegistrationOptions::class, GeneratePlatformPasskeyRegistrationOptions::class);
     }
 
     /**

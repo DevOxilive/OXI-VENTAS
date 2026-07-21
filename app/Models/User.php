@@ -12,10 +12,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Passkeys\Contracts\PasskeyUser;
+use Laravel\Passkeys\PasskeyAuthenticatable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements PasskeyUser
 {
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, Notifiable, PasskeyAuthenticatable, SoftDeletes;
 
     protected $fillable = [
         'employee_id',

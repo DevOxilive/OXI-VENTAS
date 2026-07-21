@@ -55,6 +55,7 @@ class AttendanceController extends Controller
             'canRequestCorrection' => $request->user()->hasPermission('attendance.corrections.request'),
             'canReviewCorrections' => $request->user()->hasPermission('attendance.corrections.review'),
             'canExport' => $request->user()->hasPermission('attendance.reports') && $request->user()->hasPermission('files.export'),
+            'passkeyEnabled' => $request->user()->hasPasskeysEnabled(),
         ]);
     }
 
@@ -64,8 +65,7 @@ class AttendanceController extends Controller
             'type' => ['required', 'in:' . implode(',', AttendanceRecord::TYPES)],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'], 'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'accuracy' => ['nullable', 'integer', 'min:0'], 'approximateAddress' => ['nullable', 'string', 'max:255'],
-            'authenticationMethod' => ['required', 'in:platform_biometric,device_passcode'],
-            'authenticationVerified' => ['accepted'], 'device' => ['nullable', 'array'],
+            'authenticationMethod' => ['required', 'in:platform_biometric'], 'device' => ['nullable', 'array'],
         ]);
         $user = $request->user();
         $now = now();

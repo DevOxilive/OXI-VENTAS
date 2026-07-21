@@ -24,6 +24,7 @@ const props = defineProps({
     canRequestCorrection: Boolean,
     canReviewCorrections: Boolean,
     canExport: Boolean,
+    passkeyEnabled: Boolean,
 })
 
 const page = usePage()
@@ -34,6 +35,7 @@ const filters = reactive({
     department: props.filters.department || '', employee: props.filters.employee || '', type: props.filters.type || '',
 })
 const attendanceType = ref('check_in')
+const passkeyReady = ref(props.passkeyEnabled)
 
 const columns = [
     { key: 'employee', label: 'Empleado' }, { key: 'role', label: 'Rol' }, { key: 'branch', label: 'Sucursal' },
@@ -68,7 +70,6 @@ async function registerAttendance() {
             longitude: location?.longitude ?? null,
             accuracy: location?.accuracy ?? null,
             authenticationMethod: verification.method,
-            authenticationVerified: true,
             device: deviceDetails(),
         }, {
             preserveScroll: true,
@@ -88,9 +89,64 @@ async function verifyDeviceAuthentication() {
     }
     const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
     if (!available) throw new Error('Configura huella, rostro o un bloqueo seguro en este dispositivo para continuar.')
+    if (!passkeyReady.value) throw new Error('Primero configura la huella o rostro de este dispositivo.')
 
-    // The browser performs the local verification. The server records only its result and never biometric data.
+    const { data } = await window.axios.get('/passkeys/confirm/options', { headers: { Accept: 'application/json' } })
+    const credential = await navigator.credentials.get({ publicKey: toPublicKeyOptions(data.options) })
+    await window.axios.post('/passkeys/confirm', { credential: credentialToJson(credential) }, { headers: { Accept: 'application/json' } })
     return { method: 'platform_biometric' }
+}
+
+async function registerPasskey() {
+    registering.value = true
+    try {
+        if (!window.PublicKeyCredential || !await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()) {
+            throw new Error('Este dispositivo no dispone de huella, rostro o Windows Hello compatible.')
+        }
+        const { data } = await window.axios.get('/user/passkeys/options', { headers: { Accept: 'application/json' } })
+        const credential = await navigator.credentials.create({ publicKey: toPublicKeyOptions(data.options) })
+        await window.axios.post('/user/passkeys', {
+            name: `${deviceDetails().type} de ${page.props.auth.user.name}`,
+            credential: credentialToJson(credential),
+        }, { headers: { Accept: 'application/json' } })
+        passkeyReady.value = true
+        ToastAlert({ title: 'Huella o rostro configurado correctamente' })
+    } catch (error) {
+        ErrorAlert({ title: 'No fue posible configurar la biometría', message: error?.response?.data?.message || error?.message || 'Inténtalo nuevamente.' })
+    } finally { registering.value = false }
+}
+
+function base64UrlToBuffer(value) {
+    const source = String(value).replace(/-/g, '+').replace(/_/g, '/')
+    const padded = source + '='.repeat((4 - source.length % 4) % 4)
+    return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0)).buffer
+}
+
+function bufferToBase64Url(buffer) {
+    return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function toPublicKeyOptions(options) {
+    const normalized = { ...options, challenge: base64UrlToBuffer(options.challenge) }
+    if (normalized.user?.id) normalized.user = { ...normalized.user, id: base64UrlToBuffer(normalized.user.id) }
+    if (normalized.allowCredentials) normalized.allowCredentials = normalized.allowCredentials.map((item) => ({ ...item, id: base64UrlToBuffer(item.id) }))
+    if (normalized.excludeCredentials) normalized.excludeCredentials = normalized.excludeCredentials.map((item) => ({ ...item, id: base64UrlToBuffer(item.id) }))
+    return normalized
+}
+
+function credentialToJson(credential) {
+    const response = credential.response
+    return {
+        id: credential.id, rawId: bufferToBase64Url(credential.rawId), type: credential.type,
+        response: {
+            clientDataJSON: bufferToBase64Url(response.clientDataJSON),
+            ...(response.attestationObject ? { attestationObject: bufferToBase64Url(response.attestationObject) } : {}),
+            ...(response.authenticatorData ? { authenticatorData: bufferToBase64Url(response.authenticatorData) } : {}),
+            ...(response.signature ? { signature: bufferToBase64Url(response.signature) } : {}),
+            ...(response.userHandle ? { userHandle: bufferToBase64Url(response.userHandle) } : {}),
+        },
+        clientExtensionResults: credential.getClientExtensionResults(),
+    }
 }
 
 function resolveLocation() {
@@ -134,6 +190,9 @@ onBeforeUnmount(() => unsubscribeAttendance?.())
                     <AppButton :disabled="registering" @click="registerAttendance">
                         <span class="material-symbols-outlined mr-2 text-[19px]">fingerprint</span>
                         {{ registering ? 'Validando dispositivo...' : 'Registrar asistencia' }}
+                    </AppButton>
+                    <AppButton v-if="!passkeyReady" :disabled="registering" variant="secondary" @click="registerPasskey">
+                        Configurar huella o rostro
                     </AppButton>
                 </div>
             </div>
