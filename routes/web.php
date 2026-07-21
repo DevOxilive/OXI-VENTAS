@@ -27,6 +27,10 @@ use App\Http\Controllers\Inventory\CategoryController;
 use App\Http\Controllers\Ventas\CashRegisterClosureController;
 use App\Http\Controllers\Ventas\SalesController;
 
+// Fortify disables the package auto-routes, so register the maintained
+// Laravel Passkeys routes explicitly for the attendance biometric flow.
+require base_path('vendor/laravel/passkeys/routes/routes.php');
+
 /*
 |--------------------------------------------------------------------------
 | PÚBLICO
@@ -152,7 +156,7 @@ Route::middleware([
             ->middleware('permission:attendance.view,attendance.register')
             ->name('attendance.index');
         Route::post('/attendance', [AttendanceController::class, 'store'])
-            ->middleware('permission:attendance.register')
+            ->middleware(['permission:attendance.register', 'password.confirm'])
             ->name('attendance.store');
         Route::post('/attendance/{attendanceRecord}/corrections', [AttendanceController::class, 'requestCorrection'])
             ->middleware('permission:attendance.corrections.request,attendance.corrections.review')
