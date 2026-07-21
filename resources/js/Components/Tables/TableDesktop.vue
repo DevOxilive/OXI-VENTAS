@@ -140,7 +140,19 @@ function renderCellContentFromValue(value, column) {
         <thead class="border-b border-secondary bg-secondary text-text">
           <tr>
             <th v-if="selectable" class="px-4 py-3 w-10">
-              <input v-model="allSelected" type="checkbox" class="h-4 w-4 cursor-pointer rounded border-secondary text-primary focus:ring-primary" />
+              <button
+                type="button"
+                role="checkbox"
+                :aria-checked="allSelected"
+                aria-label="Seleccionar todos los registros"
+                class="grid h-5 w-5 place-items-center rounded-md border-2 transition duration-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                :class="allSelected ? 'border-primary bg-primary text-background shadow-sm' : 'border-secondary bg-background text-transparent hover:border-primary'"
+                @click="allSelected = !allSelected"
+              >
+                <svg viewBox="0 0 16 16" class="h-4 w-4" fill="none" aria-hidden="true">
+                  <path d="M3.5 8.5 6.5 11.5 12.5 4.75" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.35" />
+                </svg>
+              </button>
             </th>
 
             <th v-for="column in visibleColumns" :key="column.key"
@@ -160,10 +172,22 @@ function renderCellContentFromValue(value, column) {
             'transition-colors',
             hoverEffect ? 'hover:bg-secondary' : '',
             striped && tableRow.index % 2 === 1 ? 'bg-secondary' : '',
+            selectable && isRowSelected(tableRow.row) ? 'bg-secondary' : '',
           ]" @click="handleRowClick(tableRow.row)">
             <td v-if="selectable" class="px-4 py-3 w-10">
-              <input type="checkbox" :checked="isRowSelected(tableRow.row)"
-                class="h-4 w-4 cursor-pointer rounded border-secondary text-primary focus:ring-primary" @click.stop @change="toggleRowSelection(tableRow.row)" />
+              <button
+                type="button"
+                role="checkbox"
+                :aria-checked="isRowSelected(tableRow.row)"
+                :aria-label="`Seleccionar ${tableRow.row[rowKey]}`"
+                class="grid h-5 w-5 place-items-center rounded-md border-2 transition duration-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                :class="isRowSelected(tableRow.row) ? 'border-primary bg-primary text-background shadow-sm' : 'border-secondary bg-background text-transparent hover:border-primary'"
+                @click.stop="toggleRowSelection(tableRow.row)"
+              >
+                <svg viewBox="0 0 16 16" class="h-4 w-4" fill="none" aria-hidden="true">
+                  <path d="M3.5 8.5 6.5 11.5 12.5 4.75" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.35" />
+                </svg>
+              </button>
             </td>
 
             <td v-for="cell in tableRow.cells" :key="cell.key" class="px-4 py-3 align-middle"

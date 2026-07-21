@@ -11,8 +11,11 @@ import { useProductActions } from '@/Composables/Inventory/useProductActions'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { usePermissions } from '@/Composables/usePermissions'
 import { getProductToolbarConfig } from '@/config/ToolbarConfigs/productToolbarConfig'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
+
+let unsubscribeProductChanged = null
 
 function cloneProductsPayload(payload) {
   return {
@@ -236,8 +239,6 @@ function shouldReloadForProductEvent(event) {
 }
 
 onMounted(() => {
-  if (!window.Echo) return
-
   const updateOnProductChange = async (event) => {
     if (!shouldReloadForProductEvent(event)) return
 
@@ -270,16 +271,17 @@ onMounted(() => {
     upsertProduct(product)
   }
 
-  window.Echo.channel('inventory.products')
-    .listen('.product.changed', updateOnProductChange)
+  unsubscribeProductChanged = subscribeRealtime(
+    REALTIME_CHANNELS.inventoryProducts,
+    REALTIME_EVENTS.productChanged,
+    updateOnProductChange,
+  )
 })
 
 onBeforeUnmount(() => {
   clearTimeout(searchTimer)
 
-  if (!window.Echo) return
-
-  window.Echo.leave('inventory.products')
+  unsubscribeProductChanged?.()
 })
 </script>
 

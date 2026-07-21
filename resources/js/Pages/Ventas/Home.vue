@@ -309,10 +309,10 @@ const selectedPaymentMethodType = computed(() => {
 });
 
 const isCashPayment = computed(() => selectedPaymentMethodType.value === "cash");
-const isAdminUser = computed(() => page.props.auth?.user?.role?.name === "Administrador");
+const canAccessAllBranches = computed(() => can("branches.access-all"));
 const canCreateSale = computed(() => can("sales.create"));
 const canReturnToBranchSelector = computed(() =>
-  isAdminUser.value && !props.selectorMode && props.branchesDB.length > 1
+  canAccessAllBranches.value && !props.selectorMode && props.branchesDB.length > 1
 );
 
 watch(cartTotal, (total) => {
@@ -976,17 +976,37 @@ function expirationBadgeLabel(alert) {
 function showExpirationAlert(alerts) {
   if (!alerts.length) return;
 
-  const summary = alerts
-    .map((alert) => {
-      const quantityLabel = `${Number(alert.quantity || 0).toFixed(0)} pza(s)`;
+  const escapeHtml = (value) => String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
-      return `<p style="margin:0 0 8px 0;"><strong>${alert.product_name}</strong>: ${quantityLabel}, ${alert.message}.</p>`;
+  const summary = topExpirationAlerts.value
+    .map((alert) => {
+      const days = Number(alert.days_to_expire ?? 999);
+      const urgencyColor = days <= 3 ? "#dc2626" : days <= 7 ? "#d97706" : "#2563eb";
+      const badgeLabel = escapeHtml(expirationBadgeLabel(alert));
+      const productName = escapeHtml(alert.product_name || "Producto sin nombre");
+      const lot = escapeHtml(alert.lot_number || "Sin lote");
+      const quantity = Number(alert.quantity || 0).toFixed(0);
+      const expirationDate = escapeHtml(alert.formatted_expiration_date || alert.expiration_date || "Fecha no disponible");
+
+      return `<article style="margin:0 0 10px;padding:12px;border:1px solid #e8c9cd;border-radius:14px;background:#fff8f8;text-align:left;">
+        <div style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;">
+          <strong style="color:#241416;font-size:14px;line-height:1.35;">${productName}</strong>
+          <span style="flex:0 0 auto;border-radius:999px;background:${urgencyColor};color:#fff;padding:4px 8px;font-size:11px;font-weight:700;white-space:nowrap;">${badgeLabel}</span>
+        </div>
+        <p style="margin:7px 0 0;color:#6d5559;font-size:12px;line-height:1.4;">Lote ${lot} · ${quantity} unidades</p>
+        <p style="margin:3px 0 0;color:#6d5559;font-size:12px;line-height:1.4;">Caduca: ${expirationDate}</p>
+      </article>`;
     })
     .join("");
 
   BlockingWarningAlert({
-    title: "Lotes proximos a vencer",
-    message: `${summary}<p style="margin:12px 0 0 0;">La campana de alertas queda arriba para revisarlos durante la venta.</p>`,
+    title: "Lotes próximos a vencer",
+    message: `<div style="margin:0 0 12px;color:#6d5559;font-size:13px;line-height:1.45;">Revisa estos lotes antes de continuar con la venta.</div><div style="max-height:300px;overflow-y:auto;padding-right:4px;">${summary}</div><p style="margin:12px 0 0;color:#6d5559;font-size:12px;line-height:1.4;">La campana permanecerá disponible arriba para consultarlos durante la venta.</p>`,
   });
 }
 
@@ -1165,6 +1185,9 @@ function submitSale() {
                 class="absolute right-0 top-[calc(100%+0.75rem)] z-30 w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-secondary bg-background shadow-2xl"
               >
                 <div class="border-b border-secondary bg-primary px-4 py-4 text-white">
+
+                  
+                  
                   <div class="flex items-start justify-between gap-3">
                     <div>
                       <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-white/80">

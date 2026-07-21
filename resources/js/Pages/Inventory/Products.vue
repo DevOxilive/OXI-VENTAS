@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { router, usePage } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
@@ -14,6 +14,7 @@ import {
   ToastAlert,
 } from '@/Components/Modales/UniversalActionModal'
 import { confirmModalAction } from '@/Components/Modales/useModalConfig'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 defineOptions({
   layout: AdminLayout,
 });
@@ -48,6 +49,23 @@ const modalMode = ref("create");
 const frontendErrors = ref({});
 const search = ref(props.filters?.search ?? "");
 const branchFilter = ref("");
+let unsubscribeTrashRealtime = null
+
+onMounted(() => {
+  unsubscribeTrashRealtime = subscribeRealtime(
+    REALTIME_CHANNELS.systems,
+    REALTIME_EVENTS.systemTrashChanged,
+    (event) => {
+      if (event?.resource === 'products') {
+        router.reload({ only: ['productsDB', 'categoriesDB'] })
+      }
+    },
+  )
+})
+
+onBeforeUnmount(() => {
+  unsubscribeTrashRealtime?.()
+})
 const categoryFilter = ref("");
 const stockFilter = ref("");
 const recordsToShow = ref(Number(props.filters?.per_page ?? 50));

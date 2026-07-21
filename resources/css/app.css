@@ -2,29 +2,289 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Sistema visual global
+ * ---------------------
+ * Esta es la unica fuente de color para la interfaz. Los alias historicos que
+ * aparecen al final permiten que las pantallas antiguas adopten el tema sin
+ * volver a declarar colores dentro de cada componente.
+ */
 @layer base {
     :root {
-        --text: #0f0001;
-        --background: #fcf7f8;
-        --primary: #e0000f;
-        --secondary: #f9e7e9;
-        --accent: #996b00;
         color-scheme: light;
+
+        /* Identidad */
+        --primary: #c91424;
+        --primary-text: #c91424;
+        --primary-hover: #a90f1c;
+        --primary-active: #8f0c17;
+        --primary-soft: #f6dadd;
+        --primary-subtle: #fbeaec;
+        --accent: #8a6100;
+        --accent-soft: #f2e5bd;
+
+        /* Texto */
+        --text: #241719;
+        --text-muted: #6f5a5e;
+        --text-subtle: #8c7479;
+        --text-on-primary: #fff9fa;
+
+        /* Superficies calidas, sin blancos puros */
+        --background: #f6f0f1;
+        --surface: #fcf8f8;
+        --surface-raised: #fffafb;
+        --surface-sunken: #eee5e7;
+        --secondary: #f2dfe2;
+        --overlay: rgb(36 23 25 / 0.52);
+
+        /* Contornos */
+        --border: #cfa4aa;
+        --border-strong: #ad747c;
+        --border-primary: #c91424;
+        --focus-ring: rgb(201 20 36 / 0.28);
+        --border-width: 1.5px;
+
+        /* Profundidad inspirada en el degradado rojo de inicio */
+        --brand-gradient: linear-gradient(135deg, #fff7f8 0%, #f5dadd 52%, #edbec4 100%);
+        --brand-gradient-strong: linear-gradient(135deg, #a90f1c 0%, #d52232 52%, #ef5360 100%);
+        --shadow-color: 111 38 49;
+        --shadow-sm: 0 1px 2px rgb(var(--shadow-color) / 0.08), 0 4px 14px rgb(var(--shadow-color) / 0.05);
+        --shadow-md: 0 10px 30px rgb(var(--shadow-color) / 0.11);
+        --shadow-lg: 0 22px 55px rgb(var(--shadow-color) / 0.15);
+
+        /* Estados semanticos */
+        --success: #25734b;
+        --success-soft: #dcecdf;
+        --warning: #8a6100;
+        --warning-soft: #f2e5bd;
+        --danger: #bd1826;
+        --danger-soft: #f7dadd;
+        --info: #315f91;
+        --info-soft: #dce7f2;
     }
 
     .dark {
-        --text: #fff0f1;
-        --background: #070304;
-        --primary: #ff1f2e;
-        --secondary: #180608;
-        --accent: #ffd166;
         color-scheme: dark;
+
+        /* Identidad */
+        --primary: #d12f40;
+        --primary-text: #ff7180;
+        --primary-hover: #eb4c5b;
+        --primary-active: #c32939;
+        --primary-soft: #452127;
+        --primary-subtle: #321c20;
+        --accent: #e5b84b;
+        --accent-soft: #40351f;
+
+        /* Texto */
+        --text: #f7edef;
+        --text-muted: #c8b4b8;
+        --text-subtle: #a78e93;
+        --text-on-primary: #fffafb;
+
+        /* Carbon y grafito con un matiz rojo, nunca negro puro */
+        --background: #181315;
+        --surface: #21191c;
+        --surface-raised: #2a1f22;
+        --surface-sunken: #130f10;
+        --secondary: #322126;
+        --overlay: rgb(8 6 7 / 0.68);
+
+        /* Contornos mas luminosos para separar superficies oscuras */
+        --border: #68444c;
+        --border-strong: #98606b;
+        --border-primary: #de3546;
+        --focus-ring: rgb(222 53 70 / 0.38);
+
+        --brand-gradient: linear-gradient(135deg, #34171c 0%, #241719 52%, #181315 100%);
+        --brand-gradient-strong: linear-gradient(135deg, #7e101b 0%, #bc1b29 52%, #ed3e4d 100%);
+        --shadow-color: 0 0 0;
+        --shadow-sm: 0 1px 2px rgb(var(--shadow-color) / 0.28), 0 5px 16px rgb(var(--shadow-color) / 0.2);
+        --shadow-md: 0 12px 34px rgb(var(--shadow-color) / 0.28);
+        --shadow-lg: 0 24px 60px rgb(var(--shadow-color) / 0.38);
+
+        /* Estados semanticos adaptados al fondo oscuro */
+        --success: #78d7a4;
+        --success-soft: #1d392b;
+        --warning: #f0c75e;
+        --warning-soft: #40351f;
+        --danger: #ff7180;
+        --danger-soft: #452127;
+        --info: #8abbea;
+        --info-soft: #20354a;
     }
 
     html,
-    body {
-        @apply bg-background text-text;
+    body,
+    #app {
+        min-height: 100%;
+        background-color: var(--background);
+        color: var(--text);
     }
+
+    body {
+        transition: background-color 180ms ease, color 180ms ease;
+    }
+
+    *,
+    ::before,
+    ::after {
+        border-color: var(--border);
+    }
+
+    ::selection {
+        background: var(--primary);
+        color: var(--text-on-primary);
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+    }
+
+    input:not([type='button']):not([type='submit']):not([type='reset']),
+    select,
+    textarea {
+        border-color: var(--border);
+        background-color: var(--surface-raised);
+        color: var(--text);
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+        color: var(--text-subtle);
+        opacity: 1;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+        border-color: var(--border-primary);
+        box-shadow: 0 0 0 3px var(--focus-ring);
+    }
+
+    button,
+    [role='button'] {
+        border-color: var(--border);
+    }
+
+    button:disabled,
+    input:disabled,
+    select:disabled,
+    textarea:disabled,
+    [aria-disabled='true'] {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
+    table {
+        border-color: var(--border);
+    }
+
+    dialog,
+    [role='dialog'] {
+        color: var(--text);
+    }
+
+    html {
+        scrollbar-color: var(--border-strong) var(--surface-sunken);
+    }
+}
+
+/*
+ * Puente para los componentes existentes. Se mantiene aqui deliberadamente:
+ * fondos, bordes, modales, tablas y controles obedecen a los mismos tokens.
+ */
+.bg-background { background-color: var(--background); }
+.bg-secondary { background-color: var(--secondary); }
+.bg-primary { background-color: var(--primary); }
+.text-text { color: var(--text); }
+.text-primary { color: var(--primary-text); }
+.text-accent { color: var(--accent); }
+.border-secondary,
+.divide-secondary > :not([hidden]) ~ :not([hidden]) { border-color: var(--border); }
+.border-primary { border-color: var(--border-primary); }
+.ring-primary { --tw-ring-color: var(--primary); }
+.ring-secondary { --tw-ring-color: var(--border); }
+
+/* Los contornos declarados con `border` ganan presencia sin volverse pesados. */
+.border { border-width: var(--border-width); }
+
+/* Alias neutros heredados: evitan blancos puros y grises frios aislados. */
+.bg-white,
+.bg-slate-50,
+.bg-gray-50 { background-color: var(--surface-raised); }
+.bg-slate-100,
+.bg-gray-100 { background-color: var(--surface-sunken); }
+.text-black,
+.text-slate-900,
+.text-gray-900,
+.text-slate-800,
+.text-gray-800,
+.text-slate-700,
+.text-gray-700 { color: var(--text); }
+.text-slate-600,
+.text-gray-600,
+.text-slate-500,
+.text-gray-500,
+.text-slate-400,
+.text-gray-400 { color: var(--text-muted); }
+.border-slate-200,
+.border-gray-200,
+.border-slate-300,
+.border-gray-300 { border-color: var(--border); }
+.text-\[\#1f1d2b\] { color: var(--text); }
+.bg-\[\#1f1d2b\] { background-color: var(--primary); }
+.border-\[\#1f1d2b\] { border-color: var(--border-strong); }
+
+/* La portada conserva su composicion, pero evita negro puro en modo oscuro. */
+.dark .hero-panel {
+    border-color: var(--border-primary) !important;
+    background: var(--brand-gradient) !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+.dark .mascot-card,
+.dark .scene-prop {
+    border-color: var(--border) !important;
+    background: var(--surface-raised) !important;
+}
+
+/* Estados interactivos globales para las superficies mas usadas. */
+.hover\:bg-secondary:hover,
+.focus\:bg-secondary:focus { background-color: var(--primary-subtle); }
+.hover\:border-primary:hover,
+.focus\:border-primary:focus { border-color: var(--border-primary); }
+.disabled\:opacity-40:disabled,
+.disabled\:opacity-50:disabled,
+.disabled\:opacity-60:disabled { opacity: 0.55; }
+
+/* SweetAlert comparte la misma superficie que los modales de Vue. */
+.swal2-popup,
+.swal2-modal,
+.swal2-toast {
+    border: var(--border-width) solid var(--border);
+    background: var(--surface-raised);
+    color: var(--text);
+    box-shadow: var(--shadow-lg);
+}
+.swal2-title,
+.swal2-html-container { color: var(--text); }
+.swal2-input,
+.swal2-select,
+.swal2-textarea {
+    border-color: var(--border);
+    background: var(--surface);
+    color: var(--text);
+}
+.swal2-confirm {
+    border: var(--border-width) solid var(--border-primary);
+    background: var(--primary) !important;
+    color: var(--text-on-primary);
+}
+.swal2-cancel {
+    border: var(--border-width) solid var(--border);
+    background: var(--surface-sunken) !important;
+    color: var(--text);
 }
 
 [x-cloak] {

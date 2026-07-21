@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'name',
         'description',
@@ -49,5 +52,10 @@ class Product extends Model
     public function barcodes()
     {
         return $this->hasMany(Barcode::class);
+    }
+
+    public function branchProducts()
+    {
+        return $this->hasMany(BranchProduct::class);
     }
 }

@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TicketTemplate extends Model
 {
+    use SoftDeletes;
+
     private const LEGACY_SETTING_KEYS = [
         'logo_path',
         'logo_url',

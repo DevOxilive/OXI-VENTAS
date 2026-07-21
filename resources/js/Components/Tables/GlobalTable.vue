@@ -203,9 +203,13 @@ onBeforeUnmount(() => {
         :row-key="rowKey"
         :no-data-message="noDataMessage"
         :loading="loading"
+        :selectable="selectable"
+        :selected-items="selectedItems"
         :mobile-card-header-field="mobileCardHeaderField"
         @action="$emit('action', $event)"
         @row-click="$emit('row-click', $event)"
+        @selection-change="$emit('selection-change', $event)"
+        @update:selectedItems="$emit('update:selectedItems', $event)"
       />
     </div>
 

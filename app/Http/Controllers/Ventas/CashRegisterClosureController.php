@@ -8,6 +8,7 @@ use App\Models\Branch;
 use App\Models\CashRegisterClosure;
 use App\Models\Sale;
 use App\Models\TicketTemplate;
+use App\Support\SystemPermission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -21,7 +22,7 @@ class CashRegisterClosureController extends Controller
     {
         $user = $request->user()->loadMissing(['role', 'branches']);
         $branches = $this->accessibleBranches($request);
-        $isAdminSelector = $user->role?->name === 'Administrador' && !$request->filled('branch');
+        $isAdminSelector = $user->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL) && !$request->filled('branch');
 
         if ($isAdminSelector) {
             return Inertia::render('Ventas/CashRegisterClosures', [

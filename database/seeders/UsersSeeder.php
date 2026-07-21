@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use App\Models\Role;
-use App\Models\Permission;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -12,24 +11,35 @@ class UsersSeeder extends Seeder
 {
     public function run(): void
     {
-        // BUSCAR ROL ADMIN
         $adminRole = Role::where('name', 'Administrador')->first();
+        $superAdministratorRole = Role::where('name', 'Super Administrador')->first();
 
-        // CREAR O ACTUALIZAR ADMIN
-        $user = User::updateOrCreate(
+        $admin = User::updateOrCreate(
             ['email' => 'admin@oxilive.com.mx'],
             [
                 'employee_id' => 1,
                 'name' => 'admin',
                 'password' => Hash::make('1234567890'),
                 'role_id' => $adminRole?->id,
+                'is_active' => true,
             ]
         );
 
-        // CARGAR TODOS LOS PERMISOS
-        $permissions = Permission::pluck('id')->toArray();
+        $admin->forceFill(['email_verified_at' => now()])->save();
+        $admin->permissions()->sync([]);
 
-        // ASIGNAR TODOS LOS PERMISOS DIRECTOS
-        $user->permissions()->sync($permissions);
+        $superAdministrator = User::updateOrCreate(
+            ['email' => 'superadmin@oxilive.com.mx'],
+            [
+                'employee_id' => null,
+                'name' => 'Superadmin',
+                'password' => Hash::make('1234567890'),
+                'role_id' => $superAdministratorRole?->id,
+                'is_active' => true,
+            ]
+        );
+
+        $superAdministrator->forceFill(['email_verified_at' => now()])->save();
+        $superAdministrator->permissions()->sync([]);
     }
 }

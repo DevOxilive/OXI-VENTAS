@@ -7,6 +7,7 @@ import LogoutOtherBrowserSessionsForm from '@/Pages/Profile/Partials/LogoutOther
 import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthenticationForm.vue'
 import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue'
 import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue'
+import { t } from '@/i18n/es'
 
 defineOptions({ layout: AdminLayout })
 
@@ -22,11 +23,11 @@ defineProps({
             <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
                 <div class="mb-6">
                     <h1 class="text-2xl font-semibold text-slate-800">
-                        Mi perfil
+                        {{ t('profile.title') }}
                     </h1>
 
                     <p class="mt-1 text-sm text-slate-500">
-                        Administra tu informacion de acceso y seguridad.
+                        {{ t('profile.subtitle') }}
                     </p>
                 </div>
 

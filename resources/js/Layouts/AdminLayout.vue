@@ -10,6 +10,8 @@ import {
     updateLivePermissions,
 } from '@/Composables/usePermissions'
 import { ToastAlert } from '@/Components/Modales/UniversalActionModal'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { t } from '@/i18n/es'
 
 const page = usePage()
 const desktopMediaQuery = '(min-width: 768px)'
@@ -39,10 +41,8 @@ const themeMetaColors = {
 const collapseEventName = 'sidebar:collapse-all'
 const isDesktopViewport = ref(false)
 const currentTheme = ref('light')
-let systemsChannel = null
-let activityChannel = null
-let handleUserChanged = null
-let handleRealtimeActivity = null
+let unsubscribeUserChanged = null
+let unsubscribeRealtimeActivity = null
 let desktopMediaQueryList = null
 let handleDesktopViewportChange = null
 
@@ -156,9 +156,9 @@ onMounted(() => {
         desktopMediaQueryList.addEventListener('change', handleDesktopViewportChange)
     }
 
-    if (!window.Echo || !page.props.auth?.user?.id) return
+    if (!page.props.auth?.user?.id) return
 
-    handleUserChanged = (event) => {
+    const handleUserChanged = (event) => {
         if (Number(page.props.auth.user.id) !== Number(event.userId)) return
 
         updateLivePermissions({
@@ -173,18 +173,23 @@ onMounted(() => {
         })
     }
 
-    handleRealtimeActivity = (event) => {
+    const handleRealtimeActivity = (event) => {
         ToastAlert({
             icon: 'info',
             title: event.message || 'Hay una actualizacion en tiempo real',
         })
     }
 
-    systemsChannel = window.Echo.channel('systems')
-        .listen('.UserChanged', handleUserChanged)
-
-    activityChannel = window.Echo.channel('activity')
-        .listen('.realtime.activity', handleRealtimeActivity)
+    unsubscribeUserChanged = subscribeRealtime(
+        REALTIME_CHANNELS.systems,
+        REALTIME_EVENTS.userChanged,
+        handleUserChanged,
+    )
+    unsubscribeRealtimeActivity = subscribeRealtime(
+        REALTIME_CHANNELS.activity,
+        REALTIME_EVENTS.activityLogged,
+        handleRealtimeActivity,
+    )
 })
 
 onBeforeUnmount(() => {
@@ -192,13 +197,8 @@ onBeforeUnmount(() => {
         desktopMediaQueryList.removeEventListener('change', handleDesktopViewportChange)
     }
 
-    if (systemsChannel && handleUserChanged) {
-        systemsChannel.stopListening('.UserChanged', handleUserChanged)
-    }
-
-    if (activityChannel && handleRealtimeActivity) {
-        activityChannel.stopListening('.realtime.activity', handleRealtimeActivity)
-    }
+    unsubscribeUserChanged?.()
+    unsubscribeRealtimeActivity?.()
 })
 
 watch(desktopSidebarCollapsed, (value) => {
@@ -280,17 +280,6 @@ watch(desktopSidebarCollapsed, (value) => {
 
                     <div class="shrink-0">
                         <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                class="inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-secondary bg-background text-text shadow-sm transition hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary"
-                                :title="currentTheme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo obscuro'"
-                                @click="toggleTheme"
-                            >
-                                <span class="material-symbols-outlined text-[24px]">
-                                    {{ currentTheme === 'dark' ? 'light_mode' : 'dark_mode' }}
-                                </span>
-                            </button>
-
                             <Dropdown
                                 align="right"
                                 width="60"
@@ -323,19 +312,42 @@ watch(desktopSidebarCollapsed, (value) => {
 
                                 <template #content>
                                     <div class="overflow-hidden rounded-b-2xl border border-t-0 border-secondary bg-background shadow-sm">
+                                        <button
+                                            type="button"
+                                            class="flex w-full items-center gap-3 border-b border-secondary px-4 py-3 text-left text-sm font-medium text-text transition hover:bg-secondary focus:bg-secondary focus:outline-none"
+                                            :title="currentTheme === 'dark' ? t('theme.switchToLight') : t('theme.switchToDark')"
+                                            @click="toggleTheme"
+                                        >
+                                            <span class="material-symbols-outlined text-[20px]">
+                                                {{ currentTheme === 'dark' ? 'light_mode' : 'dark_mode' }}
+                                            </span>
+
+                                            <span>
+                                                {{ currentTheme === 'dark' ? t('theme.switchToLight') : t('theme.switchToDark') }}
+                                            </span>
+                                        </button>
+
                                         <DropdownLink
                                             :href="route('profile.show')"
-                                            class="border-b border-secondary px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
+                                            class="flex items-center gap-3 border-b border-secondary px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
                                         >
-                                            Editar perfil
+                                            <span class="material-symbols-outlined text-[20px]">
+                                                manage_accounts
+                                            </span>
+
+                                            <span>Editar perfil</span>
                                         </DropdownLink>
 
                                         <form @submit.prevent="logout">
                                             <DropdownLink
                                                 as="button"
-                                                class="px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
+                                                class="flex items-center gap-3 px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
                                             >
-                                                Cerrar sesion
+                                                <span class="material-symbols-outlined text-[20px]">
+                                                    logout
+                                                </span>
+
+                                                <span>Cerrar sesión</span>
                                             </DropdownLink>
                                         </form>
                                     </div>

@@ -15,8 +15,11 @@ import { usePermissions } from '@/Composables/usePermissions'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { physicalCountTableConfig } from '@/config/TableConfigs/physicalCountTableConfig'
 import { getPhysicalCountToolbarConfig } from '@/config/ToolbarConfigs/physicalCountToolbarConfig'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
+
+let unsubscribePhysicalCountChanged = null
 
 const props = defineProps({
     physicalCounts: {
@@ -236,20 +239,19 @@ async function handleTableAction({ action, row }) {
 }
 
 onMounted(() => {
-    if (!window.Echo) return
-
-    window.Echo.channel('audits')
-        .listen('.PhysicalCountChanged', () => {
+    unsubscribePhysicalCountChanged = subscribeRealtime(
+        REALTIME_CHANNELS.audits,
+        REALTIME_EVENTS.physicalCountChanged,
+        () => {
             reloadPhysicalCounts()
-        })
+        },
+    )
 })
 
 onBeforeUnmount(() => {
     clearTimeout(filterTimeout)
 
-    if (!window.Echo) return
-
-    window.Echo.leave('audits')
+    unsubscribePhysicalCountChanged?.()
 })
 
 watch([statusFilter, recordsPerPage], () => {

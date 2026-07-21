@@ -9,12 +9,13 @@ use App\Models\Role;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'employee_id',
@@ -86,7 +87,7 @@ class User extends Authenticatable
 
     public function accessibleBranchesQuery(): Builder|BelongsToMany
     {
-        if ($this->role?->name === 'Administrador') {
+        if ($this->hasPermission(\App\Support\SystemPermission::BRANCHES_ACCESS_ALL)) {
             return Branch::query()->where('active', true);
         }
 
@@ -104,7 +105,7 @@ class User extends Authenticatable
 
     public function hasBranchAccess(int $branchId): bool
     {
-        if ($this->role?->name === 'Administrador') {
+        if ($this->hasPermission(\App\Support\SystemPermission::BRANCHES_ACCESS_ALL)) {
             return Branch::query()
                 ->where('active', true)
                 ->whereKey($branchId)
@@ -125,10 +126,6 @@ class User extends Authenticatable
 
     public function hasPermission($permission)
     {
-        if ($this->role?->name === 'Administrador') {
-            return true;
-        }
-
         return $this->all_permissions->contains('name', $permission);
     }
 }

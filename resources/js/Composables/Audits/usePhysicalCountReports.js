@@ -3,8 +3,10 @@ import { router } from '@inertiajs/vue3'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
 import { getPhysicalCountReportsToolbarConfig } from '@/config/ToolbarConfigs/physicalCountReportsToolbarConfig'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 
 export function usePhysicalCountReports(props) {
+    let unsubscribePhysicalCountChanged = null
     let filterReloadTimeout = null
     let syncingFromServer = false
 
@@ -277,19 +279,19 @@ export function usePhysicalCountReports(props) {
     )
 
     onMounted(() => {
-        if (!window.Echo) return
-
-        window.Echo.channel('audits')
-            .listen('.PhysicalCountChanged', () => {
+        unsubscribePhysicalCountChanged = subscribeRealtime(
+            REALTIME_CHANNELS.audits,
+            REALTIME_EVENTS.physicalCountChanged,
+            () => {
                 reloadReports()
-            })
+            },
+        )
     })
 
     onBeforeUnmount(() => {
         clearTimeout(filterReloadTimeout)
 
-        if (!window.Echo) return
-        window.Echo.leave('audits')
+        unsubscribePhysicalCountChanged?.()
     })
 
     return {

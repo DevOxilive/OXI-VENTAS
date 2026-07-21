@@ -15,6 +15,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import UserRegisterModal from '@/Components/Systems/UserRegisterModal.vue'
 import UserDetailModal from '@/Components/Systems/UserDetailModal.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 defineOptions({ layout: AdminLayout })
 
 const page = usePage()
@@ -64,9 +65,8 @@ const form = useForm({
   permissions: [],
 })
 
-let systemsChannel = null
-let handleEmployeeChanged = null
-let handleUserChanged = null
+let unsubscribeEmployeeChanged = null
+let unsubscribeUserChanged = null
 
 function getEmployeeFullName(employee) {
   return `${employee.first_name || employee.firstName || ''} ${employee.last_name || employee.lastName || ''}`.trim()
@@ -501,13 +501,11 @@ function reloadSystem() {
 }
 
 onMounted(() => {
-  if (!window.Echo) return
-
-  handleEmployeeChanged = () => {
+  const handleEmployeeChanged = () => {
     reloadSystem()
   }
 
-  handleUserChanged = (event) => {
+  const handleUserChanged = (event) => {
     if (page.props.auth.user.id === event.userId) {
       updateLivePermissions({
         permissions: event.permissions,
@@ -529,21 +527,21 @@ onMounted(() => {
     reloadSystem()
   }
 
-  systemsChannel = window.Echo.channel('systems')
-    .listen('.employee.changed', handleEmployeeChanged)
-    .listen('.UserChanged', handleUserChanged)
+  unsubscribeEmployeeChanged = subscribeRealtime(
+    REALTIME_CHANNELS.systems,
+    REALTIME_EVENTS.employeeChanged,
+    handleEmployeeChanged,
+  )
+  unsubscribeUserChanged = subscribeRealtime(
+    REALTIME_CHANNELS.systems,
+    REALTIME_EVENTS.userChanged,
+    handleUserChanged,
+  )
 })
 
 onBeforeUnmount(() => {
-  if (!systemsChannel) return
-
-  if (handleEmployeeChanged) {
-    systemsChannel.stopListening('.employee.changed', handleEmployeeChanged)
-  }
-
-  if (handleUserChanged) {
-    systemsChannel.stopListening('.UserChanged', handleUserChanged)
-  }
+  unsubscribeEmployeeChanged?.()
+  unsubscribeUserChanged?.()
 })
 </script>
 <template>
