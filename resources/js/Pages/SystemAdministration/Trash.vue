@@ -65,7 +65,8 @@ onMounted(() => {
         REALTIME_CHANNELS.systems,
         REALTIME_EVENTS.systemTrashChanged,
         (event) => {
-            if (event?.resource === props.resource) refreshTrash()
+            // "all" is the aggregate view, so it must react to changes from every recoverable module.
+            if (props.resource === 'all' || event?.resource === props.resource) refreshTrash()
         },
     )
 })

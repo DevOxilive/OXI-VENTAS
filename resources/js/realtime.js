@@ -14,7 +14,6 @@ const isSecure = scheme === 'https'
 
 /** Unico catalogo de canales consumidos por la aplicacion. */
 export const REALTIME_CHANNELS = Object.freeze({
-    activity: 'activity',
     audits: 'audits',
     inventoryProducts: 'inventory.products',
     systems: 'systems',
@@ -30,6 +29,8 @@ export const REALTIME_EVENTS = Object.freeze({
     physicalCountChanged: '.PhysicalCountChanged',
     productChanged: '.product.changed',
     stockUpdated: '.stock.updated',
+    attendanceChanged: '.attendance.changed',
+    systemAuditChanged: '.system.audit.changed',
     systemTrashChanged: '.system.trash.changed',
     userChanged: '.UserChanged',
 })
@@ -104,17 +105,29 @@ function getRealtimeClient() {
  * El conteo evita que un componente abandone un canal usado por otro.
  */
 export function subscribeRealtime(channelName, eventName, handler) {
+    return subscribeToRealtimeChannel(channelName, eventName, handler)
+}
+
+/**
+ * Subscribes to an authorized private channel without creating another Echo client.
+ */
+export function subscribePrivateRealtime(channelName, eventName, handler) {
+    return subscribeToRealtimeChannel(channelName, eventName, handler, true)
+}
+
+function subscribeToRealtimeChannel(channelName, eventName, handler, isPrivate = false) {
     const client = getRealtimeClient()
 
     if (!client || !channelName || !eventName || typeof handler !== 'function') {
         return () => {}
     }
 
-    const channel = client.channel(channelName)
+    const channel = isPrivate ? client.private(channelName) : client.channel(channelName)
     channel.listen(eventName, handler)
+    const subscriptionKey = `${isPrivate ? 'private' : 'public'}:${channelName}`
     channelSubscriptionCounts.set(
-        channelName,
-        (channelSubscriptionCounts.get(channelName) ?? 0) + 1,
+        subscriptionKey,
+        (channelSubscriptionCounts.get(subscriptionKey) ?? 0) + 1,
     )
 
     let active = true
@@ -127,15 +140,15 @@ export function subscribeRealtime(channelName, eventName, handler) {
 
         const remaining = Math.max(
             0,
-            (channelSubscriptionCounts.get(channelName) ?? 1) - 1,
+            (channelSubscriptionCounts.get(subscriptionKey) ?? 1) - 1,
         )
 
         if (remaining === 0) {
-            channelSubscriptionCounts.delete(channelName)
+            channelSubscriptionCounts.delete(subscriptionKey)
             client.leave(channelName)
             return
         }
 
-        channelSubscriptionCounts.set(channelName, remaining)
+        channelSubscriptionCounts.set(subscriptionKey, remaining)
     }
 }

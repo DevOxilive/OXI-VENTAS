@@ -50,6 +50,26 @@ class RoleSeeder extends Seeder
             ]);
         }
 
+        $attendanceSelfPermissionIds = DB::table('permissions')
+            ->whereIn('name', ['attendance.view', 'attendance.register', 'attendance.corrections.request'])
+            ->pluck('id');
+
+        foreach ([$superAdministratorRole, $adminRole, $systemsRole, $humanResourcesRole, $salesRole, $inventoryRole] as $role) {
+            foreach ($attendanceSelfPermissionIds as $permissionId) {
+                DB::table('role_permission')->updateOrInsert(['role_id' => $role->id, 'permission_id' => $permissionId]);
+            }
+        }
+
+        $attendanceManagementPermissionIds = DB::table('permissions')
+            ->whereIn('name', ['attendance.manage', 'attendance.corrections.review', 'attendance.reports'])
+            ->pluck('id');
+
+        foreach ([$superAdministratorRole, $adminRole] as $role) {
+            foreach ($attendanceManagementPermissionIds as $permissionId) {
+                DB::table('role_permission')->updateOrInsert(['role_id' => $role->id, 'permission_id' => $permissionId]);
+            }
+        }
+
         // Super Administrador is Administrador plus the exclusive system controls.
         // Rebuilding this role from those two sources prevents permissions drifting.
         $superAdministratorPermissionIds = DB::table('role_permission')

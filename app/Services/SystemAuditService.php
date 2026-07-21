@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Events\SystemAuditChanged;
 use App\Models\SystemAudit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class SystemAuditService
@@ -46,6 +48,8 @@ class SystemAuditService
                 'metadata' => $context['metadata'] ?? null,
                 'occurred_at' => now(),
             ]);
+
+            DB::afterCommit(fn () => broadcast(new SystemAuditChanged($module, $action)));
         } catch (Throwable $exception) {
             report($exception);
         }

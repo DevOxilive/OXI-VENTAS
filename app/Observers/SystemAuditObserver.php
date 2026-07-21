@@ -9,6 +9,7 @@ use App\Services\SystemAuditService;
 use App\Support\TrashRegistry;
 use App\Support\TrashRetentionPolicy;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -79,13 +80,15 @@ class SystemAuditObserver
             }
         }
 
-        if ($resource && in_array($action, ['delete', 'restore', 'force_delete'], true)) {
+        DB::afterCommit(function () use ($resource, $action, $model): void {
             try {
-                broadcast(new SystemTrashChanged($resource, $action, [$model->getKey()]))->toOthers();
+                if ($resource && in_array($action, ['delete', 'restore', 'force_delete'], true)) {
+                    broadcast(new SystemTrashChanged($resource, $action, [$model->getKey()]));
+                }
             } catch (Throwable $exception) {
                 report($exception);
             }
-        }
+        });
     }
 
     private function safeChanges(array $changes): array

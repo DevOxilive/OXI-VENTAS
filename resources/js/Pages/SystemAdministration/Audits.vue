@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3'
-import { computed, reactive } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
@@ -8,6 +8,7 @@ import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 
 const props = defineProps({ audits: Object, filters: Object, modules: Array })
 const form = reactive({ search: props.filters.search ?? '', module: props.filters.module ?? '', from: props.filters.from ?? '', to: props.filters.to ?? '' })
@@ -54,6 +55,28 @@ const columns = [
     { key: 'record_label', label: 'Registro' },
 ]
 const moduleOptions = [{ value: '', label: 'Todos los módulos' }, ...props.modules.map((module) => ({ value: module, label: moduleLabels[module] ?? 'Sistema' }))]
+let unsubscribeAuditRealtime = null
+let refreshTimer = null
+
+function refreshAudits() {
+    clearTimeout(refreshTimer)
+    refreshTimer = setTimeout(() => {
+        router.reload({ only: ['audits', 'modules'], preserveScroll: true })
+    }, 120)
+}
+
+onMounted(() => {
+    unsubscribeAuditRealtime = subscribeRealtime(
+        REALTIME_CHANNELS.systems,
+        REALTIME_EVENTS.systemAuditChanged,
+        refreshAudits,
+    )
+})
+
+onBeforeUnmount(() => {
+    clearTimeout(refreshTimer)
+    unsubscribeAuditRealtime?.()
+})
 </script>
 
 <template>

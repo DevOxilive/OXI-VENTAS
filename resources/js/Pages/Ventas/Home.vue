@@ -986,27 +986,28 @@ function showExpirationAlert(alerts) {
   const summary = topExpirationAlerts.value
     .map((alert) => {
       const days = Number(alert.days_to_expire ?? 999);
-      const urgencyColor = days <= 3 ? "#dc2626" : days <= 7 ? "#d97706" : "#2563eb";
+      const urgencyColor = days <= 3 ? "#e60012" : days <= 7 ? "#c81e2b" : "#8f1d2c";
       const badgeLabel = escapeHtml(expirationBadgeLabel(alert));
       const productName = escapeHtml(alert.product_name || "Producto sin nombre");
       const lot = escapeHtml(alert.lot_number || "Sin lote");
       const quantity = Number(alert.quantity || 0).toFixed(0);
       const expirationDate = escapeHtml(alert.formatted_expiration_date || alert.expiration_date || "Fecha no disponible");
 
-      return `<article style="margin:0 0 10px;padding:12px;border:1px solid #e8c9cd;border-radius:14px;background:#fff8f8;text-align:left;">
+      return `<article style="margin:0 0 10px;padding:12px;border:1px solid #704047;border-radius:14px;background:#1d1315;text-align:left;">
         <div style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;">
-          <strong style="color:#241416;font-size:14px;line-height:1.35;">${productName}</strong>
+          <strong style="color:#fff0f1;font-size:14px;line-height:1.35;">${productName}</strong>
           <span style="flex:0 0 auto;border-radius:999px;background:${urgencyColor};color:#fff;padding:4px 8px;font-size:11px;font-weight:700;white-space:nowrap;">${badgeLabel}</span>
         </div>
-        <p style="margin:7px 0 0;color:#6d5559;font-size:12px;line-height:1.4;">Lote ${lot} · ${quantity} unidades</p>
-        <p style="margin:3px 0 0;color:#6d5559;font-size:12px;line-height:1.4;">Caduca: ${expirationDate}</p>
+        <p style="margin:7px 0 0;color:#d6b8bd;font-size:12px;line-height:1.4;">Lote ${lot} · ${quantity} unidades</p>
+        <p style="margin:3px 0 0;color:#b9969c;font-size:12px;line-height:1.4;">Caduca: ${expirationDate}</p>
       </article>`;
     })
     .join("");
 
   BlockingWarningAlert({
     title: "Lotes próximos a vencer",
-    message: `<div style="margin:0 0 12px;color:#6d5559;font-size:13px;line-height:1.45;">Revisa estos lotes antes de continuar con la venta.</div><div style="max-height:300px;overflow-y:auto;padding-right:4px;">${summary}</div><p style="margin:12px 0 0;color:#6d5559;font-size:12px;line-height:1.4;">La campana permanecerá disponible arriba para consultarlos durante la venta.</p>`,
+    message: `<div style="margin:0 0 12px;color:#c9aaaf;font-size:13px;line-height:1.45;">Revisa estos lotes antes de continuar con la venta.</div><div style="max-height:300px;overflow-y:auto;padding-right:4px;">${summary}</div><p style="margin:12px 0 0;color:#b9969c;font-size:12px;line-height:1.4;">La campana permanecerá disponible arriba para consultarlos durante la venta.</p>`,
+    confirmButtonColor: "#e60012",
   });
 }
 

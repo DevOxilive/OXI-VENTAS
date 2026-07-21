@@ -7,6 +7,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\QzTrayController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SystemAdministrationController;
 use App\Http\Controllers\SystemAuditController;
@@ -146,6 +147,25 @@ Route::middleware([
         Route::get('/users', [UserController::class, 'index'])
             ->middleware($usersAccess)
             ->name('users.index');
+
+        Route::get('/attendance', [AttendanceController::class, 'index'])
+            ->middleware('permission:attendance.view,attendance.register')
+            ->name('attendance.index');
+        Route::post('/attendance', [AttendanceController::class, 'store'])
+            ->middleware('permission:attendance.register')
+            ->name('attendance.store');
+        Route::post('/attendance/{attendanceRecord}/corrections', [AttendanceController::class, 'requestCorrection'])
+            ->middleware('permission:attendance.corrections.request,attendance.corrections.review')
+            ->name('attendance.corrections.store');
+        Route::patch('/attendance/corrections/{attendanceCorrectionRequest}', [AttendanceController::class, 'reviewCorrection'])
+            ->middleware('permission:attendance.corrections.review')
+            ->name('attendance.corrections.review');
+        Route::get('/attendance/export/excel', [AttendanceController::class, 'exportExcel'])
+            ->middleware(['permission:attendance.reports', 'permission:files.export'])
+            ->name('attendance.export-excel');
+        Route::get('/attendance/export/pdf', [AttendanceController::class, 'exportPdf'])
+            ->middleware(['permission:attendance.reports', 'permission:files.export'])
+            ->name('attendance.export-pdf');
 
         Route::post('/users', [UserController::class, 'store'])
             ->middleware('permission:users.create')
