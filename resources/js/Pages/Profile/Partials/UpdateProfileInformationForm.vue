@@ -5,6 +5,7 @@ import AppButton from '@/Components/Buttons/AppButton.vue';
 import FormSection from '@/Components/Cards/FormSection.vue';
 import InputField from '@/Components/Forms/InputField.vue';
 import { SuccessAlert } from '@/Components/Modales/UniversalActionModal';
+import { t } from '@/i18n/es';
 
 const props = defineProps({
     user: Object,
@@ -32,8 +33,8 @@ const updateProfileInformation = () => {
         onSuccess: () => {
             clearPhotoFileInput();
             SuccessAlert({
-                title: 'Perfil actualizado',
-                message: 'La información del perfil se actualizó correctamente.',
+                title: t('profile.updated.title'),
+                message: t('profile.updated.message'),
             });
         },
     });
@@ -81,11 +82,11 @@ const clearPhotoFileInput = () => {
 <template>
     <FormSection @submitted="updateProfileInformation">
         <template #title>
-            Profile Information
+            {{ t('profile.information.title') }}
         </template>
 
         <template #description>
-            Update your account's profile information and email address.
+            {{ t('profile.information.description') }}
         </template>
 
         <template #form>
@@ -101,7 +102,7 @@ const clearPhotoFileInput = () => {
                 >
 
                 <label for="photo" class="mb-1 block text-sm font-semibold text-slate-700">
-                    Photo
+                    {{ t('profile.photo') }}
                 </label>
 
                 <!-- Current Profile Photo -->
@@ -118,7 +119,7 @@ const clearPhotoFileInput = () => {
                 </div>
 
                 <AppButton class="mt-2 me-2" variant="secondary" type="button" @click.prevent="selectNewPhoto">
-                    Select A New Photo
+                    {{ t('profile.photo.select') }}
                 </AppButton>
 
                 <AppButton
@@ -128,7 +129,7 @@ const clearPhotoFileInput = () => {
                     class="mt-2"
                     @click.prevent="deletePhoto"
                 >
-                    Remove Photo
+                    {{ t('profile.photo.remove') }}
                 </AppButton>
 
                 <p v-if="form.errors.photo" class="mt-2 text-xs text-red-500">
@@ -140,7 +141,7 @@ const clearPhotoFileInput = () => {
             <div class="col-span-6 sm:col-span-4">
                 <InputField
                     v-model="form.name"
-                    label="Name"
+                    :label="t('common.name')"
                     field="name"
                     type="text"
                     :error="form.errors.name"
@@ -153,7 +154,7 @@ const clearPhotoFileInput = () => {
             <div class="col-span-6 sm:col-span-4">
                 <InputField
                     v-model="form.email"
-                    label="Email"
+                    :label="t('common.email')"
                     field="email"
                     type="email"
                     :error="form.errors.email"
@@ -163,7 +164,7 @@ const clearPhotoFileInput = () => {
 
                 <div v-if="$page.props.jetstream.hasEmailVerification && user.email_verified_at === null">
                     <p class="text-sm mt-2">
-                        Your email address is unverified.
+                        {{ t('profile.email.unverified') }}
 
                         <Link
                             :href="route('verification.send')"
@@ -172,12 +173,12 @@ const clearPhotoFileInput = () => {
                             class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                             @click.prevent="sendEmailVerification"
                         >
-                            Click here to re-send the verification email.
+                            {{ t('profile.email.resend') }}
                         </Link>
                     </p>
 
                     <div v-show="verificationLinkSent" class="mt-2 font-medium text-sm text-green-600">
-                        A new verification link has been sent to your email address.
+                        {{ t('profile.email.resent') }}
                     </div>
                 </div>
             </div>
@@ -185,7 +186,7 @@ const clearPhotoFileInput = () => {
 
         <template #actions>
             <AppButton variant="primary" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                Save
+                {{ t('common.save') }}
             </AppButton>
         </template>
     </FormSection>

@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CashRegisterClosure extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'folio',
         'branch_id',

@@ -14,6 +14,7 @@ import { usePermissions } from "@/Composables/usePermissions"
 import { getBranchModalConfig } from "@/config/ModalConfigs/branchModalConfig"
 import { branchTableConfig } from "@/config/TableConfigs/branchTableConfig"
 import { getBranchToolbarConfig } from "@/config/ToolbarConfigs/branchToolbarConfig"
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from "@/realtime"
 
 const props = defineProps({
   branches: {
@@ -32,7 +33,7 @@ const search = ref("")
 const selectedBranch = ref(null)
 const modalMode = ref("create")
 const showCreateModal = ref(false)
-let systemsChannel = null
+let unsubscribeBranchChanged = null
 
 const form = useForm({
   name: "",
@@ -238,16 +239,15 @@ function handleRowClick(branch) {
 }
 
 onMounted(() => {
-  if (!window.Echo) return
-
-  systemsChannel = window.Echo.channel("systems")
-    .listen(".branch.changed", reloadBranches)
+  unsubscribeBranchChanged = subscribeRealtime(
+    REALTIME_CHANNELS.systems,
+    REALTIME_EVENTS.branchChanged,
+    reloadBranches,
+  )
 })
 
 onBeforeUnmount(() => {
-  if (!systemsChannel) return
-
-  systemsChannel.stopListening(".branch.changed")
+  unsubscribeBranchChanged?.()
 })
 </script>
 

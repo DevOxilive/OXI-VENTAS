@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PhysicalCountEntry extends Model
 {
+   use SoftDeletes;
+
    protected $fillable = [
     'physical_count_id',
     'branch_product_id',

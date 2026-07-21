@@ -12,6 +12,7 @@ use App\Events\RealtimeActivityLogged;
 use App\Exports\EmployeeExport;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
+use App\Support\SystemPermission;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -50,6 +51,11 @@ class EmployeeController extends Controller
 
         $user->load(['role', 'permissions', 'branches']);
 
+        if ($user->role?->name === 'Super Administrador'
+            && !request()->user()?->hasPermission(SystemPermission::SUPER_ADMINISTRATORS_MANAGE)) {
+            abort(403, 'Solo un Super Administrador puede administrar a otro Super Administrador.');
+        }
+
         try {
             broadcast(new UserChanged($user, 'deleted'))->toOthers();
             event(RealtimeActivityLogged::message('elimino', 'el usuario', $user->email, 'Sistemas', 'deleted'));
@@ -61,9 +67,6 @@ class EmployeeController extends Controller
             ->where('user_id', $user->id)
             ->delete();
 
-        $user->permissions()->detach();
-        $user->branches()->detach();
-        $user->assignedPhysicalCounts()->detach();
         $user->delete();
     }
 

@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use App\Support\FlexibleSearch;
+use App\Support\SystemPermission;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -70,7 +71,7 @@ class UserController extends Controller
 
     private function requiresBranchAssignments(Role $role, array $permissionIds = []): bool
     {
-        if ($role->name === 'Administrador') {
+        if (in_array($role->name, ['Administrador', 'Super Administrador'], true)) {
             return false;
         }
 
@@ -107,7 +108,33 @@ class UserController extends Controller
 
     private function shouldPersistBranchAssignments(Role $role): bool
     {
-        return $role->name !== 'Administrador';
+        return !in_array($role->name, ['Administrador', 'Super Administrador'], true);
+    }
+
+    private function isSuperAdministratorRole(Role $role): bool
+    {
+        return $role->name === 'Super Administrador';
+    }
+
+    private function canManageSuperAdministrators(): bool
+    {
+        return Auth::user()?->hasPermission(SystemPermission::SUPER_ADMINISTRATORS_MANAGE) ?? false;
+    }
+
+    private function ensureCanManageRole(Role $role): void
+    {
+        if ($this->isSuperAdministratorRole($role) && !$this->canManageSuperAdministrators()) {
+            abort(403, 'Solo un Super Administrador puede administrar este rol.');
+        }
+    }
+
+    private function ensureCanManageUser(User $user): void
+    {
+        $user->loadMissing('role');
+
+        if ($user->role && $this->isSuperAdministratorRole($user->role) && !$this->canManageSuperAdministrators()) {
+            abort(403, 'Solo un Super Administrador puede administrar a otro Super Administrador.');
+        }
     }
 
     private function visiblePermissionsQuery()
@@ -346,6 +373,7 @@ class UserController extends Controller
 
             'roles' => Role::with('permissions')
                 ->with(['permissions' => fn ($query) => $query->where('name', 'not like', 'roles.%')])
+                ->when(!$this->canManageSuperAdministrators(), fn ($query) => $query->where('name', '!=', 'Super Administrador'))
                 ->orderBy('name')
                 ->get(),
 
@@ -383,6 +411,7 @@ class UserController extends Controller
         ]);
 
         $role = Role::findOrFail($validated['role_id']);
+        $this->ensureCanManageRole($role);
         $finalPermissionIds = $validated['permissions'] ?? [];
         $requiresBranchAssignments = $this->requiresBranchAssignments($role, $finalPermissionIds);
 
@@ -426,6 +455,7 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $this->checkPermission('users.update');
+        $this->ensureCanManageUser($user);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -439,6 +469,7 @@ class UserController extends Controller
         ]);
 
         $role = Role::findOrFail($validated['role_id']);
+        $this->ensureCanManageRole($role);
         $finalPermissionIds = $validated['permissions'] ?? [];
         $requiresBranchAssignments = $this->requiresBranchAssignments($role, $finalPermissionIds);
 
@@ -492,6 +523,7 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         $this->checkPermission('users.delete');
+        $this->ensureCanManageUser($user);
 
         $user->load(['role', 'permissions', 'branches']);
         $userEmail = $user->email;
@@ -503,8 +535,6 @@ class UserController extends Controller
             report($e);
         }
 
-        $user->permissions()->detach();
-        $user->branches()->detach();
         $user->delete();
 
         return redirect()

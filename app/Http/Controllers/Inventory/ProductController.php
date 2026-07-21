@@ -414,23 +414,13 @@ class ProductController extends Controller
             ->values()
             ->all();
 
-        DB::transaction(function () use ($branch, $product) {
-            BranchProduct::where('branch_id', $branch->id)
-                ->where('product_id', $product->id)
-                ->delete();
-
-            $existsInAnotherBranch = BranchProduct::where('product_id', $product->id)
-                ->exists();
-
-            if (!$existsInAnotherBranch) {
-                $product->barcodes()->delete();
-
-                if ($product->image) {
-                    $this->deleteProductImage($product->image);
-                }
-
-                $product->delete();
-            }
+        DB::transaction(function () use ($product) {
+            // Deleting a product is a global catalog action. Soft-delete every
+            // active branch assignment so the product and its configuration can
+            // be recovered together from the Global Trash.
+            $product->branchProducts()->delete();
+            $product->barcodes()->delete();
+            $product->delete();
         });
 
         broadcast(new ProductChanged('deleted', $productId, $branchIds))->toOthers();

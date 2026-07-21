@@ -5,6 +5,7 @@ import AppButton from '@/Components/Buttons/AppButton.vue';
 import FormSection from '@/Components/Cards/FormSection.vue';
 import InputField from '@/Components/Forms/InputField.vue';
 import { SuccessAlert } from '@/Components/Modales/UniversalActionModal';
+import { t } from '@/i18n/es';
 
 const passwordInput = ref(null);
 const currentPasswordInput = ref(null);
@@ -22,8 +23,8 @@ const updatePassword = () => {
         onSuccess: () => {
             form.reset();
             SuccessAlert({
-                title: 'Contraseña actualizada',
-                message: 'La contraseña se actualizó correctamente.',
+                title: t('profile.password.updated.title'),
+                message: t('profile.password.updated.message'),
             });
         },
         onError: () => {
@@ -44,11 +45,11 @@ const updatePassword = () => {
 <template>
     <FormSection @submitted="updatePassword">
         <template #title>
-            Update Password
+            {{ t('profile.password.title') }}
         </template>
 
         <template #description>
-            Ensure your account is using a long, random password to stay secure.
+            {{ t('profile.password.description') }}
         </template>
 
         <template #form>
@@ -56,7 +57,7 @@ const updatePassword = () => {
                 <InputField
                     ref="currentPasswordInput"
                     v-model="form.current_password"
-                    label="Current Password"
+                    :label="t('profile.password.current')"
                     field="current_password"
                     type="password"
                     :error="form.errors.current_password"
@@ -68,7 +69,7 @@ const updatePassword = () => {
                 <InputField
                     ref="passwordInput"
                     v-model="form.password"
-                    label="New Password"
+                    :label="t('profile.password.new')"
                     field="password"
                     type="password"
                     :error="form.errors.password"
@@ -79,7 +80,7 @@ const updatePassword = () => {
             <div class="col-span-6 sm:col-span-4">
                 <InputField
                     v-model="form.password_confirmation"
-                    label="Confirm Password"
+                    :label="t('profile.password.confirm')"
                     field="password_confirmation"
                     type="password"
                     :error="form.errors.password_confirmation"
@@ -90,7 +91,7 @@ const updatePassword = () => {
 
         <template #actions>
             <AppButton variant="primary" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                Save
+                {{ t('common.save') }}
             </AppButton>
         </template>
     </FormSection>

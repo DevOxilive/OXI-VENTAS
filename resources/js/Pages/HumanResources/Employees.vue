@@ -13,8 +13,11 @@ import { usePermissions } from '@/Composables/usePermissions'
 import EmployeeToolbar from '@/Components/HumanResourses/EmployeeToolbar.vue'
 import EmployeeTable from '@/Components/HumanResourses/EmployeeTable.vue'
 import EmployeeRegisterModal from '@/Components/HumanResourses/EmployeeRegisterModal.vue'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
+
+let unsubscribeEmployeeChanged = null
 
 const { can } = usePermissions()
 
@@ -42,8 +45,6 @@ const departmentFilter = ref(props.filters.department || '')
 const positionFilter = ref(props.filters.position || '')
 const startDateFromFilter = ref(props.filters.startDateFrom || '')
 const startDateToFilter = ref(props.filters.startDateTo || '')
-let systemsChannel = null
-
 const employees = computed(() => props.employeesDB?.data || [])
 const employeePaginator = computed(() => props.employeesDB || {})
 const positions = computed(() => props.filterOptions?.positions || [])
@@ -137,10 +138,10 @@ function handleEmployeeToolbarAction(action) {
 }
 
 onMounted(() => {
-    if (!window.Echo) return
-
-    systemsChannel = window.Echo.channel('systems')
-        .listen('.employee.changed', (event) => {
+    unsubscribeEmployeeChanged = subscribeRealtime(
+        REALTIME_CHANNELS.systems,
+        REALTIME_EVENTS.employeeChanged,
+        (event) => {
             if (
                 event.action === 'deleted' &&
                 selectedEmployee.value?.id === event.employeeId
@@ -149,13 +150,12 @@ onMounted(() => {
             }
 
             refreshEmployeesRealtime()
-        })
+        },
+    )
 })
 
 onBeforeUnmount(() => {
-    if (!systemsChannel) return
-
-    systemsChannel.stopListening('.employee.changed')
+    unsubscribeEmployeeChanged?.()
 })
 </script>
 

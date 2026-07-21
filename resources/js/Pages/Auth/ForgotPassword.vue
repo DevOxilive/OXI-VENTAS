@@ -1,6 +1,7 @@
 <script setup>
 import { Head, useForm } from '@inertiajs/vue3';
 import { Link } from '@inertiajs/vue3';
+import { t } from '@/i18n/es';
 
 defineProps({
     status: String,
@@ -17,7 +18,7 @@ const submit = () => {
 
 <template>
 
-    <Head title="Forgot Password" />
+    <Head :title="t('auth.forgotPassword')" />
 
     <div class="min-h-screen flex items-center justify-center bg-gray-100 p-4">
         <!-- Card centrada -->

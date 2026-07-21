@@ -2,6 +2,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { router } from "@inertiajs/vue3";
 import { useBatchAdjustmentModal } from "@/Composables/Inventory/useBatchAdjustmentModal";
 import { useGlobalTablePagination } from "@/Composables/useGlobalTablePagination";
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from "@/realtime";
 
 function normalizeSearchValue(value) {
     return String(value ?? "")
@@ -81,6 +82,8 @@ function sortBranchProducts(items) {
 }
 
 export function useBranchInventory(props) {
+    let unsubscribeStockUpdated = null;
+    let unsubscribeProductChanged = null;
     const { handlePageChange } = useGlobalTablePagination();
     const showCreateModal = ref(false);
     const showEntryModal = ref(false);
@@ -675,10 +678,14 @@ export function useBranchInventory(props) {
     watch(inactiveCandidateFilter, reloadInventory);
 
     onMounted(() => {
-        if (!window.Echo || !currentBranch.value?.id) return;
+        if (!currentBranch.value?.id) return;
 
-        window.Echo.channel(`inventory.branch.${currentBranch.value.id}`)
-            .listen(".stock.updated", async (event) => {
+        const channelName = REALTIME_CHANNELS.inventoryBranch(currentBranch.value.id);
+
+        unsubscribeStockUpdated = subscribeRealtime(
+            channelName,
+            REALTIME_EVENTS.stockUpdated,
+            async (event) => {
                 const branchProductId =
                     event.branch_product_id ??
                     event.branchProduct?.id ??
@@ -696,8 +703,12 @@ export function useBranchInventory(props) {
                 if (shouldRefreshDetails) {
                     await refreshProductDetails(branchProductId);
                 }
-            })
-            .listen(".product.changed", async (event) => {
+            },
+        );
+        unsubscribeProductChanged = subscribeRealtime(
+            channelName,
+            REALTIME_EVENTS.productChanged,
+            async (event) => {
                 const branchIds = event.branchIds ?? event.branch_ids ?? [];
                 const currentBranchId = Number(currentBranch.value?.id);
 
@@ -718,15 +729,15 @@ export function useBranchInventory(props) {
                 if (!snapshot?.branchProduct) {
                     removeBranchProductByProductId(productId);
                 }
-            });
+            },
+        );
     });
 
     onBeforeUnmount(() => {
         clearTimeout(searchTimeout);
 
-        if (window.Echo && currentBranch.value?.id) {
-            window.Echo.leave(`inventory.branch.${currentBranch.value.id}`);
-        }
+        unsubscribeStockUpdated?.();
+        unsubscribeProductChanged?.();
     });
 
     return {

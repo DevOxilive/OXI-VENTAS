@@ -10,6 +10,7 @@ import SelectionGridSection from '@/Components/Forms/SelectionGridSection.vue';
 import SectionBorder from '@/Components/Layout/SectionBorder.vue';
 import GlobalModal from '@/Components/Modales/GlobalModal.vue';
 import { SuccessAlert } from '@/Components/Modales/UniversalActionModal';
+import { t } from '@/i18n/es';
 
 const props = defineProps({
     tokens: Array,
@@ -107,11 +108,11 @@ const toggleUpdatePermission = (permission) => {
         <!-- Generate API Token -->
         <FormSection @submitted="createApiToken">
             <template #title>
-                Create API Token
+                {{ t('api.create.title') }}
             </template>
 
             <template #description>
-                API tokens allow third-party services to authenticate with our application on your behalf.
+                {{ t('api.create.description') }}
             </template>
 
             <template #form>
@@ -119,7 +120,7 @@ const toggleUpdatePermission = (permission) => {
                 <div class="col-span-6 sm:col-span-4">
                     <InputField
                         v-model="createApiTokenForm.name"
-                        label="Name"
+                        :label="t('common.name')"
                         field="name"
                         type="text"
                         :error="createApiTokenForm.errors.name"
@@ -127,11 +128,11 @@ const toggleUpdatePermission = (permission) => {
                     />
                 </div>
 
-                <!-- Token Permissions -->
+                <!-- Permisos del token -->
                 <SelectionGridSection
                     v-if="availablePermissions.length > 0"
-                    title="Permissions"
-                    description="Select the actions this token will be allowed to perform."
+                    :title="t('api.permissions')"
+                    :description="t('api.permissions.select')"
                     wrapper-class="col-span-6"
                     grid-class="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2"
                 >
@@ -150,7 +151,7 @@ const toggleUpdatePermission = (permission) => {
 
             <template #actions>
                 <AppButton variant="primary" :class="{ 'opacity-25': createApiTokenForm.processing }" :disabled="createApiTokenForm.processing">
-                    Create
+                    {{ t('common.create') }}
                 </AppButton>
             </template>
         </FormSection>
@@ -158,15 +159,15 @@ const toggleUpdatePermission = (permission) => {
         <div v-if="tokens.length > 0">
             <SectionBorder />
 
-            <!-- Manage API Tokens -->
+    <!-- Administrar tokens de API -->
             <div class="mt-10 sm:mt-0">
                 <ActionSection>
                     <template #title>
-                        Manage API Tokens
+                        {{ t('api.manage.title') }}
                     </template>
 
                     <template #description>
-                        You may delete any of your existing tokens if they are no longer needed.
+                        {{ t('api.manage.description') }}
                     </template>
 
                     <!-- API Token List -->
@@ -179,7 +180,7 @@ const toggleUpdatePermission = (permission) => {
 
                                 <div class="flex items-center ms-2">
                                     <div v-if="token.last_used_ago" class="text-sm text-gray-400">
-                                        Last used {{ token.last_used_ago }}
+                                        {{ t('api.lastUsed') }}: {{ token.last_used_ago }}
                                     </div>
 
                                     <button
@@ -187,11 +188,11 @@ const toggleUpdatePermission = (permission) => {
                                         class="cursor-pointer ms-6 text-sm text-gray-400 underline"
                                         @click="manageApiTokenPermissions(token)"
                                     >
-                                        Permissions
+                                        {{ t('api.permissions') }}
                                     </button>
 
                                     <button class="cursor-pointer ms-6 text-sm text-red-500" @click="confirmApiTokenDeletion(token)">
-                                        Delete
+                                        {{ t('common.delete') }}
                                     </button>
                                 </div>
                             </div>
@@ -203,7 +204,7 @@ const toggleUpdatePermission = (permission) => {
 
         <GlobalModal
             v-if="displayingToken"
-            title="API Token"
+            :title="t('api.token')"
             :show-header="true"
             :show-footer="false"
             :show-save="false"
@@ -213,7 +214,7 @@ const toggleUpdatePermission = (permission) => {
             <template #content>
                 <div class="space-y-4 px-5 py-5 md:px-6">
                     <p class="text-sm text-slate-600">
-                        Please copy your new API token. For your security, it won't be shown again.
+                        {{ t('api.copy') }}
                     </p>
 
                     <div v-if="$page.props.jetstream.flash.token" class="rounded-xl bg-slate-100 px-4 py-3 font-mono text-sm text-slate-600 break-all">
@@ -225,7 +226,7 @@ const toggleUpdatePermission = (permission) => {
             <template #footer="{ close }">
                 <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:px-6">
                     <AppButton variant="secondary" @click="close">
-                        Close
+                        {{ t('common.close') }}
                     </AppButton>
                 </div>
             </template>
@@ -233,7 +234,7 @@ const toggleUpdatePermission = (permission) => {
 
         <GlobalModal
             v-if="managingPermissionsFor != null"
-            title="API Token Permissions"
+            :title="t('api.permissions.title')"
             :processing="updateApiTokenForm.processing"
             :show-header="true"
             :show-footer="false"
@@ -243,8 +244,8 @@ const toggleUpdatePermission = (permission) => {
         >
             <template #content>
                 <SelectionGridSection
-                    title="Permissions"
-                    description="Adjust the abilities that will remain active for this token."
+                    :title="t('api.permissions')"
+                    :description="t('api.permissions.adjust')"
                     wrapper-class="px-5 py-5 md:px-6"
                     grid-class="grid grid-cols-1 gap-4 md:grid-cols-2"
                 >
@@ -262,7 +263,7 @@ const toggleUpdatePermission = (permission) => {
             <template #footer="{ close }">
                 <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:px-6">
                     <AppButton variant="secondary" @click="close">
-                        Cancel
+                        {{ t('common.cancel') }}
                     </AppButton>
 
                     <AppButton
@@ -271,7 +272,7 @@ const toggleUpdatePermission = (permission) => {
                         :disabled="updateApiTokenForm.processing"
                         @click="updateApiToken"
                     >
-                        Save
+                        {{ t('common.save') }}
                     </AppButton>
                 </div>
             </template>
@@ -279,7 +280,7 @@ const toggleUpdatePermission = (permission) => {
 
         <GlobalModal
             v-if="apiTokenBeingDeleted != null"
-            title="Delete API Token"
+            :title="t('api.delete.title')"
             :processing="deleteApiTokenForm.processing"
             :show-header="true"
             :show-footer="false"
@@ -290,7 +291,7 @@ const toggleUpdatePermission = (permission) => {
             <template #content>
                 <div class="px-5 py-5 md:px-6">
                     <p class="text-sm text-slate-600">
-                        Are you sure you would like to delete this API token?
+                        {{ t('api.delete.confirm') }}
                     </p>
                 </div>
             </template>
@@ -298,7 +299,7 @@ const toggleUpdatePermission = (permission) => {
             <template #footer="{ close }">
                 <div class="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 md:px-6">
                     <AppButton variant="secondary" @click="close">
-                        Cancel
+                        {{ t('common.cancel') }}
                     </AppButton>
 
                     <AppButton
@@ -307,7 +308,7 @@ const toggleUpdatePermission = (permission) => {
                         :disabled="deleteApiTokenForm.processing"
                         @click="deleteApiToken"
                     >
-                        Delete
+                        {{ t('common.delete') }}
                     </AppButton>
                 </div>
             </template>

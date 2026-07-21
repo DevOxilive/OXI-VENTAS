@@ -8,6 +8,10 @@ use App\Http\Controllers\QzTrayController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\SystemAdministrationController;
+use App\Http\Controllers\SystemAuditController;
+use App\Http\Controllers\SystemTrashController;
+use App\Http\Controllers\SystemRoleController;
 use App\Http\Controllers\TicketTemplateController;
 use App\Http\Controllers\Audits\PhysicalCountController;
 use App\Http\Controllers\Audits\PhysicalCountReportController;
@@ -35,7 +39,7 @@ Route::get('/', function () {
 Route::get('/register', function () {
     return Inertia::render('Auth/Register', [
         'roles' => DB::table('roles')
-            ->where('name', '!=', 'Administrador')
+            ->whereNotIn('name', ['Administrador', 'Super Administrador'])
             ->orderBy('name')
             ->get(),
 
@@ -78,6 +82,48 @@ Route::middleware([
     */
 
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+    Route::prefix('system-administration')->name('system-administration.')->group(function () {
+        Route::get('/', [SystemAdministrationController::class, 'index'])
+            ->middleware('permission:system.center.access')
+            ->name('index');
+
+        Route::get('/audits', [SystemAuditController::class, 'index'])
+            ->middleware('permission:system.audit.view')
+            ->name('audits.index');
+        Route::get('/audits/export', [SystemAuditController::class, 'export'])
+            ->middleware('permission:system.audit.export')
+            ->name('audits.export');
+
+        Route::get('/roles', [SystemRoleController::class, 'index'])
+            ->middleware('permission:system.roles.manage')
+            ->name('roles.index');
+        Route::put('/roles/{role}', [SystemRoleController::class, 'update'])
+            ->middleware('permission:system.roles.manage')
+            ->name('roles.update');
+
+        Route::get('/trash', [SystemTrashController::class, 'index'])
+            ->middleware('permission:system.trash.view')
+            ->name('trash.index');
+        Route::post('/trash/{resource}/{record}/restore', [SystemTrashController::class, 'restore'])
+            ->middleware('permission:system.trash.restore')
+            ->name('trash.restore');
+        Route::post('/trash/{resource}/restore-many', [SystemTrashController::class, 'restoreMany'])
+            ->middleware('permission:system.trash.restore')
+            ->name('trash.restore-many');
+        Route::post('/trash/{resource}/restore-all', [SystemTrashController::class, 'restoreAll'])
+            ->middleware('permission:system.trash.restore')
+            ->name('trash.restore-all');
+        Route::delete('/trash/purge-expired', [SystemTrashController::class, 'purgeExpired'])
+            ->middleware('permission:system.trash.empty')
+            ->name('trash.purge-expired');
+        Route::delete('/trash/{resource}/{record}/force-delete', [SystemTrashController::class, 'forceDelete'])
+            ->middleware('permission:system.trash.force-delete')
+            ->name('trash.force-delete');
+        Route::delete('/trash/{resource}/empty', [SystemTrashController::class, 'empty'])
+            ->middleware('permission:system.trash.empty')
+            ->name('trash.empty');
+    });
 
     Route::get('/qz/certificate', [QzTrayController::class, 'certificate'])
         ->name('qz.certificate');

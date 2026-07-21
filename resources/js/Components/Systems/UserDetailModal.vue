@@ -62,7 +62,7 @@ const groupedEffectivePermissions = computed(() => {
 })
 
 const showsAssignedBranches = computed(() => {
-    if ((props.user?.role?.name || '') !== 'Administrador') {
+    if (!['Administrador', 'Super Administrador'].includes(props.user?.role?.name || '')) {
         return true
     }
 

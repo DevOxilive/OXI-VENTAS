@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Support\SystemPermission;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -30,6 +31,10 @@ class PermissionSeeder extends Seeder
             'systems.cash-closure-tickets.update',
             'systems.labels.view',
             'systems.labels.update',
+
+            // Administración global
+            SystemPermission::BRANCHES_ACCESS_ALL,
+            ...SystemPermission::exclusive(),
 
             'sales.view',
             'sales.create',

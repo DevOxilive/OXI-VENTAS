@@ -116,6 +116,7 @@ const permissionLabels = {
     "branches.create": "Crear sucursales",
     "branches.update": "Editar sucursales",
     "branches.delete": "Eliminar sucursales",
+    "branches.access-all": "Acceder a todas las sucursales",
 
     "sales.view": "Ver modulo de ventas",
     "sales.create": "Crear ventas",
@@ -166,6 +167,26 @@ const permissionLabels = {
     "systems.cash-closure-tickets.update": "Editar configuracion de tickets de corte",
     "systems.labels.view": "Ver modulo de etiquetas",
     "systems.labels.update": "Editar configuracion de etiquetas",
+
+    "system.center.access": "Acceder al Centro de Administración",
+    "system.audit.view": "Consultar Auditoría del Sistema",
+    "system.audit.export": "Exportar auditorías",
+    "system.audit.filter-advanced": "Usar filtros avanzados de auditoría",
+    "system.trash.view": "Consultar Papelera Global",
+    "system.trash.restore": "Restaurar registros eliminados",
+    "system.trash.force-delete": "Eliminar registros definitivamente",
+    "system.trash.empty": "Vaciar y depurar la Papelera Global",
+    "system.roles.manage": "Administrar roles",
+    "system.permissions.manage": "Administrar permisos",
+    "system.super-administrators.manage": "Administrar Super Administradores",
+    "system.settings.manage": "Administrar configuración crítica",
+    "system.integrations.manage": "Administrar integraciones",
+    "system.tools.access": "Acceder a herramientas del sistema",
+    "system.monitoring.view": "Consultar monitoreo del sistema",
+    "system.statistics.view": "Consultar estadísticas avanzadas",
+    "system.logs.view": "Consultar registros del sistema",
+    "system.maintenance.manage": "Administrar mantenimiento",
+    "system.records.view-all": "Consultar todos los registros del sistema",
 };
 
 const branchScopedPermissionNames = [
@@ -240,7 +261,7 @@ function buildSectionCollection(groupedModules) {
 }
 
 export function requiresBranchAssignments(roleName = "", permissionNames = []) {
-    if (roleName === "Administrador") {
+    if (["Administrador", "Super Administrador"].includes(roleName)) {
         return false;
     }
 
@@ -283,7 +304,7 @@ export function usePermissionLabels(permissions) {
     });
 
     function permissionLabel(permissionName) {
-        return permissionLabels[permissionName] || permissionName;
+        return permissionLabels[permissionName] || "Permiso sin etiqueta disponible";
     }
 
     function moduleLabel(module) {

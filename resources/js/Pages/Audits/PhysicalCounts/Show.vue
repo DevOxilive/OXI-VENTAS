@@ -10,8 +10,11 @@ import ProductFoundCard from '@/Components/Audits/PhysicalCounts/ProductFoundCar
 import CountEntryForm from '@/Components/Audits/PhysicalCounts/CountEntryForm.vue'
 import { getPhysicalCountDetailToolbarConfig } from '@/config/ToolbarConfigs/physicalCountDetailToolbarConfig'
 import { usePermissions } from '@/Composables/usePermissions'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
+
+let unsubscribePhysicalCountChanged = null
 
 const props = defineProps({
     physicalCount: {
@@ -59,10 +62,10 @@ function reloadAuditDetail() {
 }
 
 onMounted(() => {
-    if (!window.Echo) return
-
-    window.Echo.channel('audits')
-        .listen('.PhysicalCountChanged', (event) => {
+    unsubscribePhysicalCountChanged = subscribeRealtime(
+        REALTIME_CHANNELS.audits,
+        REALTIME_EVENTS.physicalCountChanged,
+        (event) => {
             if (event.physicalCount?.id !== props.physicalCount.id) return
 
             if (event.action === 'deleted') {
@@ -73,12 +76,12 @@ onMounted(() => {
             }
 
             reloadAuditDetail()
-        })
+        },
+    )
 })
 
 onBeforeUnmount(() => {
-    if (!window.Echo) return
-    window.Echo.leave('audits')
+    unsubscribePhysicalCountChanged?.()
 })
 </script>
 

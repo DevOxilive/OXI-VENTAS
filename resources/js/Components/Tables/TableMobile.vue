@@ -12,12 +12,16 @@ const props = defineProps({
   rowKey: { type: String, default: 'id' },
   noDataMessage: { type: String, default: 'No se encontraron registros' },
   loading: Boolean,
+  selectable: Boolean,
+  selectedItems: Object,
   mobileCardHeaderField: { type: String, required: true },
 })
 
 const emit = defineEmits([
   'action',
   'row-click',
+  'selection-change',
+  'update:selectedItems',
 ])
 
 const { can } = usePermissions()
@@ -87,6 +91,19 @@ function handleRowClick(row) {
   emit('row-click', row)
 }
 
+function toggleRowSelection(row) {
+  const key = row[props.rowKey]
+  const selected = { ...(props.selectedItems || {}) }
+  selected[key] = !selected[key]
+
+  emit('update:selectedItems', selected)
+  emit('selection-change', Object.keys(selected).filter(key => selected[key]))
+}
+
+function isRowSelected(row) {
+  return props.selectedItems?.[row[props.rowKey]] || false
+}
+
 function renderCellContentFromValue(value, column) {
   const formatted = formatCellValue(value, column)
 
@@ -147,6 +164,21 @@ function getActionButtonClasses(action) {
     <article v-for="tableRow in tableRows" :key="tableRow.key"
       class="rounded-2xl border border-secondary bg-background p-3 shadow-sm" @click="handleRowClick(tableRow.row)">
       <div class="flex justify-between items-start gap-3">
+        <button
+          v-if="selectable"
+          type="button"
+          role="checkbox"
+          :aria-checked="isRowSelected(tableRow.row)"
+          class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border-2 transition duration-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          :class="isRowSelected(tableRow.row) ? 'border-primary bg-primary text-background shadow-sm' : 'border-secondary bg-background text-transparent hover:border-primary'"
+          :aria-label="`Seleccionar ${tableRow.headerValue}`"
+          @click.stop
+          @click="toggleRowSelection(tableRow.row)"
+        >
+          <svg viewBox="0 0 16 16" class="h-4 w-4" fill="none" aria-hidden="true">
+            <path d="M3.5 8.5 6.5 11.5 12.5 4.75" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.35" />
+          </svg>
+        </button>
         <div class="min-w-0">
           <p v-if="mobileCardHeaderField" class="truncate font-semibold text-text">
             {{ tableRow.headerValue }}

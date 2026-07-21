@@ -123,7 +123,7 @@ function openReportGroup(group) {
             <GlobalToolbar v-bind="toolbarConfig" />
         </template>
 
-        <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <GlobalCard
                 v-for="group in visibleReportGroups"
                 :key="group.key"

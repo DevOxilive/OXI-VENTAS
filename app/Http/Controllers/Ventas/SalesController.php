@@ -13,6 +13,7 @@ use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use App\Models\TicketTemplate;
 use App\Services\StockMovementService;
+use App\Support\SystemPermission;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Http\Request;
@@ -324,7 +325,7 @@ class SalesController extends Controller
 
     private function shouldShowBranchSelector(Request $request, $user, $allowedBranches): bool
     {
-        return $user->role?->name === 'Administrador'
+        return $user->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL)
             && !$request->filled('branch')
             && $allowedBranches->isNotEmpty();
     }
@@ -352,7 +353,7 @@ class SalesController extends Controller
     {
         $query = Branch::query()->whereKey($branchId)->where('active', true);
 
-        if ($user->role?->name !== 'Administrador') {
+        if (!$user->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL)) {
             $query->whereIn('id', $user->accessibleBranchIds());
         }
 

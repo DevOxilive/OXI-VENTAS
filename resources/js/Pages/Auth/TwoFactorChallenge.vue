@@ -5,6 +5,7 @@ import AppButton from '@/Components/Buttons/AppButton.vue';
 import AuthenticationCard from '@/Components/Login/AuthenticationCard.vue';
 import AuthenticationCardLogo from '@/Components/Login/AuthenticationCardLogo.vue';
 import InputField from '@/Components/Forms/InputField.vue';
+import { t } from '@/i18n/es';
 
 const recovery = ref(false);
 
@@ -36,7 +37,7 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Two-factor Confirmation" />
+    <Head :title="t('auth.twoFactorTitle')" />
 
     <AuthenticationCard>
         <template #logo>
@@ -45,11 +46,11 @@ const submit = () => {
 
         <div class="mb-4 text-sm text-gray-600">
             <template v-if="! recovery">
-                Please confirm access to your account by entering the authentication code provided by your authenticator application.
+                {{ t('auth.twoFactorCodeHelp') }}
             </template>
 
             <template v-else>
-                Please confirm access to your account by entering one of your emergency recovery codes.
+                {{ t('auth.twoFactorRecoveryHelp') }}
             </template>
         </div>
 
@@ -58,7 +59,7 @@ const submit = () => {
                 <InputField
                     ref="codeInput"
                     v-model="form.code"
-                    label="Code"
+                    :label="t('profile.twoFactor.code')"
                     field="code"
                     type="text"
                     inputmode="numeric"
@@ -72,7 +73,7 @@ const submit = () => {
                 <InputField
                     ref="recoveryCodeInput"
                     v-model="form.recovery_code"
-                    label="Recovery Code"
+                    :label="t('auth.recoveryCode')"
                     field="recovery_code"
                     type="text"
                     :error="form.errors.recovery_code"
@@ -83,16 +84,16 @@ const submit = () => {
             <div class="flex items-center justify-end mt-4">
                 <button type="button" class="text-sm text-gray-600 hover:text-gray-900 underline cursor-pointer" @click.prevent="toggleRecovery">
                     <template v-if="! recovery">
-                        Use a recovery code
+                        {{ t('auth.useRecoveryCode') }}
                     </template>
 
                     <template v-else>
-                        Use an authentication code
+                        {{ t('auth.useAuthenticationCode') }}
                     </template>
                 </button>
 
                 <AppButton variant="primary" class="ms-4" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                    Log in
+                    {{ t('auth.login') }}
                 </AppButton>
             </div>
         </form>

@@ -79,7 +79,7 @@ const badgeClasses = {
             </span>
         </div>
 
-        <p v-if="subtitle" class="text-xs font-black uppercase tracking-[0.18em] text-text opacity-50">
+        <p v-if="subtitle" class="min-h-10 text-xs font-black uppercase tracking-[0.18em] text-text opacity-50">
             {{ subtitle }}
         </p>
 

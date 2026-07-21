@@ -1,6 +1,4 @@
 export function generateMenu(role, permissions = [], branches = []) {
-    const isAdmin = role === "Administrador";
-
     const can = (permission) => permissions.includes(permission);
     const canAny = (permissionList) => permissionList.some((permission) => can(permission));
 
@@ -55,9 +53,10 @@ export function generateMenu(role, permissions = [], branches = []) {
         ],
         labels: ["systems.labels.view", "systems.labels.update"],
         inventoryReports: ["inventory.view", "inventory.create", "inventory.update", "inventory.delete"],
+        systemAdministration: ["system.center.access"],
     };
 
-    const canUse = (moduleKey) => isAdmin || canAny(modulePermissions[moduleKey] || []);
+    const canUse = (moduleKey) => canAny(modulePermissions[moduleKey] || []);
 
     const menu = [];
 
@@ -205,7 +204,7 @@ export function generateMenu(role, permissions = [], branches = []) {
     ];
 
     const canSeeBranchesSection =
-        isAdmin ||
+        can("branches.access-all") ||
         can("inventory.products.view") ||
         can("inventory.products.create") ||
         can("inventory.products.update") ||
@@ -335,6 +334,15 @@ export function generateMenu(role, permissions = [], branches = []) {
                       ]
                     : []),
             ],
+        });
+    }
+
+    if (canUse("systemAdministration")) {
+        menu.push({
+            text: "Centro de Administración",
+            key: "system-administration",
+            icon: "admin_panel_settings",
+            url: route("system-administration.index"),
         });
     }
 

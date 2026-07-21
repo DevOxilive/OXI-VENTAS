@@ -5,6 +5,7 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import { usePermissions } from '@/Composables/usePermissions'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
 
@@ -24,8 +25,7 @@ const props = defineProps({
 
 const page = usePage()
 const { canAny, permissions } = usePermissions()
-let userChannel = null
-let handleUserChanged = null
+let unsubscribeUserChanged = null
 
 const roleName = computed(() => props.dashboardUser?.role || 'Usuario')
 const userName = computed(() => props.dashboardUser?.name || 'Equipo')
@@ -438,25 +438,26 @@ const quickActions = computed(() =>
 )
 
 onMounted(() => {
-    if (!window.Echo || !page.props.auth?.user?.id) {
+    if (!page.props.auth?.user?.id) {
         return
     }
 
-    handleUserChanged = () => {
+    const handleUserChanged = () => {
         router.reload({
             preserveScroll: true,
             preserveState: false,
         })
     }
 
-    userChannel = window.Echo.channel(`users.${page.props.auth.user.id}`)
-        .listen('.UserChanged', handleUserChanged)
+    unsubscribeUserChanged = subscribeRealtime(
+        REALTIME_CHANNELS.user(page.props.auth.user.id),
+        REALTIME_EVENTS.userChanged,
+        handleUserChanged,
+    )
 })
 
 onBeforeUnmount(() => {
-    if (userChannel && handleUserChanged) {
-        userChannel.stopListening('.UserChanged', handleUserChanged)
-    }
+    unsubscribeUserChanged?.()
 })
 </script>
 

@@ -4,6 +4,7 @@ import AppButton from '@/Components/Buttons/AppButton.vue';
 import AuthenticationCard from '@/Components/Login/AuthenticationCard.vue';
 import AuthenticationCardLogo from '@/Components/Login/AuthenticationCardLogo.vue';
 import InputField from '@/Components/Forms/InputField.vue';
+import { t } from '@/i18n/es';
 
 const props = defineProps({
     email: String,
@@ -25,7 +26,7 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Reset Password" />
+    <Head :title="t('auth.resetPassword')" />
 
     <AuthenticationCard>
         <template #logo>
@@ -36,7 +37,7 @@ const submit = () => {
             <div>
                 <InputField
                     v-model="form.email"
-                    label="Email"
+                    :label="t('common.email')"
                     field="email"
                     type="email"
                     :error="form.errors.email"
@@ -49,7 +50,7 @@ const submit = () => {
             <div class="mt-4">
                 <InputField
                     v-model="form.password"
-                    label="Password"
+                    :label="t('common.password')"
                     field="password"
                     type="password"
                     :error="form.errors.password"
@@ -61,7 +62,7 @@ const submit = () => {
             <div class="mt-4">
                 <InputField
                     v-model="form.password_confirmation"
-                    label="Confirm Password"
+                    :label="t('profile.password.confirm')"
                     field="password_confirmation"
                     type="password"
                     :error="form.errors.password_confirmation"
@@ -72,7 +73,7 @@ const submit = () => {
 
             <div class="flex items-center justify-end mt-4">
                 <AppButton variant="primary" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                    Reset Password
+                    {{ t('auth.resetPassword') }}
                 </AppButton>
             </div>
         </form>

@@ -5,6 +5,7 @@ import AppButton from '@/Components/Buttons/AppButton.vue';
 import AuthenticationCard from '@/Components/Login/AuthenticationCard.vue';
 import AuthenticationCardLogo from '@/Components/Login/AuthenticationCardLogo.vue';
 import InputField from '@/Components/Forms/InputField.vue';
+import { t } from '@/i18n/es';
 
 const form = useForm({
     password: '',
@@ -24,7 +25,7 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Secure Area" />
+    <Head :title="t('auth.secureArea')" />
 
     <AuthenticationCard>
         <template #logo>
@@ -32,7 +33,7 @@ const submit = () => {
         </template>
 
         <div class="mb-4 text-sm text-gray-600">
-            This is a secure area of the application. Please confirm your password before continuing.
+            {{ t('auth.secureAreaHelp') }}
         </div>
 
         <form @submit.prevent="submit">
@@ -40,7 +41,7 @@ const submit = () => {
                 <InputField
                     ref="passwordInput"
                     v-model="form.password"
-                    label="Password"
+                    :label="t('common.password')"
                     field="password"
                     type="password"
                     :error="form.errors.password"
@@ -52,7 +53,7 @@ const submit = () => {
 
             <div class="flex justify-end mt-4">
                 <AppButton variant="primary" class="ms-4" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                    Confirm
+                    {{ t('common.confirm') }}
                 </AppButton>
             </div>
         </form>

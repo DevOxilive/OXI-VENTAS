@@ -45,15 +45,9 @@ export function usePermissions() {
     const permissions = computed(() => livePermissions.value);
     const role = computed(() => liveRole.value);
 
-    const can = (permission) => {
-        if (role.value === "Administrador") return true;
-
-        return permissions.value.includes(permission);
-    };
+    const can = (permission) => permissions.value.includes(permission);
 
     const canAny = (permissionList = []) => {
-        if (role.value === "Administrador") return true;
-
         return permissionList.some((permission) =>
             permissions.value.includes(permission)
         );

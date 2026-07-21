@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted } from "vue";
 import { Head, router } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
@@ -21,6 +21,7 @@ import { getPurchaseReportProductsTableConfig } from "@/config/TableConfigs/purc
 import { getPurchaseReportToolbarConfig } from "@/config/ToolbarConfigs/purchaseReportToolbarConfig";
 
 import PurchaseReportDrafts from "@/Components/Inventory/PurchaseReports/PurchaseReportDrafts.vue";
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 
 const props = defineProps({
     currentBranch: Object,
@@ -66,6 +67,23 @@ const tableRows = computed(() => report.tableRows.value);
 const pagination = computed(() => report.paginator.value);
 const selectedProducts = computed(() => report.selectedProducts.value);
 const purchaseLists = computed(() => props.reportsDB?.data ?? []);
+let unsubscribeTrashRealtime = null
+
+onMounted(() => {
+    unsubscribeTrashRealtime = subscribeRealtime(
+        REALTIME_CHANNELS.systems,
+        REALTIME_EVENTS.systemTrashChanged,
+        (event) => {
+            if (event?.resource === 'purchase-reports') {
+                router.reload({ only: ['reportsDB', 'purchaseCycle'] })
+            }
+        },
+    )
+})
+
+onBeforeUnmount(() => {
+    unsubscribeTrashRealtime?.()
+})
 
 function handleTableAction({ action, row }) {
     if (action === "add") {
