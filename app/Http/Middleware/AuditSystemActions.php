@@ -14,7 +14,7 @@ class AuditSystemActions
 
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->isMethodSafe() || $request->routeIs('system.audits.*')) {
+        if ($request->isMethodSafe() || $request->routeIs('system.audits.*') || $request->routeIs('systems.attendance.*')) {
             return $next($request);
         }
 

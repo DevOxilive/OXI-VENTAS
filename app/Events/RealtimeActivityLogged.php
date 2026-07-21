@@ -2,7 +2,8 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
+use App\Models\User;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -18,6 +19,8 @@ class RealtimeActivityLogged implements ShouldBroadcastNow
     public string $module;
     public string $action;
     public ?string $entity;
+    /** @var array<int, int> */
+    private array $recipientIds;
 
     public function __construct(
         string $message,
@@ -33,6 +36,7 @@ class RealtimeActivityLogged implements ShouldBroadcastNow
         $this->module = $module;
         $this->action = $action;
         $this->entity = $entity;
+        $this->recipientIds = $this->resolveRecipientIds($actor?->id);
     }
 
     public static function message(
@@ -55,13 +59,44 @@ class RealtimeActivityLogged implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [
-            new Channel('activity'),
-        ];
+        return collect($this->recipientIds)
+            ->map(fn (int $userId) => new PrivateChannel('users.' . $userId))
+            ->all();
     }
 
     public function broadcastAs(): string
     {
         return 'realtime.activity';
+    }
+
+    /**
+     * Activity alerts are intentionally limited to the actor and the roles
+     * responsible for system supervision. Authorization is then enforced by
+     * the private users.{id} channel itself.
+     *
+     * @return array<int, int>
+     */
+    private function resolveRecipientIds(?int $actorId): array
+    {
+        return User::query()
+            ->where('is_active', true)
+            ->where(function ($query) use ($actorId): void {
+                if ($actorId) {
+                    $query->whereKey($actorId)->orWhereHas('role', fn ($roleQuery) =>
+                        $roleQuery->whereIn('name', ['Administrador', 'Super Administrador'])
+                    );
+
+                    return;
+                }
+
+                $query->whereHas('role', fn ($roleQuery) =>
+                    $roleQuery->whereIn('name', ['Administrador', 'Super Administrador'])
+                );
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

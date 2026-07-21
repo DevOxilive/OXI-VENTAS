@@ -32,6 +32,14 @@ class PermissionSeeder extends Seeder
             'systems.labels.view',
             'systems.labels.update',
 
+            // Asistencias
+            'attendance.view',
+            'attendance.register',
+            'attendance.corrections.request',
+            'attendance.manage',
+            'attendance.corrections.review',
+            'attendance.reports',
+
             // Administración global
             SystemPermission::BRANCHES_ACCESS_ALL,
             ...SystemPermission::exclusive(),

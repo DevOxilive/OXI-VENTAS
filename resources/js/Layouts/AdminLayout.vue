@@ -10,7 +10,7 @@ import {
     updateLivePermissions,
 } from '@/Composables/usePermissions'
 import { ToastAlert } from '@/Components/Modales/UniversalActionModal'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime, subscribeRealtime } from '@/realtime'
 import { t } from '@/i18n/es'
 
 const page = usePage()
@@ -185,8 +185,8 @@ onMounted(() => {
         REALTIME_EVENTS.userChanged,
         handleUserChanged,
     )
-    unsubscribeRealtimeActivity = subscribeRealtime(
-        REALTIME_CHANNELS.activity,
+    unsubscribeRealtimeActivity = subscribePrivateRealtime(
+        REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.activityLogged,
         handleRealtimeActivity,
     )

@@ -52,6 +52,7 @@ export function generateMenu(role, permissions = [], branches = []) {
             "systems.cash-closure-tickets.update",
         ],
         labels: ["systems.labels.view", "systems.labels.update"],
+        attendance: ["attendance.view", "attendance.register"],
         inventoryReports: ["inventory.view", "inventory.create", "inventory.update", "inventory.delete"],
         systemAdministration: ["system.center.access"],
     };
@@ -94,7 +95,7 @@ export function generateMenu(role, permissions = [], branches = []) {
     | SISTEMAS
     |--------------------------------------------------------------------------
     */
-    if (canUse("users") || canUse("branches")) {
+    if (canUse("users") || canUse("branches") || canUse("attendance")) {
         menu.push({
             text: "Sistemas",
             key: "systems",
@@ -121,6 +122,14 @@ export function generateMenu(role, permissions = [], branches = []) {
                               url: route("branches.index"),
                           },
                       ]
+                    : []),
+                ...(canUse("attendance")
+                    ? [{
+                        text: "Asistencias",
+                        key: "systems.attendance",
+                        icon: "fact_check",
+                        url: route("systems.attendance.index"),
+                    }]
                     : []),
             ],
         });
