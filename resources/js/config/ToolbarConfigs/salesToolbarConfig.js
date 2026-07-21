@@ -81,7 +81,7 @@ export function getSalesToolbarConfig({
         id: "toggle-expiration-alerts",
         label: "Alertas",
         icon: "notifications",
-        variant: expirationAlertCount ? "amber" : "slate",
+        variant: expirationAlertCount ? "danger" : "slate",
         badge: expirationAlertCount ? String(expirationAlertCount) : "",
       },
     ],

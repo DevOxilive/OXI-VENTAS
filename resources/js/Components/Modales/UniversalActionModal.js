@@ -128,13 +128,14 @@ export function BlockingWarningAlert({
     title = "Advertencia",
     message = "Revisa esta acción antes de continuar",
     confirmText = "OK",
+    confirmButtonColor = "#e60012",
 } = {}) {
     return Swal.fire({
         icon: "warning",
         title: title,
         html: message,
         confirmButtonText: confirmText,
-        confirmButtonColor: "#f59e0b",
+        confirmButtonColor,
         allowOutsideClick: false,
         allowEscapeKey: false,
         allowEnterKey: true,
