@@ -69,8 +69,10 @@ class AttendanceController extends Controller
         ]);
         $user = $request->user();
         $now = now();
+        $employeeId = Employee::query()->whereKey($user->employee_id)->value('id');
+        $branchId = Branch::query()->whereKey($user->branch_id)->value('id');
         $record = AttendanceRecord::create([
-            'user_id' => $user->id, 'employee_id' => $user->employee_id, 'branch_id' => $user->branch_id,
+            'user_id' => $user->id, 'employee_id' => $employeeId, 'branch_id' => $branchId,
             'attendance_date' => $now->toDateString(), 'recorded_at' => $now, 'type' => $data['type'],
             'status' => $this->statusFor($data['type'], $now, $data['latitude'] ?? null, $data['longitude'] ?? null),
             'latitude' => $data['latitude'] ?? null, 'longitude' => $data['longitude'] ?? null,
