@@ -19,6 +19,14 @@ class PermissionSeeder extends Seeder
             'employees.create',
             'employees.update',
             'employees.delete',
+            'departments.view',
+            'departments.create',
+            'departments.update',
+            'departments.delete',
+            'positions.view',
+            'positions.create',
+            'positions.update',
+            'positions.delete',
 
             // Sistemas
             'users.view',

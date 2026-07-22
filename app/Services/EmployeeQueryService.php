@@ -11,7 +11,9 @@ class EmployeeQueryService
         $query = Employee::query();
 
         if (!empty($filters['department'])) {
-            $query->where('department', $filters['department']);
+            $query->whereHas('position', function ($positionQuery) use ($filters) {
+                $positionQuery->where('department_id', $filters['department']);
+            });
         }
 
         if (!empty($filters['employment_status'])) {
@@ -19,7 +21,7 @@ class EmployeeQueryService
         }
 
         if (!empty($filters['position'])) {
-            $query->where('position', 'like', '%' . $filters['position'] . '%');
+            $query->where('position_id', $filters['position']);
         }
 
         if (!empty($filters['contract_type'])) {

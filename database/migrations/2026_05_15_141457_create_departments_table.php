@@ -14,10 +14,6 @@ return new class extends Migration
 
             $table->string('name');
 
-            $table->foreignId('area_id')
-                ->constrained('areas')
-                ->cascadeOnDelete();
-
             $table->boolean('active')
                 ->default(true);
 

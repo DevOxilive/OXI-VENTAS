@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Events\UserChanged;
 use Inertia\Inertia;
 use App\Models\Employee;
+use App\Models\Department;
+use App\Models\Position;
 use App\Models\User;
 use Illuminate\Http\Request;
 use App\Events\EmployeeChanged;
@@ -14,6 +16,7 @@ use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
 use App\Support\SystemPermission;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
@@ -76,12 +79,13 @@ class EmployeeController extends Controller
         $perPage = TablePagination::resolvePerPage($request, 50);
 
         $employmentStatus = trim((string) $request->input('employmentStatus', ''));
-        $department = trim((string) $request->input('department', ''));
-        $position = trim((string) $request->input('position', ''));
+        $department = $request->integer('department') ?: null;
+        $position = $request->integer('position') ?: null;
         $startDateFrom = trim((string) $request->input('startDateFrom', ''));
         $startDateTo = trim((string) $request->input('startDateTo', ''));
 
         $employeesDB = Employee::query()
+            ->with('position.department')
             ->when($search, function ($query) use ($search) {
                 FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
                     FlexibleSearch::orWhereColumns($subQuery, [
@@ -89,21 +93,21 @@ class EmployeeController extends Controller
                         'last_name',
                         'email',
                         'phone',
-                        'position',
-                        'department',
                         'nss',
                         'rfc',
                     ], $phrase, $terms);
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'position', ['name'], $phrase, $terms);
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'position.department', ['name'], $phrase, $terms);
                 });
             })
             ->when($employmentStatus, function ($query) use ($employmentStatus) {
                 $query->where('employment_status', $employmentStatus);
             })
             ->when($department, function ($query) use ($department) {
-                $query->where('department', $department);
+                $query->whereHas('position', fn ($positionQuery) => $positionQuery->where('department_id', $department));
             })
             ->when($position, function ($query) use ($position) {
-                $query->where('position', 'like', "%{$position}%");
+                $query->where('position_id', $position);
             })
             ->when($startDateFrom, function ($query) use ($startDateFrom) {
                 $query->whereDate('start_date', '>=', $startDateFrom);
@@ -132,8 +136,10 @@ class EmployeeController extends Controller
                     'startDate' => $employee->start_date,
                     'employmentStatus' => $employee->employment_status,
                     'photo' => $employee->photo,
-                    'position' => $employee->position,
-                    'department' => $employee->department,
+                    'positionId' => $employee->position_id,
+                    'position' => $employee->position?->name ?? 'Sin puesto',
+                    'departmentId' => $employee->position?->department_id,
+                    'department' => $employee->position?->department?->name ?? 'Sin departamento',
                     'bank' => $employee->bank,
                     'accountNumber' => $employee->account_number,
                     'educationLevel' => $employee->education_level,
@@ -148,26 +154,20 @@ class EmployeeController extends Controller
         return Inertia::render('HumanResources/Employees', [
             'employeesDB' => $employeesDB,
             'filterOptions' => [
-                'positions' => Employee::query()
-                    ->whereNotNull('position')
-                    ->where('position', '!=', '')
-                    ->distinct()
-                    ->orderBy('position')
-                    ->pluck('position')
-                    ->map(fn ($position) => [
-                        'value' => $position,
-                        'label' => $position,
+                'positions' => Position::query()
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn (Position $position) => [
+                        'value' => $position->id,
+                        'label' => $position->name,
                     ])
                     ->values(),
-                'departments' => Employee::query()
-                    ->whereNotNull('department')
-                    ->where('department', '!=', '')
-                    ->distinct()
-                    ->orderBy('department')
-                    ->pluck('department')
-                    ->map(fn ($department) => [
-                        'value' => $department,
-                        'label' => $department,
+                'departments' => Department::query()
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn (Department $department) => [
+                        'value' => $department->id,
+                        'label' => $department->name,
                     ])
                     ->values(),
                 'statuses' => Employee::query()
@@ -191,18 +191,13 @@ class EmployeeController extends Controller
                 'startDateFrom' => $startDateFrom,
                 'startDateTo' => $startDateTo,
             ],
+            'organizationOptions' => $this->organizationOptions(),
         ]);
     }
 
     public function store(Request $request)
     {
-        $request->validate([
-            'firstName' => 'required',
-            'lastName' => 'required',
-            'email' => 'required|email|unique:employees,email',
-            'position' => 'required',
-            'department' => 'required',
-        ]);
+        $this->validateEmployee($request);
 
         $employee = Employee::create([
             'first_name' => $request->firstName,
@@ -220,8 +215,7 @@ class EmployeeController extends Controller
             'start_date' => $request->startDate,
             'employment_status' => $request->employmentStatus,
             'photo' => null,
-            'position' => $request->position,
-            'department' => $request->department,
+            'position_id' => $request->positionId,
             'bank' => $request->bank,
             'account_number' => $request->accountNumber,
             'education_level' => $request->educationLevel,
@@ -242,13 +236,7 @@ class EmployeeController extends Controller
     {
         $employee = Employee::findOrFail($id);
 
-        $request->validate([
-            'firstName' => 'required',
-            'lastName' => 'required',
-            'email' => 'required|email|unique:employees,email,' . $id,
-            'position' => 'required',
-            'department' => 'required',
-        ]);
+        $this->validateEmployee($request, $employee);
 
         $employee->update([
             'first_name' => $request->firstName,
@@ -265,8 +253,7 @@ class EmployeeController extends Controller
             'maps_url' => $request->mapsUrl,
             'start_date' => $request->startDate,
             'employment_status' => $request->employmentStatus,
-            'position' => $request->position,
-            'department' => $request->department,
+            'position_id' => $request->positionId,
             'bank' => $request->bank,
             'account_number' => $request->accountNumber,
             'education_level' => $request->educationLevel,
@@ -316,5 +303,52 @@ class EmployeeController extends Controller
             new EmployeeExport($employmentStatus, $department, $position, $search, $startDateFrom, $startDateTo),
             $fileName
         );
+    }
+
+    private function organizationOptions(): array
+    {
+        return [
+            'departments' => Department::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'active'])
+                ->map(fn (Department $department) => [
+                    'value' => $department->id,
+                    'label' => $department->active ? $department->name : "{$department->name} (Inactivo)",
+                    'active' => $department->active,
+                ])
+                ->values(),
+            'positions' => Position::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'department_id', 'active'])
+                ->map(fn (Position $position) => [
+                    'value' => $position->id,
+                    'label' => $position->active ? $position->name : "{$position->name} (Inactivo)",
+                    'departmentId' => $position->department_id,
+                    'active' => $position->active,
+                ])
+                ->values(),
+        ];
+    }
+
+    private function validateEmployee(Request $request, ?Employee $employee = null): array
+    {
+        $positionRule = Rule::exists('positions', 'id')
+            ->where(fn ($query) => $query->where('department_id', $request->integer('departmentId')));
+
+        if (!$employee) {
+            $positionRule->where(fn ($query) => $query->where('active', true));
+        }
+
+        return $request->validate([
+            'firstName' => ['required', 'string', 'max:80'],
+            'lastName' => ['required', 'string', 'max:80'],
+            'email' => [
+                'required',
+                'email',
+                Rule::unique('employees', 'email')->ignore($employee?->id),
+            ],
+            'departmentId' => ['required', 'integer', 'exists:departments,id'],
+            'positionId' => ['required', 'integer', $positionRule],
+        ]);
     }
 }

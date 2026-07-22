@@ -109,7 +109,11 @@ class RoleSeeder extends Seeder
         }
 
         foreach ($permissions as $permission) {
-            if (str_starts_with($permission->name, 'employees.')) {
+            if (
+                str_starts_with($permission->name, 'employees.')
+                || str_starts_with($permission->name, 'departments.')
+                || str_starts_with($permission->name, 'positions.')
+            ) {
                 DB::table('role_permission')->updateOrInsert([
                     'role_id' => $humanResourcesRole->id,
                     'permission_id' => $permission->id,

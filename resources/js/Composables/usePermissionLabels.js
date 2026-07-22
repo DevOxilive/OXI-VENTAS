@@ -12,6 +12,8 @@ const permissionSectionOrder = [
 const permissionModuleOrder = [
     "dashboard",
     "employees",
+    "departments",
+    "positions",
     "users",
     "branches",
     "files",
@@ -43,6 +45,14 @@ const permissionModules = {
     },
     employees: {
         label: "Registro de empleados",
+        section: "human-resources",
+    },
+    departments: {
+        label: "Registro de departamentos",
+        section: "human-resources",
+    },
+    positions: {
+        label: "Registro de puestos",
         section: "human-resources",
     },
     users: {
@@ -106,6 +116,15 @@ const permissionLabels = {
     "employees.create": "Crear empleados",
     "employees.update": "Editar empleados",
     "employees.delete": "Eliminar empleados",
+
+    "departments.view": "Ver registro de departamentos",
+    "departments.create": "Crear departamentos",
+    "departments.update": "Editar departamentos",
+    "departments.delete": "Eliminar departamentos",
+    "positions.view": "Ver registro de puestos",
+    "positions.create": "Crear puestos",
+    "positions.update": "Editar puestos",
+    "positions.delete": "Eliminar puestos",
 
     "users.view": "Ver modulo de usuarios",
     "users.create": "Crear usuarios",

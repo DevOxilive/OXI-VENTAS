@@ -27,11 +27,11 @@ export function useEmployeeFilters(employeesDB) {
                     : true;
 
                 const matchesDepartment = departmentFilter.value
-                    ? employee.department === departmentFilter.value
+                    ? String(employee.departmentId) === String(departmentFilter.value)
                     : true;
 
                 const matchesPosition = positionFilter.value
-                    ? employee.position === positionFilter.value
+                    ? String(employee.positionId) === String(positionFilter.value)
                     : true;
 
                 return (

@@ -31,7 +31,7 @@ class PurchaseSeeder extends Seeder
 
             $employees = Employee::query()
                 ->where('employment_status', 'Activo')
-                ->whereIn('department', ['Inventario', 'Ventas'])
+                ->whereHas('position.department', fn ($department) => $department->whereIn('name', ['Inventario', 'Ventas']))
                 ->orderBy('id')
                 ->get();
 

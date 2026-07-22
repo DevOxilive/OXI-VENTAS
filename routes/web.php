@@ -7,6 +7,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\QzTrayController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\PositionController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SystemAdministrationController;
@@ -68,6 +70,7 @@ Route::middleware([
     $usersAccess = 'permission:users.view,users.create,users.update,users.delete';
     $branchesAccess = 'permission:branches.view,branches.create,branches.update,branches.delete';
     $employeesAccess = 'permission:employees.view,employees.create,employees.update,employees.delete';
+    $organizationAccess = 'permission:departments.view,departments.create,departments.update,departments.delete,positions.view,positions.create,positions.update,positions.delete';
     $salesAccess = 'permission:sales.view,sales.create,sales.update,sales.delete,sales.reports';
     $cashClosuresAccess = 'permission:sales.cash-closures.view,sales.cash-closures.create,sales.cash-closures.update,sales.cash-closures.delete';
     $ticketsAccess = 'permission:systems.tickets.view,systems.tickets.update';
@@ -236,7 +239,7 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('human-resources')->name('human-resources.')->group(function () use ($employeesAccess) {
+    Route::prefix('human-resources')->name('human-resources.')->group(function () use ($employeesAccess, $organizationAccess) {
         Route::get('/employees', [EmployeeController::class, 'index'])
             ->middleware($employeesAccess)
             ->name('employees.index');
@@ -256,6 +259,34 @@ Route::middleware([
         Route::get('/employees/export-excel', [EmployeeController::class, 'exportExcel'])
             ->middleware('permission:files.export')
             ->name('employees.export-excel');
+
+        Route::get('/departments', [DepartmentController::class, 'index'])
+            ->middleware($organizationAccess)
+            ->name('departments.index');
+
+        Route::post('/departments', [DepartmentController::class, 'store'])
+            ->middleware('permission:departments.create')
+            ->name('departments.store');
+
+        Route::put('/departments/{department}', [DepartmentController::class, 'update'])
+            ->middleware('permission:departments.update')
+            ->name('departments.update');
+
+        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])
+            ->middleware('permission:departments.delete')
+            ->name('departments.destroy');
+
+        Route::post('/positions', [PositionController::class, 'store'])
+            ->middleware('permission:positions.create')
+            ->name('positions.store');
+
+        Route::put('/positions/{position}', [PositionController::class, 'update'])
+            ->middleware('permission:positions.update')
+            ->name('positions.update');
+
+        Route::delete('/positions/{position}', [PositionController::class, 'destroy'])
+            ->middleware('permission:positions.delete')
+            ->name('positions.destroy');
     });
 
     /*

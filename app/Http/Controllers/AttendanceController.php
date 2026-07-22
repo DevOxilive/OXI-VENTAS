@@ -8,6 +8,7 @@ use App\Models\AttendanceCorrectionRequest;
 use App\Models\AttendanceRecord;
 use App\Models\Branch;
 use App\Models\Employee;
+use App\Models\Department;
 use App\Models\User;
 use App\Services\SystemAuditService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -24,7 +25,7 @@ class AttendanceController extends Controller
     {
         $filters = $request->validate([
             'from' => ['nullable', 'date'], 'to' => ['nullable', 'date', 'after_or_equal:from'],
-            'branch' => ['nullable', 'integer', 'exists:branches,id'], 'department' => ['nullable', 'string', 'max:120'],
+            'branch' => ['nullable', 'integer', 'exists:branches,id'], 'department' => ['nullable', 'integer', 'exists:departments,id'],
             'employee' => ['nullable', 'integer', 'exists:employees,id'], 'type' => ['nullable', 'string'],
         ]);
         $canManage = $request->user()->hasPermission('attendance.manage') || $request->user()->hasPermission('attendance.reports');
@@ -47,7 +48,7 @@ class AttendanceController extends Controller
             'options' => [
                 'types' => collect(AttendanceRecord::TYPES)->map(fn ($type) => ['value' => $type, 'label' => $this->typeLabel($type)])->values(),
                 'branches' => Branch::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->map(fn ($branch) => ['value' => $branch->id, 'label' => $branch->name]),
-                'departments' => Employee::query()->whereNotNull('department')->where('department', '!=', '')->distinct()->orderBy('department')->pluck('department')->map(fn ($department) => ['value' => $department, 'label' => $department]),
+                'departments' => Department::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->map(fn ($department) => ['value' => $department->id, 'label' => $department->name]),
                 'employees' => Employee::query()->where('employment_status', '!=', 'Inactivo')->orderBy('first_name')->get()->map(fn ($employee) => ['value' => $employee->id, 'label' => trim($employee->first_name . ' ' . $employee->last_name)]),
             ],
             'canManage' => $canManage,
@@ -125,12 +126,12 @@ class AttendanceController extends Controller
 
     private function recordsQuery(Request $request, bool $canManage, array $filters)
     {
-        return AttendanceRecord::query()->with(['user.role', 'employee', 'branch'])
+        return AttendanceRecord::query()->with(['user.role', 'employee.position.department', 'branch'])
             ->when(!$canManage, fn ($query) => $query->where('user_id', $request->user()->id))
             ->when($filters['from'] ?? null, fn ($query, $value) => $query->whereDate('attendance_date', '>=', $value))
             ->when($filters['to'] ?? null, fn ($query, $value) => $query->whereDate('attendance_date', '<=', $value))
             ->when($filters['branch'] ?? null, fn ($query, $value) => $query->where('branch_id', $value))
-            ->when($filters['department'] ?? null, fn ($query, $value) => $query->whereHas('employee', fn ($employee) => $employee->where('department', $value)))
+            ->when($filters['department'] ?? null, fn ($query, $value) => $query->whereHas('employee.position', fn ($position) => $position->where('department_id', $value)))
             ->when($filters['employee'] ?? null, fn ($query, $value) => $query->where('employee_id', $value))
             ->when($filters['type'] ?? null, fn ($query, $value) => $query->where('type', $value))
             ->latest('recorded_at');

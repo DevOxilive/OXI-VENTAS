@@ -4,6 +4,16 @@ export function generateMenu(role, permissions = [], branches = []) {
 
     const modulePermissions = {
         employees: ["employees.view", "employees.create", "employees.update", "employees.delete"],
+        organizationStructure: [
+            "departments.view",
+            "departments.create",
+            "departments.update",
+            "departments.delete",
+            "positions.view",
+            "positions.create",
+            "positions.update",
+            "positions.delete",
+        ],
         users: ["users.view", "users.create", "users.update", "users.delete"],
         branches: ["branches.view", "branches.create", "branches.update", "branches.delete"],
         products: [
@@ -73,19 +83,29 @@ export function generateMenu(role, permissions = [], branches = []) {
     | CAPITAL HUMANO
     |--------------------------------------------------------------------------
     */
-    if (canUse("employees")) {
+    if (canUse("employees") || canUse("organizationStructure")) {
         menu.push({
             text: "Capital Humano",
             key: "human-resources",
             icon: "badge",
             isOpen: false,
             children: [
-                {
-                    text: "Registro de empleados",
-                    key: "human-resources.employees",
-                    icon: "group",
-                    url: route("human-resources.employees.index"),
-                },
+                ...(canUse("employees")
+                    ? [{
+                        text: "Registro de empleados",
+                        key: "human-resources.employees",
+                        icon: "group",
+                        url: route("human-resources.employees.index"),
+                    }]
+                    : []),
+                ...(canUse("organizationStructure")
+                    ? [{
+                        text: "Registro de Departamentos",
+                        key: "human-resources.departments",
+                        icon: "account_tree",
+                        url: route("human-resources.departments.index"),
+                    }]
+                    : []),
             ],
         });
     }

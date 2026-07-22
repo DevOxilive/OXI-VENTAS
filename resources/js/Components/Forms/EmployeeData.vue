@@ -7,6 +7,7 @@ const props = defineProps({
     employee: Object,
     frontendErrors: Object,
     departments: Array,
+    positions: Array,
     readonly: {
         type: Boolean,
         default: false
@@ -164,14 +165,15 @@ function openGoogleMaps() {
             </h5>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <InputField label="Puesto" field="position" v-model="employee.position" :readonly="readonly"
-                    :error="frontendErrors.position || employee.errors.position"
-                    @validate="$emit('validate', 'position')" />
-
-                <SelectField label="Departamento" field="department" v-model="employee.department"
+                <SelectField label="Departamento" field="departmentId" v-model="employee.departmentId"
                     :options="departments" :disabled="readonly"
-                    :error="frontendErrors.department || employee.errors.department"
-                    @validate="$emit('validate', 'department')" />
+                    :error="frontendErrors.departmentId || employee.errors.departmentId"
+                    @validate="$emit('validate', 'departmentId')" />
+
+                <SelectField label="Puesto" field="positionId" v-model="employee.positionId"
+                    :options="positions" :disabled="readonly || !employee.departmentId"
+                    :error="frontendErrors.positionId || employee.errors.positionId"
+                    @validate="$emit('validate', 'positionId')" />
 
                 <SelectField label="Tipo de contrato" field="contractType" v-model="employee.contractType" :options="[
                     { value: 'Planta/Indefinido', label: 'Planta/Indefinido' },
