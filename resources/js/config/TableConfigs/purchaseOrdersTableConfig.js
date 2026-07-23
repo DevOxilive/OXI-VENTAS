@@ -1,5 +1,6 @@
-export function getPurchaseOrdersTableConfig({ mode = 'view' } = {}) {
+export function getPurchaseOrdersTableConfig({ mode = 'view', viewPermission = null } = {}) {
     const completed = mode === 'history'
+    const purchasing = mode === 'purchasing' || mode === 'tracking'
 
     return {
         columns: [
@@ -23,13 +24,6 @@ export function getPurchaseOrdersTableConfig({ mode = 'view' } = {}) {
                 mobileLabel: 'Sucursales',
                 mobileDisplay: true,
             },
-            ...(completed ? [{
-                key: 'actual_total',
-                label: 'Total pagado',
-                format: 'currency',
-                mobileLabel: 'Total pagado',
-                mobileDisplay: true,
-            }] : []),
             {
                 key: 'display_date',
                 label: 'Fecha',
@@ -40,10 +34,19 @@ export function getPurchaseOrdersTableConfig({ mode = 'view' } = {}) {
         ],
         actions: [
             {
-                id: 'open',
-                label: mode === 'tracking' ? 'Capturar compra' : 'Ver detalle',
-                icon: mode === 'tracking' ? 'edit_note' : 'visibility',
+                id: 'view',
+                label: 'Ver detalle',
+                icon: 'visibility',
                 variant: 'blue',
+                permission: viewPermission,
+            },
+            {
+                id: 'edit',
+                label: 'Editar compra',
+                icon: 'edit',
+                variant: 'yellow',
+                permission: 'inventory.purchase-orders.costs',
+                hidden: () => !purchasing,
             },
         ],
         mobileCardHeaderField: 'folio',

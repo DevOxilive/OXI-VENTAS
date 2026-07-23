@@ -10,6 +10,7 @@ class GeneralPurchaseOrderItem extends Model
         'general_purchase_order_id',
         'product_id',
         'product_name',
+        'product_description',
         'product_code',
         'base_unit',
         'requested_quantity',
@@ -18,14 +19,14 @@ class GeneralPurchaseOrderItem extends Model
         'purchase_presentation',
         'package_quantity',
         'units_per_package',
-        'package_price',
+        'purchase_price',
         'purchased_quantity',
         'gross_total',
         'discount_amount',
         'actual_total',
         'net_unit_cost',
         'unavailable',
-        'promotion_notes',
+        'purchase_notes',
     ];
 
     protected $casts = [
@@ -34,7 +35,7 @@ class GeneralPurchaseOrderItem extends Model
         'estimated_total' => 'decimal:2',
         'package_quantity' => 'decimal:2',
         'units_per_package' => 'decimal:2',
-        'package_price' => 'decimal:2',
+        'purchase_price' => 'decimal:2',
         'purchased_quantity' => 'decimal:2',
         'gross_total' => 'decimal:2',
         'discount_amount' => 'decimal:2',

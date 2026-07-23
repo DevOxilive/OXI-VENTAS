@@ -12,7 +12,7 @@ function resolveStockStatus(product) {
 }
 
 export function usePurchaseReport(props) {
-    const notes = ref("");
+    const assignedToUserId = ref("");
     const selectedItems = ref({});
     const editingOrder = ref(null);
     let filterTimer = null;
@@ -121,17 +121,16 @@ export function usePurchaseReport(props) {
     }
 
     function clearDraft() {
-        notes.value = "";
+        assignedToUserId.value = "";
         selectedItems.value = {};
         editingOrder.value = null;
     }
 
     function applyFilters(overrides = {}) {
         router.get(
-            route("inventory.branches.purchase-reports.index", {
-                branch: props.currentBranch.id,
-            }),
+            route("ventas.purchase-reports.index"),
             {
+                branch: props.currentBranch.id,
                 search: localFilters.value.search || undefined,
                 category_id: localFilters.value.category_id || undefined,
                 stock: localFilters.value.stock || undefined,
@@ -181,14 +180,14 @@ export function usePurchaseReport(props) {
         }
 
         editingOrder.value = order;
-        notes.value = order.notes ?? "";
+        assignedToUserId.value = order.assigned_to_user_id ?? "";
         selectedItems.value = mappedItems;
         window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     function buildPayload() {
         return {
-            notes: notes.value,
+            assigned_to_user_id: assignedToUserId.value || null,
             items: selectedProducts.value.map((item) => ({
                 branch_product_id: item.branch_product_id,
                 requested_quantity: Number(item.requested_quantity || 0),
@@ -263,7 +262,7 @@ export function usePurchaseReport(props) {
     }
 
     return {
-        notes,
+        assignedToUserId,
         selectedItems,
         editingOrder,
         isEditing,

@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class GeneralPurchaseOrder extends Model
 {
+    public const STATUS_DRAFT = 'DRAFT';
+
     public const STATUS_PURCHASING = 'PURCHASING';
 
     public const STATUS_COMPLETED = 'COMPLETED';
@@ -21,7 +23,6 @@ class GeneralPurchaseOrder extends Model
         'discount_total',
         'actual_total',
         'purchased_at',
-        'notes',
         'completed_at',
     ];
 

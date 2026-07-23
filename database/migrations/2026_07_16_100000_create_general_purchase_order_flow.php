@@ -44,11 +44,11 @@ return new class extends Migration
 
         Schema::create('general_purchase_orders', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('purchase_cycle_id')->unique()->constrained()->restrictOnDelete();
+            $table->foreignId('purchase_cycle_id')->constrained()->restrictOnDelete();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('completed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->string('folio')->nullable()->unique();
-            $table->string('status')->default('PURCHASING');
+            $table->string('status')->default('DRAFT');
             $table->decimal('estimated_total', 14, 2)->default(0);
             $table->decimal('gross_total', 14, 2)->default(0);
             $table->decimal('discount_total', 14, 2)->default(0);
@@ -58,6 +58,7 @@ return new class extends Migration
             $table->timestamp('completed_at')->nullable();
             $table->timestamps();
 
+            $table->index('purchase_cycle_id', 'general_purchase_orders_cycle_index');
             $table->index(['status', 'created_at']);
         });
 
@@ -66,6 +67,7 @@ return new class extends Migration
             $table->foreignId('general_purchase_order_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->nullable()->constrained()->nullOnDelete();
             $table->string('product_name');
+            $table->text('product_description')->nullable();
             $table->string('product_code')->nullable();
             $table->string('base_unit')->nullable();
             $table->decimal('requested_quantity', 12, 2)->default(0);
@@ -74,14 +76,14 @@ return new class extends Migration
             $table->string('purchase_presentation')->default('Paquete');
             $table->decimal('package_quantity', 10, 2)->nullable();
             $table->decimal('units_per_package', 10, 2)->nullable();
-            $table->decimal('package_price', 12, 2)->nullable();
+            $table->decimal('purchase_price', 12, 2)->nullable();
             $table->decimal('purchased_quantity', 12, 2)->default(0);
             $table->decimal('gross_total', 14, 2)->default(0);
             $table->decimal('discount_amount', 14, 2)->default(0);
             $table->decimal('actual_total', 14, 2)->default(0);
             $table->decimal('net_unit_cost', 12, 4)->default(0);
             $table->boolean('unavailable')->default(false);
-            $table->string('promotion_notes', 255)->nullable();
+            $table->text('purchase_notes')->nullable();
             $table->timestamps();
 
             $table->unique(

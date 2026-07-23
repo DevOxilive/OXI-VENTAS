@@ -5,6 +5,7 @@ const permissionSectionOrder = [
     "human-resources",
     "systems",
     "branches",
+    "purchases",
     "sales",
     "printers",
 ];
@@ -19,11 +20,12 @@ const permissionModuleOrder = [
     "files",
     "inventory.products",
     "inventory.branches",
-    "inventory.purchase-reports",
-    "inventory.purchase-orders",
+    "purchases.purchase-lists",
+    "purchases.general-orders",
     "audits",
     "inventory",
     "sales",
+    "inventory.purchase-reports",
     "systems.tickets",
     "systems.cash-closure-tickets",
     "systems.labels",
@@ -34,6 +36,7 @@ const permissionSectionsMap = {
     "human-resources": "Capital Humano",
     systems: "Sistemas",
     branches: "Sucursales",
+    purchases: "Compras",
     sales: "Ventas",
     printers: "Impresoras",
 };
@@ -75,13 +78,25 @@ const permissionModules = {
         label: "Stock",
         section: "branches",
     },
-    "inventory.purchase-reports": {
-        label: "Listas de compra",
-        section: "branches",
+    "purchases.purchase-lists": {
+        label: "Listas de compra y Órdenes de compra",
+        section: "purchases",
     },
-    "inventory.purchase-orders": {
-        label: "Ordenes generales",
-        section: "branches",
+    "purchases.general-orders.generate": {
+        label: "Órdenes de compra generales · Generar",
+        section: "purchases",
+    },
+    "purchases.general-orders.purchasing": {
+        label: "Órdenes de compra generales · En compra",
+        section: "purchases",
+    },
+    "purchases.general-orders.completed": {
+        label: "Órdenes de compra generales · Completadas",
+        section: "purchases",
+    },
+    "purchases.general-orders": {
+        label: "Órdenes de compra generales",
+        section: "purchases",
     },
     audits: {
         label: "Auditorias",
@@ -165,14 +180,21 @@ const permissionLabels = {
     "audits.physical-counts.update": "Editar auditorias",
     "audits.physical-counts.delete": "Eliminar auditorias",
 
-    "inventory.purchase-reports.view": "Ver modulo de listas/reportes de compra",
-    "inventory.purchase-reports.create": "Crear reportes de compra",
-    "inventory.purchase-reports.update": "Editar reportes de compra",
-    "inventory.purchase-reports.delete": "Eliminar reportes de compra",
+    "inventory.purchase-reports.view": "Ver listas y órdenes de compra",
+    "inventory.purchase-reports.create": "Crear listas de compra",
+    "inventory.purchase-reports.update": "Editar listas de compra",
+    "inventory.purchase-reports.delete": "Eliminar listas de compra",
     "inventory.purchase-orders.view": "Consultar ordenes generales",
     "inventory.purchase-orders.create": "Generar ordenes generales",
     "inventory.purchase-orders.update": "Dar seguimiento a compras",
+    "inventory.purchase-orders.costs": "Consultar y capturar costos de compra",
     "inventory.purchase-orders.history": "Consultar compras completadas",
+    "inventory.purchase-orders.generate.view": "Ver Órdenes de compra",
+    "inventory.purchase-orders.generate.create": "Crear Órdenes de compra generales",
+    "inventory.purchase-orders.generate.update": "Editar Órdenes de compra",
+    "inventory.purchase-orders.generate.transfer": "Transferir Órdenes de compra",
+    "inventory.purchase-orders.purchasing.view": "Ver Órdenes de compra generales",
+    "inventory.purchase-orders.completed.view": "Ver Órdenes de compra generales completadas",
 
     "inventory.view": "Ver modulo de reportes de inventario",
     "inventory.create": "Crear reportes de inventario",
@@ -241,11 +263,22 @@ function getPermissionModule(permissionName = "") {
     }
 
     if (permissionName.startsWith("inventory.purchase-reports.")) {
-        return "inventory.purchase-reports";
+        return "purchases.purchase-lists";
     }
 
-    if (permissionName.startsWith("inventory.purchase-orders.")) {
-        return "inventory.purchase-orders";
+    if (permissionName.startsWith("inventory.purchase-orders.generate.")) {
+        return "purchases.general-orders";
+    }
+
+    if (
+        permissionName.startsWith("inventory.purchase-orders.purchasing.")
+        || permissionName === "inventory.purchase-orders.costs"
+    ) {
+        return "purchases.general-orders";
+    }
+
+    if (permissionName.startsWith("inventory.purchase-orders.completed.")) {
+        return "purchases.general-orders";
     }
 
     if (permissionName.startsWith("audits.")) {

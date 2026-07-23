@@ -4,6 +4,8 @@ export function getPurchaseReportToolbarConfig({
     cycleFolio = '',
     cycleSubmitted = false,
     hasProducts = false,
+    canCreate = false,
+    canClear = false,
 } = {}) {
     return {
         title: editingFolio ? `Editando ${editingFolio}` : 'Generar lista de compra',
@@ -18,19 +20,19 @@ export function getPurchaseReportToolbarConfig({
         showCounter: false,
         filters: [],
         actions: [
-            {
+            ...(canCreate ? [{
                 id: 'submit-empty',
                 label: cycleSubmitted ? 'Solicitud enviada' : 'Sin productos',
                 icon: cycleSubmitted ? 'task_alt' : 'playlist_remove',
                 variant: 'secondary',
                 disabled: cycleSubmitted || hasProducts,
-            },
-            {
+            }] : []),
+            ...(canClear ? [{
                 id: 'clear',
                 label: 'Limpiar',
                 icon: 'delete_sweep',
                 variant: 'red',
-            },
+            }] : []),
         ],
         tabs: [],
     }

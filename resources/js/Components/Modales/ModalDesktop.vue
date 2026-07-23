@@ -123,7 +123,8 @@ function closeFromBackdrop(closeOnBackdrop) {
 
             <main
                 v-if="$slots.content"
-                class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-background touch-pan-y"
+                class="flex min-h-0 flex-1 flex-col overscroll-contain bg-background touch-pan-y"
+                :class="scrollMode === 'controlled' ? 'overflow-hidden' : 'overflow-y-auto'"
                 @click.stop
                 @wheel.stop
                 @touchmove.stop

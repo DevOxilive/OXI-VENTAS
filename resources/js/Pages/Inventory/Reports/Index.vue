@@ -30,13 +30,6 @@ const reportGroups = [
         permissions: ['audits.physical-counts.reports'],
     },
     {
-        key: 'sales',
-        title: 'Reportes de ventas',
-        description: 'Ventas por periodo, productos, sucursales y comportamiento comercial.',
-        icon: 'point_of_sale',
-        disabled: true,
-    },
-    {
         key: 'cash-closures',
         title: 'Reportes de cortes',
         description: 'Cortes de caja registrados, efectivo contado, diferencias y usuario responsable.',
@@ -63,24 +56,6 @@ const reportGroups = [
         disabled: false,
         routeName: 'inventory.branches.reports.movements',
         permissions: ['inventory.view', 'inventory.branches.view'],
-    },
-    {
-        key: 'purchase-orders',
-        title: 'Reportes generales',
-        description: 'Consulta ordenes generales en compra y compras completadas.',
-        icon: 'receipt_long',
-        disabled: false,
-        routeName: 'inventory.branches.reports.purchase-orders',
-        permissions: ['inventory.purchase-orders.view', 'inventory.purchase-orders.create'],
-    },
-    {
-        key: 'branch-purchase-orders',
-        title: 'Reportes por sucursal',
-        description: 'Consulta borradores, ordenes generadas y compras completadas de esta sucursal.',
-        icon: 'shopping_bag',
-        disabled: false,
-        routeName: 'inventory.branches.reports.purchases',
-        permissions: ['inventory.purchase-reports.view'],
     },
 ]
 

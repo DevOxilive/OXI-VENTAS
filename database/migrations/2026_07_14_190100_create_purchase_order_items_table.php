@@ -28,6 +28,7 @@ return new class extends Migration
             $table->decimal('min_stock', 10, 2)->default(0);
             $table->decimal('requested_quantity', 10, 2)->default(0);
             $table->decimal('purchased_quantity', 10, 2)->nullable();
+            $table->decimal('received_quantity', 10, 2)->nullable();
             $table->decimal('estimated_price', 10, 2)->nullable();
             $table->decimal('estimated_total', 12, 2)->nullable();
             $table->decimal('actual_price', 10, 2)->nullable();
@@ -39,6 +40,7 @@ return new class extends Migration
                 'ADJUSTED',
                 'UNAVAILABLE',
             ])->default('REQUESTED');
+            $table->text('receipt_notes')->nullable();
             $table->timestamps();
 
             $table->unique(

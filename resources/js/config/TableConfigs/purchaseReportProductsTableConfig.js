@@ -1,4 +1,4 @@
-export function getPurchaseReportProductsTableConfig() {
+export function getPurchaseReportProductsTableConfig({ canManage = false } = {}) {
     return {
         columns: [
             {
@@ -40,7 +40,7 @@ export function getPurchaseReportProductsTableConfig() {
                 label: "Agregar",
                 icon: "add_shopping_cart",
                 variant: "green",
-                hidden: (row) => Boolean(row.in_purchase_list),
+                hidden: (row) => !canManage || Boolean(row.in_purchase_list),
                 mobile: "button",
             },
             {
@@ -48,7 +48,7 @@ export function getPurchaseReportProductsTableConfig() {
                 label: "Quitar",
                 icon: "remove_shopping_cart",
                 variant: "red",
-                hidden: (row) => !row.in_purchase_list,
+                hidden: (row) => !canManage || !row.in_purchase_list,
                 mobile: "button",
             },
         ],
