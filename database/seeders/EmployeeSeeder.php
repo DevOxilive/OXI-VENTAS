@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Employee;
+use App\Models\Position;
 
 class EmployeeSeeder extends Seeder
 {
@@ -283,6 +284,14 @@ class EmployeeSeeder extends Seeder
         ];
 
         foreach ($employees as $employee) {
+            $position = Position::query()
+                ->where('name', $employee['position'])
+                ->whereHas('department', fn ($query) => $query->where('name', $employee['department']))
+                ->firstOrFail();
+
+            unset($employee['position'], $employee['department']);
+            $employee['position_id'] = $position->id;
+
             Employee::updateOrCreate(
                 ['email' => $employee['email']],
                 $employee

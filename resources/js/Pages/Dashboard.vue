@@ -1,13 +1,24 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
-import VueApexCharts from 'vue3-apexcharts'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import { getDashboardToolbarConfig } from '@/config/ToolbarConfigs/dashboardToolbarConfig'
 
 defineOptions({ layout: AdminLayout })
+
+const VueApexCharts = defineAsyncComponent(async () => {
+    await Promise.all([
+        import('apexcharts/area'),
+        import('apexcharts/bar'),
+        import('apexcharts/heatmap'),
+        import('apexcharts/radar'),
+        import('apexcharts/features/legend'),
+    ])
+
+    return (await import('vue3-apexcharts/core')).default
+})
 
 const props = defineProps({
     filters: {

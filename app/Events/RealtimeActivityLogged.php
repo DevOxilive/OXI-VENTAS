@@ -27,6 +27,8 @@ class RealtimeActivityLogged implements ShouldBroadcastNow
         string $module,
         string $action,
         ?string $entity = null,
+        array $additionalRecipientIds = [],
+        bool $includeDefaultRecipients = true,
     ) {
         $actor = Auth::user();
 
@@ -36,7 +38,15 @@ class RealtimeActivityLogged implements ShouldBroadcastNow
         $this->module = $module;
         $this->action = $action;
         $this->entity = $entity;
-        $this->recipientIds = $this->resolveRecipientIds($actor?->id);
+        $this->recipientIds = collect($includeDefaultRecipients
+            ? $this->resolveRecipientIds($actor?->id)
+            : [])
+            ->merge($additionalRecipientIds)
+            ->filter()
+            ->map(fn ($userId) => (int) $userId)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public static function message(

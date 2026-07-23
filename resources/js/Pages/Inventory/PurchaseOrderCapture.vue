@@ -21,35 +21,79 @@ const props = defineProps({
 })
 
 const presentationOptions = [
-    { label: 'Paquete', value: 'Paquete' },
+    { label: 'Pieza', value: 'Pieza' },
     { label: 'Caja', value: 'Caja' },
-    { label: 'Bolsa', value: 'Bolsa' },
     { label: 'Kilo', value: 'Kilo' },
     { label: 'Costal', value: 'Costal' },
-    { label: 'Pieza', value: 'Pieza' },
+    { label: 'Bolsa', value: 'Bolsa' },
+    { label: 'Paquete', value: 'Paquete' },
 ]
 const form = reactive({
     purchased_at: props.orderDB.purchased_at || new Date().toISOString().slice(0, 10),
-    notes: props.orderDB.notes || '',
     items: (props.orderDB.items || []).map((item) => ({
         ...item,
-        package_quantity: number(item.package_quantity),
-        units_per_package: number(item.units_per_package) || 1,
-        package_price: number(item.package_price),
-        actual_total: number(item.actual_total),
+        purchase_presentation: item.purchase_presentation || 'Pieza',
+        package_quantity: number(item.package_quantity ?? item.requested_quantity),
+        units_per_package: item.purchase_presentation === 'Caja'
+            ? number(item.units_per_package) || 1
+            : 1,
+        purchase_price: number(item.purchase_price ?? item.previous_cost),
+        promotion_status: item.purchase_notes ? 'YES' : 'NO',
+        purchase_notes: item.purchase_notes || '',
         unavailable: Boolean(item.unavailable),
-        promotion_notes: item.promotion_notes || '',
+        image_failed: false,
     })),
 })
-const actualTotal = computed(() => form.items.reduce(
-    (total, item) => total + (item.unavailable ? 0 : number(item.actual_total)),
+const totalPurchased = computed(() => form.items.reduce(
+    (total, item) => total + purchasedQuantity(item),
     0,
 ))
-const grossTotal = computed(() => form.items.reduce((total, item) => total + lineGross(item), 0))
-const discountTotal = computed(() => Math.max(0, grossTotal.value - actualTotal.value))
+const branchSummary = computed(() => {
+    const branches = new Map()
+
+    for (const branch of props.orderDB.branches || []) {
+        const branchId = Number(branch.id)
+        const current = branches.get(branchId) || {
+            id: branchId,
+            name: branch.name || 'Sucursal',
+            folios: [],
+            productIds: new Set(),
+        }
+
+        if (branch.folio && !current.folios.includes(branch.folio)) {
+            current.folios.push(branch.folio)
+        }
+
+        branches.set(branchId, current)
+    }
+
+    for (const item of form.items) {
+        for (const branch of item.branch_breakdown || []) {
+            const branchId = Number(branch.branch_id)
+            const current = branches.get(branchId) || {
+                id: branchId,
+                name: branch.branch_name || 'Sucursal',
+                folios: [],
+                productIds: new Set(),
+            }
+
+            current.productIds.add(Number(item.product_id || item.id))
+
+            if (branch.order_folio && !current.folios.includes(branch.order_folio)) {
+                current.folios.push(branch.order_folio)
+            }
+
+            branches.set(branchId, current)
+        }
+    }
+
+    return [...branches.values()]
+        .map((branch) => ({ ...branch, products_count: branch.productIds.size }))
+        .sort((first, second) => first.name.localeCompare(second.name, 'es'))
+})
 const toolbarConfig = computed(() => ({
     title: `Capturando ${props.orderDB.folio}`,
-    subtitle: `${form.items.length} productos de ${props.orderDB.branches?.length || 0} sucursales.`,
+    subtitle: `${form.items.length} productos de ${branchSummary.value.length} sucursales.`,
     backButton: true,
     backLabel: 'Seguimiento',
     showSearch: false,
@@ -75,35 +119,64 @@ function currency(value) {
     }).format(number(value))
 }
 
-function lineGross(item) {
-    return item.unavailable ? 0 : number(item.package_quantity) * number(item.package_price)
+function requiresBoxContent(item) {
+    return item.purchase_presentation === 'Caja'
 }
 
-function receivedUnits(item) {
-    return item.unavailable ? 0 : number(item.package_quantity) * number(item.units_per_package)
+function presentationName(item) {
+    return item.purchase_presentation || 'Pieza'
 }
 
-function lineDiscount(item) {
-    return Math.max(0, lineGross(item) - number(item.actual_total))
+function quantityLabel(item) {
+    return {
+        Caja: 'Cajas compradas',
+        Kilo: 'Kilos comprados',
+        Costal: 'Costales comprados',
+        Bolsa: 'Bolsas compradas',
+        Paquete: 'Paquetes comprados',
+        Pieza: 'Piezas compradas',
+    }[presentationName(item)] || 'Cantidad comprada'
 }
 
-function netUnitCost(item) {
-    const units = receivedUnits(item)
-    return units > 0 ? number(item.actual_total) / units : 0
+function quantitySuffix(item) {
+    return {
+        Caja: 'cajas',
+        Kilo: 'kg',
+        Costal: 'costales',
+        Bolsa: 'bolsas',
+        Paquete: 'paquetes',
+        Pieza: 'pzas.',
+    }[presentationName(item)] || ''
+}
+
+function purchasedQuantity(item) {
+    if (item.unavailable) return 0
+
+    return number(item.package_quantity) * (requiresBoxContent(item) ? number(item.units_per_package) : 1)
+}
+
+function togglePromotion(item) {
+    const enabled = item.promotion_status !== 'YES'
+
+    item.promotion_status = enabled ? 'YES' : 'NO'
+
+    if (!enabled) {
+        item.purchase_notes = ''
+    }
 }
 
 function payload() {
     return {
         purchased_at: form.purchased_at,
-        notes: form.notes,
         items: form.items.map((item) => ({
             id: item.id,
-            purchase_presentation: item.purchase_presentation,
+            purchase_presentation: presentationName(item),
             package_quantity: item.unavailable ? 0 : item.package_quantity,
-            units_per_package: item.unavailable ? 0 : item.units_per_package,
-            package_price: item.unavailable ? 0 : item.package_price,
-            actual_total: item.unavailable ? 0 : item.actual_total,
-            promotion_notes: item.unavailable ? null : item.promotion_notes,
+            units_per_package: item.unavailable
+                ? 0
+                : (requiresBoxContent(item) ? item.units_per_package : 1),
+            purchase_price: item.unavailable ? 0 : item.purchase_price,
+            purchase_notes: item.promotion_status === 'YES' ? item.purchase_notes : null,
             unavailable: item.unavailable,
         })),
     }
@@ -117,8 +190,9 @@ function routeParams() {
 }
 
 function backToTracking() {
-    router.get(route('inventory.branches.reports.purchase-orders.tracking', {
+    router.get(route('inventory.branches.reports.purchase-orders', {
         branch: props.currentBranch.id,
+        status: 'PURCHASING',
     }))
 }
 
@@ -131,7 +205,7 @@ function saveOrder() {
             entityName: 'Orden general',
             successTitle: 'Orden general actualizada correctamente',
             errorTitle: 'No se pudo actualizar la orden general',
-            errorMessage: 'Revisa presentaciones, cantidades, costos y totales pagados.',
+            errorMessage: 'Revisa las cantidades y los precios de compra capturados.',
         }),
     )
 }
@@ -141,7 +215,7 @@ async function completeOrder() {
         mode: 'update',
         entityName: 'orden general',
         title: 'Completar compra general',
-        message: 'La compra quedara cerrada y pasara al historial. Esta accion no modifica el stock.',
+        message: 'Se actualizará el último costo de cada producto encontrado y las Órdenes de compra pasarán a revisión.',
         confirmText: 'Completar compra',
     })
 
@@ -155,8 +229,7 @@ async function completeOrder() {
             entityName: 'Compra general',
             successTitle: 'Compra general completada correctamente',
             errorTitle: 'No se pudo completar la compra general',
-            errorMessage: 'Revisa que todos los productos tengan cantidades y costos validos.',
-            onSuccess: backToTracking,
+            errorMessage: 'Revisa que cada producto tenga cantidad y precio de compra.',
         }),
     )
 }
@@ -170,116 +243,174 @@ async function completeOrder() {
             <GlobalToolbar v-bind="toolbarConfig" @back="backToTracking" />
         </template>
 
-        <div class="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <FormPanel title="Productos comprados" panel-class="min-w-0 shadow-none">
-                <div class="space-y-3">
+        <div class="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
+            <FormPanel
+                title="Productos de la orden general"
+                description="Registra únicamente lo que se encontró, la cantidad comprada y el nuevo precio."
+                panel-class="min-w-0 shadow-none"
+            >
+                <div class="space-y-4">
                     <article
                         v-for="item in form.items"
                         :key="item.id"
-                        class="rounded-2xl border border-secondary bg-background p-4"
+                        class="grid min-w-0 gap-5 rounded-2xl border border-secondary bg-background p-4 xl:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.35fr)]"
                     >
-                        <div class="flex flex-col gap-2 border-b border-secondary pb-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div class="min-w-0">
-                                <p class="truncate text-sm font-bold text-text">{{ item.product_name }}</p>
-                                <p class="mt-0.5 truncate text-xs text-text opacity-55">
-                                    {{ item.product_code || 'Sin codigo' }} · {{ item.base_unit || 'pieza' }}
-                                </p>
-                            </div>
-                            <strong class="shrink-0 text-sm text-text">{{ quantity(item.requested_quantity) }} solicitadas</strong>
-                        </div>
+                        <section class="min-w-0 xl:border-r xl:border-secondary xl:pr-5">
+                            <div class="flex min-w-0 gap-4">
+                                <div class="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-secondary bg-secondary">
+                                    <img
+                                        v-if="item.image_url && !item.image_failed"
+                                        :src="item.image_url"
+                                        :alt="item.product_name"
+                                        class="h-full w-full object-cover"
+                                        @error="item.image_failed = true"
+                                    />
+                                    <span v-else class="material-symbols-outlined text-4xl text-text opacity-35">inventory_2</span>
+                                </div>
 
-                        <div class="mt-3 grid gap-3 md:grid-cols-2 2xl:grid-cols-[140px_repeat(4,minmax(120px,1fr))]">
-                            <SelectField
-                                v-model="item.purchase_presentation"
-                                :field="`general_order_${item.id}_presentation`"
-                                label="Presentacion"
-                                :options="presentationOptions"
-                                :disabled="item.unavailable"
-                            />
-                            <InputField
-                                v-model="item.package_quantity"
-                                :field="`general_order_${item.id}_packages`"
-                                validation-field="purchase_order_quantity"
-                                label="Cantidad"
-                                type="text"
-                                inputmode="decimal"
-                                :show-counter="false"
-                                :disabled="item.unavailable"
-                            />
-                            <InputField
-                                v-model="item.units_per_package"
-                                :field="`general_order_${item.id}_units`"
-                                validation-field="purchase_order_quantity"
-                                label="Contenido"
-                                type="text"
-                                inputmode="decimal"
-                                :suffix="item.base_unit || 'pzas.'"
-                                :show-counter="false"
-                                :disabled="item.unavailable"
-                            />
-                            <InputField
-                                v-model="item.package_price"
-                                :field="`general_order_${item.id}_package_price`"
-                                validation-field="purchase_order_cost"
-                                label="Precio"
-                                type="text"
-                                inputmode="decimal"
-                                prefix="$"
-                                :show-counter="false"
-                                :disabled="item.unavailable"
-                            />
-                            <InputField
-                                v-model="item.actual_total"
-                                :field="`general_order_${item.id}_actual_total`"
-                                validation-field="purchase_order_cost"
-                                label="Pagado"
-                                type="text"
-                                inputmode="decimal"
-                                prefix="$"
-                                :show-counter="false"
-                                :disabled="item.unavailable"
-                            />
-                        </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-base font-black leading-tight text-text">{{ item.product_name }}</p>
+                                    <p class="mt-1 break-all text-xs text-text opacity-55">
+                                        {{ item.product_code || 'Sin código' }}
+                                    </p>
+                                    <p class="mt-2 line-clamp-3 text-sm leading-relaxed text-text opacity-65">
+                                        {{ item.product_description || 'Sin descripción registrada.' }}
+                                    </p>
 
-                        <div class="mt-3 grid items-end gap-3 xl:grid-cols-[minmax(0,1fr)_170px_300px]">
-                            <InputField
-                                v-model="item.promotion_notes"
-                                :field="`general_order_${item.id}_promotion`"
-                                validation-field="purchase_promotion"
-                                label="Promocion"
-                                placeholder="Ej. 3x2"
-                                :show-counter="false"
-                                :disabled="item.unavailable"
-                            />
-                            <SelectionCheckboxCard
-                                compact
-                                variant="soft"
-                                :checked="item.unavailable"
-                                title="No encontrado"
-                                @toggle="item.unavailable = !item.unavailable"
-                            />
-                            <div class="flex min-h-[46px] flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary px-3 py-2 text-xs text-text">
-                                <span><strong>{{ quantity(receivedUnits(item)) }}</strong> recibidas</span>
-                                <span><strong>{{ currency(lineDiscount(item)) }}</strong> desc.</span>
-                                <span><strong>{{ currency(netUnitCost(item)) }}</strong> c/u</span>
+                                    <div class="mt-3 space-y-1 text-sm text-text">
+                                        <p>
+                                            <span class="opacity-60">Precio anterior registrado:</span>
+                                            <strong class="ml-1">{{ currency(item.previous_cost) }}</strong>
+                                        </p>
+                                        <p>
+                                            <span class="opacity-60">Cantidad solicitada:</span>
+                                            <strong class="ml-1">{{ quantity(item.requested_quantity) }} {{ item.base_unit || 'pzas.' }}</strong>
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+
+                            <div class="mt-4 border-t border-secondary pt-3">
+                                <p class="mb-2 text-xs font-bold uppercase tracking-wide text-text opacity-50">Sucursales solicitantes</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span
+                                        v-for="branch in item.branch_breakdown"
+                                        :key="`${item.id}_${branch.order_id || branch.branch_id}`"
+                                        class="rounded-full border border-secondary bg-secondary px-3 py-1.5 text-xs font-semibold text-text"
+                                    >
+                                        {{ branch.branch_name }} · {{ quantity(branch.requested_quantity) }}
+                                    </span>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="min-w-0">
+                            <div
+                                class="grid gap-3"
+                                :class="requiresBoxContent(item) ? 'md:grid-cols-2 2xl:grid-cols-4' : 'md:grid-cols-3'"
+                            >
+                                <SelectField
+                                    v-model="item.purchase_presentation"
+                                    :field="`general_order_${item.id}_presentation`"
+                                    label="Presentación"
+                                    :options="presentationOptions"
+                                    :disabled="item.unavailable"
+                                />
+                                <InputField
+                                    v-model="item.package_quantity"
+                                    :field="`general_order_${item.id}_quantity`"
+                                    validation-field="purchase_order_quantity"
+                                    :label="quantityLabel(item)"
+                                    type="text"
+                                    inputmode="decimal"
+                                    :suffix="quantitySuffix(item)"
+                                    :show-counter="false"
+                                    :disabled="item.unavailable"
+                                />
+                                <InputField
+                                    v-if="requiresBoxContent(item)"
+                                    v-model="item.units_per_package"
+                                    :field="`general_order_${item.id}_box_content`"
+                                    validation-field="purchase_order_quantity"
+                                    label="Contenido por caja"
+                                    type="text"
+                                    inputmode="decimal"
+                                    :suffix="item.base_unit || 'pzas.'"
+                                    :show-counter="false"
+                                    :disabled="item.unavailable"
+                                />
+                                <InputField
+                                    v-model="item.purchase_price"
+                                    :field="`general_order_${item.id}_purchase_price`"
+                                    validation-field="purchase_order_cost"
+                                    label="Precio de compra"
+                                    type="text"
+                                    inputmode="decimal"
+                                    prefix="$"
+                                    :show-counter="false"
+                                    :disabled="item.unavailable"
+                                />
+                            </div>
+
+                            <div class="mt-4 grid gap-3 md:grid-cols-2">
+                                <SelectionCheckboxCard
+                                    compact
+                                    variant="soft"
+                                    :checked="item.unavailable"
+                                    title="No encontrado"
+                                    @toggle="item.unavailable = !item.unavailable"
+                                />
+                                <SelectionCheckboxCard
+                                    compact
+                                    variant="soft"
+                                    :checked="item.promotion_status === 'YES'"
+                                    :disabled="item.unavailable"
+                                    title="Descuento o promoción"
+                                    @toggle="togglePromotion(item)"
+                                />
+                            </div>
+
+                            <TextareaField
+                                v-if="item.promotion_status === 'YES' && !item.unavailable"
+                                v-model="item.purchase_notes"
+                                class="mt-3"
+                                :field="`general_order_${item.id}_purchase_notes`"
+                                label="Nota del producto"
+                                placeholder="Ej. promoción 3x2, cinco piezas de regalo o descuento indicado en el ticket"
+                                :rows="3"
+                            />
+
+                            <div class="mt-4 rounded-2xl bg-secondary p-3 text-sm text-text">
+                                <span class="block text-xs opacity-55">Cantidad total comprada</span>
+                                <strong class="text-base">
+                                    {{ quantity(purchasedQuantity(item)) }} {{ item.base_unit || 'pzas.' }}
+                                </strong>
+                            </div>
+                        </section>
                     </article>
                 </div>
             </FormPanel>
 
-            <aside class="space-y-4">
-                <FormPanel title="Resumen" panel-class="shadow-none">
-                    <InputField v-model="form.purchased_at" field="general_purchase_date" label="Fecha" type="date" />
-                    <div class="mt-4 space-y-2 border-t border-secondary pt-4 text-sm text-text">
-                        <div class="flex justify-between gap-3"><span class="opacity-65">Importe</span><strong>{{ currency(grossTotal) }}</strong></div>
-                        <div class="flex justify-between gap-3"><span class="opacity-65">Descuento</span><strong>{{ currency(discountTotal) }}</strong></div>
-                        <div class="flex justify-between gap-3 text-base"><span>Pagado</span><strong>{{ currency(actualTotal) }}</strong></div>
+            <aside class="min-w-0 space-y-4 2xl:sticky 2xl:top-5 2xl:self-start">
+                <FormPanel title="Sucursales participantes" panel-class="shadow-none">
+                    <div class="space-y-2">
+                        <div
+                            v-for="branch in branchSummary"
+                            :key="branch.id"
+                            class="rounded-xl border border-secondary bg-secondary p-3 text-sm text-text"
+                        >
+                            <p class="font-bold">{{ branch.name }}</p>
+                            <p class="mt-0.5 text-xs opacity-55">{{ branch.folios.join(', ') || 'Orden de compra incluida' }}</p>
+                            <p class="mt-2 font-semibold">
+                                {{ branch.products_count }} {{ branch.products_count === 1 ? 'producto' : 'productos' }}
+                            </p>
+                        </div>
                     </div>
-                </FormPanel>
 
-                <FormPanel title="Notas" panel-class="shadow-none">
-                    <TextareaField v-model="form.notes" field="general_purchase_notes" placeholder="Observaciones" :rows="3" />
+                    <div class="mt-4 border-t border-secondary pt-4 text-sm text-text">
+                        <span class="block text-xs opacity-60">Cantidad total comprada</span>
+                        <strong class="mt-1 block text-xl">{{ quantity(totalPurchased) }}</strong>
+                    </div>
                 </FormPanel>
 
                 <div class="grid gap-2">

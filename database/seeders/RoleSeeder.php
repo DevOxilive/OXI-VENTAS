@@ -139,7 +139,11 @@ class RoleSeeder extends Seeder
         }
 
         foreach ($permissions as $permission) {
-            if (str_starts_with($permission->name, 'employees.')) {
+            if (
+                str_starts_with($permission->name, 'employees.')
+                || str_starts_with($permission->name, 'departments.')
+                || str_starts_with($permission->name, 'positions.')
+            ) {
                 DB::table('role_permission')->updateOrInsert([
                     'role_id' => $humanResourcesRole->id,
                     'permission_id' => $permission->id,
@@ -148,7 +152,10 @@ class RoleSeeder extends Seeder
         }
 
         foreach ($permissions as $permission) {
-            if (str_starts_with($permission->name, 'sales.')) {
+            if (
+                str_starts_with($permission->name, 'sales.')
+                || str_starts_with($permission->name, 'inventory.purchase-reports.')
+            ) {
                 DB::table('role_permission')->updateOrInsert([
                     'role_id' => $salesRole->id,
                     'permission_id' => $permission->id,
@@ -158,7 +165,11 @@ class RoleSeeder extends Seeder
 
         foreach ($permissions as $permission) {
             if (
-                str_starts_with($permission->name, 'inventory.')
+                (str_starts_with($permission->name, 'inventory.')
+                && $permission->name !== 'inventory.purchase-orders.costs'
+                && ! str_starts_with($permission->name, 'inventory.purchase-orders.generate.')
+                && $permission->name !== 'inventory.purchase-orders.purchasing.view'
+                && $permission->name !== 'inventory.purchase-orders.completed.view')
                 || str_starts_with($permission->name, 'audits.physical-counts.')
                 || $permission->name === 'files.export'
             ) {

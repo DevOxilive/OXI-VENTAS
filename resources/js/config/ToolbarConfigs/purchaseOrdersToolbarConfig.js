@@ -1,6 +1,6 @@
-export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, cycle = {}, mode = 'view', canConsolidate = false, canGenerate = false } = {}) {
+export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, mode = 'view', tabs = null } = {}) {
     const headings = {
-        view: ['Reportes generales', 'Consulta ordenes generales en compra y compras generales completadas.'],
+        view: ['Órdenes de compra generales', 'Selecciona Órdenes de compra de sucursal, prepara la Orden de compra general y consulta su seguimiento.'],
         tracking: ['Seguimiento de compras', 'Registra lo comprado al regresar de Central.'],
         history: ['Compras completadas', 'Consulta las compras generales que ya fueron cerradas.'],
     }
@@ -12,27 +12,20 @@ export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, cycle 
         backButton: true,
         backLabel: 'Centro de reportes',
         search: filters.search ?? '',
-        searchPlaceholder: 'Buscar por OCG, producto, codigo o sucursal',
-        showSearch: true,
+        searchPlaceholder: 'Buscar por Orden de compra general, producto, código o sucursal',
+        showSearch: mode !== 'view' || filters.status !== 'GENERATE',
         compactFilters: true,
         filters: [],
-        actions: mode === 'view' && canConsolidate && filters.status !== 'COMPLETED' ? [
-            {
-                id: 'consolidate',
-                label: canGenerate ? 'Generar orden general' : 'Selecciona sucursales',
-                icon: canGenerate ? 'merge_type' : 'hourglass_top',
-                variant: 'primary',
-                disabled: !canGenerate,
-            },
-        ] : [],
-        tabs: mode === 'view' ? [
+        actions: [],
+        tabs: mode === 'view' ? (tabs ?? [
+            { key: 'GENERATE', label: 'Generar', icon: 'playlist_add' },
             { key: 'PURCHASING', label: 'En compra', icon: 'local_shipping' },
             { key: 'COMPLETED', label: 'Completadas', icon: 'task_alt' },
-        ] : [],
-        activeTab: filters.status ?? 'PURCHASING',
+        ]) : [],
+        activeTab: filters.status ?? 'GENERATE',
         recordsPerPage: Number(filters.per_page ?? 25),
         recordsPerPageOptions: [15, 25, 50],
-        showRecordsPerPage: true,
+        showRecordsPerPage: mode !== 'view' || filters.status !== 'GENERATE',
         totalRecords: total,
         filteredRecords: total,
         showCounter: true,

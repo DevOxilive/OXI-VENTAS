@@ -45,18 +45,18 @@ class EmployeeExport implements
 
     public function collection()
     {
-        $query = Employee::query();
+        $query = Employee::query()->with('position.department');
 
         if ($this->employmentStatus) {
             $query->where('employment_status', $this->employmentStatus);
         }
 
         if ($this->department) {
-            $query->where('department', $this->department);
+            $query->whereHas('position', fn ($positionQuery) => $positionQuery->where('department_id', $this->department));
         }
 
         if ($this->position) {
-            $query->where('position', 'like', '%' . $this->position . '%');
+            $query->where('position_id', $this->position);
         }
 
         if ($this->startDateFrom) {
@@ -71,8 +71,8 @@ class EmployeeExport implements
             $query->where(function ($q) {
                 $q->where('first_name', 'like', '%' . $this->search . '%')
                     ->orWhere('last_name', 'like', '%' . $this->search . '%')
-                    ->orWhere('position', 'like', '%' . $this->search . '%')
-                    ->orWhere('department', 'like', '%' . $this->search . '%');
+                    ->orWhereHas('position', fn ($positionQuery) => $positionQuery->where('name', 'like', '%' . $this->search . '%'))
+                    ->orWhereHas('position.department', fn ($departmentQuery) => $departmentQuery->where('name', 'like', '%' . $this->search . '%'));
             });
         }
 
@@ -120,8 +120,8 @@ class EmployeeExport implements
             $address,
             $employee->start_date,
             $employee->employment_status,
-            $employee->position,
-            $employee->department,
+            $employee->position?->name,
+            $employee->position?->department?->name,
             $employee->bank,
             $employee->account_number,
             $employee->education_level,

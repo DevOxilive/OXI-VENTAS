@@ -232,7 +232,13 @@ function renderCellContentFromValue(value, column) {
                   </div>
 
                   <div v-if="cell.column.subKey" class="truncate text-xs text-text opacity-50">
-                    {{ cell.subValue }}
+                    <span
+                      v-if="cell.column.subKeyBadge && cell.subValue"
+                      class="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-primary opacity-100"
+                    >
+                      {{ cell.subValue }}
+                    </span>
+                    <template v-else>{{ cell.subValue }}</template>
                   </div>
                 </div>
 

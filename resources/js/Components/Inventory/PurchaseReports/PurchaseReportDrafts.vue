@@ -1,6 +1,7 @@
 <script setup>
-import SectionHeading from '@/Components/Cards/SectionHeading.vue'
+import GlobalCard from '@/Components/Cards/GlobalCard.vue'
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
+import { usePermissions } from '@/Composables/usePermissions'
 
 const props = defineProps({
     reports: {
@@ -11,17 +12,10 @@ const props = defineProps({
         type: Object,
         default: () => ({}),
     },
-    activeDraftId: {
-        type: [Number, String],
-        default: null,
-    },
-    canDelete: {
-        type: Boolean,
-        default: false,
-    },
 })
 
-const emit = defineEmits(['open', 'delete', 'paginate'])
+const emit = defineEmits(['edit', 'delete', 'paginate'])
+const { can } = usePermissions()
 
 function formatDate(date) {
     if (!date) return 'Sin fecha'
@@ -33,90 +27,97 @@ function formatDate(date) {
     }).format(new Date(date))
 }
 
-function itemCount(report) {
-    return Number(report.items_count ?? report.items?.length ?? 0)
+function reportTitle(report) {
+    return report.folio || `Lista #${report.id}`
 }
 
-function openReport(report) {
-    emit('open', report)
+function reportDetails(report) {
+    const itemsCount = Number(report.items_count ?? report.items?.length ?? 0)
+
+    return `${formatDate(report.display_date || report.created_at)} · ${itemsCount} ${itemsCount === 1 ? 'producto' : 'productos'}`
 }
 </script>
 
 <template>
-    <aside class="min-w-0 rounded-[28px] border border-secondary bg-background p-4 shadow-sm">
-        <SectionHeading
-            title="Borradores"
-            description="Continua una lista guardada."
-            spacing="sm"
-        />
-
+    <GlobalCard
+        title="Borradores"
+        description="Continúa una lista guardada."
+        icon="edit_note"
+        :clickable="false"
+        class="h-full"
+    >
         <div
-            v-if="!reports.length"
-            class="mt-4 rounded-2xl border border-dashed border-secondary bg-secondary px-4 py-5 text-center text-xs text-text opacity-70"
-        >
-            Todavia no hay borradores guardados.
-        </div>
-
-        <div
-            v-else
-            class="mt-4 max-h-[calc(100vh-24rem)] space-y-2 overflow-y-auto pr-1"
+            v-if="reports.length"
+            class="mt-5 max-h-[calc(100vh-27rem)] space-y-2 overflow-y-auto pr-1"
         >
             <article
                 v-for="report in reports"
                 :key="report.id"
-                class="flex items-center gap-1 rounded-2xl border p-1 transition"
-                :class="String(activeDraftId ?? '') === String(report.id)
-                    ? 'border-primary bg-secondary ring-2 ring-primary/20'
-                    : 'border-secondary bg-secondary hover:border-primary'"
+                class="flex items-center justify-between gap-3 rounded-2xl border border-secondary bg-secondary px-3 py-3"
             >
-                <button
-                    type="button"
-                    class="min-w-0 flex-1 rounded-xl px-2 py-2 text-left"
-                    @click="openReport(report)"
-                >
-                    <p class="truncate text-xs font-bold text-text">
-                        {{ report.folio || `Lista #${report.id}` }}
+                <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-bold text-text">
+                        {{ reportTitle(report) }}
                     </p>
-                    <p class="mt-1 truncate text-[10px] text-text opacity-60">
-                        {{ formatDate(report.display_date || report.created_at) }} ·
-                        {{ itemCount(report) }} {{ itemCount(report) === 1 ? 'producto' : 'productos' }}
+                    <p class="mt-1 truncate text-xs text-text opacity-60">
+                        {{ reportDetails(report) }}
                     </p>
-                </button>
+                </div>
 
-                <ActionIconButton
-                    v-if="report.status === 'DRAFT' && canDelete"
-                    class="h-8 w-8 shrink-0"
-                    icon="delete"
-                    title="Eliminar borrador"
-                    variant="red"
-                    @click="emit('delete', report)"
-                />
+                <div class="flex shrink-0 items-center gap-2">
+                    <ActionIconButton
+                        v-if="can('inventory.purchase-reports.update')"
+                        class="h-9 w-9"
+                        icon="edit"
+                        title="Editar borrador"
+                        variant="amber"
+                        @click="emit('edit', report)"
+                    />
+
+                    <ActionIconButton
+                        v-if="can('inventory.purchase-reports.delete')"
+                        class="h-9 w-9"
+                        icon="delete"
+                        title="Eliminar borrador"
+                        variant="red"
+                        @click="emit('delete', report)"
+                    />
+                </div>
             </article>
         </div>
 
+        <p
+            v-else
+            class="mt-5 rounded-2xl border border-dashed border-secondary bg-secondary px-4 py-5 text-center text-sm text-text opacity-70"
+        >
+            Todavía no hay borradores guardados.
+        </p>
+
         <div
             v-if="Number(pagination.last_page || 1) > 1"
-            class="mt-3 flex items-center justify-between border-t border-secondary pt-3"
+            class="mt-4 flex items-center justify-between border-t border-secondary pt-4"
         >
-            <button
-                type="button"
-                class="rounded-lg border border-secondary bg-background px-2 py-1 text-xs font-semibold text-text disabled:cursor-not-allowed disabled:opacity-40"
+            <ActionIconButton
+                icon="chevron_left"
+                title="Página anterior"
+                variant="slate"
                 :disabled="!pagination.prev_page_url"
+                class="disabled:cursor-not-allowed disabled:opacity-40"
                 @click="emit('paginate', pagination.prev_page_url)"
-            >
-                Anterior
-            </button>
-            <span class="text-[10px] text-text opacity-60">
-                {{ pagination.current_page }} / {{ pagination.last_page }}
+            />
+
+            <span class="text-xs font-semibold text-text opacity-60">
+                Página {{ pagination.current_page }} de {{ pagination.last_page }}
             </span>
-            <button
-                type="button"
-                class="rounded-lg border border-secondary bg-background px-2 py-1 text-xs font-semibold text-text disabled:cursor-not-allowed disabled:opacity-40"
+
+            <ActionIconButton
+                icon="chevron_right"
+                title="Página siguiente"
+                variant="slate"
                 :disabled="!pagination.next_page_url"
+                class="disabled:cursor-not-allowed disabled:opacity-40"
                 @click="emit('paginate', pagination.next_page_url)"
-            >
-                Siguiente
-            </button>
+            />
         </div>
-    </aside>
+    </GlobalCard>
 </template>

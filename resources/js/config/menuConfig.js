@@ -4,6 +4,7 @@ export function generateMenu(role, permissions = [], branches = []) {
 
     const modulePermissions = {
         employees: ["employees.view", "employees.create", "employees.update", "employees.delete"],
+        organizationStructure: ["departments.view", "departments.create", "departments.update", "departments.delete", "positions.view", "positions.create", "positions.update", "positions.delete"],
         users: ["users.view", "users.create", "users.update", "users.delete"],
         branches: ["branches.view", "branches.create", "branches.update", "branches.delete"],
         products: [
@@ -81,7 +82,7 @@ export function generateMenu(role, permissions = [], branches = []) {
     | CAPITAL HUMANO
     |--------------------------------------------------------------------------
     */
-    if (canUse("employees") || canUse("attendance") || canUse("attendanceSchedules") || canUse("attendanceScheduleAssignments") || canUse("attendanceIncidents")) {
+    if (canUse("employees") || canUse("organizationStructure") || canUse("attendance") || canUse("attendanceSchedules") || canUse("attendanceScheduleAssignments") || canUse("attendanceIncidents")) {
         menu.push({
             text: "Capital Humano",
             key: "human-resources",
@@ -105,6 +106,7 @@ export function generateMenu(role, permissions = [], branches = []) {
                 ...(canUse("attendanceSchedules") ? [{ text: "Horarios", key: "human-resources.attendance-schedules", icon: "schedule", url: route("human-resources.attendance-schedules.index") }] : []),
                 ...(canUse("attendanceScheduleAssignments") ? [{ text: "Asignación de horarios", key: "human-resources.attendance-schedule-assignments", icon: "assignment_ind", url: route("human-resources.attendance-schedule-assignments.index") }] : []),
                 ...(canUse("attendanceIncidents") ? [{ text: "Incidencias", key: "human-resources.attendance-incidents", icon: "event_note", url: route("human-resources.attendance-incidents.index") }] : []),
+                ...(canUse("organizationStructure") ? [{ text: "Departamentos y puestos", key: "human-resources.departments", icon: "account_tree", url: route("human-resources.departments.index") }] : []),
             ],
         });
     }

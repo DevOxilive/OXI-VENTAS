@@ -1,0 +1,55 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+
+return new class extends Migration
+{
+    private const PERMISSIONS = [
+        'departments.view',
+        'departments.create',
+        'departments.update',
+        'departments.delete',
+        'positions.view',
+        'positions.create',
+        'positions.update',
+        'positions.delete',
+    ];
+
+    public function up(): void
+    {
+        foreach (self::PERMISSIONS as $name) {
+            DB::table('permissions')->updateOrInsert(
+                ['name' => $name],
+                ['created_at' => now(), 'updated_at' => now()]
+            );
+        }
+
+        $roleIds = DB::table('roles')
+            ->whereIn('name', ['Super Administrador', 'Administrador', 'Recursos Humanos'])
+            ->pluck('id');
+        $permissionIds = DB::table('permissions')
+            ->whereIn('name', self::PERMISSIONS)
+            ->pluck('id');
+
+        foreach ($roleIds as $roleId) {
+            foreach ($permissionIds as $permissionId) {
+                DB::table('role_permission')->updateOrInsert([
+                    'role_id' => $roleId,
+                    'permission_id' => $permissionId,
+                ]);
+            }
+        }
+    }
+
+    public function down(): void
+    {
+        $permissionIds = DB::table('permissions')
+            ->whereIn('name', self::PERMISSIONS)
+            ->pluck('id');
+
+        DB::table('role_permission')->whereIn('permission_id', $permissionIds)->delete();
+        DB::table('permission_user')->whereIn('permission_id', $permissionIds)->delete();
+        DB::table('permissions')->whereIn('id', $permissionIds)->delete();
+    }
+};

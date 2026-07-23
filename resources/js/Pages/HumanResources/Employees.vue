@@ -18,6 +18,7 @@ import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtim
 defineOptions({ layout: AdminLayout })
 
 let unsubscribeEmployeeChanged = null
+let unsubscribeOrganizationStructureChanged = null
 
 const { can } = usePermissions()
 
@@ -31,6 +32,10 @@ const props = defineProps({
         default: () => ({}),
     },
     filterOptions: {
+        type: Object,
+        default: () => ({}),
+    },
+    organizationOptions: {
         type: Object,
         default: () => ({}),
     },
@@ -104,7 +109,7 @@ function reloadEmployees() {
 
 function refreshEmployeesRealtime() {
     router.reload({
-        only: ['employeesDB', 'filterOptions'],
+        only: ['employeesDB', 'filterOptions', 'organizationOptions'],
         preserveScroll: true,
         preserveState: true,
     })
@@ -152,10 +157,17 @@ onMounted(() => {
             refreshEmployeesRealtime()
         },
     )
+
+    unsubscribeOrganizationStructureChanged = subscribeRealtime(
+        REALTIME_CHANNELS.systems,
+        REALTIME_EVENTS.organizationStructureChanged,
+        refreshEmployeesRealtime,
+    )
 })
 
 onBeforeUnmount(() => {
     unsubscribeEmployeeChanged?.()
+    unsubscribeOrganizationStructureChanged?.()
 })
 </script>
 
@@ -190,6 +202,7 @@ onBeforeUnmount(() => {
                 (modalMode === 'edit' && can('employees.update')) ||
                 (modalMode === 'view' && can('employees.view'))
             )
-        " :mode="modalMode" :employeeToEdit="liveSelectedEmployee" @close="closeModal" />
+        " :mode="modalMode" :employeeToEdit="liveSelectedEmployee"
+            :organization-options="organizationOptions" @close="closeModal" />
     </PageLayout>
 </template>

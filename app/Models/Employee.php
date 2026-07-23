@@ -28,8 +28,7 @@ class Employee extends Model
         'start_date',
         'employment_status',
         'photo',
-        'position',
-        'department',
+        'position_id',
         'bank',
         'account_number',
         'education_level',
@@ -45,4 +44,8 @@ class Employee extends Model
         return $this->hasOne(User::class);
     }
 
+    public function position()
+    {
+        return $this->belongsTo(Position::class);
+    }
 }

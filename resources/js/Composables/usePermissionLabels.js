@@ -12,6 +12,8 @@ const permissionSectionOrder = [
 const permissionModuleOrder = [
     "dashboard",
     "employees",
+    "departments",
+    "positions",
     "attendance",
     "attendance.schedules",
     "attendance.schedule-assignments",
@@ -49,6 +51,8 @@ const permissionModules = {
         label: "Registro de empleados",
         section: "human-resources",
     },
+    departments: { label: "Registro de departamentos", section: "human-resources" },
+    positions: { label: "Registro de puestos", section: "human-resources" },
     attendance: {
         label: "Asistencias",
         section: "human-resources",
@@ -126,6 +130,14 @@ const permissionLabels = {
     "employees.create": "Registrar empleados nuevos",
     "employees.update": "Editar información de empleados",
     "employees.delete": "Eliminar empleados",
+    "departments.view": "Ver registro de departamentos",
+    "departments.create": "Crear departamentos",
+    "departments.update": "Editar departamentos",
+    "departments.delete": "Eliminar departamentos",
+    "positions.view": "Ver registro de puestos",
+    "positions.create": "Crear puestos",
+    "positions.update": "Editar puestos",
+    "positions.delete": "Eliminar puestos",
 
     "attendance.view": "Ver métricas, filtros y registros de asistencia",
     "attendance.register": "Registrar entrada, comida y salida",

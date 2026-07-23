@@ -25,7 +25,10 @@ const routeName = 'inventory.branches.reports.purchase-orders.history'
 const orders = usePurchaseOrders(props, routeName)
 const { handlePageChange } = useGlobalTablePagination()
 const selectedOrder = ref(null)
-const tableConfig = getPurchaseOrdersTableConfig({ mode: 'history' })
+const tableConfig = getPurchaseOrdersTableConfig({
+    mode: 'history',
+    viewPermission: 'inventory.purchase-orders.completed.view',
+})
 const toolbarConfig = computed(() => getPurchaseOrdersToolbarConfig({
     filters: orders.localFilters.value,
     total: Number(orders.pagination.value?.total ?? 0),
@@ -46,7 +49,7 @@ async function openOrder(order) {
 }
 
 function handleTableAction({ action, row }) {
-    if (action === 'open') openOrder(row)
+    if (action === 'view') openOrder(row)
 }
 </script>
 
@@ -69,7 +72,6 @@ function handleTableAction({ action, row }) {
             :loading="false"
             v-bind="tableConfig"
             @action="handleTableAction"
-            @row-click="openOrder"
             @page-change="handlePageChange"
         />
 

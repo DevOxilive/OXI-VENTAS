@@ -13,12 +13,17 @@ const emit = defineEmits(['close'])
 const props = defineProps({
     mode: String,
     employeeToEdit: Object,
+    organizationOptions: {
+        type: Object,
+        default: () => ({}),
+    },
 })
 
 const {
     employee,
     frontendErrors,
     departments,
+    positions,
     errorSummary,
     validateField,
     saveEmployee,
@@ -193,12 +198,16 @@ watch(
                 panel-class="p-4"
             >
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <InputField label="Puesto" field="position" v-model="employee.position" :readonly="isReadOnly"
-                        :error="frontendErrors.position || employee.errors.position" @validate="validateField('position')" />
-
-                    <SelectField label="Departamento" field="department" v-model="employee.department"
+                    <SelectField label="Departamento" field="departmentId" v-model="employee.departmentId"
                         :options="departments" :disabled="isReadOnly"
-                        :error="frontendErrors.department || employee.errors.department" @validate="validateField('department')" />
+                        :error="frontendErrors.departmentId || employee.errors.departmentId"
+                        @validate="validateField('departmentId')" />
+
+                    <SelectField label="Puesto" field="positionId" v-model="employee.positionId"
+                        :options="positions" :disabled="isReadOnly || !employee.departmentId"
+                        :placeholder="employee.departmentId ? 'Seleccione un puesto' : 'Selecciona primero un departamento'"
+                        :error="frontendErrors.positionId || employee.errors.positionId"
+                        @validate="validateField('positionId')" />
 
                     <SelectField label="Tipo de contrato" field="contractType" v-model="employee.contractType" :options="[
                         { value: 'Planta/Indefinido', label: 'Planta/Indefinido' },

@@ -1,0 +1,85 @@
+export function getGeneralPurchaseSourceOrdersTableConfig() {
+    return {
+        columns: [
+            {
+                key: 'folio',
+                label: 'Orden de compra',
+                width: '175px',
+                mobileSecondary: false,
+            },
+            {
+                key: 'assigned_to_name',
+                label: 'Encargado de tienda',
+                mobileLabel: 'Encargado de tienda',
+                mobileDisplay: true,
+            },
+            {
+                key: 'items_count',
+                label: 'Productos',
+                format: 'number',
+                mobileLabel: 'Productos',
+                mobileDisplay: true,
+            },
+            {
+                key: 'requested_quantity',
+                label: 'Piezas',
+                format: 'number',
+                mobileLabel: 'Piezas',
+                mobileDisplay: true,
+            },
+            {
+                key: 'generated_at',
+                label: 'Fecha',
+                format: 'date',
+                mobileLabel: 'Fecha',
+                mobileDisplay: true,
+            },
+        ],
+        actions: [
+            {
+                id: 'view',
+                label: 'Ver',
+                icon: 'visibility',
+                variant: 'blue',
+                permission: 'inventory.purchase-orders.generate.view',
+            },
+            {
+                id: 'transfer',
+                label: 'Transferir',
+                icon: 'swap_horiz',
+                variant: 'secondary',
+                permission: 'inventory.purchase-orders.generate.transfer',
+                hidden: (row) => row.selected || row.in_draft,
+            },
+            {
+                id: 'edit',
+                label: 'Editar',
+                icon: 'edit',
+                variant: 'yellow',
+                permission: 'inventory.purchase-orders.generate.update',
+                hidden: (row) => row.selected || row.in_draft,
+            },
+            {
+                id: 'add',
+                label: 'Agregar a Orden de compra general',
+                icon: 'add_circle',
+                variant: 'green',
+                permission: 'inventory.purchase-orders.generate.create',
+                hidden: (row) => row.selected,
+            },
+            {
+                id: 'remove',
+                label: 'Quitar de Orden de compra general',
+                icon: 'remove_circle',
+                variant: 'red',
+                permission: 'inventory.purchase-orders.generate.create',
+                hidden: (row) => !row.selected,
+            },
+        ],
+        mobileCardHeaderField: 'folio',
+        noDataMessage: 'Esta sucursal no tiene órdenes pendientes asignadas.',
+        rowKey: 'id',
+        striped: true,
+        hoverEffect: true,
+    }
+}

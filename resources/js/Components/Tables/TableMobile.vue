@@ -53,6 +53,7 @@ const tableRows = computed(() =>
         key: column.key,
         column,
         value,
+        subValue: column.subKey ? getNestedValue(row, column.subKey) : null,
         content: renderCellContentFromValue(value, column),
       })
     })
@@ -190,6 +191,12 @@ function getActionButtonClasses(action) {
             <p class="mt-0.5 truncate text-xs text-text opacity-70">
               {{ cell.value }}
             </p>
+            <span
+              v-if="cell.column.subKeyBadge && cell.subValue"
+              class="mt-1 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-primary"
+            >
+              {{ cell.subValue }}
+            </span>
           </template>
         </div>
 
@@ -240,6 +247,12 @@ function getActionButtonClasses(action) {
             <p v-else class="mt-0.5 truncate font-medium text-text">
               {{ cell.content.content }}
             </p>
+            <span
+              v-if="cell.column.subKeyBadge && cell.subValue"
+              class="mt-1 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-primary"
+            >
+              {{ cell.subValue }}
+            </span>
           </div>
         </template>
       </div>

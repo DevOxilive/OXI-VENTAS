@@ -47,7 +47,7 @@ class ExecutiveSalesHistorySeeder extends Seeder
 
             $salesEmployees = Employee::query()
                 ->where('employment_status', 'Activo')
-                ->where('department', 'Ventas')
+                ->whereHas('position.department', fn ($department) => $department->where('name', 'Ventas'))
                 ->orderBy('id')
                 ->get();
 
