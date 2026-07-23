@@ -65,7 +65,15 @@ export function generateMenu(role, permissions = [], branches = []) {
             "systems.cash-closure-tickets.update",
         ],
         labels: ["systems.labels.view", "systems.labels.update"],
-        attendance: ["attendance.view", "attendance.register"],
+        attendance: [
+            "attendance.view",
+            "attendance.register",
+            "attendance.export.excel",
+            "attendance.export.pdf",
+        ],
+        attendanceSchedules: ["attendance.schedules.view", "attendance.schedules.create", "attendance.schedules.update", "attendance.schedules.delete"],
+        attendanceScheduleAssignments: ["attendance.schedule-assignments.view", "attendance.schedule-assignments.create", "attendance.schedule-assignments.update", "attendance.schedule-assignments.delete"],
+        attendanceIncidents: ["attendance.incidents.view", "attendance.incidents.create", "attendance.incidents.update", "attendance.incidents.delete", "attendance.incidents.approve", "attendance.incidents.reject"],
         inventoryReports: ["inventory.view", "inventory.create", "inventory.update", "inventory.delete"],
         systemAdministration: ["system.center.access"],
     };
@@ -86,7 +94,7 @@ export function generateMenu(role, permissions = [], branches = []) {
     | CAPITAL HUMANO
     |--------------------------------------------------------------------------
     */
-    if (canUse("employees") || canUse("organizationStructure")) {
+    if (canUse("employees") || canUse("organizationStructure") || canUse("attendance") || canUse("attendanceSchedules") || canUse("attendanceScheduleAssignments") || canUse("attendanceIncidents")) {
         menu.push({
             text: "Capital Humano",
             key: "human-resources",
@@ -100,6 +108,23 @@ export function generateMenu(role, permissions = [], branches = []) {
                         icon: "group",
                         url: route("human-resources.employees.index"),
                     }]
+                    : []),
+                ...(canUse("attendance")
+                    ? [{
+                        text: "Asistencias",
+                        key: "human-resources.attendance",
+                        icon: "fact_check",
+                        url: route("human-resources.attendance.index"),
+                    }]
+                    : []),
+                ...(canUse("attendanceSchedules")
+                    ? [{ text: "Horarios", key: "human-resources.attendance-schedules", icon: "schedule", url: route("human-resources.attendance-schedules.index") }]
+                    : []),
+                ...(canUse("attendanceScheduleAssignments")
+                    ? [{ text: "Asignación de horarios", key: "human-resources.attendance-schedule-assignments", icon: "assignment_ind", url: route("human-resources.attendance-schedule-assignments.index") }]
+                    : []),
+                ...(canUse("attendanceIncidents")
+                    ? [{ text: "Incidencias", key: "human-resources.attendance-incidents", icon: "event_note", url: route("human-resources.attendance-incidents.index") }]
                     : []),
                 ...(canUse("organizationStructure")
                     ? [{
@@ -118,7 +143,7 @@ export function generateMenu(role, permissions = [], branches = []) {
     | SISTEMAS
     |--------------------------------------------------------------------------
     */
-    if (canUse("users") || canUse("branches") || canUse("attendance")) {
+    if (canUse("users") || canUse("branches")) {
         menu.push({
             text: "Sistemas",
             key: "systems",
@@ -145,14 +170,6 @@ export function generateMenu(role, permissions = [], branches = []) {
                               url: route("branches.index"),
                           },
                       ]
-                    : []),
-                ...(canUse("attendance")
-                    ? [{
-                        text: "Asistencias",
-                        key: "systems.attendance",
-                        icon: "fact_check",
-                        url: route("systems.attendance.index"),
-                    }]
                     : []),
             ],
         });

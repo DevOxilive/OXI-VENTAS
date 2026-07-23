@@ -12,8 +12,7 @@ class AttendanceRecord extends Model
     use HasFactory;
 
     public const TYPES = [
-        'check_in', 'check_out', 'meal_start', 'meal_end', 'break_start', 'break_end',
-        'remote_work', 'commission', 'training',
+        'check_in', 'meal_start', 'meal_end', 'check_out',
     ];
 
     public const STATUSES = [
@@ -24,7 +23,7 @@ class AttendanceRecord extends Model
         'user_id', 'employee_id', 'branch_id', 'attendance_date', 'recorded_at', 'type', 'status',
         'latitude', 'longitude', 'location_accuracy', 'approximate_address', 'within_geofence',
         'geofence_snapshot', 'authentication_method', 'authentication_result', 'operating_system',
-        'browser', 'device_type', 'user_agent', 'ip_address', 'metadata',
+        'browser', 'device_type', 'user_agent', 'ip_address', 'selfie_path', 'metadata',
     ];
 
     protected function casts(): array

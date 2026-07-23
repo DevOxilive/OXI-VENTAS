@@ -4,6 +4,7 @@ namespace App\Events;
 
 use App\Models\User;
 use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -35,7 +36,7 @@ class UserChanged implements ShouldBroadcastNow
     {
         return [
             new Channel('systems'),
-            new Channel('users.' . $this->userId),
+            new PrivateChannel('users.' . $this->userId),
         ];
     }
 

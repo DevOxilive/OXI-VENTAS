@@ -38,6 +38,9 @@ let unsubscribeBranchChanged = null
 const form = useForm({
   name: "",
   color: "#facc15",
+  attendance_latitude: "",
+  attendance_longitude: "",
+  attendance_geofence_radius_meters: "",
 })
 
 const toolbarConfig = computed(() =>
@@ -100,6 +103,9 @@ function resetForm() {
   form.reset()
   form.clearErrors()
   form.color = "#facc15"
+  form.attendance_latitude = ""
+  form.attendance_longitude = ""
+  form.attendance_geofence_radius_meters = ""
 }
 
 function openCreateModal() {
@@ -114,6 +120,9 @@ function viewBranch(branch) {
   modalMode.value = "view"
   form.name = branch.name
   form.color = branch.color || "#facc15"
+  form.attendance_latitude = branch.attendance_latitude || ""
+  form.attendance_longitude = branch.attendance_longitude || ""
+  form.attendance_geofence_radius_meters = branch.attendance_geofence_radius_meters || ""
   showCreateModal.value = true
 }
 
@@ -122,6 +131,9 @@ function editBranch(branch) {
   modalMode.value = "edit"
   form.name = branch.name
   form.color = branch.color || "#facc15"
+  form.attendance_latitude = branch.attendance_latitude || ""
+  form.attendance_longitude = branch.attendance_longitude || ""
+  form.attendance_geofence_radius_meters = branch.attendance_geofence_radius_meters || ""
   showCreateModal.value = true
 }
 
@@ -175,6 +187,9 @@ function reloadBranches(event = null) {
       selectedBranch.value = updatedBranch
       form.name = updatedBranch.name
       form.color = updatedBranch.color || "#facc15"
+      form.attendance_latitude = updatedBranch.attendance_latitude || ""
+      form.attendance_longitude = updatedBranch.attendance_longitude || ""
+      form.attendance_geofence_radius_meters = updatedBranch.attendance_geofence_radius_meters || ""
     },
   })
 }
@@ -208,6 +223,9 @@ function submit() {
     onSuccess: () => {
       form.reset("name")
       form.color = "#facc15"
+      form.attendance_latitude = ""
+      form.attendance_longitude = ""
+      form.attendance_geofence_radius_meters = ""
     },
   }))
 }
@@ -308,6 +326,37 @@ onBeforeUnmount(() => {
             field="color"
             :disabled="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
             :error="form.errors.color"
+          />
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <InputField
+              v-model="form.attendance_latitude"
+              label="Latitud para asistencias"
+              field="attendance-latitude"
+              type="number"
+              step="0.0000001"
+              :readonly="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
+              :error="form.errors.attendance_latitude"
+            />
+            <InputField
+              v-model="form.attendance_longitude"
+              label="Longitud para asistencias"
+              field="attendance-longitude"
+              type="number"
+              step="0.0000001"
+              :readonly="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
+              :error="form.errors.attendance_longitude"
+            />
+          </div>
+
+          <InputField
+            v-model="form.attendance_geofence_radius_meters"
+            label="Radio permitido para asistencias (metros)"
+            field="attendance-geofence-radius"
+            type="number"
+            min="10"
+            :readonly="modalMode === 'view' || (modalMode === 'edit' && !can('branches.update'))"
+            :error="form.errors.attendance_geofence_radius_meters"
           />
         </FormPanel>
       </form>

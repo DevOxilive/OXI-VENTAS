@@ -10,6 +10,9 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\AttendanceScheduleController;
+use App\Http\Controllers\AttendanceIncidentController;
+use App\Http\Controllers\AttendanceScheduleAssignmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SystemAdministrationController;
 use App\Http\Controllers\SystemAuditController;
@@ -288,6 +291,45 @@ Route::middleware([
         Route::delete('/positions/{position}', [PositionController::class, 'destroy'])
             ->middleware('permission:positions.delete')
             ->name('positions.destroy');
+
+        Route::get('/attendance', [AttendanceController::class, 'index'])
+            ->middleware('permission:attendance.view,attendance.register,attendance.export.excel,attendance.export.pdf')
+            ->name('attendance.index');
+        Route::post('/attendance', [AttendanceController::class, 'store'])
+            ->middleware('permission:attendance.register')
+            ->name('attendance.store');
+        Route::get('/attendance/{attendanceRecord}/evidence-photo', [AttendanceController::class, 'evidencePhoto'])
+            ->middleware('permission:attendance.manage')
+            ->name('attendance.evidence-photo');
+        Route::post('/attendance/{attendanceRecord}/corrections', [AttendanceController::class, 'requestCorrection'])
+            ->middleware('permission:attendance.corrections.request,attendance.corrections.review')
+            ->name('attendance.corrections.store');
+        Route::patch('/attendance/corrections/{attendanceCorrectionRequest}', [AttendanceController::class, 'reviewCorrection'])
+            ->middleware('permission:attendance.corrections.review')
+            ->name('attendance.corrections.review');
+        Route::get('/attendance/export/excel', [AttendanceController::class, 'exportExcel'])
+            ->middleware('permission:attendance.export.excel')
+            ->name('attendance.export-excel');
+        Route::get('/attendance/export/pdf', [AttendanceController::class, 'exportPdf'])
+            ->middleware('permission:attendance.export.pdf')
+            ->name('attendance.export-pdf');
+        Route::get('/attendance-table', [AttendanceController::class, 'table'])
+            ->middleware('permission:attendance.view,attendance.manage,attendance.export.excel,attendance.export.pdf')
+            ->name('attendance-table.index');
+
+        Route::get('/attendance-schedules', [AttendanceScheduleController::class, 'index'])->middleware('permission:attendance.schedules.view,attendance.schedules.create,attendance.schedules.update,attendance.schedules.delete')->name('attendance-schedules.index');
+        Route::post('/attendance-schedules', [AttendanceScheduleController::class, 'store'])->middleware('permission:attendance.schedules.create')->name('attendance-schedules.store');
+        Route::put('/attendance-schedules/{attendanceSchedule}', [AttendanceScheduleController::class, 'update'])->middleware('permission:attendance.schedules.update')->name('attendance-schedules.update');
+        Route::delete('/attendance-schedules/{attendanceSchedule}', [AttendanceScheduleController::class, 'destroy'])->middleware('permission:attendance.schedules.delete')->name('attendance-schedules.destroy');
+        Route::get('/attendance-schedule-assignments', [AttendanceScheduleAssignmentController::class, 'index'])->middleware('permission:attendance.schedule-assignments.view,attendance.schedule-assignments.create,attendance.schedule-assignments.update,attendance.schedule-assignments.delete')->name('attendance-schedule-assignments.index');
+        Route::post('/attendance-schedule-assignments', [AttendanceScheduleAssignmentController::class, 'store'])->middleware('permission:attendance.schedule-assignments.create')->name('attendance-schedule-assignments.store');
+        Route::put('/attendance-schedule-assignments/{attendanceScheduleAssignment}', [AttendanceScheduleAssignmentController::class, 'update'])->middleware('permission:attendance.schedule-assignments.update')->name('attendance-schedule-assignments.update');
+        Route::delete('/attendance-schedule-assignments/{attendanceScheduleAssignment}', [AttendanceScheduleAssignmentController::class, 'destroy'])->middleware('permission:attendance.schedule-assignments.delete')->name('attendance-schedule-assignments.destroy');
+        Route::get('/attendance-incidents', [AttendanceIncidentController::class, 'index'])->middleware('permission:attendance.incidents.view,attendance.incidents.create,attendance.incidents.update,attendance.incidents.delete,attendance.incidents.approve,attendance.incidents.reject')->name('attendance-incidents.index');
+        Route::post('/attendance-incidents', [AttendanceIncidentController::class, 'store'])->middleware('permission:attendance.incidents.create')->name('attendance-incidents.store');
+        Route::put('/attendance-incidents/{attendanceIncident}', [AttendanceIncidentController::class, 'update'])->middleware('permission:attendance.incidents.update')->name('attendance-incidents.update');
+        Route::delete('/attendance-incidents/{attendanceIncident}', [AttendanceIncidentController::class, 'destroy'])->middleware('permission:attendance.incidents.delete')->name('attendance-incidents.destroy');
+        Route::patch('/attendance-incidents/{attendanceIncident}/review', [AttendanceIncidentController::class, 'review'])->middleware('permission:attendance.incidents.approve,attendance.incidents.reject')->name('attendance-incidents.review');
     });
 
     /*

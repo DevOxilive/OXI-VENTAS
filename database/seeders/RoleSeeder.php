@@ -51,7 +51,7 @@ class RoleSeeder extends Seeder
         }
 
         $attendanceSelfPermissionIds = DB::table('permissions')
-            ->whereIn('name', ['attendance.view', 'attendance.register', 'attendance.corrections.request'])
+            ->whereIn('name', ['attendance.register', 'attendance.corrections.request'])
             ->pluck('id');
 
         foreach ([$superAdministratorRole, $adminRole, $systemsRole, $humanResourcesRole, $salesRole, $inventoryRole] as $role) {
@@ -61,13 +61,43 @@ class RoleSeeder extends Seeder
         }
 
         $attendanceManagementPermissionIds = DB::table('permissions')
-            ->whereIn('name', ['attendance.manage', 'attendance.corrections.review', 'attendance.reports'])
+            ->whereIn('name', [
+                'attendance.manage',
+                'attendance.corrections.review',
+                'attendance.export.excel',
+                'attendance.export.pdf',
+                'attendance.schedules.view',
+                'attendance.schedules.create',
+                'attendance.schedules.update',
+                'attendance.schedules.delete',
+                'attendance.schedule-assignments.view',
+                'attendance.schedule-assignments.create',
+                'attendance.schedule-assignments.update',
+                'attendance.schedule-assignments.delete',
+                'attendance.incidents.view',
+                'attendance.incidents.create',
+                'attendance.incidents.update',
+                'attendance.incidents.delete',
+                'attendance.incidents.approve',
+                'attendance.incidents.reject',
+            ])
             ->pluck('id');
 
         foreach ([$superAdministratorRole, $adminRole] as $role) {
             foreach ($attendanceManagementPermissionIds as $permissionId) {
                 DB::table('role_permission')->updateOrInsert(['role_id' => $role->id, 'permission_id' => $permissionId]);
             }
+        }
+
+        $attendanceViewPermissionId = DB::table('permissions')
+            ->where('name', 'attendance.view')
+            ->value('id');
+
+        foreach ([$superAdministratorRole, $adminRole, $humanResourcesRole] as $role) {
+            DB::table('role_permission')->updateOrInsert([
+                'role_id' => $role->id,
+                'permission_id' => $attendanceViewPermissionId,
+            ]);
         }
 
         // Super Administrador is Administrador plus the exclusive system controls.
