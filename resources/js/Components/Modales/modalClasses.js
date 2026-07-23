@@ -9,6 +9,7 @@ export const modalSizeStyles = {
 
 export const modalHeightStyles = {
     auto: { height: 'auto', maxHeight: 'calc(100dvh - 2rem)' },
+    compact: { height: 'min(78dvh, 46rem)', maxHeight: 'calc(100dvh - 2rem)' },
     full: { height: 'min(90dvh, calc(100dvh - 2rem))', maxHeight: 'calc(100dvh - 2rem)' },
 }
 

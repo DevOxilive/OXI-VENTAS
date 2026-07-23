@@ -37,8 +37,8 @@ class PurchaseCycle extends Model
         return $this->hasMany(PurchaseOrder::class);
     }
 
-    public function generalOrder()
+    public function generalOrders()
     {
-        return $this->hasOne(GeneralPurchaseOrder::class);
+        return $this->hasMany(GeneralPurchaseOrder::class);
     }
 }

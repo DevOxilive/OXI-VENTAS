@@ -1,6 +1,4 @@
-export function getBranchPurchaseOrdersTableConfig({ status = 'DRAFT' } = {}) {
-    const completed = status === 'COMPLETED'
-
+export function getBranchPurchaseOrdersTableConfig({ status = 'GENERATED' } = {}) {
     return {
         columns: [
             {
@@ -12,6 +10,8 @@ export function getBranchPurchaseOrdersTableConfig({ status = 'DRAFT' } = {}) {
             {
                 key: 'status_label',
                 label: 'Estado',
+                subKey: 'inventory_edit_label',
+                subKeyBadge: true,
                 mobileLabel: 'Estado',
                 mobileDisplay: true,
             },
@@ -20,13 +20,6 @@ export function getBranchPurchaseOrdersTableConfig({ status = 'DRAFT' } = {}) {
                 label: 'Productos',
                 format: 'number',
                 mobileLabel: 'Productos',
-                mobileDisplay: true,
-            },
-            {
-                key: completed ? 'actual_total' : 'estimated_total',
-                label: completed ? 'Total pagado' : 'Total estimado',
-                format: 'currency',
-                mobileLabel: completed ? 'Total pagado' : 'Total estimado',
                 mobileDisplay: true,
             },
             {
@@ -39,18 +32,27 @@ export function getBranchPurchaseOrdersTableConfig({ status = 'DRAFT' } = {}) {
         ],
         actions: [
             {
-                id: 'open',
+                id: 'edit',
+                label: 'Editar orden',
+                icon: 'edit',
+                variant: 'yellow',
+                permission: 'inventory.purchase-reports.update',
+                hidden: (row) => !['GENERATED', 'REVIEW'].includes(row.status),
+            },
+            {
+                id: 'view',
                 label: 'Ver detalle',
                 icon: 'visibility',
                 variant: 'blue',
+                permission: 'inventory.purchase-reports.view',
             },
         ],
         mobileCardHeaderField: 'folio',
         noDataMessage: {
-            DRAFT: 'Todavia no hay borradores de esta sucursal.',
-            GENERATED: 'Todavia no hay ordenes generadas de esta sucursal.',
-            COMPLETED: 'Todavia no hay ordenes completadas de esta sucursal.',
-        }[status] || 'No hay ordenes para mostrar.',
+            GENERATED: 'Todavía no hay órdenes pendientes de esta sucursal.',
+            REVIEW: 'Todavía no hay órdenes por revisar de esta sucursal.',
+            COMPLETED: 'Todavía no hay órdenes completadas de esta sucursal.',
+        }[status] || 'No hay órdenes para mostrar.',
         rowKey: 'id',
         striped: true,
         hoverEffect: true,

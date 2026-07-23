@@ -7,12 +7,13 @@ import PageLayout from "@/Layouts/PageLayout.vue";
 import GlobalToolbar from "@/Components/Toolbars/GlobalToolbar.vue";
 import GlobalTable from "@/Components/Tables/GlobalTable.vue";
 import AppButton from "@/Components/Buttons/AppButton.vue";
+import ActionIconButton from "@/Components/Forms/ActionIconButton.vue";
 import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
 import QuantityStepper from "@/Components/Forms/QuantityStepper.vue";
 import EmptyStateCard from "@/Components/Cards/EmptyStateCard.vue";
+import GlobalCard from "@/Components/Cards/GlobalCard.vue";
 import SectionHeading from "@/Components/Cards/SectionHeading.vue";
-import TextareaField from "@/Components/Forms/TextareaField.vue";
 import { confirmModalAction, getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 import { useGlobalTablePagination } from "@/Composables/useGlobalTablePagination";
 import { usePurchaseReport } from "@/Composables/Inventory/usePurchaseReport";
@@ -24,10 +25,22 @@ import PurchaseReportDrafts from "@/Components/Inventory/PurchaseReports/Purchas
 import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 
 const props = defineProps({
+    selectorMode: {
+        type: Boolean,
+        default: false,
+    },
     currentBranch: Object,
+    branchesDB: {
+        type: Array,
+        default: () => [],
+    },
     productsDB: Object,
     filters: Object,
     categoriesDB: Array,
+    inventoryUsersDB: {
+        type: Array,
+        default: () => [],
+    },
     reportsDB: {
         type: Object,
         default: () => ({}),
@@ -42,7 +55,6 @@ const report = usePurchaseReport(props);
 const { handlePageChange } = useGlobalTablePagination();
 const { can } = usePermissions();
 
-const tableConfig = getPurchaseReportProductsTableConfig();
 const stockOptions = [
     { label: "Todo el stock", value: "" },
     { label: "Stock bajo", value: "LOW" },
@@ -56,13 +68,41 @@ const perPageOptions = [
 
 const branchLabel = computed(() => props.currentBranch?.name || "Sin sucursal");
 const cycleSubmitted = computed(() => Boolean(props.purchaseCycle?.submitted));
-const toolbarConfig = computed(() => getPurchaseReportToolbarConfig({
-    branchName: branchLabel.value,
-    editingFolio: report.editingOrder.value?.folio || "",
-    cycleFolio: props.purchaseCycle?.folio || "",
-    cycleSubmitted: cycleSubmitted.value,
-    hasProducts: report.selectedCount.value > 0,
+const canCreatePurchaseReport = computed(() => can("inventory.purchase-reports.create"));
+const canUpdatePurchaseReport = computed(() => can("inventory.purchase-reports.update"));
+const canSavePurchaseReport = computed(() => report.isEditing.value
+    ? canUpdatePurchaseReport.value
+    : canCreatePurchaseReport.value);
+const canWorkOnPurchaseList = computed(() => canCreatePurchaseReport.value || canUpdatePurchaseReport.value);
+const tableConfig = computed(() => getPurchaseReportProductsTableConfig({
+    canManage: canSavePurchaseReport.value,
 }));
+const canGeneratePurchaseOrder = computed(() => canSavePurchaseReport.value);
+const hasAssignedInventoryUser = computed(() => Boolean(report.assignedToUserId.value));
+const inventoryUserOptions = computed(() => props.inventoryUsersDB.map((user) => ({
+    value: user.value ?? user.id,
+    label: user.email ? `${user.label ?? user.name} - ${user.email}` : (user.label ?? user.name),
+})));
+const toolbarConfig = computed(() => props.selectorMode
+    ? {
+        title: "Lista de compra",
+        subtitle: "Selecciona la sucursal para generar su lista de compra.",
+        showSearch: false,
+        showRecordsPerPage: false,
+        showCounter: false,
+        filters: [],
+        actions: [],
+        tabs: [],
+    }
+    : getPurchaseReportToolbarConfig({
+        branchName: branchLabel.value,
+        editingFolio: report.editingOrder.value?.folio || "",
+        cycleFolio: props.purchaseCycle?.folio || "",
+        cycleSubmitted: cycleSubmitted.value,
+        hasProducts: report.selectedCount.value > 0,
+        canCreate: canCreatePurchaseReport.value,
+        canClear: canWorkOnPurchaseList.value,
+    }));
 const tableRows = computed(() => report.tableRows.value);
 const pagination = computed(() => report.paginator.value);
 const selectedProducts = computed(() => report.selectedProducts.value);
@@ -96,11 +136,9 @@ function handleTableAction({ action, row }) {
     }
 }
 
-function handleTableRowClick(row) {
-    report.toggleProduct(row);
-}
-
 async function openDraft(draft) {
+    if (!canUpdatePurchaseReport.value) return;
+
     if (Number(report.editingOrder.value?.id) === Number(draft?.id)) return;
 
     if (report.selectedCount.value > 0) {
@@ -128,6 +166,8 @@ function handleToolbarAction(action) {
 }
 
 async function submitWithoutProducts() {
+    if (!canCreatePurchaseReport.value) return;
+
     const result = await confirmModalAction({
         mode: "create",
         entityName: "solicitud",
@@ -154,6 +194,8 @@ async function submitWithoutProducts() {
 }
 
 async function generateOrder() {
+    if (!canGeneratePurchaseOrder.value) return;
+
     const result = await confirmModalAction({
         mode: "create",
         entityName: "orden de compra",
@@ -167,6 +209,8 @@ async function generateOrder() {
 }
 
 async function deleteDraft(draft) {
+    if (!can("inventory.purchase-reports.delete")) return;
+
     const result = await confirmModalAction({
         mode: "delete",
         entityName: "borrador",
@@ -207,6 +251,16 @@ function paginateLists(url) {
     });
 }
 
+function selectBranch(branchId) {
+    if (!branchId) return;
+
+    router.get(
+        route("ventas.purchase-reports.index"),
+        { branch: branchId },
+        { preserveScroll: true, replace: true },
+    );
+}
+
 </script>
 
 <template>
@@ -221,19 +275,41 @@ function paginateLists(url) {
                 />
             </template>
 
-            <div>
-                <section class="grid min-w-0 gap-5 xl:grid-cols-[280px_minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+            <div
+                v-if="selectorMode"
+                class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
+            >
+                <GlobalCard
+                    v-for="branch in branchesDB"
+                    :key="branch.id"
+                    :title="branch.name"
+                    subtitle="Lista de compra"
+                    description="Genera la solicitud con los productos que necesita esta sucursal."
+                    icon="shopping_cart"
+                    badge="Seleccionar"
+                    @click="selectBranch(branch.id)"
+                />
+            </div>
+
+            <div v-else>
+                <section
+                    class="grid min-w-0 gap-5"
+                    :class="canWorkOnPurchaseList
+                        ? 'xl:grid-cols-[minmax(340px,0.72fr)_minmax(0,1.15fr)_minmax(340px,0.85fr)]'
+                        : 'xl:grid-cols-1'"
+                >
                     <PurchaseReportDrafts
                         :reports="purchaseLists"
                         :pagination="reportsDB"
-                        :active-draft-id="report.editingOrder.value?.id"
-                        :can-delete="can('inventory.purchase-reports.delete')"
-                        @open="openDraft"
+                        @edit="openDraft"
                         @delete="deleteDraft"
                         @paginate="paginateLists"
                     />
 
-                    <article class="min-w-0 rounded-[28px] border border-secondary bg-background p-5 shadow-sm">
+                    <article
+                        v-if="canWorkOnPurchaseList"
+                        class="min-w-0 rounded-[28px] border border-secondary bg-background p-5 shadow-sm"
+                    >
                         <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-[minmax(0,1.3fr)_180px_180px_150px]">
                             <InputField
                                 v-model="report.localFilters.value.search"
@@ -275,13 +351,15 @@ function paginateLists(url) {
                                 :loading="false"
                                 v-bind="tableConfig"
                                 @action="handleTableAction"
-                                @row-click="handleTableRowClick"
                                 @page-change="handlePageChange"
                             />
                         </div>
                     </article>
 
-                    <article class="flex min-h-0 min-w-0 flex-col rounded-[28px] border border-secondary bg-background p-5 shadow-sm">
+                    <article
+                        v-if="canWorkOnPurchaseList"
+                        class="flex min-h-0 min-w-0 flex-col rounded-[28px] border border-secondary bg-background p-5 shadow-sm"
+                    >
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <SectionHeading
                                 :title="report.isEditing.value ? `Productos de ${report.editingOrder.value?.folio}` : 'Productos de la lista'"
@@ -311,14 +389,14 @@ function paginateLists(url) {
                                         <p class="truncate text-xs text-text opacity-60">{{ item.code || "Sin codigo" }}</p>
                                     </div>
 
-                                    <button
-                                        type="button"
+                                    <ActionIconButton
+                                        v-if="canSavePurchaseReport"
                                         class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-secondary bg-background text-text transition hover:border-primary hover:text-primary"
+                                        icon="close"
                                         title="Eliminar producto"
+                                        variant="red"
                                         @click="report.removeItem(item.branch_product_id)"
-                                    >
-                                        <span class="material-symbols-outlined text-[17px]">close</span>
-                                    </button>
+                                    />
                                 </div>
 
                                 <div class="mt-2 flex items-center gap-3">
@@ -343,16 +421,24 @@ function paginateLists(url) {
                         </div>
 
                         <div class="mt-4 space-y-4 border-t border-secondary pt-4">
-                            <TextareaField
-                                v-model="report.notes.value"
-                                label="Notas generales"
-                                field="purchase_report_notes"
-                                placeholder="Observaciones generales para la lista"
-                                :rows="2"
+                            <SelectField
+                                v-model="report.assignedToUserId.value"
+                                label="Responsable de Inventario"
+                                field="assigned_to_user_id"
+                                :options="inventoryUserOptions"
+                                placeholder="Selecciona a quien se asignará la orden"
                             />
+
+                            <p
+                                v-if="inventoryUserOptions.length === 0"
+                                class="rounded-xl border border-secondary bg-secondary px-3 py-2 text-xs font-semibold text-text"
+                            >
+                                No hay personal de Inventario activo con acceso a esta sucursal.
+                            </p>
 
                             <div class="grid gap-3 sm:grid-cols-2">
                                 <AppButton
+                                    v-if="canSavePurchaseReport"
                                     block
                                     :disabled="report.selectedCount.value === 0"
                                     variant="secondary"
@@ -362,8 +448,9 @@ function paginateLists(url) {
                                 </AppButton>
 
                                 <AppButton
+                                    v-if="canGeneratePurchaseOrder"
                                     block
-                                    :disabled="report.selectedCount.value === 0"
+                                    :disabled="report.selectedCount.value === 0 || !hasAssignedInventoryUser"
                                     @click="generateOrder"
                                 >
                                     Generar orden de compra

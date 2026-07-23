@@ -20,6 +20,11 @@ return new class extends Migration
                 ->constrained()
                 ->nullOnDelete();
 
+            $table->foreignId('assigned_to_user_id')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
+
             $table->foreignId('completed_by')
                 ->nullable()
                 ->constrained('users')
@@ -31,6 +36,7 @@ return new class extends Migration
             $table->enum('status', [
                 'DRAFT',
                 'GENERATED',
+                'REVIEW',
                 'COMPLETED',
                 'CANCELLED',
             ])->default('DRAFT');

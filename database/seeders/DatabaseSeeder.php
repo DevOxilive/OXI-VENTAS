@@ -12,13 +12,12 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             RoleSeeder::class,
 
+            DepartmentSeeder::class,
+            PositionSeeder::class,
             EmployeeSeeder::class,
             UsersSeeder::class,
 
             BranchSeeder::class,
-            AreaSeeder::class,
-            DepartmentSeeder::class,
-            PositionSeeder::class,
 
             SupplierSeeder::class,
             CustomerSeeder::class,
@@ -29,7 +28,6 @@ class DatabaseSeeder extends Seeder
             TripDetailSeeder::class,
             IncidentSeeder::class,
             InventoryReportSeeder::class,
-            PurchaseSeeder::class,
             ExecutiveDashboardSeeder::class,
 
         ]);

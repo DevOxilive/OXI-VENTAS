@@ -12,6 +12,8 @@ class PurchaseOrder extends Model
 
     public const STATUS_GENERATED = 'GENERATED';
 
+    public const STATUS_REVIEW = 'REVIEW';
+
     public const STATUS_COMPLETED = 'COMPLETED';
 
     public const STATUS_CANCELLED = 'CANCELLED';
@@ -21,17 +23,18 @@ class PurchaseOrder extends Model
         'purchase_cycle_id',
         'general_purchase_order_id',
         'user_id',
+        'assigned_to_user_id',
         'completed_by',
+        'inventory_edited_by',
         'folio',
         'source',
         'status',
         'estimated_total',
         'actual_total',
         'purchased_at',
-        'notes',
-        'adjustment_notes',
         'generated_at',
         'completed_at',
+        'inventory_edited_at',
     ];
 
     protected $casts = [
@@ -40,6 +43,7 @@ class PurchaseOrder extends Model
         'purchased_at' => 'date',
         'generated_at' => 'datetime',
         'completed_at' => 'datetime',
+        'inventory_edited_at' => 'datetime',
     ];
 
     public function branch()
@@ -62,9 +66,19 @@ class PurchaseOrder extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function assignedTo()
+    {
+        return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
+
     public function completedBy()
     {
         return $this->belongsTo(User::class, 'completed_by');
+    }
+
+    public function inventoryEditedBy()
+    {
+        return $this->belongsTo(User::class, 'inventory_edited_by');
     }
 
     public function items()

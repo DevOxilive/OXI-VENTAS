@@ -4,7 +4,7 @@ import { router } from '@inertiajs/vue3'
 export function usePurchaseOrders(props, routeName = 'inventory.branches.reports.purchase-orders') {
     const localFilters = ref({
         search: props.filters?.search ?? '',
-        status: props.filters?.status ?? 'PURCHASING',
+        status: props.filters?.status ?? 'GENERATE',
         per_page: Number(props.filters?.per_page ?? 25),
     })
     let filterTimer = null

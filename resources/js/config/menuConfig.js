@@ -4,6 +4,16 @@ export function generateMenu(role, permissions = [], branches = []) {
 
     const modulePermissions = {
         employees: ["employees.view", "employees.create", "employees.update", "employees.delete"],
+        organizationStructure: [
+            "departments.view",
+            "departments.create",
+            "departments.update",
+            "departments.delete",
+            "positions.view",
+            "positions.create",
+            "positions.update",
+            "positions.delete",
+        ],
         users: ["users.view", "users.create", "users.update", "users.delete"],
         branches: ["branches.view", "branches.create", "branches.update", "branches.delete"],
         products: [
@@ -25,10 +35,13 @@ export function generateMenu(role, permissions = [], branches = []) {
             "inventory.purchase-reports.delete",
         ],
         purchaseOrders: [
-            "inventory.purchase-orders.view",
-            "inventory.purchase-orders.create",
-            "inventory.purchase-orders.update",
-            "inventory.purchase-orders.history",
+            "inventory.purchase-orders.generate.view",
+            "inventory.purchase-orders.generate.create",
+            "inventory.purchase-orders.generate.update",
+            "inventory.purchase-orders.generate.transfer",
+            "inventory.purchase-orders.purchasing.view",
+            "inventory.purchase-orders.completed.view",
+            "inventory.purchase-orders.costs",
         ],
         audits: [
             "audits.physical-counts.view",
@@ -73,19 +86,29 @@ export function generateMenu(role, permissions = [], branches = []) {
     | CAPITAL HUMANO
     |--------------------------------------------------------------------------
     */
-    if (canUse("employees")) {
+    if (canUse("employees") || canUse("organizationStructure")) {
         menu.push({
             text: "Capital Humano",
             key: "human-resources",
             icon: "badge",
             isOpen: false,
             children: [
-                {
-                    text: "Registro de empleados",
-                    key: "human-resources.employees",
-                    icon: "group",
-                    url: route("human-resources.employees.index"),
-                },
+                ...(canUse("employees")
+                    ? [{
+                        text: "Registro de empleados",
+                        key: "human-resources.employees",
+                        icon: "group",
+                        url: route("human-resources.employees.index"),
+                    }]
+                    : []),
+                ...(canUse("organizationStructure")
+                    ? [{
+                        text: "Registro de Departamentos",
+                        key: "human-resources.departments",
+                        icon: "account_tree",
+                        url: route("human-resources.departments.index"),
+                    }]
+                    : []),
             ],
         });
     }
@@ -167,13 +190,13 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        ...(canUse("purchaseReports")
+        ...(canUse("purchaseOrders")
             ? [
                   {
-                      text: "Listas de compra",
-                      key: `inventory.${branch.slug}.purchase-report`,
-                      icon: "shopping_cart",
-                      url: route("inventory.branches.purchase-reports.index", {
+                      text: "Órdenes de compra generales",
+                      key: `inventory.${branch.slug}.general-purchase-orders`,
+                      icon: "receipt_long",
+                      url: route("inventory.branches.reports.purchase-orders", {
                           branch: branch.id,
                       }),
                   },
@@ -196,9 +219,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         ...(canUse("audits") ||
         canUse("cashClosures") ||
         canUse("inventoryReports") ||
-        canUse("branchInventory") ||
-        canUse("purchaseReports") ||
-        canUse("purchaseOrders")
+        canUse("branchInventory")
             ? [
                   {
                       text: "Reportes",
@@ -222,14 +243,6 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("inventory.branches.create") ||
         can("inventory.branches.update") ||
         can("inventory.branches.delete") ||
-        can("inventory.purchase-reports.view") ||
-        can("inventory.purchase-reports.create") ||
-        can("inventory.purchase-reports.update") ||
-        can("inventory.purchase-reports.delete") ||
-        can("inventory.purchase-orders.view") ||
-        can("inventory.purchase-orders.create") ||
-        can("inventory.purchase-orders.update") ||
-        can("inventory.purchase-orders.history") ||
         can("audits.physical-counts.view") ||
         can("audits.physical-counts.count") ||
         can("audits.physical-counts.reports") ||
@@ -242,7 +255,6 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("inventory.branches.view") ||
         canUse("products") ||
         canUse("branchInventory") ||
-        canUse("purchaseReports") ||
         canUse("purchaseOrders") ||
         canUse("audits") ||
         canUse("cashClosures") ||
@@ -271,9 +283,24 @@ export function generateMenu(role, permissions = [], branches = []) {
         });
     }
 
+    const purchaseListsMenuItem = {
+        text: "Lista de compra",
+        key: "sales.purchase-lists",
+        icon: "shopping_cart",
+        url: route("ventas.purchase-reports.index"),
+    };
+    const branchPurchaseOrdersMenuItem = {
+        text: "Órdenes de compra",
+        key: "sales.purchase-orders",
+        icon: "shopping_bag",
+        url: route("ventas.purchase-orders.index"),
+    };
+    const canUsePurchaseNavigation = canUse("purchaseReports");
+
     if (
         canUse("sales") ||
-        canUse("cashClosures")
+        canUse("cashClosures") ||
+        canUsePurchaseNavigation
     ) {
         menu.push({
             text: "Ventas",
@@ -281,12 +308,14 @@ export function generateMenu(role, permissions = [], branches = []) {
             icon: "point_of_sale",
             isOpen: false,
             children: [
-                {
-                    text: "Punto de venta",
-                    key: "sales.pos",
-                    icon: "point_of_sale",
-                    url: route("ventas.home"),
-                },
+                ...(canUse("sales")
+                    ? [{
+                        text: "Punto de venta",
+                        key: "sales.pos",
+                        icon: "point_of_sale",
+                        url: route("ventas.home"),
+                    }]
+                    : []),
                 ...(canUse("cashClosures")
                     ? [
                           {
@@ -296,6 +325,12 @@ export function generateMenu(role, permissions = [], branches = []) {
                               url: route("ventas.cash-closures.index"),
                           },
                       ]
+                    : []),
+                ...(canUsePurchaseNavigation
+                    ? [purchaseListsMenuItem]
+                    : []),
+                ...(canUsePurchaseNavigation
+                    ? [branchPurchaseOrdersMenuItem]
                     : []),
             ],
         });

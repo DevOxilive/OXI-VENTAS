@@ -9,8 +9,8 @@ import { validateSingleField, validateForm } from "@/Validation/schemaBuilder";
 const employeeFields = [
     "firstName",
     "lastName",
-    "position",
-    "department",
+    "positionId",
+    "departmentId",
     "employmentStatus",
     "email",
     "phone",
@@ -33,18 +33,11 @@ const employeeFields = [
 ];
 
 export function useEmployeeForm(props, emit) {
-    const departments = [
-        "Inventario",
-        "Sistemas",
-        "Recursos Humanos",
-        "Ventas",
-    ];
-
     const employee = useForm({
         firstName: "",
         lastName: "",
-        position: "",
-        department: "",
+        positionId: "",
+        departmentId: "",
         employmentStatus: "Activo",
         email: "",
         phone: "",
@@ -67,6 +60,24 @@ export function useEmployeeForm(props, emit) {
         nss: "",
         rfc: "",
     });
+
+    const allDepartments = computed(
+        () => props.organizationOptions?.departments || [],
+    );
+    const allPositions = computed(
+        () => props.organizationOptions?.positions || [],
+    );
+    const departments = computed(() => allDepartments.value.filter((department) => (
+        department.active
+        || Number(department.value) === Number(employee.departmentId)
+    )));
+    const positions = computed(() => allPositions.value.filter((position) => (
+        Number(position.departmentId) === Number(employee.departmentId)
+        && (
+            position.active
+            || Number(position.value) === Number(employee.positionId)
+        )
+    )));
 
     const frontendErrors = reactive({});
 
@@ -136,8 +147,12 @@ export function useEmployeeForm(props, emit) {
         employee.defaults({
             firstName: props.employeeToEdit.firstName || "",
             lastName: props.employeeToEdit.lastName || "",
-            position: props.employeeToEdit.position || "",
-            department: props.employeeToEdit.department || "",
+            positionId: props.employeeToEdit.positionId
+                ? String(props.employeeToEdit.positionId)
+                : "",
+            departmentId: props.employeeToEdit.departmentId
+                ? String(props.employeeToEdit.departmentId)
+                : "",
             employmentStatus: props.employeeToEdit.employmentStatus || "Activo",
             email: props.employeeToEdit.email || "",
             phone: props.employeeToEdit.phone || "",
@@ -201,6 +216,22 @@ export function useEmployeeForm(props, emit) {
 
     const errorSummary = computed(() =>
         Object.values(frontendErrors).filter((error) => error !== ""),
+    );
+
+    watch(
+        () => employee.departmentId,
+        () => {
+            if (!employee.positionId) return;
+
+            const positionBelongsToDepartment = allPositions.value.some((position) => (
+                Number(position.value) === Number(employee.positionId)
+                && Number(position.departmentId) === Number(employee.departmentId)
+            ));
+
+            if (!positionBelongsToDepartment) {
+                employee.positionId = "";
+            }
+        },
     );
 
     watch(
@@ -295,7 +326,7 @@ export function useEmployeeForm(props, emit) {
                 clearFrontendErrors();
 
                 router.reload({
-                    only: ["employeesDB"],
+                    only: ["employeesDB", "filterOptions", "organizationOptions"],
                     preserveScroll: true,
                 });
             },
@@ -312,6 +343,7 @@ export function useEmployeeForm(props, emit) {
         employee,
         frontendErrors,
         departments,
+        positions,
         errorSummary,
         validateField,
         saveEmployee,

@@ -26,6 +26,7 @@ export const REALTIME_EVENTS = Object.freeze({
     activityLogged: '.realtime.activity',
     branchChanged: '.branch.changed',
     employeeChanged: '.employee.changed',
+    organizationStructureChanged: '.organization-structure.changed',
     physicalCountChanged: '.PhysicalCountChanged',
     productChanged: '.product.changed',
     stockUpdated: '.stock.updated',

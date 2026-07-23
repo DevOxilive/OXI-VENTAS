@@ -34,6 +34,12 @@ export const fieldRegistry = {
         spamMessage: "Puesto no válido.",
     },
 
+    positionId: {
+        type: "numeric",
+        required: true,
+        message: "Selecciona un puesto válido.",
+    },
+
     email: {
         type: "email",
         required: true,
@@ -145,6 +151,12 @@ export const fieldRegistry = {
         preventSpam: true,
         message: "Departamento inválido.",
         spamMessage: "Departamento no válido.",
+    },
+
+    departmentId: {
+        type: "numeric",
+        required: true,
+        message: "Selecciona un departamento válido.",
     },
 
     employmentStatus: {

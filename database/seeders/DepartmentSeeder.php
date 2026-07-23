@@ -10,15 +10,17 @@ class DepartmentSeeder extends Seeder
     public function run(): void
     {
         $departments = [
-            ['id' => 1, 'name' => 'Management', 'area_id' => 1, 'active' => true],
-            ['id' => 2, 'name' => 'PointOfSale', 'area_id' => 2, 'active' => true],
-            ['id' => 3, 'name' => 'Warehouse', 'area_id' => 3, 'active' => true],
-            ['id' => 4, 'name' => 'Distribution', 'area_id' => 4, 'active' => true],
+            ['name' => 'Administración', 'active' => true],
+            ['name' => 'Ventas', 'active' => true],
+            ['name' => 'Inventario', 'active' => true],
+            ['name' => 'Logística', 'active' => true],
+            ['name' => 'Sistemas', 'active' => true],
+            ['name' => 'Recursos Humanos', 'active' => true],
         ];
 
         foreach ($departments as $department) {
             DB::table('departments')->updateOrInsert(
-                ['id' => $department['id']],
+                ['name' => $department['name']],
                 array_merge($department, [
                     'created_at' => now(),
                     'updated_at' => now(),
