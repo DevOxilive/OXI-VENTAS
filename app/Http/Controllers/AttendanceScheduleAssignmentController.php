@@ -7,6 +7,7 @@ use App\Models\AttendanceSchedule;
 use App\Models\AttendanceScheduleAssignment;
 use App\Models\Employee;
 use App\Services\SystemAuditService;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -19,8 +20,25 @@ class AttendanceScheduleAssignmentController extends Controller
     public function index()
     {
         return Inertia::render('HumanResources/AttendanceScheduleAssignments', [
-            'assignments' => AttendanceScheduleAssignment::query()->with(['schedule','assignable','assignedBy'])->where('assignable_type', Employee::class)->latest()->paginate(30)->through(fn ($assignment) => $this->payload($assignment)),
-            'employees' => Employee::query()->where('employment_status', '!=', 'Inactivo')->orderBy('first_name')->get(['id','first_name','last_name','department','position'])->map(fn ($employee) => ['value' => $employee->id, 'label' => trim($employee->first_name.' '.$employee->last_name)]),
+            'assignments' => AttendanceScheduleAssignment::query()
+                ->with([
+                    'schedule',
+                    'assignable' => function (MorphTo $morphTo) {
+                        $morphTo->morphWith([
+                            Employee::class => ['position.department'],
+                        ]);
+                    },
+                    'assignedBy',
+                ])
+                ->where('assignable_type', Employee::class)
+                ->latest()
+                ->paginate(30)
+                ->through(fn ($assignment) => $this->payload($assignment)),
+            'employees' => Employee::query()
+                ->where('employment_status', '!=', 'Inactivo')
+                ->orderBy('first_name')
+                ->get(['id', 'first_name', 'last_name'])
+                ->map(fn ($employee) => ['value' => $employee->id, 'label' => trim($employee->first_name . ' ' . $employee->last_name)]),
             'schedules' => AttendanceSchedule::query()->where('active', true)->orderBy('name')->get(['id','name'])->map(fn ($schedule) => ['value' => $schedule->id, 'label' => $schedule->name]),
         ]);
     }
@@ -65,6 +83,8 @@ class AttendanceScheduleAssignmentController extends Controller
     private function payload(AttendanceScheduleAssignment $assignment): array
     {
         $employee = $assignment->assignable;
-        return ['id' => $assignment->id, 'employee_id' => $assignment->assignable_id, 'attendance_schedule_id' => $assignment->attendance_schedule_id, 'employee' => trim(($employee?->first_name ?? '').' '.($employee?->last_name ?? '')), 'department' => $employee?->department, 'position' => $employee?->position, 'schedule' => $assignment->schedule?->name, 'effective_from' => $assignment->effective_from?->toDateString(), 'effective_to' => $assignment->effective_to?->toDateString(), 'working_days' => $assignment->working_days ?: ['monday','tuesday','wednesday','thursday','friday'], 'observations' => $assignment->observations, 'active' => $assignment->active, 'assigned_by' => $assignment->assignedBy?->name ?? 'Sistema', 'created_at' => $assignment->created_at?->format('d/m/Y H:i')];
+        $position = $employee?->position;
+
+        return ['id' => $assignment->id, 'employee_id' => $assignment->assignable_id, 'attendance_schedule_id' => $assignment->attendance_schedule_id, 'employee' => trim(($employee?->first_name ?? '').' '.($employee?->last_name ?? '')), 'department' => $position?->department?->name ?? 'Sin departamento', 'position' => $position?->name ?? 'Sin puesto', 'schedule' => $assignment->schedule?->name, 'effective_from' => $assignment->effective_from?->toDateString(), 'effective_to' => $assignment->effective_to?->toDateString(), 'working_days' => $assignment->working_days ?: ['monday','tuesday','wednesday','thursday','friday'], 'observations' => $assignment->observations, 'active' => $assignment->active, 'assigned_by' => $assignment->assignedBy?->name ?? 'Sistema', 'created_at' => $assignment->created_at?->format('d/m/Y H:i')];
     }
 }
