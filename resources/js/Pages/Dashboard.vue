@@ -12,7 +12,6 @@ const VueApexCharts = defineAsyncComponent(async () => {
     await Promise.all([
         import('apexcharts/area'),
         import('apexcharts/bar'),
-        import('apexcharts/heatmap'),
         import('apexcharts/radar'),
         import('apexcharts/features/legend'),
     ])
@@ -40,14 +39,6 @@ const props = defineProps({
     summary: {
         type: Object,
         default: () => ({}),
-    },
-    branchPerformance: {
-        type: Array,
-        default: () => [],
-    },
-    topProducts: {
-        type: Array,
-        default: () => [],
     },
     shrinkageSummary: {
         type: Object,
@@ -144,12 +135,6 @@ function repeatedPaletteColors(palette) {
 
 const emptyWidgetData = {
     label: '',
-    branchPerformance: [],
-    categoryPerformance: [],
-    categoryTimeline: [],
-    paymentBreakdown: [],
-    movementBreakdown: [],
-    movementTimeline: [],
     productWeekdayRadar: {
         product: null,
         weekdays: [],
@@ -164,36 +149,13 @@ const emptyWidgetData = {
         revenue_loss: 0,
         units: 0,
     },
-    topProducts: [],
-    productTimeline: [],
 }
 
 const widgetCatalog = [
     {
-        id: 'branchSummary',
-        title: 'Pulso comercial',
-        kind: 'branchSummary',
-        wide: true,
-    },
-    {
-        id: 'categoryRadar',
-        title: 'Categorias',
-        kind: 'categoryRadar',
-    },
-    {
         id: 'weekdayRadar',
         title: 'Producto por dia y sucursal',
         kind: 'weekdayRadar',
-    },
-    {
-        id: 'paymentMethods',
-        title: 'Metodos de pago',
-        kind: 'paymentMethods',
-    },
-    {
-        id: 'movementMix',
-        title: 'Movimientos',
-        kind: 'movementMix',
     },
     {
         id: 'revenue',
@@ -238,13 +200,6 @@ const widgetCatalog = [
         tone: 'primary',
         wide: true,
     },
-    {
-        id: 'topProducts',
-        title: 'Productos con mayor movimiento',
-        kind: 'products',
-        tone: 'text',
-        wide: true,
-    },
 ]
 
 function defaultLayout() {
@@ -253,17 +208,12 @@ function defaultLayout() {
     return {
         order,
         periods: {
-            branchSummary: 'month',
             weekdayRadar: 'week',
-            categoryRadar: 'month',
-            paymentMethods: 'month',
-            movementMix: 'week',
             revenue: 'month',
             investment: 'month',
             expectedProfit: 'month',
             profit: 'month',
             shrinkage: 'month',
-            topProducts: 'month',
         },
     }
 }
@@ -431,26 +381,6 @@ function branchRows(id) {
     return dataFor(id).branchPerformance ?? []
 }
 
-function categoryRows(id) {
-    return dataFor(id).categoryPerformance ?? []
-}
-
-function categoryTimelineRows(id) {
-    return dataFor(id).categoryTimeline ?? []
-}
-
-function paymentRows(id) {
-    return dataFor(id).paymentBreakdown ?? []
-}
-
-function movementRows(id) {
-    return dataFor(id).movementBreakdown ?? []
-}
-
-function movementTimelineRows(id) {
-    return dataFor(id).movementTimeline ?? []
-}
-
 function weekdayRadarData(id) {
     return dataFor(id).productWeekdayRadar ?? emptyWidgetData.productWeekdayRadar
 }
@@ -465,14 +395,6 @@ function shrinkageTimelineRows(id) {
 
 function shrinkageProducts(id) {
     return dataFor(id).shrinkageProducts ?? []
-}
-
-function productRows(id) {
-    return dataFor(id).topProducts ?? []
-}
-
-function productTimelineRows(id) {
-    return dataFor(id).productTimeline ?? []
 }
 
 function metricTotal(id, metric) {
@@ -534,18 +456,6 @@ function timelineSeries(rows, nameKey, valueKey, limit = 5) {
     }))
 }
 
-function heatmapSeries(rows, nameKey, valueKey, limit = 7) {
-    const context = timelineContext(rows, nameKey, valueKey, limit)
-
-    return context.names.map((name) => ({
-        name,
-        data: context.periodKeys.map((key, index) => ({
-            x: context.labels[index] ?? key,
-            y: context.valuesByName.get(name)?.get(key) ?? 0,
-        })),
-    }))
-}
-
 const visibleWidgets = computed(() => {
     const order = normalizeWidgetOrder(layout.value.order)
     const widgetsById = new Map(widgetCatalog.map((widget) => [widget.id, widget]))
@@ -576,7 +486,7 @@ const summaryCards = computed(() => [
         surface: 'bg-background',
         labelClass: 'text-text opacity-70',
         valueClass: 'text-text',
-        formula: 'Costo vendido estimado: suma de sale_details.quantity por products.cost. No es costo historico exacto por lote.',
+        formula: 'Inversión proyectada: suma de las Órdenes de compra de sucursal generadas, en revisión o completadas durante el rango.',
     },
     {
         label: 'Utilidad',
@@ -584,7 +494,7 @@ const summaryCards = computed(() => [
         surface: 'bg-secondary',
         labelClass: 'text-accent',
         valueClass: 'text-text',
-        formula: 'Utilidad bruta estimada: ventas netas menos costo vendido estimado.',
+        formula: 'Utilidad estimada: ventas netas menos la inversión proyectada de Órdenes de compra de sucursal.',
     },
     {
         label: 'Merma',
@@ -716,14 +626,9 @@ function handleWidgetDragEnd() {
 
 function bentoWidgetClasses(widget) {
     const classes = {
-        branchSummary: 'lg:col-span-6 xl:col-span-12',
         weekdayRadar: 'lg:col-span-3 xl:col-span-5',
-        categoryRadar: 'lg:col-span-3 xl:col-span-7',
-        paymentMethods: 'lg:col-span-3 xl:col-span-4',
-        movementMix: 'lg:col-span-3 xl:col-span-8',
         branchMetric: 'lg:col-span-3 xl:col-span-3',
         shrinkage: 'lg:col-span-3 xl:col-span-7',
-        products: 'lg:col-span-3 xl:col-span-5',
     }
 
     return classes[widget.kind] ?? 'lg:col-span-3 xl:col-span-6'
@@ -750,30 +655,6 @@ const chartPayloads = computed(() => {
             return
         }
 
-        if (widget.kind === 'categoryRadar') {
-            payloads[widget.id] = {
-                options: categoryBarOptions(widget.id),
-                series: categoryBarSeries(widget.id),
-            }
-            return
-        }
-
-        if (widget.kind === 'paymentMethods') {
-            payloads[widget.id] = {
-                options: paymentOptions(widget.id),
-                series: paymentSeries(widget.id),
-            }
-            return
-        }
-
-        if (widget.kind === 'movementMix') {
-            payloads[widget.id] = {
-                options: movementOptions(widget.id),
-                series: movementSeries(widget.id),
-            }
-            return
-        }
-
         if (widget.kind === 'branchMetric') {
             payloads[widget.id] = {
                 options: branchMetricOptions(widget.id, widget.tone),
@@ -790,12 +671,6 @@ const chartPayloads = computed(() => {
             return
         }
 
-        if (widget.kind === 'products') {
-            payloads[widget.id] = {
-                options: productTreeOptions(widget.id),
-                series: productTreeSeries(widget.id),
-            }
-        }
     })
 
     return payloads
@@ -861,156 +736,6 @@ function branchMetricOptions(id, color) {
     }
 }
 
-function categoryBarSeries(id) {
-    return timelineSeries(categoryTimelineRows(id), 'category_name', 'revenue', 5)
-}
-
-function categoryBarOptions(id) {
-    const labels = timelineLabels(categoryTimelineRows(id))
-    const palette = dashboardPalette.value
-
-    return {
-        chart: chartSettings('area', palette, {
-            stacked: false,
-        }),
-        colors: repeatedPaletteColors(palette),
-        dataLabels: { enabled: false },
-        stroke: { curve: 'smooth', width: 4, lineCap: 'round' },
-        fill: {
-            type: 'gradient',
-            gradient: { opacityFrom: 0.5, opacityTo: 0.06 },
-        },
-        markers: {
-            size: 4,
-            strokeWidth: 0,
-            hover: { size: 7 },
-        },
-        grid: {
-            borderColor: palette.grid,
-            strokeDashArray: 4,
-        },
-        legend: {
-            position: 'bottom',
-            horizontalAlign: 'left',
-            fontSize: '11px',
-        },
-        xaxis: {
-            categories: labels,
-            tickAmount: Math.min(8, Math.max(2, labels.length)),
-        },
-        yaxis: { labels: { formatter: (value) => formatCurrency(value) } },
-        tooltip: {
-            shared: true,
-            intersect: false,
-            y: {
-                formatter: (value) => formatCurrency(value),
-            },
-        },
-    }
-}
-
-function paymentSeries(id) {
-    return [
-        {
-            name: 'Total',
-            data: paymentRows(id).map((row) => Number(row.total ?? 0)),
-        },
-    ]
-}
-
-function paymentOptions(id) {
-    const palette = dashboardPalette.value
-
-    return {
-        chart: chartSettings('bar', palette),
-        plotOptions: {
-            bar: {
-                horizontal: true,
-                distributed: true,
-                borderRadius: 14,
-                barHeight: '62%',
-            },
-        },
-        labels: paymentRows(id).map((row) => row.name),
-        colors: repeatedPaletteColors(palette),
-        dataLabels: {
-            enabled: true,
-            formatter: (value) => formatCurrency(value),
-            style: {
-                fontSize: '11px',
-                fontWeight: 800,
-                colors: [palette.background],
-            },
-            dropShadow: { enabled: false },
-        },
-        grid: {
-            borderColor: palette.grid,
-            strokeDashArray: 4,
-        },
-        legend: { show: false },
-        xaxis: {
-            categories: paymentRows(id).map((row) => row.name),
-            labels: {
-                formatter: (value) => formatCurrency(value),
-            },
-        },
-        tooltip: {
-            y: {
-                formatter: (value) => formatCurrency(value),
-            },
-        },
-    }
-}
-
-function movementSeries(id) {
-    return heatmapSeries(movementTimelineRows(id), 'reason', 'movements', 6).map((serie) => ({
-        ...serie,
-        name: movementLabel(serie.name),
-    }))
-}
-
-function movementOptions(id) {
-    const palette = dashboardPalette.value
-
-    return {
-        chart: chartSettings('heatmap', palette),
-        colors: [palette.accent],
-        plotOptions: {
-            heatmap: {
-                radius: 12,
-                shadeIntensity: 0.28,
-                useFillColorAsStroke: false,
-                colorScale: {
-                    ranges: [
-                        { from: 0, to: 0, color: palette.background, name: 'Sin movimiento' },
-                        { from: 1, to: 25, color: palette.secondary, name: 'Bajo' },
-                        { from: 26, to: 100, color: palette.accentSoft, name: 'Medio' },
-                        { from: 101, to: 10000, color: palette.accent, name: 'Alto' },
-                    ],
-                },
-            },
-        },
-        dataLabels: { enabled: false },
-        xaxis: { labels: { rotate: -20 } },
-        tooltip: {
-            y: {
-                formatter: (value) => `${formatNumber(value)} movimientos`,
-            },
-        },
-    }
-}
-
-function movementLabel(value) {
-    return {
-        PURCHASE: 'Compras',
-        SALE: 'Ventas',
-        DAMAGED: 'Danado',
-        EXPIRED: 'Caducado',
-        INVENTORY_DIFFERENCE: 'Ajuste',
-        OTHER: 'Otros',
-    }[value] ?? value
-}
-
 function shrinkageSeries(id) {
     return timelineSeries(shrinkageTimelineRows(id), 'category_name', 'cost_loss', 5)
 }
@@ -1041,40 +766,6 @@ function shrinkageOptions(id) {
         tooltip: {
             shared: true,
             intersect: false,
-            y: {
-                formatter: (value) => formatCurrency(value),
-            },
-        },
-    }
-}
-
-function productTreeSeries(id) {
-    return heatmapSeries(productTimelineRows(id), 'product_name', 'revenue', 8)
-}
-
-function productTreeOptions(id) {
-    const palette = dashboardPalette.value
-
-    return {
-        chart: chartSettings('heatmap', palette),
-        colors: [palette.accent],
-        plotOptions: {
-            heatmap: {
-                radius: 12,
-                shadeIntensity: 0.38,
-                colorScale: {
-                    ranges: [
-                        { from: 0, to: 0, color: palette.background, name: 'Sin venta' },
-                        { from: 1, to: 250, color: palette.secondary, name: 'Bajo' },
-                        { from: 251, to: 1000, color: palette.accentSoft, name: 'Medio' },
-                        { from: 1001, to: 100000, color: palette.accent, name: 'Alto' },
-                    ],
-                },
-            },
-        },
-        dataLabels: { enabled: false },
-        xaxis: { labels: { rotate: -20 } },
-        tooltip: {
             y: {
                 formatter: (value) => formatCurrency(value),
             },
@@ -1226,44 +917,7 @@ function weekdayRadarOptions(id) {
                         </span>
                     </header>
 
-                    <div v-if="widget.kind === 'branchSummary'" class="mt-4">
-                        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                            <article
-                                v-for="row in compactRows(branchRows(widget.id), 4)"
-                                :key="row.id"
-                                class="group relative overflow-hidden rounded-[24px] border border-secondary bg-secondary p-4 transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md"
-                            >
-                                <span class="absolute -right-6 -top-8 h-24 w-24 rounded-full bg-primary opacity-10 transition group-hover:scale-125" />
-                                <span class="absolute bottom-3 right-4 text-5xl font-black text-primary opacity-10">
-                                    {{ Math.round(Number(row.margin ?? 0)) }}%
-                                </span>
-
-                                <div class="relative">
-                                    <p class="truncate text-xs font-bold uppercase tracking-[0.18em] text-text opacity-55">
-                                        {{ row.name }}
-                                    </p>
-
-                                    <p class="mt-2 text-2xl font-black text-text">
-                                        {{ formatCurrency(row.revenue) }}
-                                    </p>
-
-                                    <div class="mt-3 grid grid-cols-2 gap-2 text-xs font-bold">
-                                        <div class="rounded-2xl bg-background px-3 py-2">
-                                            <span class="block text-text opacity-50">Utilidad</span>
-                                            <span class="mt-0.5 block text-accent">{{ formatCurrency(row.profit) }}</span>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-background px-3 py-2">
-                                            <span class="block text-text opacity-50">Tickets</span>
-                                            <span class="mt-0.5 block text-primary">{{ formatNumber(row.transactions) }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </article>
-                        </div>
-                    </div>
-
-                    <div v-else-if="widget.kind === 'weekdayRadar'" class="mt-3">
+                    <div v-if="widget.kind === 'weekdayRadar'" class="mt-3">
                         <div class="mb-3 rounded-3xl border border-secondary bg-secondary px-4 py-3">
                             <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-text opacity-50">
                                 Producto analizado
@@ -1282,69 +936,6 @@ function weekdayRadarOptions(id) {
                             :options="chartPayload(widget.id).options"
                             :series="chartPayload(widget.id).series"
                         />
-                    </div>
-
-                    <div v-else-if="widget.kind === 'categoryRadar'" class="mt-3">
-                        <VueApexCharts
-                            height="330"
-                            type="area"
-                            :options="chartPayload(widget.id).options"
-                            :series="chartPayload(widget.id).series"
-                        />
-
-                        <div class="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-                            <div
-                                v-for="row in compactRows(categoryRows(widget.id), 4)"
-                                :key="row.category_name"
-                                class="rounded-2xl bg-secondary px-3 py-2"
-                            >
-                                <p class="truncate text-xs font-bold text-text opacity-70">{{ row.category_name }}</p>
-                                <p class="text-sm font-black text-text">{{ formatCurrency(row.revenue) }}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div v-else-if="widget.kind === 'paymentMethods'" class="mt-3">
-                        <VueApexCharts
-                            height="220"
-                            type="bar"
-                            :options="chartPayload(widget.id).options"
-                            :series="chartPayload(widget.id).series"
-                        />
-
-                        <div class="mt-3 max-h-32 overflow-auto rounded-2xl border border-secondary">
-                            <table class="min-w-full divide-y divide-secondary text-xs">
-                                <tbody class="divide-y divide-secondary">
-                                    <tr
-                                        v-for="row in compactRows(paymentRows(widget.id), 5)"
-                                        :key="row.id"
-                                    >
-                                        <td class="px-3 py-2 font-bold text-text">{{ row.name }}</td>
-                                        <td class="px-3 py-2 text-right font-black text-text">{{ formatCurrency(row.total) }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div v-else-if="widget.kind === 'movementMix'" class="mt-3">
-                        <VueApexCharts
-                            height="285"
-                            type="heatmap"
-                            :options="chartPayload(widget.id).options"
-                            :series="chartPayload(widget.id).series"
-                        />
-
-                        <div class="mt-3 grid grid-cols-2 gap-2 md:grid-cols-5">
-                            <div
-                                v-for="row in compactRows(movementRows(widget.id), 4)"
-                                :key="`${row.reason}-${row.type}`"
-                                class="rounded-2xl bg-secondary px-3 py-2"
-                            >
-                                <p class="truncate text-xs font-bold text-text opacity-70">{{ movementLabel(row.reason) }}</p>
-                                <p class="text-sm font-black text-text">{{ formatNumber(row.movements) }}</p>
-                            </div>
-                        </div>
                     </div>
 
                     <div v-else-if="widget.kind === 'branchMetric'" class="mt-3">
@@ -1439,26 +1030,6 @@ function weekdayRadarOptions(id) {
                         </div>
                     </div>
 
-                    <div v-else-if="widget.kind === 'products'" class="mt-3">
-                        <VueApexCharts
-                            height="360"
-                            type="heatmap"
-                            :options="chartPayload(widget.id).options"
-                            :series="chartPayload(widget.id).series"
-                        />
-
-                        <div class="mt-3 grid gap-2 md:grid-cols-4">
-                            <div
-                                v-for="row in compactRows(productRows(widget.id), 4)"
-                                :key="row.id"
-                                class="rounded-2xl bg-secondary px-3 py-2"
-                            >
-                                <p class="truncate text-xs font-bold text-text opacity-70">{{ row.name }}</p>
-                                <p class="text-sm font-black text-text">{{ formatCurrency(row.revenue) }}</p>
-                                <p class="text-xs font-bold text-accent">{{ formatCurrency(row.profit) }} utilidad</p>
-                            </div>
-                        </div>
-                    </div>
                 </article>
             </section>
         </main>
