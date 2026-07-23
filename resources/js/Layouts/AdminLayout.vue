@@ -165,12 +165,6 @@ onMounted(() => {
             permissions: event.permissions || [],
             role: event.role,
         })
-
-        router.reload({
-            only: ['auth', 'branches'],
-            preserveScroll: true,
-            preserveState: true,
-        })
     }
 
     const handleRealtimeActivity = (event) => {
@@ -180,8 +174,8 @@ onMounted(() => {
         })
     }
 
-    unsubscribeUserChanged = subscribeRealtime(
-        REALTIME_CHANNELS.systems,
+    unsubscribeUserChanged = subscribePrivateRealtime(
+        REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.userChanged,
         handleUserChanged,
     )

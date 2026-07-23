@@ -38,6 +38,21 @@ export const formatters = {
     return date.toLocaleDateString(locale)
   },
 
+  time: (value, options = {}) => {
+    if (!value) return options.fallback || '-'
+
+    const [hours = '00', minutes = '00'] = String(value).split(':')
+    const date = new Date(2000, 0, 1, Number(hours), Number(minutes))
+
+    if (Number.isNaN(date.getTime())) return options.fallback || '-'
+
+    return new Intl.DateTimeFormat(options.locale || 'es-MX', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(date)
+  },
+
   badge: (value, options = {}) => {
     const label = options.labelMap?.[value] || String(value)
     return { label, value }

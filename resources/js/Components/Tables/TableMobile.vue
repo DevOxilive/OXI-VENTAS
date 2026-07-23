@@ -28,7 +28,9 @@ const { can } = usePermissions()
 const { getCellValue, isActionVisible } = useTableConfig(props)
 
 const canViewActions = computed(() =>
-  props.actions?.some(action => isActionVisible(action, {}, { can }))
+  props.items?.some(row =>
+    props.actions?.some(action => isActionVisible(action, row, { can }))
+  )
 )
 
 const mobileBodyColumns = computed(() =>

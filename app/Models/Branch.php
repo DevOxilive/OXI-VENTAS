@@ -17,6 +17,9 @@ class Branch extends Model
         'slug',
         'color',
         'active',
+        'attendance_latitude',
+        'attendance_longitude',
+        'attendance_geofence_radius_meters',
     ];
 
     public function users()

@@ -32,8 +32,13 @@ class AttendanceChanged implements ShouldBroadcastNow
     /** @return array<int, int> */
     private function recipients(?int $actorId): array
     {
-        return User::query()->where('is_active', true)->get()
-            ->filter(fn (User $user) => $user->id === $actorId || $user->hasPermission('attendance.view') || $user->hasPermission('attendance.manage'))
+        return User::query()
+            ->with(['role.permissions', 'permissions'])
+            ->where('is_active', true)
+            ->get()
+            ->filter(fn (User $user) => $user->id === $actorId || $user->all_permissions->contains(
+                fn ($permission) => str_starts_with($permission->name, 'attendance.'),
+            ))
             ->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
     }
 }

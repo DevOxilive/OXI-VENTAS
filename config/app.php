@@ -123,4 +123,18 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Passkeys
+    |--------------------------------------------------------------------------
+    */
+    'passkeys' => [
+        'relying_party_id' => env('PASSKEYS_RELYING_PARTY_ID', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        'allowed_origins' => array_values(array_filter(array_unique([
+            ...array_filter(explode(',', (string) env('PASSKEYS_ALLOWED_ORIGINS', ''))),
+            env('APP_URL', 'http://localhost'),
+            'http://localhost:8000',
+        ]))),
+    ],
+
 ];

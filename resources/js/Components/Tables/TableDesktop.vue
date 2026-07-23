@@ -30,7 +30,9 @@ const { can } = usePermissions()
 const { visibleColumns, getCellValue, isActionVisible, totalColumns } = useTableConfig(props)
 
 const canViewActions = computed(() =>
-  props.actions?.some(action => isActionVisible(action, {}, { can }))
+  props.items?.some(row =>
+    props.actions?.some(action => isActionVisible(action, row, { can }))
+  )
 )
 
 const tableRows = computed(() =>

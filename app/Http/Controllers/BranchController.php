@@ -69,6 +69,9 @@ class BranchController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'color' => ['nullable', 'string', 'max:20'],
+            'attendance_latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'attendance_longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'attendance_geofence_radius_meters' => ['nullable', 'integer', 'min:10', 'max:10000'],
         ]);
 
         $branch = DB::transaction(function () use ($data) {
@@ -76,6 +79,9 @@ class BranchController extends Controller
                 'name' => $data['name'],
                 'slug' => Str::slug($data['name']),
                 'color' => $data['color'] ?? null,
+                'attendance_latitude' => $data['attendance_latitude'] ?? null,
+                'attendance_longitude' => $data['attendance_longitude'] ?? null,
+                'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? null,
                 'active' => true,
             ]);
 
@@ -117,12 +123,18 @@ class BranchController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'color' => ['nullable', 'string', 'max:20'],
             'active' => ['boolean'],
+            'attendance_latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'attendance_longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'attendance_geofence_radius_meters' => ['nullable', 'integer', 'min:10', 'max:10000'],
         ]);
 
         $branch->update([
             'name' => $data['name'],
             'slug' => Str::slug($data['name']),
             'color' => $data['color'] ?? null,
+            'attendance_latitude' => $data['attendance_latitude'] ?? null,
+            'attendance_longitude' => $data['attendance_longitude'] ?? null,
+            'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? null,
             'active' => $data['active'] ?? true,
         ]);
 

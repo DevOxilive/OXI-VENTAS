@@ -21,6 +21,9 @@
 /storage/*.key
 /storage/pail
 /vendor
+/tools/face-recognition/.venv/
+/tools/face-recognition/__pycache__/
+/.codex/
 Homestead.json
 Homestead.yaml
 Thumbs.db

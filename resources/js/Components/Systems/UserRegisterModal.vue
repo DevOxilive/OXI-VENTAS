@@ -221,6 +221,7 @@ function closeModal() {
                                 placeholder="Confirmar contraseña"
                                 :error="errors.password_confirmation"
                             />
+
                         </div>
                     </FormPanel>
 

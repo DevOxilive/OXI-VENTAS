@@ -31,6 +31,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // The package merges its defaults during registration. Apply the
+        // application policy before it registers the passkey management routes.
+        config()->set([
+            'passkeys.relying_party_id' => config('app.passkeys.relying_party_id'),
+            'passkeys.allowed_origins' => config('app.passkeys.allowed_origins'),
+            'passkeys.management_middleware' => [],
+        ]);
+
         Vite::createAssetPathsUsing(fn (string $path) => "/{$path}");
 
         Inertia::share([

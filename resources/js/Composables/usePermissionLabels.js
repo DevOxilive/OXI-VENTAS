@@ -12,6 +12,10 @@ const permissionSectionOrder = [
 const permissionModuleOrder = [
     "dashboard",
     "employees",
+    "attendance",
+    "attendance.schedules",
+    "attendance.schedule-assignments",
+    "attendance.incidents",
     "users",
     "branches",
     "files",
@@ -43,6 +47,22 @@ const permissionModules = {
     },
     employees: {
         label: "Registro de empleados",
+        section: "human-resources",
+    },
+    attendance: {
+        label: "Asistencias",
+        section: "human-resources",
+    },
+    "attendance.schedules": {
+        label: "Horarios",
+        section: "human-resources",
+    },
+    "attendance.schedule-assignments": {
+        label: "Asignación de horarios",
+        section: "human-resources",
+    },
+    "attendance.incidents": {
+        label: "Incidencias",
         section: "human-resources",
     },
     users: {
@@ -102,10 +122,32 @@ const permissionModules = {
 const permissionLabels = {
     "dashboard.executive.view": "Ver dashboard ejecutivo",
 
-    "employees.view": "Ver modulo de empleados",
-    "employees.create": "Crear empleados",
-    "employees.update": "Editar empleados",
+    "employees.view": "Ver empleados y consultar sus datos",
+    "employees.create": "Registrar empleados nuevos",
+    "employees.update": "Editar información de empleados",
     "employees.delete": "Eliminar empleados",
+
+    "attendance.view": "Ver métricas, filtros y registros de asistencia",
+    "attendance.register": "Registrar entrada, comida y salida",
+    "attendance.manage": "Ver fotografías y ubicaciones de asistencia",
+    "attendance.export.excel": "Exportar registros de asistencia en Excel",
+    "attendance.export.pdf": "Exportar registros de asistencia en PDF",
+    "attendance.corrections.request": "Solicitar corrección de un registro de asistencia",
+    "attendance.corrections.review": "Aprobar o rechazar correcciones de asistencia",
+    "attendance.schedules.view": "Ver horarios configurados",
+    "attendance.schedules.create": "Crear horarios",
+    "attendance.schedules.update": "Editar horarios",
+    "attendance.schedules.delete": "Eliminar horarios",
+    "attendance.schedule-assignments.view": "Ver horarios asignados al personal",
+    "attendance.schedule-assignments.create": "Asignar horarios al personal",
+    "attendance.schedule-assignments.update": "Editar asignaciones de horarios",
+    "attendance.schedule-assignments.delete": "Desactivar asignaciones de horarios",
+    "attendance.incidents.view": "Ver incidencias registradas",
+    "attendance.incidents.create": "Registrar incidencias",
+    "attendance.incidents.update": "Editar incidencias pendientes",
+    "attendance.incidents.delete": "Eliminar incidencias pendientes",
+    "attendance.incidents.approve": "Aprobar incidencias pendientes",
+    "attendance.incidents.reject": "Rechazar incidencias pendientes",
 
     "users.view": "Ver modulo de usuarios",
     "users.create": "Crear usuarios",
@@ -199,6 +241,18 @@ const branchScopedPermissionNames = [
 function getPermissionModule(permissionName = "") {
     if (permissionName.startsWith("dashboard.")) {
         return "dashboard";
+    }
+
+    if (permissionName.startsWith("attendance.schedule-assignments.")) {
+        return "attendance.schedule-assignments";
+    }
+
+    if (permissionName.startsWith("attendance.schedules.")) {
+        return "attendance.schedules";
+    }
+
+    if (permissionName.startsWith("attendance.incidents.")) {
+        return "attendance.incidents";
     }
 
     if (permissionName.startsWith("systems.tickets.")) {
