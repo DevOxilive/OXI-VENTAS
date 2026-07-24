@@ -1,1037 +1,196 @@
 <script setup>
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
-import { getDashboardToolbarConfig } from '@/config/ToolbarConfigs/dashboardToolbarConfig'
+import SelectField from '@/Components/Forms/SelectField.vue'
+import InputField from '@/Components/Forms/InputField.vue'
 
 defineOptions({ layout: AdminLayout })
 
 const VueApexCharts = defineAsyncComponent(async () => {
-    await Promise.all([
-        import('apexcharts/area'),
-        import('apexcharts/bar'),
-        import('apexcharts/radar'),
-        import('apexcharts/features/legend'),
-    ])
-
+    await Promise.all([import('apexcharts/bar'), import('apexcharts/column'), import('apexcharts/line'), import('apexcharts/radar'), import('apexcharts/features/legend')])
     return (await import('vue3-apexcharts/core')).default
 })
 
 const props = defineProps({
-    filters: {
-        type: Object,
-        default: () => ({
-            period: 'month',
-            branch_id: null,
-            date_from: '',
-            date_to: '',
-            max_date: '',
-            label: '',
-            branches: [],
-        }),
-    },
-    dashboardWidgets: {
-        type: Object,
-        default: () => ({}),
-    },
-    summary: {
-        type: Object,
-        default: () => ({}),
-    },
-    shrinkageSummary: {
-        type: Object,
-        default: () => ({
-            cost_loss: 0,
-            revenue_loss: 0,
-            units: 0,
-            by_branch: [],
-        }),
-    },
+    branches: { type: Array, default: () => [] },
+    chartWidget: { type: Object, default: () => ({ filters: {}, summary: {}, series: [], limitations: {} }) },
+    rankingWidget: { type: Object, default: () => ({ filters: {}, rows: [] }) },
+    radarWidget: { type: Object, default: () => ({ filters: {}, product_id: null, product_sales: null }) },
+    categoryWidget: { type: Object, default: () => ({ filters: {}, selected_ids: [], rows: [] }) },
+    categories: { type: Array, default: () => [] },
 })
 
-const storageKey = 'dashboard.executive.grid.v2'
-const selectedBranchId = ref(props.filters.branch_id ?? '')
-const dateFrom = ref(props.filters.date_from ?? '')
-const dateTo = ref(props.filters.date_to ?? '')
-const themeTick = ref(0)
-const isLayoutEditing = ref(false)
-const draggedWidgetId = ref(null)
-const dragOverWidgetId = ref(null)
-let dashboardThemeFrame = null
+const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 })
+const number = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 3 })
+const metricColors = ['#e0000f', '#171717', '#a06b00', '#dc2626']
+const groupingOptions = [{ label: 'Por día', value: 'day' }, { label: 'Por semana', value: 'week' }, { label: 'Por mes', value: 'month' }]
+const branchOptions = computed(() => props.branches.map((branch) => ({ label: branch.name, value: branch.id })))
+const productSearch = ref('')
+const productOptions = ref([])
+const isSearchingProducts = ref(false)
+const categorySearch = ref('')
+let productSearchTimer
 
-function cssVar(name, fallback) {
-    if (typeof window === 'undefined') return fallback
+const chartBranch = computed(() => props.chartWidget.series?.[0] ?? null)
+const chartFilters = computed(() => props.chartWidget.filters ?? {})
+const rankingFilters = computed(() => props.rankingWidget.filters ?? {})
+const radarFilters = computed(() => props.radarWidget.filters ?? {})
+const categoryFilters = computed(() => props.categoryWidget.filters ?? {})
+const rankingRows = computed(() => props.rankingWidget.rows ?? [])
+const radarRows = computed(() => props.radarWidget.product_sales?.rows ?? [])
+const categoryRows = computed(() => props.categoryWidget.rows ?? [])
+const selectedCategoryIds = computed(() => props.categoryWidget.selected_ids ?? [])
+const selectedCategories = computed(() => props.categories.filter((category) => selectedCategoryIds.value.includes(category.id)))
+const categoryOptionsList = computed(() => {
+    const search = categorySearch.value.trim().toLocaleLowerCase('es-MX')
+    if (!search) return []
 
-    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-    return value || fallback
-}
-
-function hexToRgb(hex) {
-    const normalized = String(hex || '').replace('#', '').trim()
-    const value = normalized.length === 3
-        ? normalized.split('').map((char) => `${char}${char}`).join('')
-        : normalized
-
-    if (!/^[0-9a-fA-F]{6}$/.test(value)) {
-        return null
-    }
-
-    return {
-        r: parseInt(value.slice(0, 2), 16),
-        g: parseInt(value.slice(2, 4), 16),
-        b: parseInt(value.slice(4, 6), 16),
-    }
-}
-
-function withAlpha(hex, alpha) {
-    const rgb = hexToRgb(hex)
-
-    if (!rgb) return hex
-
-    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`
-}
-
-const dashboardPalette = computed(() => {
-    themeTick.value
-
-    const text = cssVar('--text', '#0f0001')
-    const background = cssVar('--background', '#fcf7f8')
-    const primary = cssVar('--primary', '#e0000f')
-    const secondary = cssVar('--secondary', '#f9e7e9')
-    const accent = cssVar('--accent', '#996b00')
-
-    return {
-        text,
-        background,
-        primary,
-        secondary,
-        accent,
-        muted: withAlpha(text, 0.7),
-        soft: withAlpha(text, 0.5),
-        grid: withAlpha(text, 0.14),
-        primarySoft: withAlpha(primary, 0.18),
-        accentSoft: withAlpha(accent, 0.18),
-        textSoft: withAlpha(text, 0.16),
-    }
+    return props.categories
+        .filter((category) => !selectedCategoryIds.value.includes(category.id))
+        .filter((category) => category.name.toLocaleLowerCase('es-MX').includes(search))
+        .slice(0, 8)
 })
-
-function chartSettings(type, palette, overrides = {}) {
-    return {
-        type,
-        toolbar: { show: false },
-        foreColor: palette.muted,
-        animations: { enabled: false },
-        redrawOnParentResize: false,
-        redrawOnWindowResize: false,
-        ...overrides,
-    }
-}
-
-function repeatedPaletteColors(palette) {
-    return [palette.primary, palette.accent, palette.text, palette.primary, palette.accent]
-}
-
-const emptyWidgetData = {
-    label: '',
-    productWeekdayRadar: {
-        product: null,
-        weekdays: [],
-        branches: [],
-    },
-    shrinkageByBranch: [],
-    shrinkageByCategory: [],
-    shrinkageTimeline: [],
-    shrinkageProducts: [],
-    shrinkageSummary: {
-        cost_loss: 0,
-        revenue_loss: 0,
-        units: 0,
-    },
-}
-
-const widgetCatalog = [
-    {
-        id: 'weekdayRadar',
-        title: 'Producto por dia y sucursal',
-        kind: 'weekdayRadar',
-    },
-    {
-        id: 'revenue',
-        title: 'Ventas',
-        kind: 'branchMetric',
-        metric: 'revenue',
-        tone: 'primary',
-        valueLabel: 'Ventas',
-        wide: true,
-    },
-    {
-        id: 'investment',
-        title: 'Inversion',
-        kind: 'branchMetric',
-        metric: 'investment',
-        tone: 'text',
-        valueLabel: 'Inversion',
-        wide: true,
-    },
-    {
-        id: 'expectedProfit',
-        title: 'Ganancias',
-        kind: 'branchMetric',
-        metric: 'expected_profit',
-        tone: 'accent',
-        valueLabel: 'Ganancia esperada',
-        wide: true,
-    },
-    {
-        id: 'profit',
-        title: 'Utilidad generada',
-        kind: 'branchMetric',
-        metric: 'profit',
-        tone: 'accent',
-        valueLabel: 'Utilidad',
-        wide: true,
-    },
-    {
-        id: 'shrinkage',
-        title: 'Mermas por categoria',
-        kind: 'shrinkage',
-        tone: 'primary',
-        wide: true,
-    },
-]
-
-function defaultLayout() {
-    const order = widgetCatalog.map((widget) => widget.id)
-
-    return {
-        order,
-        periods: {
-            weekdayRadar: 'week',
-            revenue: 'month',
-            investment: 'month',
-            expectedProfit: 'month',
-            profit: 'month',
-            shrinkage: 'month',
-        },
-    }
-}
-
-function normalizeWidgetOrder(order = []) {
-    const catalogIds = widgetCatalog.map((widget) => widget.id)
-    const savedIds = Array.isArray(order) ? order : []
-    const validSavedIds = savedIds.filter((id, index) =>
-        catalogIds.includes(id) && savedIds.indexOf(id) === index
-    )
-    const missingIds = catalogIds.filter((id) => !validSavedIds.includes(id))
-
-    return [...validSavedIds, ...missingIds]
-}
-
-function loadLayout() {
-    if (typeof window === 'undefined') return defaultLayout()
-
-    try {
-        const saved = JSON.parse(window.localStorage.getItem(storageKey) ?? '{}')
-        const defaults = defaultLayout()
-        const legacyOrder = saved.order ?? [
-            ...(saved.pinned ?? []),
-            ...defaults.order.filter((id) => !(saved.pinned ?? []).includes(id)),
-        ]
-
-        return {
-            order: normalizeWidgetOrder(legacyOrder),
-            periods: {
-                ...defaults.periods,
-                ...(saved.periods ?? {}),
-            },
-        }
-    } catch {
-        return defaultLayout()
-    }
-}
-
-const layout = ref(loadLayout())
-
-watch(
-    () => props.filters,
-    (value) => {
-        selectedBranchId.value = value?.branch_id ?? ''
-        dateFrom.value = value?.date_from ?? ''
-        dateTo.value = value?.date_to ?? ''
-    },
-    { deep: true },
-)
-
-watch(
-    layout,
-    (value) => {
-        if (typeof window === 'undefined') return
-
-        window.localStorage.setItem(storageKey, JSON.stringify(value))
-    },
-    { deep: true },
-)
-
-watch([selectedBranchId, dateFrom, dateTo], () => {
-    applyDashboardFilters()
-})
-
-function applyDashboardFilters(overrides = {}) {
-    const nextDateFrom = overrides.date_from ?? dateFrom.value
-    const nextDateTo = overrides.date_to ?? dateTo.value
-
-    if (!nextDateFrom || !nextDateTo) return
-
-    router.get(
-        route('dashboard'),
-        {
-            period: overrides.period ?? props.filters.period ?? 'month',
-            branch_id: (overrides.branch_id ?? selectedBranchId.value) || undefined,
-            date_from: nextDateFrom,
-            date_to: nextDateTo,
-        },
-        {
-            preserveScroll: true,
-            preserveState: true,
-            replace: true,
-        },
-    )
-}
-
-function refreshDashboardTheme() {
-    if (dashboardThemeFrame !== null) return
-
-    dashboardThemeFrame = window.requestAnimationFrame(() => {
-        themeTick.value += 1
-        dashboardThemeFrame = null
-    })
-}
-
-onMounted(() => {
-    if (typeof window === 'undefined') return
-
-    window.addEventListener('oxi-theme-change', refreshDashboardTheme)
-})
-
-onBeforeUnmount(() => {
-    if (typeof window === 'undefined') return
-
-    window.removeEventListener('oxi-theme-change', refreshDashboardTheme)
-
-    if (dashboardThemeFrame !== null) {
-        window.cancelAnimationFrame(dashboardThemeFrame)
-    }
-})
-
-const currencyFormatter = new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-    maximumFractionDigits: 0,
-})
-const numberFormatters = new Map()
-
-function formatCurrency(value) {
-    const amount = Number(value ?? 0)
-
-    return currencyFormatter.format(Number.isFinite(amount) ? amount : 0)
-}
-
-function formatNumber(value, digits = 0) {
-    const amount = Number(value ?? 0)
-    const formatterKey = String(digits)
-
-    if (!numberFormatters.has(formatterKey)) {
-        numberFormatters.set(formatterKey, new Intl.NumberFormat('es-MX', {
-            maximumFractionDigits: digits,
-        }))
-    }
-
-    return numberFormatters.get(formatterKey).format(Number.isFinite(amount) ? amount : 0)
-}
-
-function widgetPeriod(id) {
-    return layout.value.periods[id] ?? 'month'
-}
-
-function setAllWidgetPeriods(period) {
-    layout.value.periods = widgetCatalog.reduce((periods, widget) => ({
-        ...periods,
-        [widget.id]: period,
-    }), {})
-}
-
-function resetDashboardLayout() {
-    layout.value = {
-        ...defaultLayout(),
-        periods: {
-            ...defaultLayout().periods,
-        },
-    }
-    draggedWidgetId.value = null
-    dragOverWidgetId.value = null
-}
-
-function dataFor(id) {
-    return props.dashboardWidgets?.[widgetPeriod(id)] ?? emptyWidgetData
-}
-
-function branchRows(id) {
-    return dataFor(id).branchPerformance ?? []
-}
-
-function weekdayRadarData(id) {
-    return dataFor(id).productWeekdayRadar ?? emptyWidgetData.productWeekdayRadar
-}
-
-function shrinkageRows(id) {
-    return dataFor(id).shrinkageByCategory ?? []
-}
-
-function shrinkageTimelineRows(id) {
-    return dataFor(id).shrinkageTimeline ?? []
-}
-
-function shrinkageProducts(id) {
-    return dataFor(id).shrinkageProducts ?? []
-}
-
-function metricTotal(id, metric) {
-    return branchRows(id).reduce((total, row) => total + Number(row[metric] ?? 0), 0)
-}
-
-function compactRows(rows, limit = 5) {
-    return rows.slice(0, limit)
-}
-
-function timelineLabels(rows) {
-    return [...new Map(rows.map((row) => [row.period_key, row.label])).values()]
-}
-
-function timelineContext(rows, nameKey, valueKey, limit = 5) {
-    const labelsByPeriod = new Map()
-    const periodKeys = []
-    const totalsByName = new Map()
-    const valuesByName = new Map()
-
-    rows.forEach((row) => {
-        const periodKey = row.period_key
-        const name = row[nameKey]
-        const value = Number(row[valueKey] ?? 0)
-
-        if (!labelsByPeriod.has(periodKey)) {
-            labelsByPeriod.set(periodKey, row.label ?? periodKey)
-            periodKeys.push(periodKey)
-        }
-
-        totalsByName.set(name, (totalsByName.get(name) ?? 0) + value)
-
-        if (!valuesByName.has(name)) {
-            valuesByName.set(name, new Map())
-        }
-
-        valuesByName.get(name).set(periodKey, value)
-    })
-
-    const names = [...totalsByName.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, limit)
-        .map(([name]) => name)
-
-    return {
-        labels: periodKeys.map((key) => labelsByPeriod.get(key) ?? key),
-        names,
-        periodKeys,
-        valuesByName,
-    }
-}
-
-function timelineSeries(rows, nameKey, valueKey, limit = 5) {
-    const context = timelineContext(rows, nameKey, valueKey, limit)
-
-    return context.names.map((name) => ({
-        name,
-        data: context.periodKeys.map((key) => context.valuesByName.get(name)?.get(key) ?? 0),
-    }))
-}
-
-const visibleWidgets = computed(() => {
-    const order = normalizeWidgetOrder(layout.value.order)
-    const widgetsById = new Map(widgetCatalog.map((widget) => [widget.id, widget]))
-
-    return order
-        .map((id) => widgetsById.get(id))
-        .filter(Boolean)
-})
-
-const chartPeriodValue = computed(() => {
-    const periods = [...new Set(visibleWidgets.value.map((widget) => widgetPeriod(widget.id)))]
-
-    return periods.length === 1 ? periods[0] : ''
-})
-
+const hasChartData = computed(() => chartBranch.value?.series?.some((row) => Number(row.sales) || Number(row.investment) || Number(row.profit) || Number(row.shrinkage)))
+const hasRadarData = computed(() => radarRows.value.some((row) => Number(row.units) > 0))
+const hasRankingData = computed(() => rankingRows.value.some((row) => Number(row.sales) > 0))
+const hasSelectedCategories = computed(() => selectedCategories.value.length > 0)
 const summaryCards = computed(() => [
-    {
-        label: 'Ventas',
-        value: formatCurrency(props.summary.revenue),
-        surface: 'bg-secondary',
-        labelClass: 'text-primary',
-        valueClass: 'text-text',
-        formula: 'Ventas netas: suma de sales.total con status completed en el rango filtrado.',
-    },
-    {
-        label: 'Inversion',
-        value: formatCurrency(props.summary.investment),
-        surface: 'bg-background',
-        labelClass: 'text-text opacity-70',
-        valueClass: 'text-text',
-        formula: 'Inversión proyectada: suma de las Órdenes de compra de sucursal generadas, en revisión o completadas durante el rango.',
-    },
-    {
-        label: 'Utilidad',
-        value: formatCurrency(props.summary.profit),
-        surface: 'bg-secondary',
-        labelClass: 'text-accent',
-        valueClass: 'text-text',
-        formula: 'Utilidad estimada: ventas netas menos la inversión proyectada de Órdenes de compra de sucursal.',
-    },
-    {
-        label: 'Merma',
-        value: formatCurrency(props.shrinkageSummary.cost_loss),
-        surface: 'bg-secondary',
-        labelClass: 'text-primary',
-        valueClass: 'text-text',
-        formula: 'Valor de merma estimado: movimientos DAMAGED, EXPIRED y INVENTORY_DIFFERENCE por products.cost.',
-    },
+    { key: 'sales', title: 'Ventas', description: 'Ventas completadas y ya incluidas en un corte de caja.' },
+    { key: 'investment', title: 'Inversión', description: 'Total final de órdenes de compra completadas de esta sucursal.' },
+    { key: 'profit', title: 'Utilidad estimada', description: 'Ventas menos el costo actual de los productos vendidos.' },
+    { key: 'shrinkage', title: 'Merma estimada', description: 'Daños o caducidades valuadas al costo actual.' },
 ])
-
-const selectedBranchName = computed(() => {
-    const branch = props.filters.branches?.find(
-        (item) => Number(item.id) === Number(selectedBranchId.value),
-    )
-
-    return branch?.name ?? 'Todas las sucursales'
+const chartOptions = computed(() => ({
+    chart: { type: 'line', toolbar: { show: false }, animations: { enabled: false } }, colors: metricColors,
+    stroke: { curve: 'smooth', width: 3, dashArray: [0, 7, 9, 4] }, dataLabels: { enabled: false }, markers: { size: 2, hover: { size: 5 } },
+    xaxis: { categories: chartBranch.value?.series?.map((row) => row.label) ?? [], labels: { trim: true } },
+    yaxis: { labels: { formatter: (value) => currency.format(value) } }, legend: { position: 'top', fontSize: '11px' },
+    tooltip: { shared: true, y: { formatter: (value) => currency.format(value) } }, grid: { borderColor: 'rgba(128, 128, 128, 0.18)' },
+}))
+const chartSeries = computed(() => {
+    const rows = chartBranch.value?.series ?? []
+    return [{ name: 'Ventas', data: rows.map((row) => Number(row.sales)) }, { name: 'Inversión', data: rows.map((row) => Number(row.investment)) }, { name: 'Utilidad', data: rows.map((row) => Number(row.profit)) }, { name: 'Merma', data: rows.map((row) => Number(row.shrinkage)) }]
 })
+const rankingOptions = computed(() => ({
+    chart: { type: 'bar', toolbar: { show: false }, animations: { enabled: false } }, colors: ['#e0000f', '#171717', '#a06b00', '#dc2626', '#6b7280'],
+    plotOptions: { bar: { horizontal: false, columnWidth: '48%', borderRadius: 4, distributed: true } }, dataLabels: { enabled: false },
+    xaxis: { categories: rankingRows.value.map((row) => row.branch_name), labels: { trim: true, rotate: -20 } }, yaxis: { labels: { formatter: (value) => currency.format(value) } },
+    legend: { show: false }, tooltip: { y: { formatter: (value) => currency.format(value) } }, grid: { borderColor: 'rgba(128, 128, 128, 0.18)' },
+}))
+const radarOptions = computed(() => ({
+    chart: { type: 'radar', toolbar: { show: false }, animations: { enabled: false } }, colors: ['#e0000f'], xaxis: { categories: radarRows.value.map((row) => row.label) }, yaxis: { show: false },
+    stroke: { width: 2.5 }, fill: { opacity: 0.3 }, markers: { size: 4 }, tooltip: { y: { formatter: (value) => `${number.format(value)} piezas` } },
+    plotOptions: { radar: { polygons: { strokeColors: 'rgba(128, 128, 128, 0.25)', connectorColors: 'rgba(128, 128, 128, 0.25)' } } },
+}))
+const categoryRadarOptions = computed(() => ({
+    chart: { type: 'radar', toolbar: { show: false }, animations: { enabled: false } }, colors: ['#a06b00'],
+    xaxis: { categories: categoryRows.value.map((row) => row.label) }, yaxis: { show: false },
+    stroke: { width: 2.5 }, fill: { opacity: 0.3 }, markers: { size: 4 },
+    tooltip: { y: { formatter: (value) => currency.format(value) } },
+    plotOptions: { radar: { polygons: { strokeColors: 'rgba(128, 128, 128, 0.25)', connectorColors: 'rgba(128, 128, 128, 0.25)' } } },
+}))
 
-const dashboardToolbarConfig = computed(() =>
-    getDashboardToolbarConfig({
-        branchName: selectedBranchName.value,
-        rangeLabel: props.filters.label,
-        branches: props.filters.branches ?? [],
-        selectedBranchId: selectedBranchId.value,
-        period: props.filters.period ?? 'month',
-        chartPeriod: chartPeriodValue.value,
-        dateFrom: dateFrom.value,
-        dateTo: dateTo.value,
-        maxDate: props.filters.max_date,
-        isLayoutEditing: isLayoutEditing.value,
-    }),
-)
-
-function handleDashboardToolbarFilter({ key, value }) {
-    if (key === 'chart_period') {
-        if (value) {
-            setAllWidgetPeriods(value)
-        }
-
-        return
-    }
-
-    if (key === 'branch_id') {
-        selectedBranchId.value = value
-        return
-    }
-
-    if (key === 'date_from') {
-        dateFrom.value = value
-        return
-    }
-
-    if (key === 'date_to') {
-        dateTo.value = value
-        return
-    }
-
-    if (key === 'period') {
-        applyDashboardFilters({ period: value })
-    }
-}
-
-function handleDashboardToolbarAction(action) {
-    if (action === 'toggle-layout-edit') {
-        isLayoutEditing.value = !isLayoutEditing.value
-        draggedWidgetId.value = null
-        dragOverWidgetId.value = null
-        return
-    }
-
-    if (action === 'reset-layout') {
-        resetDashboardLayout()
-        return
-    }
-
-    if (action === 'reset-chart-periods') {
-        layout.value.periods = defaultLayout().periods
-    }
-}
-
-function handleWidgetDragStart(event, widget) {
-    if (!isLayoutEditing.value) {
-        event.preventDefault()
-        return
-    }
-
-    draggedWidgetId.value = widget.id
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', widget.id)
-}
-
-function handleWidgetDragEnter(widget) {
-    if (!isLayoutEditing.value || !draggedWidgetId.value || draggedWidgetId.value === widget.id) return
-
-    dragOverWidgetId.value = widget.id
-}
-
-function handleWidgetDrop(widget) {
-    if (!isLayoutEditing.value || !draggedWidgetId.value || draggedWidgetId.value === widget.id) {
-        draggedWidgetId.value = null
-        dragOverWidgetId.value = null
-        return
-    }
-
-    const order = normalizeWidgetOrder(layout.value.order)
-    const fromIndex = order.indexOf(draggedWidgetId.value)
-    const toIndex = order.indexOf(widget.id)
-
-    if (fromIndex === -1 || toIndex === -1) {
-        draggedWidgetId.value = null
-        dragOverWidgetId.value = null
-        return
-    }
-
-    const nextOrder = [...order]
-    const [movedWidgetId] = nextOrder.splice(fromIndex, 1)
-    nextOrder.splice(toIndex, 0, movedWidgetId)
-
-    layout.value.order = nextOrder
-    draggedWidgetId.value = null
-    dragOverWidgetId.value = null
-}
-
-function handleWidgetDragEnd() {
-    draggedWidgetId.value = null
-    dragOverWidgetId.value = null
-}
-
-function bentoWidgetClasses(widget) {
-    const classes = {
-        weekdayRadar: 'lg:col-span-3 xl:col-span-5',
-        branchMetric: 'lg:col-span-3 xl:col-span-3',
-        shrinkage: 'lg:col-span-3 xl:col-span-7',
-    }
-
-    return classes[widget.kind] ?? 'lg:col-span-3 xl:col-span-6'
-}
-
-function widgetTitle(widget) {
-    return widget.title
-}
-
-const emptyChartPayload = {
-    options: {},
-    series: [],
-}
-
-const chartPayloads = computed(() => {
-    const payloads = {}
-
-    widgetCatalog.forEach((widget) => {
-        if (widget.kind === 'weekdayRadar') {
-            payloads[widget.id] = {
-                options: weekdayRadarOptions(widget.id),
-                series: weekdayRadarSeries(widget.id),
-            }
-            return
-        }
-
-        if (widget.kind === 'branchMetric') {
-            payloads[widget.id] = {
-                options: branchMetricOptions(widget.id, widget.tone),
-                series: branchMetricSeries(widget.id, widget.metric, widget.valueLabel),
-            }
-            return
-        }
-
-        if (widget.kind === 'shrinkage') {
-            payloads[widget.id] = {
-                options: shrinkageOptions(widget.id),
-                series: shrinkageSeries(widget.id),
-            }
-            return
-        }
-
-    })
-
-    return payloads
+watch(productSearch, (term) => {
+    clearTimeout(productSearchTimer); productOptions.value = []
+    if (term.trim().length < 2) return
+    productSearchTimer = setTimeout(async () => {
+        isSearchingProducts.value = true
+        try {
+            const { data } = await window.axios.get(route('dashboard.products.search'), { params: { search: term, radar_date_from: radarFilters.value.date_from, radar_date_to: radarFilters.value.date_to } })
+            productOptions.value = data.products ?? []
+        } finally { isSearchingProducts.value = false }
+    }, 250)
 })
+onBeforeUnmount(() => clearTimeout(productSearchTimer))
 
-function chartPayload(id) {
-    return chartPayloads.value[id] ?? emptyChartPayload
-}
-
-function branchMetricSeries(id, metric, label) {
-    return [
-        {
-            name: label,
-            data: branchRows(id).map((row) => Number(row[metric] ?? 0)),
-        },
-    ]
-}
-
-function branchMetricOptions(id, color) {
-    const palette = dashboardPalette.value
-    const tone = {
-        primary: palette.primary,
-        accent: palette.accent,
-        text: palette.text,
-    }[color] ?? palette.primary
-
+function currentParams() {
     return {
-        chart: chartSettings('bar', palette),
-        plotOptions: {
-            bar: {
-                horizontal: false,
-                borderRadius: 11,
-                columnWidth: '48%',
-            },
-        },
-        colors: [tone],
-        dataLabels: { enabled: false },
-        fill: {
-            type: 'gradient',
-            gradient: {
-                shade: 'light',
-                opacityFrom: 0.92,
-                opacityTo: 0.58,
-            },
-        },
-        grid: {
-            borderColor: palette.grid,
-            strokeDashArray: 4,
-        },
-        xaxis: {
-            categories: branchRows(id).map((row) => row.name),
-        },
-        yaxis: {
-            labels: {
-                formatter: (value) => formatCurrency(value),
-            },
-        },
-        tooltip: {
-            y: {
-                formatter: (value) => formatCurrency(value),
-            },
-        },
+        chart_branch_id: chartFilters.value.branch_id, chart_date_from: chartFilters.value.date_from, chart_date_to: chartFilters.value.date_to, chart_grouping: chartFilters.value.grouping,
+        ranking_date_from: rankingFilters.value.date_from, ranking_date_to: rankingFilters.value.date_to,
+        radar_date_from: radarFilters.value.date_from, radar_date_to: radarFilters.value.date_to, radar_product_id: props.radarWidget.product_id || undefined,
+        category_branch_id: categoryFilters.value.branch_id, category_date_from: categoryFilters.value.date_from, category_date_to: categoryFilters.value.date_to,
+        category_ids: selectedCategoryIds.value.join(',') || undefined,
     }
 }
-
-function shrinkageSeries(id) {
-    return timelineSeries(shrinkageTimelineRows(id), 'category_name', 'cost_loss', 5)
+function updateWidget(values) { router.get(route('dashboard'), { ...currentParams(), ...values }, { preserveScroll: true, preserveState: true, replace: true }) }
+function chooseProduct(product) { productSearch.value = product.name; productOptions.value = []; updateWidget({ radar_product_id: product.id }) }
+function clearProduct() { productSearch.value = ''; productOptions.value = []; updateWidget({ radar_product_id: undefined }) }
+function selectCategory(category) {
+    categorySearch.value = ''
+    updateWidget({ category_ids: [...selectedCategoryIds.value, category.id].join(',') })
 }
-
-function shrinkageOptions(id) {
-    const labels = timelineLabels(shrinkageTimelineRows(id))
-    const palette = dashboardPalette.value
-
-    return {
-        chart: chartSettings('area', palette),
-        colors: repeatedPaletteColors(palette),
-        dataLabels: { enabled: false },
-        stroke: { curve: 'smooth', width: 4, lineCap: 'round' },
-        fill: {
-            type: 'gradient',
-            gradient: { opacityFrom: 0.48, opacityTo: 0.05 },
-        },
-        markers: {
-            size: 4,
-            strokeWidth: 0,
-            hover: { size: 7 },
-        },
-        legend: {
-            position: 'bottom',
-        },
-        xaxis: { categories: labels, tickAmount: Math.min(8, Math.max(2, labels.length)) },
-        yaxis: { labels: { formatter: (value) => formatCurrency(value) } },
-        tooltip: {
-            shared: true,
-            intersect: false,
-            y: {
-                formatter: (value) => formatCurrency(value),
-            },
-        },
-    }
-}
-
-function weekdayRadarSeries(id) {
-    return weekdayRadarData(id).branches.map((branch) => ({
-        name: branch.branch_name,
-        data: branch.units.map((value) => Number(value ?? 0)),
-    }))
-}
-
-function weekdayRadarOptions(id) {
-    const data = weekdayRadarData(id)
-    const palette = dashboardPalette.value
-
-    return {
-        chart: chartSettings('radar', palette),
-        colors: repeatedPaletteColors(palette),
-        dataLabels: {
-            enabled: false,
-            background: {
-                enabled: true,
-                borderRadius: 4,
-                opacity: 0.9,
-            },
-            formatter: (value) => formatNumber(value, 0),
-        },
-        markers: {
-            size: 5,
-            strokeWidth: 0,
-            hover: { size: 8 },
-        },
-        stroke: {
-            width: 3,
-            lineCap: 'round',
-        },
-        fill: {
-            opacity: 0.22,
-        },
-        plotOptions: {
-            radar: {
-                polygons: {
-                    strokeColors: palette.grid,
-                    fill: {
-                        colors: [palette.secondary, palette.background],
-                    },
-                },
-            },
-        },
-        legend: {
-            position: 'bottom',
-            fontSize: '11px',
-        },
-        xaxis: {
-            categories: data.weekdays,
-        },
-        yaxis: {
-            labels: {
-                formatter: (value) => formatNumber(value),
-            },
-        },
-        tooltip: {
-            y: {
-                formatter: (value) => `${formatNumber(value)} unidades`,
-            },
-        },
-    }
+function removeCategory(categoryId) {
+    updateWidget({ category_ids: selectedCategoryIds.value.filter((id) => id !== categoryId).join(',') || undefined })
 }
 </script>
 
 <template>
     <Head title="Dashboard" />
-
     <PageLayout>
         <template #toolbar>
-            <div class="space-y-4">
-                <GlobalToolbar
-                    v-bind="dashboardToolbarConfig"
-                    @update:filter="handleDashboardToolbarFilter"
-                    @action="handleDashboardToolbarAction"
-                />
-
-                <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <article
-                        v-for="card in summaryCards"
-                        :key="card.label"
-                        :title="card.formula"
-                        class="rounded-[22px] border border-secondary p-4 shadow-sm"
-                        :class="card.surface"
-                    >
-                        <p class="text-[10px] font-bold uppercase tracking-[0.18em]" :class="card.labelClass">
-                            {{ card.label }}
-                        </p>
-                        <p class="mt-1 text-2xl font-black" :class="card.valueClass">
-                            {{ card.value }}
-                        </p>
-                    </article>
-                </section>
-            </div>
+            <GlobalToolbar title="Dashboard" subtitle="Consulta el desempeño de sucursales, ventas, inversión, utilidad y merma." :show-search="false" :show-records-per-page="false" :show-counter="false" />
         </template>
 
-        <main class="space-y-4">
-            <section class="grid grid-cols-1 gap-4 lg:grid-cols-6 xl:grid-cols-12">
-                <article
-                    v-for="widget in visibleWidgets"
-                    :key="widget.id"
-                    :draggable="isLayoutEditing"
-                    class="overflow-hidden rounded-[26px] border border-secondary bg-background/95 p-4 shadow-sm transition"
-                    :class="[
-                        bentoWidgetClasses(widget),
-                        isLayoutEditing ? 'cursor-grab ring-1 ring-primary/20 active:cursor-grabbing' : '',
-                        draggedWidgetId === widget.id ? 'scale-[0.99] opacity-50' : '',
-                        dragOverWidgetId === widget.id && draggedWidgetId !== widget.id ? 'border-primary bg-secondary' : '',
-                    ]"
-                    @dragstart="handleWidgetDragStart($event, widget)"
-                    @dragenter.prevent="handleWidgetDragEnter(widget)"
-                    @dragover.prevent
-                    @drop.prevent="handleWidgetDrop(widget)"
-                    @dragend="handleWidgetDragEnd"
-                >
-                    <header class="flex items-start justify-between gap-3">
-                        <div class="flex min-w-0 items-start gap-2">
-                            <span
-                                v-if="isLayoutEditing"
-                                class="material-symbols-outlined mt-0.5 shrink-0 text-[20px] text-primary"
-                                title="Arrastra para reordenar"
-                            >
-                                drag_indicator
-                            </span>
+        <div class="space-y-5">
+            <section class="rounded-2xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+                <div class="mb-5">
+                    <h1 class="text-lg font-semibold">Indicadores por sucursal</h1>
+                    <p class="text-sm text-black/60 dark:text-white/60">Selecciona la sucursal y la forma en que deseas resumir el historial.</p>
+                </div>
+                <div class="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div><SelectField label="Sucursal" field="chart-branch" :model-value="chartFilters.branch_id" :options="branchOptions" @update:model-value="updateWidget({ chart_branch_id: $event })" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Sucursal de la gráfica y sus indicadores.</p></div>
+                    <div><SelectField label="Agrupar datos" field="chart-grouping" :model-value="chartFilters.grouping" :options="groupingOptions" @update:model-value="updateWidget({ chart_grouping: $event })" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Resume el rango por días, semanas o meses.</p></div>
+                    <div><InputField label="Desde" field="chart-date-from" type="date" :model-value="chartFilters.date_from" @update:model-value="updateWidget({ chart_date_from: $event })" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Primer día incluido en el historial.</p></div>
+                    <div><InputField label="Hasta" field="chart-date-to" type="date" :model-value="chartFilters.date_to" @update:model-value="updateWidget({ chart_date_to: $event })" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Último día incluido en el historial.</p></div>
+                </div>
+                <div class="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <article v-for="card in summaryCards" :key="card.key" class="rounded-xl bg-black/[0.03] p-4 dark:bg-white/[0.06]"><p class="text-sm font-medium">{{ card.title }}</p><p class="mt-1 text-xl font-bold">{{ currency.format(chartWidget.summary?.[card.key]?.value ?? 0) }}</p><p class="mt-2 text-xs text-black/60 dark:text-white/60">{{ card.description }}</p></article>
+                </div>
+                <VueApexCharts v-if="hasChartData" height="360" :options="chartOptions" :series="chartSeries" />
+                <p v-else class="py-24 text-center text-sm text-black/60 dark:text-white/60">No se registraron datos confirmados para esta sucursal en el rango elegido.</p>
+            </section>
 
-                            <div class="min-w-0">
-                                <h2 class="truncate text-base font-black text-text">
-                                    {{ widgetTitle(widget) }}
-                                </h2>
-                                <p class="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-text opacity-50">
-                                    {{ dataFor(widget.id).label }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <span
-                            v-if="isLayoutEditing"
-                            class="rounded-2xl border border-primary bg-secondary px-2.5 py-1.5 text-[11px] font-bold text-primary"
-                        >
-                            Movible
-                        </span>
-                    </header>
-
-                    <div v-if="widget.kind === 'weekdayRadar'" class="mt-3">
-                        <div class="mb-3 rounded-3xl border border-secondary bg-secondary px-4 py-3">
-                            <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-text opacity-50">
-                                Producto analizado
-                            </p>
-                            <p class="mt-1 text-lg font-black text-text">
-                                {{ weekdayRadarData(widget.id).product?.name ?? 'Sin ventas en el periodo' }}
-                            </p>
-                            <p class="text-xs font-bold text-text opacity-70">
-                                {{ formatNumber(weekdayRadarData(widget.id).product?.units ?? 0) }} unidades vendidas
-                            </p>
-                        </div>
-
-                        <VueApexCharts
-                            height="380"
-                            type="radar"
-                            :options="chartPayload(widget.id).options"
-                            :series="chartPayload(widget.id).series"
-                        />
+            <section class="grid gap-5 xl:grid-cols-2">
+                <article class="rounded-2xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+                    <h2 class="font-semibold">Ranking de ventas</h2><p class="mb-4 text-sm text-black/60 dark:text-white/60">Compara ventas confirmadas de todas las sucursales.</p>
+                    <div class="mb-4 grid gap-4 sm:grid-cols-2">
+                        <div><InputField label="Desde" field="ranking-date-from" type="date" :model-value="rankingFilters.date_from" @update:model-value="updateWidget({ ranking_date_from: $event })" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Inicio del periodo que se compara.</p></div>
+                        <div><InputField label="Hasta" field="ranking-date-to" type="date" :model-value="rankingFilters.date_to" @update:model-value="updateWidget({ ranking_date_to: $event })" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Fin del periodo que se compara.</p></div>
                     </div>
+                    <p class="mb-3 text-xs text-black/60 dark:text-white/60">Se ordena por ventas completadas que ya pertenecen a un corte de caja.</p>
+                    <VueApexCharts v-if="hasRankingData" height="290" :options="rankingOptions" :series="[{ name: 'Ventas', data: rankingRows.map((row) => Number(row.sales)) }]" />
+                    <p v-else class="py-20 text-center text-sm text-black/60 dark:text-white/60">Aún no hay ventas confirmadas para comparar.</p>
+                </article>
 
-                    <div v-else-if="widget.kind === 'branchMetric'" class="mt-3">
-                        <div class="mb-1.5 rounded-2xl bg-secondary px-3 py-2">
-                            <p class="text-xs font-bold uppercase tracking-[0.2em] text-text opacity-50">
-                                Total visible
-                            </p>
-                            <p class="mt-1 text-lg font-black text-text">
-                                {{ formatCurrency(metricTotal(widget.id, widget.metric)) }}
-                            </p>
-                        </div>
-
-                        <VueApexCharts
-                            height="230"
-                            type="bar"
-                            :options="chartPayload(widget.id).options"
-                            :series="chartPayload(widget.id).series"
-                        />
-
-                        <div class="mt-1.5 max-h-28 overflow-auto rounded-2xl border border-secondary">
-                            <table class="min-w-full divide-y divide-secondary text-xs">
-                                <tbody class="divide-y divide-secondary">
-                                    <tr
-                                        v-for="row in compactRows(branchRows(widget.id), 6)"
-                                        :key="row.id"
-                                        class="bg-background"
-                                    >
-                                        <td class="px-3 py-2 font-bold text-text">
-                                            {{ row.name }}
-                                        </td>
-                                        <td class="px-3 py-2 text-right font-black text-text">
-                                            {{ formatCurrency(row[widget.metric]) }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                <article class="rounded-2xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+                    <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="font-semibold">Radar de venta por producto</h2><p class="text-sm text-black/60 dark:text-white/60">Compara piezas vendidas del producto entre sucursales.</p></div><span v-if="radarWidget.product_sales?.product" class="rounded-full bg-red-50 px-3 py-1 text-sm font-medium text-red-800 dark:bg-red-950/40 dark:text-red-100">{{ radarWidget.product_sales.product.name }}</span></div>
+                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                        <div class="relative sm:col-span-2"><label class="mb-1 block text-sm font-semibold text-text">Producto</label><input v-model="productSearch" type="search" class="w-full rounded-xl border border-secondary bg-background px-4 py-3 pr-24 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary" placeholder="Busca el producto que quieres comparar" autocomplete="off"><button v-if="radarWidget.product_id" type="button" class="absolute right-2 top-9 text-sm font-medium text-primary" @click="clearProduct">Limpiar</button><span v-else-if="isSearchingProducts" class="absolute right-3 top-9 text-xs text-text/50">Buscando…</span><p class="mt-1 text-xs text-black/60 dark:text-white/60">Busca un producto y el radar mostrará sus piezas vendidas por sucursal.</p><div v-if="productOptions.length" class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-secondary bg-background p-1 shadow-xl"><button v-for="product in productOptions" :key="product.id" type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-secondary" @click="chooseProduct(product)"><span>{{ product.name }}</span><span v-if="product.code" class="text-xs text-text/50">{{ product.code }}</span></button></div></div>
+                        <div><InputField label="Desde" field="radar-date-from" type="date" :model-value="radarFilters.date_from" @update:model-value="updateWidget({ radar_date_from: $event })" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Inicio de las ventas del producto.</p></div>
+                        <div><InputField label="Hasta" field="radar-date-to" type="date" :model-value="radarFilters.date_to" @update:model-value="updateWidget({ radar_date_to: $event })" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Fin de las ventas del producto.</p></div>
                     </div>
-
-                    <div v-else-if="widget.kind === 'shrinkage'" class="mt-3">
-                        <div class="mb-1.5 grid gap-1.5 sm:grid-cols-3">
-                            <div class="rounded-2xl bg-secondary px-3 py-2">
-                                <p class="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-                                    Costo
-                                </p>
-                                <p class="mt-1 text-lg font-black text-text">
-                                    {{ formatCurrency(dataFor(widget.id).shrinkageSummary.cost_loss) }}
-                                </p>
-                            </div>
-                            <div class="rounded-2xl bg-secondary px-3 py-2">
-                                <p class="text-xs font-bold uppercase tracking-[0.18em] text-text opacity-50">
-                                    Venta perdida
-                                </p>
-                                <p class="mt-1 text-lg font-black text-text">
-                                    {{ formatCurrency(dataFor(widget.id).shrinkageSummary.revenue_loss) }}
-                                </p>
-                            </div>
-                            <div class="rounded-2xl bg-secondary px-3 py-2">
-                                <p class="text-xs font-bold uppercase tracking-[0.18em] text-text opacity-50">
-                                    Unidades
-                                </p>
-                                <p class="mt-1 text-lg font-black text-text">
-                                    {{ formatNumber(dataFor(widget.id).shrinkageSummary.units, 1) }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <VueApexCharts
-                            height="260"
-                            type="area"
-                            :options="chartPayload(widget.id).options"
-                            :series="chartPayload(widget.id).series"
-                        />
-
-                        <div class="mt-1.5 max-h-28 overflow-auto rounded-2xl border border-secondary">
-                            <table class="min-w-full divide-y divide-secondary text-xs">
-                                <tbody class="divide-y divide-secondary">
-                                    <tr
-                                        v-for="row in compactRows(shrinkageRows(widget.id), 6)"
-                                        :key="row.category_name"
-                                        class="bg-background transition hover:bg-secondary"
-                                    >
-                                        <td class="px-3 py-2 font-bold text-text">
-                                            {{ row.category_name }}
-                                        </td>
-                                        <td class="px-3 py-2 text-right font-black text-primary">
-                                            {{ formatCurrency(row.cost_loss) }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
+                    <p class="my-3 text-xs text-black/60 dark:text-white/60">Suma las cantidades vendidas en ventas completadas y con corte de caja dentro de este rango.</p>
+                    <VueApexCharts v-if="radarWidget.product_sales?.product && hasRadarData" height="290" :options="radarOptions" :series="[{ name: 'Piezas vendidas', data: radarRows.map((row) => Number(row.units)) }]" />
+                    <p v-else-if="radarWidget.product_sales?.product" class="py-16 text-center text-sm text-black/60 dark:text-white/60">Este producto no tiene ventas confirmadas en el rango elegido.</p><p v-else class="py-16 text-center text-sm text-black/60 dark:text-white/60">Busca y selecciona un producto para comparar dónde se vende más.</p>
                 </article>
             </section>
-        </main>
+
+            <section class="rounded-2xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+                <h2 class="font-semibold">Comparador de categorías</h2><p class="mb-4 text-sm text-black/60 dark:text-white/60">Elige las categorías que quieres contrastar dentro de una sucursal.</p>
+                <div class="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div><SelectField label="Sucursal" field="category-branch" :model-value="categoryFilters.branch_id" :options="branchOptions" @update:model-value="updateWidget({ category_branch_id: $event })" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Sucursal en la que se comparan las categorías.</p></div>
+                    <div><InputField label="Desde" field="category-date-from" type="date" :model-value="categoryFilters.date_from" @update:model-value="updateWidget({ category_date_from: $event })" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Primer día de ventas incluido.</p></div>
+                    <div><InputField label="Hasta" field="category-date-to" type="date" :model-value="categoryFilters.date_to" @update:model-value="updateWidget({ category_date_to: $event })" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Último día de ventas incluido.</p></div>
+                    <div class="relative"><InputField label="Buscar categorías" field="category-search" type="search" :model-value="categorySearch" placeholder="Escribe una categoría" autocomplete="off" :show-counter="false" @update:model-value="categorySearch = $event" /><p class="mt-1 text-xs text-black/60 dark:text-white/60">Añade sólo las categorías que deseas ver.</p><div v-if="categoryOptionsList.length" class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-secondary bg-background p-1 shadow-xl"><button v-for="category in categoryOptionsList" :key="category.id" type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-secondary" @click="selectCategory(category)"><span>{{ category.name }}</span><span class="text-xs font-medium text-primary">Agregar</span></button></div></div>
+                </div>
+                <div v-if="selectedCategories.length" class="mb-4 rounded-xl bg-black/[0.03] p-3 dark:bg-white/[0.06]"><p class="mb-2 text-xs font-medium text-black/60 dark:text-white/60">Categorías seleccionadas</p><div class="flex flex-wrap gap-2"><button v-for="category in selectedCategories" :key="category.id" type="button" class="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-950 transition hover:bg-amber-200 dark:bg-amber-950/40 dark:text-amber-100" @click="removeCategory(category.id)"><span>{{ category.name }}</span><span aria-hidden="true">×</span></button></div></div>
+                <p class="mb-3 text-xs text-black/60 dark:text-white/60">Cada esquina del radar representa una categoría seleccionada. El valor es el importe de ventas completadas que ya pertenecen a un corte de caja dentro del periodo elegido.</p>
+                <VueApexCharts v-if="hasSelectedCategories" height="330" :options="categoryRadarOptions" :series="[{ name: 'Ventas', data: categoryRows.map((row) => Number(row.revenue)) }]" />
+                <p v-else class="py-20 text-center text-sm text-black/60 dark:text-white/60">Busca y selecciona al menos una categoría para iniciar la comparación.</p>
+            </section>
+        </div>
     </PageLayout>
 </template>

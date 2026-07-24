@@ -258,7 +258,7 @@ watch(desktopSidebarCollapsed, (value) => {
             />
         </aside>
 
-        <section class="flex min-w-0 flex-1 flex-col overflow-hidden" @click="closeSidebarFromOutside">
+        <section class="flex min-w-0 flex-1 flex-col overflow-visible" @click="closeSidebarFromOutside">
             <header class="shrink-0 border-b border-secondary bg-background px-4 py-3 shadow-sm md:px-8">
                 <div class="flex min-h-16 items-center justify-between gap-4 md:justify-end">
                     <div class="flex min-w-0 items-center gap-3">

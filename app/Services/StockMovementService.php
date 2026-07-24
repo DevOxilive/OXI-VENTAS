@@ -165,7 +165,7 @@ class StockMovementService
             StockMovement::TYPE_ADJUSTMENT,
         ];
 
-        if (!in_array($type, $validTypes, true)) {
+        if (! in_array($type, $validTypes, true)) {
             throw new InvalidArgumentException('Tipo de movimiento invalido.');
         }
 
@@ -184,7 +184,7 @@ class StockMovementService
             ],
         ];
 
-        if (!in_array($reason, $validReasonsByType[$type], true)) {
+        if (! in_array($reason, $validReasonsByType[$type], true)) {
             throw new InvalidArgumentException('Motivo de movimiento invalido para este tipo.');
         }
 
@@ -216,7 +216,7 @@ class StockMovementService
         }
 
         $hasExpirationDate = collect($batches)
-            ->contains(fn ($batch) => !empty($batch['expiration_date']));
+            ->contains(fn ($batch) => ! empty($batch['expiration_date']));
 
         $branchProduct->update([
             'tracks_batches' => true,
@@ -436,6 +436,7 @@ class StockMovementService
             'type' => $type,
             'reason' => $reason,
             'quantity' => $quantity,
+            'unit_cost' => $branchProduct->product?->cost ?? 0,
             'previous_stock' => $previousStock,
             'new_stock' => $projectedStock,
             'user_id' => $userId ?? Auth::id(),
@@ -487,12 +488,11 @@ class StockMovementService
     private function broadcastInventoryRefresh(
         int $branchProductId,
         string $movementType,
-    ): void
-    {
+    ): void {
         $branchProduct = BranchProduct::with('product:id,name')
             ->find($branchProductId);
 
-        if (!$branchProduct) {
+        if (! $branchProduct) {
             return;
         }
 

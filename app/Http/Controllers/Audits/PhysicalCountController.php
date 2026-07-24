@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Audits;
 use App\Events\PhysicalCountChanged;
 use App\Events\RealtimeActivityLogged;
 use App\Exports\PhysicalCountExport;
-use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
+use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
@@ -33,8 +33,7 @@ class PhysicalCountController extends Controller
 
     public function __construct(
         private PhysicalCountSnapshotService $snapshotService
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -793,6 +792,7 @@ class PhysicalCountController extends Controller
                     'type' => StockMovement::TYPE_ADJUSTMENT,
                     'reason' => StockMovement::REASON_INVENTORY_DIFFERENCE,
                     'quantity' => abs($difference),
+                    'unit_cost' => $branchProduct->product?->cost ?? 0,
                     'previous_stock' => $previousStock,
                     'new_stock' => $newStock,
                     'user_id' => Auth::id(),
@@ -953,8 +953,7 @@ class PhysicalCountController extends Controller
         array $comparisonRows,
         Collection $audits,
         ?Collection $activeBranchProducts = null
-    ): array
-    {
+    ): array {
         if ($snapshotRows->isNotEmpty()) {
             $countedKeys = collect($comparisonRows)
                 ->map(fn ($row) => $row['physical_count_id'].':'.$row['branch_product_id'])

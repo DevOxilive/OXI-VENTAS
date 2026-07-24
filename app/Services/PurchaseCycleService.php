@@ -5,11 +5,11 @@ namespace App\Services;
 use App\Models\Branch;
 use App\Models\GeneralPurchaseOrder;
 use App\Models\GeneralPurchaseOrderItem;
+use App\Models\Product;
 use App\Models\PurchaseCycle;
 use App\Models\PurchaseCycleBranch;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
-use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -179,7 +179,9 @@ class PurchaseCycleService
 
             foreach ($order->branchOrders as $branchOrder) {
                 $branchOrder->update([
-                    'actual_total' => 0,
+                    'actual_total' => round((float) $branchOrder->items->sum(
+                        fn (PurchaseOrderItem $item) => (float) $item->actual_total
+                    ), 2),
                     'status' => PurchaseOrder::STATUS_REVIEW,
                     'purchased_at' => $order->purchased_at,
                     'completed_by' => null,
@@ -246,6 +248,7 @@ class PurchaseCycleService
                 fn (array $allocation) => (float) $allocation['item']->requested_quantity
             ));
             $remainingQuantity = round((float) $generalItem->purchased_quantity, 2);
+            $unitCost = round((float) $generalItem->net_unit_cost, 4);
             $lastIndex = $allocations->count() - 1;
 
             foreach ($allocations as $index => $allocation) {
@@ -260,9 +263,9 @@ class PurchaseCycleService
                 $branchItem->update([
                     'purchased_quantity' => $allocatedQuantity,
                     'received_quantity' => $allocatedQuantity,
-                    'actual_price' => 0,
+                    'actual_price' => $unitCost,
                     'discount_amount' => 0,
-                    'actual_total' => 0,
+                    'actual_total' => round($allocatedQuantity * $unitCost, 2),
                     'status' => abs($allocatedQuantity - (float) $branchItem->requested_quantity) > 0.009
                         ? PurchaseOrderItem::STATUS_ADJUSTED
                         : PurchaseOrderItem::STATUS_PURCHASED,
@@ -489,6 +492,9 @@ class PurchaseCycleService
             : ($presentation === 'Caja' ? (float) ($input['units_per_package'] ?? 0) : 1);
         $purchasePrice = $unavailable ? 0 : (float) ($input['purchase_price'] ?? 0);
         $purchasedQuantity = $packageQuantity * $unitsPerPackage;
+        $grossTotal = $packageQuantity * $purchasePrice;
+        $discountAmount = $unavailable ? 0 : (float) ($input['discount_amount'] ?? 0);
+        $actualTotal = max(0, $grossTotal - $discountAmount);
 
         $item->update([
             'purchase_presentation' => $presentation,
@@ -496,10 +502,10 @@ class PurchaseCycleService
             'units_per_package' => $unitsPerPackage,
             'purchase_price' => $purchasePrice,
             'purchased_quantity' => $purchasedQuantity,
-            'gross_total' => 0,
-            'discount_amount' => 0,
-            'actual_total' => 0,
-            'net_unit_cost' => 0,
+            'gross_total' => round($grossTotal, 2),
+            'discount_amount' => round($discountAmount, 2),
+            'actual_total' => round($actualTotal, 2),
+            'net_unit_cost' => $purchasedQuantity > 0 ? round($actualTotal / $purchasedQuantity, 4) : 0,
             'unavailable' => $unavailable,
             'purchase_notes' => $input['purchase_notes'] ?? null,
         ]);
@@ -509,9 +515,9 @@ class PurchaseCycleService
     {
         $order->update([
             'purchased_at' => $payload['purchased_at'] ?? now()->toDateString(),
-            'gross_total' => 0,
-            'discount_total' => 0,
-            'actual_total' => 0,
+            'gross_total' => round((float) $order->items->sum(fn ($item) => (float) $item->gross_total), 2),
+            'discount_total' => round((float) $order->items->sum(fn ($item) => (float) $item->discount_amount), 2),
+            'actual_total' => round((float) $order->items->sum(fn ($item) => (float) $item->actual_total), 2),
         ]);
     }
 }

@@ -16,6 +16,7 @@ class SaleDetail extends Model
         'discount_percentage',
         'discount_amount',
         'unit_price',
+        'unit_cost',
         'subtotal',
     ];
 
@@ -25,6 +26,7 @@ class SaleDetail extends Model
         'discount_percentage' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'unit_price' => 'decimal:2',
+        'unit_cost' => 'decimal:4',
         'subtotal' => 'decimal:2',
     ];
 
