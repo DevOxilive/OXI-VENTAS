@@ -234,4 +234,3 @@ onBeforeUnmount(() => unsubscribeSchedules?.())
     </GlobalModal>
   </PageLayout>
 </template>
-

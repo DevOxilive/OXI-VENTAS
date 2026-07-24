@@ -16,7 +16,6 @@ use App\Services\StockMovementService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Hash;
 
 class InventoryBranchHistorySeeder extends Seeder
 {
@@ -121,20 +120,16 @@ class InventoryBranchHistorySeeder extends Seeder
 
     private function reportUsers(Branch $branch)
     {
-        return collect([
-            ['name' => 'Ana Caducidades', 'email' => 'ana.caducidades@oxilive.com.mx'],
-            ['name' => 'Bruno Danados', 'email' => 'bruno.danados@oxilive.com.mx'],
-            ['name' => 'Carla Ajustes', 'email' => 'carla.ajustes@oxilive.com.mx'],
-            ['name' => 'Diego Entradas', 'email' => 'diego.entradas@oxilive.com.mx'],
-            ['name' => 'Elena Ventas', 'email' => 'elena.ventas@oxilive.com.mx'],
-        ])->map(fn (array $user) => User::updateOrCreate(
-            ['email' => $user['email']],
-            [
-                'name' => $user['name'],
-                'password' => Hash::make('password'),
-                'branch_id' => null,
-            ]
-        ))->values();
+        return User::query()
+            ->whereIn('email', [
+                'ana.lilia@oxilive.com.mx',
+                'laura@oxilive.com.mx',
+                'blanca@oxilive.com.mx',
+                'diana@oxilive.com.mx',
+                'rodrigo@oxilive.com.mx',
+            ])
+            ->get()
+            ->values();
     }
 
     private function categories()

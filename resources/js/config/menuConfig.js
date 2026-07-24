@@ -89,12 +89,14 @@ export function generateMenu(role, permissions = [], branches = []) {
             icon: "badge",
             isOpen: false,
             children: [
-                {
-                    text: "Registro de empleados",
-                    key: "human-resources.employees",
-                    icon: "group",
-                    url: route("human-resources.employees.index"),
-                },
+                ...(canUse("employees")
+                    ? [{
+                        text: "Registro de empleados",
+                        key: "human-resources.employees",
+                        icon: "group",
+                        url: route("human-resources.employees.index"),
+                    }]
+                    : []),
                 ...(canUse("attendance")
                     ? [{
                         text: "Asistencias",
@@ -103,10 +105,23 @@ export function generateMenu(role, permissions = [], branches = []) {
                         url: route("human-resources.attendance.index"),
                     }]
                     : []),
-                ...(canUse("attendanceSchedules") ? [{ text: "Horarios", key: "human-resources.attendance-schedules", icon: "schedule", url: route("human-resources.attendance-schedules.index") }] : []),
-                ...(canUse("attendanceScheduleAssignments") ? [{ text: "Asignación de horarios", key: "human-resources.attendance-schedule-assignments", icon: "assignment_ind", url: route("human-resources.attendance-schedule-assignments.index") }] : []),
-                ...(canUse("attendanceIncidents") ? [{ text: "Incidencias", key: "human-resources.attendance-incidents", icon: "event_note", url: route("human-resources.attendance-incidents.index") }] : []),
-                ...(canUse("organizationStructure") ? [{ text: "Departamentos y puestos", key: "human-resources.departments", icon: "account_tree", url: route("human-resources.departments.index") }] : []),
+                ...(canUse("attendanceSchedules")
+                    ? [{ text: "Horarios", key: "human-resources.attendance-schedules", icon: "schedule", url: route("human-resources.attendance-schedules.index") }]
+                    : []),
+                ...(canUse("attendanceScheduleAssignments")
+                    ? [{ text: "Asignación de horarios", key: "human-resources.attendance-schedule-assignments", icon: "assignment_ind", url: route("human-resources.attendance-schedule-assignments.index") }]
+                    : []),
+                ...(canUse("attendanceIncidents")
+                    ? [{ text: "Incidencias", key: "human-resources.attendance-incidents", icon: "event_note", url: route("human-resources.attendance-incidents.index") }]
+                    : []),
+                ...(canUse("organizationStructure")
+                    ? [{
+                        text: "Registro de Departamentos",
+                        key: "human-resources.departments",
+                        icon: "account_tree",
+                        url: route("human-resources.departments.index"),
+                    }]
+                    : []),
             ],
         });
     }
@@ -131,8 +146,9 @@ export function generateMenu(role, permissions = [], branches = []) {
                               icon: "security",
                               url: route("systems.users.index"),
                           },
-                    ]
+                      ]
                     : []),
+
                 ...(canUse("branches")
                     ? [
                           {

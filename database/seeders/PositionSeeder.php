@@ -18,6 +18,7 @@ class PositionSeeder extends Seeder
             ['name' => 'Analista', 'department' => 'Sistemas', 'description' => 'Analiza información y procesos del sistema.'],
             ['name' => 'Soporte TI', 'department' => 'Sistemas', 'description' => 'Atiende incidencias tecnológicas.'],
             ['name' => 'Vendedora', 'department' => 'Ventas', 'description' => 'Atiende y registra operaciones de venta.'],
+            ['name' => 'Encargada de sucursal', 'department' => 'Ventas', 'description' => 'Coordina la operación comercial de la sucursal.'],
             ['name' => 'Ejecutiva comercial', 'department' => 'Ventas', 'description' => 'Da seguimiento a clientes y objetivos comerciales.'],
             ['name' => 'Asistente de ventas', 'department' => 'Ventas', 'description' => 'Apoya la operación comercial.'],
         ];
