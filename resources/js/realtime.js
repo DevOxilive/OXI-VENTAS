@@ -1,6 +1,8 @@
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
 
+const runtimeConfig = window.__OXIVENTAS_REALTIME__ ?? {}
+
 function envNumber(value, fallback = null) {
     if (value === undefined || value === '') return fallback
 
@@ -8,8 +10,8 @@ function envNumber(value, fallback = null) {
     return Number.isFinite(parsed) ? parsed : fallback
 }
 
-const scheme = import.meta.env.VITE_REVERB_SCHEME ?? 'http'
-const port = envNumber(import.meta.env.VITE_REVERB_PORT, 8080)
+const scheme = runtimeConfig.scheme ?? import.meta.env.VITE_REVERB_SCHEME ?? 'http'
+const port = envNumber(runtimeConfig.port ?? import.meta.env.VITE_REVERB_PORT, 8080)
 const isSecure = scheme === 'https'
 
 /** Unico catalogo de canales consumidos por la aplicacion. */
@@ -42,8 +44,8 @@ export const REALTIME_EVENTS = Object.freeze({
  */
 export const REALTIME_CONFIG = Object.freeze({
     broadcaster: 'reverb',
-    key: import.meta.env.VITE_REVERB_APP_KEY,
-    host: import.meta.env.VITE_REVERB_HOST,
+    key: runtimeConfig.key ?? import.meta.env.VITE_REVERB_APP_KEY,
+    host: runtimeConfig.host ?? import.meta.env.VITE_REVERB_HOST,
     port,
     scheme,
     secure: isSecure,
