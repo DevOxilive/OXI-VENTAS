@@ -80,17 +80,13 @@ class DashboardController extends Controller
                 end: $filters['end'],
             ),
             'branchPerformance' => $branchPerformance,
-            'topProducts' => $this->topProducts($branchIds, $filters['start'], $filters['end']),
             'expiringBatches' => $this->expiringBatches($branchIds, $filters['start'], $filters['end']),
             'lowRotationProducts' => $lowRotationProducts,
             'lowRotationByBranch' => $lowRotationByBranch,
             'purchaseSummary' => $this->purchaseSummary($branchIds, $filters['start'], $filters['end']),
-            'paymentBreakdown' => $this->paymentBreakdown($branchIds, $filters['start'], $filters['end']),
             'customerBreakdown' => $this->customerBreakdown($branchIds, $filters['start'], $filters['end']),
             'discountSummary' => $this->discountSummary($branchIds, $filters['start'], $filters['end']),
-            'movementBreakdown' => $this->movementBreakdown($branchIds, $filters['start'], $filters['end']),
             'shrinkageSummary' => $this->shrinkageSummary($branchIds, $filters['start'], $filters['end']),
-            'categoryPerformance' => $this->categoryPerformance($branchIds, $filters['start'], $filters['end']),
             'inventoryCoverage' => $this->inventoryCoverage($branchIds, $filters['end']),
             'annualSummary' => $this->annualSummary($branchIds, $filters['end']->year),
         ]);
@@ -207,12 +203,6 @@ class DashboardController extends Controller
                     $period => [
                         'label' => $range['label'],
                         'salesTrend' => $this->salesTrend($branchIds, $period, $range['start'], $range['end']),
-                        'branchPerformance' => $this->branchPerformance($branchIds, $range['start'], $range['end']),
-                        'categoryPerformance' => $this->categoryPerformance($branchIds, $range['start'], $range['end']),
-                        'categoryTimeline' => $this->categoryTimeline($branchIds, $period, $range['start'], $range['end']),
-                        'paymentBreakdown' => $this->paymentBreakdown($branchIds, $range['start'], $range['end']),
-                        'movementBreakdown' => $this->movementBreakdown($branchIds, $range['start'], $range['end']),
-                        'movementTimeline' => $this->movementTimeline($branchIds, $period, $range['start'], $range['end']),
                         'productWeekdayRadar' => $this->productWeekdayRadar($branchIds, $range['start'], $range['end']),
                         'shrinkageByBranch' => $shrinkage['by_branch'],
                         'shrinkageByCategory' => $shrinkage['by_category'],
@@ -223,8 +213,6 @@ class DashboardController extends Controller
                             'revenue_loss' => $shrinkage['revenue_loss'],
                             'units' => $shrinkage['units'],
                         ],
-                        'topProducts' => $this->topProducts($branchIds, $range['start'], $range['end']),
-                        'productTimeline' => $this->productTimeline($branchIds, $period, $range['start'], $range['end']),
                     ],
                 ];
             })
@@ -514,33 +502,6 @@ class DashboardController extends Controller
             ->values();
     }
 
-    private function topProducts(Collection $branchIds, Carbon $start, Carbon $end): array
-    {
-        return DB::table('sale_details')
-            ->join('sales', 'sales.id', '=', 'sale_details.sale_id')
-            ->join('products', 'products.id', '=', 'sale_details.product_id')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->whereBetween('sales.date', [$start, $end])
-            ->select('products.id', 'products.name')
-            ->selectRaw('COALESCE(SUM(sale_details.subtotal), 0) as revenue')
-            ->selectRaw('COALESCE(SUM(sale_details.quantity), 0) as units')
-            ->selectRaw('COALESCE(SUM(sale_details.quantity * products.cost), 0) as investment')
-            ->groupBy('products.id', 'products.name')
-            ->orderByDesc('revenue')
-            ->limit(10)
-            ->get()
-            ->map(fn ($row) => [
-                'id' => (int) $row->id,
-                'name' => $row->name,
-                'revenue' => round((float) $row->revenue, 2),
-                'investment' => round((float) $row->investment, 2),
-                'profit' => round((float) $row->revenue - (float) $row->investment, 2),
-                'units' => round((float) $row->units, 2),
-            ])
-            ->values()
-            ->all();
-    }
-
     private function expiringBatches(Collection $branchIds, Carbon $start, Carbon $end): array
     {
         return ProductBatch::query()
@@ -691,26 +652,22 @@ class DashboardController extends Controller
 
     private function salesInvestment(Collection $branchIds, Carbon $start, Carbon $end): float
     {
-        return (float) DB::table('sale_details')
-            ->join('sales', 'sales.id', '=', 'sale_details.sale_id')
-            ->join('products', 'products.id', '=', 'sale_details.product_id')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->where('sales.status', 'completed')
-            ->whereBetween('sales.date', [$start, $end])
-            ->selectRaw('COALESCE(SUM(sale_details.quantity * products.cost), 0) as total')
+        return (float) DB::table('purchase_orders')
+            ->whereIn('branch_id', $branchIds)
+            ->whereIn('status', ['GENERATED', 'REVIEW', 'COMPLETED'])
+            ->whereBetween('generated_at', [$start, $end])
+            ->selectRaw('COALESCE(SUM(estimated_total), 0) as total')
             ->value('total');
     }
 
     private function salesInvestmentByDate(Collection $branchIds, Carbon $start, Carbon $end): array
     {
-        return DB::table('sale_details')
-            ->join('sales', 'sales.id', '=', 'sale_details.sale_id')
-            ->join('products', 'products.id', '=', 'sale_details.product_id')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->where('sales.status', 'completed')
-            ->whereBetween('sales.date', [$start, $end])
-            ->selectRaw('DATE(sales.date) as period_key')
-            ->selectRaw('COALESCE(SUM(sale_details.quantity * products.cost), 0) as total')
+        return DB::table('purchase_orders')
+            ->whereIn('branch_id', $branchIds)
+            ->whereIn('status', ['GENERATED', 'REVIEW', 'COMPLETED'])
+            ->whereBetween('generated_at', [$start, $end])
+            ->selectRaw('DATE(generated_at) as period_key')
+            ->selectRaw('COALESCE(SUM(estimated_total), 0) as total')
             ->groupBy('period_key')
             ->pluck('total', 'period_key')
             ->map(fn ($value) => (float) $value)
@@ -719,14 +676,12 @@ class DashboardController extends Controller
 
     private function salesInvestmentByMonth(Collection $branchIds, Carbon $start, Carbon $end): array
     {
-        return DB::table('sale_details')
-            ->join('sales', 'sales.id', '=', 'sale_details.sale_id')
-            ->join('products', 'products.id', '=', 'sale_details.product_id')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->where('sales.status', 'completed')
-            ->whereBetween('sales.date', [$start, $end])
-            ->selectRaw("DATE_FORMAT(sales.date, '%Y-%m') as period_key")
-            ->selectRaw('COALESCE(SUM(sale_details.quantity * products.cost), 0) as total')
+        return DB::table('purchase_orders')
+            ->whereIn('branch_id', $branchIds)
+            ->whereIn('status', ['GENERATED', 'REVIEW', 'COMPLETED'])
+            ->whereBetween('generated_at', [$start, $end])
+            ->selectRaw("DATE_FORMAT(generated_at, '%Y-%m') as period_key")
+            ->selectRaw('COALESCE(SUM(estimated_total), 0) as total')
             ->groupBy('period_key')
             ->pluck('total', 'period_key')
             ->map(fn ($value) => (float) $value)
@@ -735,14 +690,12 @@ class DashboardController extends Controller
 
     private function salesInvestmentByWeek(Collection $branchIds, Carbon $start, Carbon $end): array
     {
-        return DB::table('sale_details')
-            ->join('sales', 'sales.id', '=', 'sale_details.sale_id')
-            ->join('products', 'products.id', '=', 'sale_details.product_id')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->where('sales.status', 'completed')
-            ->whereBetween('sales.date', [$start, $end])
-            ->selectRaw('YEARWEEK(sales.date, 1) as period_key')
-            ->selectRaw('COALESCE(SUM(sale_details.quantity * products.cost), 0) as total')
+        return DB::table('purchase_orders')
+            ->whereIn('branch_id', $branchIds)
+            ->whereIn('status', ['GENERATED', 'REVIEW', 'COMPLETED'])
+            ->whereBetween('generated_at', [$start, $end])
+            ->selectRaw('YEARWEEK(generated_at, 1) as period_key')
+            ->selectRaw('COALESCE(SUM(estimated_total), 0) as total')
             ->groupBy('period_key')
             ->pluck('total', 'period_key')
             ->map(fn ($value) => (float) $value)
@@ -751,15 +704,13 @@ class DashboardController extends Controller
 
     private function salesInvestmentByBranch(Collection $branchIds, Carbon $start, Carbon $end): array
     {
-        return DB::table('sale_details')
-            ->join('sales', 'sales.id', '=', 'sale_details.sale_id')
-            ->join('products', 'products.id', '=', 'sale_details.product_id')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->where('sales.status', 'completed')
-            ->whereBetween('sales.date', [$start, $end])
-            ->selectRaw('sales.branch_id as branch_id')
-            ->selectRaw('COALESCE(SUM(sale_details.quantity * products.cost), 0) as total')
-            ->groupBy('sales.branch_id')
+        return DB::table('purchase_orders')
+            ->whereIn('branch_id', $branchIds)
+            ->whereIn('status', ['GENERATED', 'REVIEW', 'COMPLETED'])
+            ->whereBetween('generated_at', [$start, $end])
+            ->selectRaw('branch_id')
+            ->selectRaw('COALESCE(SUM(estimated_total), 0) as total')
+            ->groupBy('branch_id')
             ->pluck('total', 'branch_id')
             ->map(fn ($value) => (float) $value)
             ->all();
@@ -855,33 +806,6 @@ class DashboardController extends Controller
         ];
     }
 
-    private function paymentBreakdown(Collection $branchIds, Carbon $start, Carbon $end): array
-    {
-        return DB::table('sales')
-            ->join('payment_methods', 'payment_methods.id', '=', 'sales.payment_method_id')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->where('sales.status', 'completed')
-            ->whereBetween('sales.date', [$start, $end])
-            ->select('payment_methods.id', 'payment_methods.name')
-            ->selectRaw('COUNT(sales.id) as transactions')
-            ->selectRaw('COALESCE(SUM(sales.total), 0) as total')
-            ->selectRaw('COALESCE(SUM(sales.cash_received), 0) as cash_received')
-            ->selectRaw('COALESCE(SUM(sales.change_due), 0) as change_due')
-            ->groupBy('payment_methods.id', 'payment_methods.name')
-            ->orderByDesc('total')
-            ->get()
-            ->map(fn ($row) => [
-                'id' => (int) $row->id,
-                'name' => $row->name,
-                'transactions' => (int) $row->transactions,
-                'total' => round((float) $row->total, 2),
-                'cash_received' => round((float) $row->cash_received, 2),
-                'change_due' => round((float) $row->change_due, 2),
-            ])
-            ->values()
-            ->all();
-    }
-
     private function customerBreakdown(Collection $branchIds, Carbon $start, Carbon $end): array
     {
         return DB::table('sales')
@@ -950,86 +874,6 @@ class DashboardController extends Controller
         ];
     }
 
-    private function movementBreakdown(Collection $branchIds, Carbon $start, Carbon $end): array
-    {
-        return DB::table('stock_movements')
-            ->join('branch_products', 'branch_products.id', '=', 'stock_movements.branch_product_id')
-            ->whereIn('branch_products.branch_id', $branchIds)
-            ->whereBetween('stock_movements.created_at', [$start, $end])
-            ->select('stock_movements.reason', 'stock_movements.type')
-            ->selectRaw('COUNT(stock_movements.id) as movements')
-            ->selectRaw('COALESCE(SUM(ABS(stock_movements.quantity)), 0) as units')
-            ->groupBy('stock_movements.reason', 'stock_movements.type')
-            ->orderByDesc('movements')
-            ->get()
-            ->map(fn ($row) => [
-                'reason' => $row->reason,
-                'type' => $row->type,
-                'movements' => (int) $row->movements,
-                'units' => round((float) $row->units, 2),
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function categoryTimeline(Collection $branchIds, string $period, Carbon $start, Carbon $end): array
-    {
-        $periodKey = $this->periodKeyExpression('sales.date', $period);
-
-        return DB::table('sale_details')
-            ->join('sales', 'sales.id', '=', 'sale_details.sale_id')
-            ->join('products', 'products.id', '=', 'sale_details.product_id')
-            ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->where('sales.status', 'completed')
-            ->whereBetween('sales.date', [$start, $end])
-            ->selectRaw("{$periodKey} as period_key")
-            ->selectRaw("COALESCE(categories.name, 'Sin categoria') as category_name")
-            ->selectRaw('COALESCE(SUM(sale_details.subtotal), 0) as revenue')
-            ->selectRaw('COALESCE(SUM(sale_details.quantity * products.cost), 0) as investment')
-            ->selectRaw('COALESCE(SUM(sale_details.quantity), 0) as units')
-            ->groupBy('period_key', 'categories.name')
-            ->orderBy('period_key')
-            ->get()
-            ->map(fn ($row) => [
-                'period_key' => (string) $row->period_key,
-                'label' => $this->periodLabel((string) $row->period_key, $period),
-                'category_name' => $row->category_name,
-                'revenue' => round((float) $row->revenue, 2),
-                'investment' => round((float) $row->investment, 2),
-                'profit' => round((float) $row->revenue - (float) $row->investment, 2),
-                'units' => round((float) $row->units, 2),
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function movementTimeline(Collection $branchIds, string $period, Carbon $start, Carbon $end): array
-    {
-        $periodKey = $this->periodKeyExpression('stock_movements.created_at', $period);
-
-        return DB::table('stock_movements')
-            ->join('branch_products', 'branch_products.id', '=', 'stock_movements.branch_product_id')
-            ->whereIn('branch_products.branch_id', $branchIds)
-            ->whereBetween('stock_movements.created_at', [$start, $end])
-            ->select('stock_movements.reason')
-            ->selectRaw("{$periodKey} as period_key")
-            ->selectRaw('COUNT(stock_movements.id) as movements')
-            ->selectRaw('COALESCE(SUM(ABS(stock_movements.quantity)), 0) as units')
-            ->groupBy('period_key', 'stock_movements.reason')
-            ->orderBy('period_key')
-            ->get()
-            ->map(fn ($row) => [
-                'period_key' => (string) $row->period_key,
-                'label' => $this->periodLabel((string) $row->period_key, $period),
-                'reason' => $row->reason,
-                'movements' => (int) $row->movements,
-                'units' => round((float) $row->units, 2),
-            ])
-            ->values()
-            ->all();
-    }
-
     private function shrinkageTimeline(Collection $branchIds, string $period, Carbon $start, Carbon $end): array
     {
         $periodKey = $this->periodKeyExpression('stock_movements.created_at', $period);
@@ -1058,44 +902,6 @@ class DashboardController extends Controller
                 'category_name' => $row->category_name,
                 'cost_loss' => round((float) $row->cost_loss, 2),
                 'revenue_loss' => round((float) $row->revenue_loss, 2),
-                'units' => round((float) $row->units, 2),
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function productTimeline(Collection $branchIds, string $period, Carbon $start, Carbon $end): array
-    {
-        $periodKey = $this->periodKeyExpression('sales.date', $period);
-        $topProductIds = collect($this->topProducts($branchIds, $start, $end))
-            ->pluck('id')
-            ->take(6)
-            ->values();
-
-        if ($topProductIds->isEmpty()) {
-            return [];
-        }
-
-        return DB::table('sale_details')
-            ->join('sales', 'sales.id', '=', 'sale_details.sale_id')
-            ->join('products', 'products.id', '=', 'sale_details.product_id')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->where('sales.status', 'completed')
-            ->whereIn('products.id', $topProductIds)
-            ->whereBetween('sales.date', [$start, $end])
-            ->select('products.id as product_id', 'products.name as product_name')
-            ->selectRaw("{$periodKey} as period_key")
-            ->selectRaw('COALESCE(SUM(sale_details.subtotal), 0) as revenue')
-            ->selectRaw('COALESCE(SUM(sale_details.quantity), 0) as units')
-            ->groupBy('period_key', 'products.id', 'products.name')
-            ->orderBy('period_key')
-            ->get()
-            ->map(fn ($row) => [
-                'period_key' => (string) $row->period_key,
-                'label' => $this->periodLabel((string) $row->period_key, $period),
-                'product_id' => (int) $row->product_id,
-                'product_name' => $row->product_name,
-                'revenue' => round((float) $row->revenue, 2),
                 'units' => round((float) $row->units, 2),
             ])
             ->values()
@@ -1265,42 +1071,6 @@ class DashboardController extends Controller
                 ->values()
                 ->all(),
         ];
-    }
-
-    private function categoryPerformance(Collection $branchIds, Carbon $start, Carbon $end): array
-    {
-        return DB::table('sale_details')
-            ->join('sales', 'sales.id', '=', 'sale_details.sale_id')
-            ->join('products', 'products.id', '=', 'sale_details.product_id')
-            ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->where('sales.status', 'completed')
-            ->whereBetween('sales.date', [$start, $end])
-            ->selectRaw("COALESCE(categories.name, 'Sin categoria') as category_name")
-            ->selectRaw('COALESCE(SUM(sale_details.subtotal), 0) as revenue')
-            ->selectRaw('COALESCE(SUM(sale_details.quantity * products.cost), 0) as investment')
-            ->selectRaw('COALESCE(SUM(sale_details.quantity), 0) as units')
-            ->selectRaw('COUNT(DISTINCT products.id) as products')
-            ->groupBy('categories.name')
-            ->orderByDesc('revenue')
-            ->get()
-            ->map(function ($row) {
-                $revenue = (float) $row->revenue;
-                $investment = (float) $row->investment;
-                $profit = $revenue - $investment;
-
-                return [
-                    'category_name' => $row->category_name,
-                    'revenue' => round($revenue, 2),
-                    'investment' => round($investment, 2),
-                    'profit' => round($profit, 2),
-                    'margin' => $revenue > 0 ? round(($profit / $revenue) * 100, 1) : 0.0,
-                    'units' => round((float) $row->units, 2),
-                    'products' => (int) $row->products,
-                ];
-            })
-            ->values()
-            ->all();
     }
 
     private function inventoryCoverage(Collection $branchIds, Carbon $end): array

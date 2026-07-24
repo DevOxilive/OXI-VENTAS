@@ -158,6 +158,25 @@ Route::middleware([
             ->middleware($usersAccess)
             ->name('users.index');
 
+        Route::get('/attendance', [AttendanceController::class, 'index'])
+            ->middleware('permission:attendance.view,attendance.register')
+            ->name('attendance.index');
+        Route::post('/attendance', [AttendanceController::class, 'store'])
+            ->middleware(['permission:attendance.register', 'password.confirm'])
+            ->name('attendance.store');
+        Route::post('/attendance/{attendanceRecord}/corrections', [AttendanceController::class, 'requestCorrection'])
+            ->middleware('permission:attendance.corrections.request,attendance.corrections.review')
+            ->name('attendance.corrections.store');
+        Route::patch('/attendance/corrections/{attendanceCorrectionRequest}', [AttendanceController::class, 'reviewCorrection'])
+            ->middleware('permission:attendance.corrections.review')
+            ->name('attendance.corrections.review');
+        Route::get('/attendance/export/excel', [AttendanceController::class, 'exportExcel'])
+            ->middleware(['permission:attendance.reports', 'permission:files.export'])
+            ->name('attendance.export-excel');
+        Route::get('/attendance/export/pdf', [AttendanceController::class, 'exportPdf'])
+            ->middleware(['permission:attendance.reports', 'permission:files.export'])
+            ->name('attendance.export-pdf');
+
         Route::post('/users', [UserController::class, 'store'])
             ->middleware('permission:users.create')
             ->name('users.store');
@@ -244,13 +263,33 @@ Route::middleware([
             ->middleware('permission:files.export')
             ->name('employees.export-excel');
 
-        Route::get('/departments', [DepartmentController::class, 'index'])->middleware($organizationAccess)->name('departments.index');
-        Route::post('/departments', [DepartmentController::class, 'store'])->middleware('permission:departments.create')->name('departments.store');
-        Route::put('/departments/{department}', [DepartmentController::class, 'update'])->middleware('permission:departments.update')->name('departments.update');
-        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->middleware('permission:departments.delete')->name('departments.destroy');
-        Route::post('/positions', [PositionController::class, 'store'])->middleware('permission:positions.create')->name('positions.store');
-        Route::put('/positions/{position}', [PositionController::class, 'update'])->middleware('permission:positions.update')->name('positions.update');
-        Route::delete('/positions/{position}', [PositionController::class, 'destroy'])->middleware('permission:positions.delete')->name('positions.destroy');
+        Route::get('/departments', [DepartmentController::class, 'index'])
+            ->middleware($organizationAccess)
+            ->name('departments.index');
+
+        Route::post('/departments', [DepartmentController::class, 'store'])
+            ->middleware('permission:departments.create')
+            ->name('departments.store');
+
+        Route::put('/departments/{department}', [DepartmentController::class, 'update'])
+            ->middleware('permission:departments.update')
+            ->name('departments.update');
+
+        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])
+            ->middleware('permission:departments.delete')
+            ->name('departments.destroy');
+
+        Route::post('/positions', [PositionController::class, 'store'])
+            ->middleware('permission:positions.create')
+            ->name('positions.store');
+
+        Route::put('/positions/{position}', [PositionController::class, 'update'])
+            ->middleware('permission:positions.update')
+            ->name('positions.update');
+
+        Route::delete('/positions/{position}', [PositionController::class, 'destroy'])
+            ->middleware('permission:positions.delete')
+            ->name('positions.destroy');
 
         Route::get('/attendance', [AttendanceController::class, 'index'])
             ->middleware('permission:attendance.view,attendance.register,attendance.export.excel,attendance.export.pdf')
