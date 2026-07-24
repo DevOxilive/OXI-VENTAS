@@ -57,9 +57,7 @@ class AttendanceController extends Controller
             'options' => [
                 'types' => collect(AttendanceRecord::TYPES)->map(fn ($type) => ['value' => $type, 'label' => $this->typeLabel($type)])->values(),
                 'branches' => $canViewAttendance ? Branch::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->map(fn ($branch) => ['value' => $branch->id, 'label' => $branch->name]) : [],
-                'departments' => $canViewAttendance
-                    ? Department::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->map(fn ($department) => ['value' => $department->id, 'label' => $department->name])
-                    : [],
+                'departments' => $canViewAttendance ? Department::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->map(fn ($department) => ['value' => $department->id, 'label' => $department->name]) : [],
                 'employees' => $canViewAttendance ? Employee::query()->where('employment_status', '!=', 'Inactivo')->orderBy('first_name')->get()->map(fn ($employee) => ['value' => $employee->id, 'label' => trim($employee->first_name.' '.$employee->last_name)]) : [],
             ],
             'canViewAttendance' => $canViewAttendance,
