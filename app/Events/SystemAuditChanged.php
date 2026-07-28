@@ -15,6 +15,9 @@ class SystemAuditChanged implements ShouldBroadcastNow
     public function __construct(
         public string $module,
         public string $action,
+        public ?int $actorId = null,
+        public ?string $routeName = null,
+        public string $result = 'success',
     ) {}
 
     public function broadcastOn(): array

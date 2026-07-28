@@ -3,6 +3,8 @@ import qz from "qz-tray";
 const PRINTER_STORAGE_KEY = "ventas_printer_name";
 
 let securityConfigured = false;
+let connectionPromise = null;
+let printQueue = Promise.resolve();
 
 function csrfToken() {
   if (typeof document === "undefined") {
@@ -87,13 +89,18 @@ export async function connectQzTray() {
     return qz;
   }
 
-  await qz.websocket.connect({
-    retries: 2,
-    delay: 1,
-    keepAlive: 60,
-  });
+  if (!connectionPromise) {
+    connectionPromise = qz.websocket.connect({
+      retries: 2,
+      delay: 1,
+      keepAlive: 60,
+    }).then(() => qz)
+      .finally(() => {
+        connectionPromise = null;
+      });
+  }
 
-  return qz;
+  return connectionPromise;
 }
 
 export function isQzTrayActive() {
@@ -108,6 +115,63 @@ export async function disconnectQzTray() {
   }
 
   await qz.websocket.disconnect();
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function withTimeout(promise, ms, message) {
+  let timeoutId = null;
+
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(message));
+    }, ms);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+    }
+  });
+}
+
+async function reconnectQzTray() {
+  configureSecurity();
+  connectionPromise = null;
+
+  try {
+    if (qz.websocket.isActive()) {
+      await qz.websocket.disconnect();
+    }
+  } catch (error) {
+    // Si QZ ya se quedo en un estado inconsistente, forzamos una conexion nueva abajo.
+  }
+
+  return connectQzTray();
+}
+
+function shouldRetryQzPrint(error) {
+  const message = String(error?.message || error || "");
+
+  return /sendData is not a function|connection attempt has not returned|open connection with QZ Tray already exists|websocket|closed|not connected|tiempo de espera/i.test(message);
+}
+
+async function sendRawPrint(printerName, payload) {
+  const config = qz.configs.create(printerName, {
+    encoding: "Cp1252",
+    copies: 1,
+  });
+
+  return qz.print(config, [{
+    type: "raw",
+    format: "command",
+    flavor: "plain",
+    data: payload,
+  }]);
 }
 
 export async function getQzPrinters() {
@@ -127,28 +191,51 @@ export async function printEscPosTicket(printerName, printData = [], options = {
     throw new Error("No hay una impresora seleccionada.");
   }
 
-  if (!isQzTrayActive()) {
-    if (options.connectIfNeeded === false) {
-      throw new Error("QZ Tray no esta conectado. La venta se guardo sin imprimir ticket.");
-    }
-
-    await connectQzTray();
-  }
-
-  const config = qz.configs.create(printerName, {
-    encoding: "Cp1252",
-    copies: 1,
-  });
-
   const payload = (Array.isArray(printData) ? printData.join("") : String(printData || ""))
     .replace(/\r?\n/g, "\r\n");
 
-  return qz.print(config, [{
-    type: "raw",
-    format: "command",
-    flavor: "plain",
-    data: payload,
-  }]);
+  const runPrint = async () => {
+    if (options.freshConnection) {
+      await reconnectQzTray();
+    } else if (!isQzTrayActive() || options.reconnectBeforePrint) {
+      await connectQzTray();
+    }
+
+    try {
+      return await withTimeout(
+        sendRawPrint(printerName, payload),
+        Number(options.timeoutMs || 8000),
+        "QZ Tray agoto el tiempo de espera al imprimir."
+      );
+    } catch (error) {
+      if (!shouldRetryQzPrint(error)) {
+        throw error;
+      }
+
+      await reconnectQzTray();
+
+      return withTimeout(
+        sendRawPrint(printerName, payload),
+        Number(options.timeoutMs || 8000),
+        "QZ Tray agoto el tiempo de espera al reintentar impresion."
+      );
+    } finally {
+      if (options.disconnectAfterPrint) {
+        await wait(Number(options.disconnectDelayMs || 350));
+
+        try {
+          await disconnectQzTray();
+        } catch (error) {
+          // La siguiente impresion abrira una conexion nueva si esta ya no existe.
+        }
+      }
+    }
+  };
+
+  const queuedPrint = printQueue.then(runPrint, runPrint);
+  printQueue = queuedPrint.catch(() => {});
+
+  return queuedPrint;
 }
 
 export async function printHtmlTicket(printerName, html, dimensions = {}) {

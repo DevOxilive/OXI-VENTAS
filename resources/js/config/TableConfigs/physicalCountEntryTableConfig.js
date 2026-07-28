@@ -43,12 +43,18 @@ export function getPhysicalCountEntryTableConfig({ status }) {
                 label: "Ver",
                 icon: "visibility",
                 variant: "blue",
+                permission: [
+                    "audits.physical-counts.view",
+                    "audits.physical-counts.update",
+                    "audits.physical-counts.delete",
+                ],
             },
             {
                 id: "edit",
                 label: "Editar",
                 icon: "edit",
                 variant: "amber",
+                permission: "audits.physical-counts.update",
                 hidden: () => !isOpen,
             },
             {
@@ -56,6 +62,7 @@ export function getPhysicalCountEntryTableConfig({ status }) {
                 label: "Eliminar",
                 icon: "delete",
                 variant: "red",
+                permission: "audits.physical-counts.delete",
                 hidden: () => !isOpen,
             },
         ],

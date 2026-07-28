@@ -69,10 +69,12 @@ class AttendanceScheduleAssignmentController extends Controller
 
     public function destroy(Request $request, AttendanceScheduleAssignment $attendanceScheduleAssignment)
     {
-        $attendanceScheduleAssignment->update(['active' => false, 'effective_to' => $attendanceScheduleAssignment->effective_to ?? now()->toDateString()]);
-        $this->audit->record('attendance_schedule_assignment', 'deactivate', 'success', $request, ['record_type' => AttendanceScheduleAssignment::class, 'record_id' => $attendanceScheduleAssignment->id]);
-        broadcast(new AttendanceChanged(0, 'schedule_assignment_deactivated', $request->user()->id));
-        return back()->with('success', 'Asignación desactivada; el historial se conserva.');
+        abort_unless($attendanceScheduleAssignment->assignable_type === Employee::class, 404);
+        $assignmentId = $attendanceScheduleAssignment->id;
+        $attendanceScheduleAssignment->delete();
+        $this->audit->record('attendance_schedule_assignment', 'delete', 'success', $request, ['record_type' => AttendanceScheduleAssignment::class, 'record_id' => $assignmentId, 'record_label' => 'Asignación de horario']);
+        broadcast(new AttendanceChanged(0, 'schedule_assignment_deleted', $request->user()->id));
+        return back()->with('success', 'Asignación eliminada correctamente. El empleado y el horario se conservan.');
     }
 
     private function validated(Request $request): array

@@ -8,13 +8,13 @@ use Tests\TestCase;
 
 class PasskeyOriginTest extends TestCase
 {
-    public function test_quick_tunnel_uses_a_valid_shared_relying_party_domain(): void
+    public function test_quick_tunnel_uses_its_exact_hostname_as_the_relying_party_domain(): void
     {
         $request = Request::create('https://previously-fin-skins-sweet.trycloudflare.com/user/passkeys/options');
 
         app(ResolvePasskeyOrigin::class)->handle($request, fn () => response()->noContent());
 
-        $this->assertSame('trycloudflare.com', config('passkeys.relying_party_id'));
+        $this->assertSame('previously-fin-skins-sweet.trycloudflare.com', config('passkeys.relying_party_id'));
         $this->assertSame([
             'https://previously-fin-skins-sweet.trycloudflare.com',
         ], config('passkeys.allowed_origins'));

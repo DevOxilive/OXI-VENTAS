@@ -14,6 +14,7 @@ const props = defineProps({
         type: String,
         default: 'Volver',
     },
+    icon: String,
     title: String,
     subtitle: String,
     search: String,
@@ -154,6 +155,19 @@ function multiFilterLabel(filter) {
                 </button>
             </div>
         </div>
+
+        <div v-if="icon || title || subtitle" class="flex min-w-0 items-start gap-3">
+            <div v-if="icon" class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-secondary text-primary">
+                <span class="material-symbols-outlined text-[26px]">
+                    {{ icon }}
+                </span>
+            </div>
+
+            <div class="min-w-0">
+                <h2 v-if="title" class="text-xl font-black text-text">{{ title }}</h2>
+                <p v-if="subtitle" class="mt-1 text-sm text-text opacity-70">{{ subtitle }}</p>
+            </div>
+        </div>
         <div v-if="tabs.length" class="overflow-x-auto">
             <div class="flex min-w-max gap-2">
                 <button v-for="tab in tabs" :key="tab.key" type="button"
@@ -170,7 +184,8 @@ function multiFilterLabel(filter) {
             </div>
         </div>
 
-        <div v-if="hasActions" class="grid grid-cols-1 gap-2">
+        <div v-if="hasActions || $slots.actions" class="grid grid-cols-1 gap-2">
+            <slot name="actions">
             <button v-for="action in visibleActions" :key="action.id" type="button"
                 class="w-full h-11 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2"
                 :class="[
@@ -192,6 +207,7 @@ function multiFilterLabel(filter) {
                     {{ action.badge }}
                 </span>
             </button>
+            </slot>
         </div>
 
         <div v-if="hasSearch || hasRecordsPerPage" class="grid grid-cols-1 gap-3">

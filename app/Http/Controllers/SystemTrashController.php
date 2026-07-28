@@ -126,23 +126,38 @@ class SystemTrashController extends SystemAdministrationController
 
     private function allRecords(Request $request, string $search, string $period, $from, $to): LengthAwarePaginator
     {
-        $all = collect(TrashRegistry::resources())
-            ->flatMap(function (array $definition) use ($search, $period, $from, $to) {
-                $resource = $definition['key'];
+        $perPage = TablePagination::resolvePerPage($request, 50);
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $offset = max(0, ($page - 1) * $perPage);
+        $windowSize = $offset + $perPage;
+        $total = 0;
 
-                return $this->applyFilters(TrashRegistry::query($resource), $resource, $search, $period, $from, $to)
+        $all = collect(TrashRegistry::resources())
+            ->flatMap(function (array $definition) use ($search, $period, $from, $to, $windowSize, &$total) {
+                $resource = $definition['key'];
+                $query = $this->applyFilters(
+                    TrashRegistry::query($resource),
+                    $resource,
+                    $search,
+                    $period,
+                    $from,
+                    $to
+                );
+
+                $total += (clone $query)->count();
+
+                return $query
+                    ->latest('deleted_at')
+                    ->limit($windowSize)
                     ->get()
                     ->map(fn ($model) => $this->recordPayload($model, $resource));
             })
             ->sortByDesc('deleted_at')
             ->values();
 
-        $perPage = TablePagination::resolvePerPage($request, 50);
-        $page = LengthAwarePaginator::resolveCurrentPage();
-
         return (new LengthAwarePaginator(
-            $all->forPage($page, $perPage)->values(),
-            $all->count(),
+            $all->slice($offset, $perPage)->values(),
+            $total,
             $perPage,
             $page,
             ['path' => $request->url(), 'query' => $request->query()],

@@ -38,6 +38,15 @@ class AuditSystemActions
         $record = $parameters->first(fn ($value) => is_object($value) && method_exists($value, 'getKey'));
 
         if ($record) {
+            if ($result === 'success') {
+                $this->audit->announceChange(
+                    $segments[0] ?? 'system',
+                    $this->action($request, $name),
+                    $result,
+                    $request,
+                );
+            }
+
             return;
         }
 

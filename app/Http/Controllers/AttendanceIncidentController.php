@@ -13,14 +13,69 @@ class AttendanceIncidentController extends Controller
 {
     public function __construct(private readonly SystemAuditService $audit) {}
 
-    public function index()
+    public function index(Request $request)
     {
-        return Inertia::render('HumanResources/AttendanceIncidents', ['incidents' => AttendanceIncident::query()->with(['employee','authorizedBy'])->latest('incident_date')->paginate(30), 'employees' => Employee::query()->where('employment_status', '!=', 'Inactivo')->orderBy('first_name')->get(['id','first_name','last_name'])->map(fn ($employee) => ['value' => $employee->id, 'label' => trim($employee->first_name.' '.$employee->last_name)])]);
+        $filters = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'in:pending,approved,rejected'],
+        ]);
+
+        $incidents = AttendanceIncident::query()
+            ->with(['employee', 'authorizedBy'])
+            ->when($filters['from'] ?? null, fn ($query, $date) => $query->whereDate('incident_date', '>=', $date))
+            ->when($filters['to'] ?? null, fn ($query, $date) => $query->whereDate('incident_date', '<=', $date))
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when($filters['search'] ?? null, function ($query, $search) {
+                $like = '%'.$search.'%';
+
+                $query->whereHas('employee', function ($employeeQuery) use ($like) {
+                    $employeeQuery
+                        ->where('first_name', 'like', $like)
+                        ->orWhere('last_name', 'like', $like)
+                        ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", [$like]);
+                });
+            })
+            ->latest('incident_date')
+            ->latest()
+            ->paginate(30)
+            ->through(fn (AttendanceIncident $incident) => [
+                'id' => $incident->id,
+                'employee_id' => $incident->employee_id,
+                'employee_name' => trim(($incident->employee?->first_name ?? '').' '.($incident->employee?->last_name ?? '')),
+                'incident_date' => $incident->incident_date,
+                'estimated_arrival_at' => $incident->estimated_arrival_at,
+                'rest_day_requested' => $incident->rest_day_requested,
+                'rest_day_date' => $incident->rest_day_date,
+                'make_up_date' => $incident->make_up_date,
+                'reason' => $incident->reason,
+                'status' => $incident->status,
+                'created_at' => $incident->created_at,
+                'authorized_at' => $incident->authorized_at,
+                'authorized_by' => $incident->authorizedBy?->name,
+            ])
+            ->withQueryString();
+
+        return Inertia::render('HumanResources/AttendanceIncidents', [
+            'incidents' => $incidents,
+            'employees' => Employee::query()
+                ->where('employment_status', '!=', 'Inactivo')
+                ->orderBy('first_name')
+                ->get(['id','first_name','last_name'])
+                ->map(fn ($employee) => ['value' => $employee->id, 'label' => trim($employee->first_name.' '.$employee->last_name)]),
+            'filters' => $filters,
+            'statuses' => [
+                ['value' => 'pending', 'label' => 'Pendiente'],
+                ['value' => 'approved', 'label' => 'Aprobada'],
+                ['value' => 'rejected', 'label' => 'Denegada'],
+            ],
+        ]);
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate(['employee_id' => ['required','exists:employees,id'], 'incident_date' => ['required','date'], 'incident_time' => ['nullable','date_format:H:i'], 'estimated_arrival_at' => ['nullable','date_format:H:i'], 'reason' => ['required','string','max:2000']]);
+        $data = $this->validateIncident($request);
         $data['type'] = 'attendance';
         $incident = AttendanceIncident::create($data);
         $this->audit->record('attendance_incident', 'create', 'success', $request, ['record_type' => AttendanceIncident::class, 'record_id' => $incident->id, 'record_label' => $incident->type]);
@@ -44,7 +99,7 @@ class AttendanceIncidentController extends Controller
     public function update(Request $request, AttendanceIncident $attendanceIncident)
     {
         abort_if($attendanceIncident->status !== 'pending', 422, 'Solo se pueden editar incidencias pendientes.');
-        $data = $request->validate(['employee_id' => ['required','exists:employees,id'], 'incident_date' => ['required','date'], 'estimated_arrival_at' => ['nullable','date_format:H:i'], 'reason' => ['required','string','max:2000']]);
+        $data = $this->validateIncident($request);
         $attendanceIncident->update($data);
         broadcast(new AttendanceChanged(0, 'incident_updated', $request->user()->id));
         return back()->with('success', 'Incidencia actualizada correctamente.');
@@ -56,5 +111,28 @@ class AttendanceIncidentController extends Controller
         $attendanceIncident->delete();
         broadcast(new AttendanceChanged(0, 'incident_deleted', $request->user()->id));
         return back()->with('success', 'Incidencia eliminada correctamente.');
+    }
+
+    private function validateIncident(Request $request): array
+    {
+        $data = $request->validate([
+            'employee_id' => ['required', 'exists:employees,id'],
+            'incident_date' => ['required', 'date'],
+            'incident_time' => ['nullable', 'date_format:H:i'],
+            'estimated_arrival_at' => ['nullable', 'date_format:H:i'],
+            'rest_day_requested' => ['nullable', 'boolean'],
+            'rest_day_date' => ['nullable', 'required_if_accepted:rest_day_requested', 'date'],
+            'make_up_date' => ['nullable', 'required_if_accepted:rest_day_requested', 'date', 'after_or_equal:rest_day_date'],
+            'reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $data['rest_day_requested'] = $request->boolean('rest_day_requested');
+
+        if (! $data['rest_day_requested']) {
+            $data['rest_day_date'] = null;
+            $data['make_up_date'] = null;
+        }
+
+        return $data;
     }
 }

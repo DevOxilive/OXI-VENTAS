@@ -25,6 +25,14 @@ const visibleSections = sections.filter((section) => can(section.permission))
 
 let unsubscribeTrashRealtime = null
 let unsubscribeAuditRealtime = null
+let auditRefreshTimer = null
+
+function refreshAuditCount() {
+    clearTimeout(auditRefreshTimer)
+    auditRefreshTimer = setTimeout(() => {
+        router.reload({ only: ['auditCount'], preserveScroll: true })
+    }, 120)
+}
 
 onMounted(() => {
     unsubscribeTrashRealtime = subscribeRealtime(
@@ -36,11 +44,12 @@ onMounted(() => {
     unsubscribeAuditRealtime = subscribeRealtime(
         REALTIME_CHANNELS.systems,
         REALTIME_EVENTS.systemAuditChanged,
-        () => router.reload({ only: ['auditCount'], preserveScroll: true }),
+        refreshAuditCount,
     )
 })
 
 onBeforeUnmount(() => {
+    clearTimeout(auditRefreshTimer)
     unsubscribeTrashRealtime?.()
     unsubscribeAuditRealtime?.()
 })

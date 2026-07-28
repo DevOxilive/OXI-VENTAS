@@ -18,17 +18,28 @@ class DashboardMetricsService
 {
     public function payload(Collection $branchIds, Carbon $start, Carbon $end): array
     {
-        $previousEnd = $start->copy()->subSecond();
-        $previousStart = $previousEnd->copy()->subSeconds($start->diffInSeconds($end));
-
-        $current = $this->metrics($branchIds, $start, $end);
-        $previous = $this->metrics($branchIds, $previousStart, $previousEnd);
-
-        return [
-            'summary' => $this->summary($current, $previous),
+        return $this->summaryPayload($branchIds, $start, $end) + [
             'series' => $this->series($branchIds, $start, $end),
             'shrinkage_by_category' => $this->shrinkageByCategory($branchIds, $start, $end),
             'product_sales' => null,
+        ];
+    }
+
+    public function summaryPayload(Collection $branchIds, Carbon $start, Carbon $end): array
+    {
+        $previousEnd = $start->copy()->subSecond();
+        $previousStart = $previousEnd->copy()->subSeconds($start->diffInSeconds($end));
+
+        [$current, $previous] = $this->comparisonMetrics(
+            $branchIds,
+            $start,
+            $end,
+            $previousStart,
+            $previousEnd
+        );
+
+        return [
+            'summary' => $this->summary($current, $previous),
             'limitations' => [
                 // El dominio conserva el precio histórico de venta, pero no el costo
                 // ligado a cada detalle de venta ni a cada salida por merma.
@@ -72,37 +83,89 @@ class DashboardMetricsService
             ]);
     }
 
-    private function metrics(Collection $branchIds, Carbon $start, Carbon $end): array
+    private function comparisonMetrics(
+        Collection $branchIds,
+        Carbon $start,
+        Carbon $end,
+        Carbon $previousStart,
+        Carbon $previousEnd
+    ): array
     {
-        $sales = $this->confirmedSales($branchIds, $start, $end)
-            ->selectRaw('COALESCE(SUM(sales.total), 0) as amount')
-            ->selectRaw('COUNT(sales.id) as transactions')
+        $sales = $this->confirmedSales($branchIds, $previousStart, $end)
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN sales.date BETWEEN ? AND ? THEN sales.total ELSE 0 END), 0) as current_amount',
+                [$start, $end]
+            )
+            ->selectRaw(
+                'SUM(CASE WHEN sales.date BETWEEN ? AND ? THEN 1 ELSE 0 END) as current_transactions',
+                [$start, $end]
+            )
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN sales.date BETWEEN ? AND ? THEN sales.total ELSE 0 END), 0) as previous_amount',
+                [$previousStart, $previousEnd]
+            )
+            ->selectRaw(
+                'SUM(CASE WHEN sales.date BETWEEN ? AND ? THEN 1 ELSE 0 END) as previous_transactions',
+                [$previousStart, $previousEnd]
+            )
             ->first();
 
-        $cost = $this->saleCostQuery($branchIds, $start, $end)
-            ->selectRaw('COALESCE(SUM(sale_details.quantity * COALESCE(sale_details.unit_cost, products.cost)), 0) as amount')
-            ->value('amount');
-
-        $investment = $this->investmentQuery($branchIds, $start, $end)
-            ->selectRaw('COALESCE(SUM(purchase_orders.actual_total), 0) as amount')
-            ->value('amount');
-
-        $shrinkage = $this->shrinkageQuery($branchIds, $start, $end)
-            ->selectRaw('COALESCE(SUM(ABS(stock_movements.quantity) * COALESCE(stock_movements.unit_cost, products.cost)), 0) as amount')
-            ->selectRaw('COALESCE(SUM(ABS(stock_movements.quantity)), 0) as units')
+        $cost = $this->saleCostQuery($branchIds, $previousStart, $end)
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN sales.date BETWEEN ? AND ? THEN sale_details.quantity * COALESCE(sale_details.unit_cost, products.cost) ELSE 0 END), 0) as current_amount',
+                [$start, $end]
+            )
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN sales.date BETWEEN ? AND ? THEN sale_details.quantity * COALESCE(sale_details.unit_cost, products.cost) ELSE 0 END), 0) as previous_amount',
+                [$previousStart, $previousEnd]
+            )
             ->first();
 
-        $salesAmount = round((float) ($sales->amount ?? 0), 2);
-        $costAmount = round((float) $cost, 2);
+        $investment = $this->investmentQuery($branchIds, $previousStart, $end)
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN purchase_orders.completed_at BETWEEN ? AND ? THEN purchase_orders.actual_total ELSE 0 END), 0) as current_amount',
+                [$start, $end]
+            )
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN purchase_orders.completed_at BETWEEN ? AND ? THEN purchase_orders.actual_total ELSE 0 END), 0) as previous_amount',
+                [$previousStart, $previousEnd]
+            )
+            ->first();
 
-        return [
-            'sales' => $salesAmount,
-            'transactions' => (int) ($sales->transactions ?? 0),
-            'investment' => round((float) $investment, 2),
-            'profit' => round($salesAmount - $costAmount, 2),
-            'shrinkage' => round((float) ($shrinkage->amount ?? 0), 2),
-            'shrinkage_units' => round((float) ($shrinkage->units ?? 0), 3),
-        ];
+        $shrinkage = $this->shrinkageQuery($branchIds, $previousStart, $end)
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN stock_movements.created_at BETWEEN ? AND ? THEN ABS(stock_movements.quantity) * COALESCE(stock_movements.unit_cost, products.cost) ELSE 0 END), 0) as current_amount',
+                [$start, $end]
+            )
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN stock_movements.created_at BETWEEN ? AND ? THEN ABS(stock_movements.quantity) ELSE 0 END), 0) as current_units',
+                [$start, $end]
+            )
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN stock_movements.created_at BETWEEN ? AND ? THEN ABS(stock_movements.quantity) * COALESCE(stock_movements.unit_cost, products.cost) ELSE 0 END), 0) as previous_amount',
+                [$previousStart, $previousEnd]
+            )
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN stock_movements.created_at BETWEEN ? AND ? THEN ABS(stock_movements.quantity) ELSE 0 END), 0) as previous_units',
+                [$previousStart, $previousEnd]
+            )
+            ->first();
+
+        $buildMetrics = function (string $prefix) use ($sales, $cost, $investment, $shrinkage): array {
+            $salesAmount = round((float) ($sales->{$prefix.'_amount'} ?? 0), 2);
+            $costAmount = round((float) ($cost->{$prefix.'_amount'} ?? 0), 2);
+
+            return [
+                'sales' => $salesAmount,
+                'transactions' => (int) ($sales->{$prefix.'_transactions'} ?? 0),
+                'investment' => round((float) ($investment->{$prefix.'_amount'} ?? 0), 2),
+                'profit' => round($salesAmount - $costAmount, 2),
+                'shrinkage' => round((float) ($shrinkage->{$prefix.'_amount'} ?? 0), 2),
+                'shrinkage_units' => round((float) ($shrinkage->{$prefix.'_units'} ?? 0), 3),
+            ];
+        };
+
+        return [$buildMetrics('current'), $buildMetrics('previous')];
     }
 
     private function summary(array $current, array $previous): array

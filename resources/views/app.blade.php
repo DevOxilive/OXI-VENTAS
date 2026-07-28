@@ -33,15 +33,46 @@
         })();
     </script>
 
-    @if (app()->environment('production'))
-        @php
+    @php
+        $realtimeTunnelConfig = null;
+        $realtimeTunnelPath = storage_path('framework/realtime-tunnel.json');
+
+        if (is_readable($realtimeTunnelPath)) {
+            $decodedRealtimeTunnel = json_decode(file_get_contents($realtimeTunnelPath), true);
+
+            if (
+                is_array($decodedRealtimeTunnel)
+                && filled($decodedRealtimeTunnel['host'] ?? null)
+                && filled($decodedRealtimeTunnel['scheme'] ?? null)
+            ) {
+                $realtimeTunnelConfig = $decodedRealtimeTunnel;
+            }
+        }
+
+        if ($realtimeTunnelConfig) {
+            $realtimeConfig = [
+                'key' => config('broadcasting.connections.reverb.key'),
+                'host' => $realtimeTunnelConfig['host'],
+                'port' => $realtimeTunnelConfig['port'] ?? 443,
+                'scheme' => $realtimeTunnelConfig['scheme'],
+            ];
+        } elseif (app()->environment('production')) {
             $realtimeConfig = [
                 'key' => config('broadcasting.connections.reverb.key'),
                 'host' => request()->getHost(),
                 'port' => request()->isSecure() ? 443 : request()->getPort(),
                 'scheme' => request()->getScheme(),
             ];
-        @endphp
+        } else {
+            $realtimeConfig = [
+                'key' => config('broadcasting.connections.reverb.key'),
+                'host' => config('broadcasting.connections.reverb.options.host'),
+                'port' => config('broadcasting.connections.reverb.options.port'),
+                'scheme' => config('broadcasting.connections.reverb.options.scheme'),
+            ];
+        }
+    @endphp
+    @if (filled($realtimeConfig['key']) && filled($realtimeConfig['host']))
         <script>
             window.__OXIVENTAS_REALTIME__ = @json($realtimeConfig);
         </script>

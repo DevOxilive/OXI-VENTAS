@@ -144,6 +144,24 @@ class BranchInventoryController extends Controller
             ->whereNotNull('last_restocked_at')
             ->whereRaw('DATE_ADD(last_restocked_at, INTERVAL inactive_candidate_after_days DAY) <= NOW()');
 
+        $inventoryAggregate = (clone $baseStatsQuery)
+            ->join('products', 'products.id', '=', 'branch_products.product_id')
+            ->selectRaw('COUNT(*) as total_products')
+            ->selectRaw('COALESCE(SUM(branch_products.stock), 0) as total_stock')
+            ->selectRaw('SUM(CASE WHEN branch_products.stock <= branch_products.min_stock AND branch_products.stock > 0 THEN 1 ELSE 0 END) as low_stock')
+            ->selectRaw('SUM(CASE WHEN branch_products.stock <= 0 THEN 1 ELSE 0 END) as out_of_stock')
+            ->selectRaw('SUM(CASE WHEN branch_products.last_restocked_at IS NOT NULL AND DATE_ADD(branch_products.last_restocked_at, INTERVAL branch_products.inactive_candidate_after_days DAY) <= NOW() THEN 1 ELSE 0 END) as inactive_candidates')
+            ->selectRaw('COALESCE(SUM(branch_products.stock * products.sale_price), 0) as inventory_value')
+            ->first();
+
+        $batchAggregate = (clone $batchAlertsQuery)
+            ->selectRaw('SUM(CASE WHEN expiration_date < ? THEN 1 ELSE 0 END) as expired_batches', [$today])
+            ->selectRaw(
+                'SUM(CASE WHEN expiration_date >= ? AND expiration_date <= ? THEN 1 ELSE 0 END) as near_expiration_batches',
+                [$today, $nearExpirationLimit]
+            )
+            ->first();
+
         $mapBatchAlert = function ($batch) {
             $branchProduct = $batch->branchProduct;
             $product = $branchProduct?->product;
@@ -259,47 +277,20 @@ class BranchInventoryController extends Controller
                 ->withQueryString(),
 
             'inventoryStats' => [
-                'total_products' => (clone $baseStatsQuery)->count(),
-                'total_stock' => (clone $baseStatsQuery)->sum('stock'),
-
-                'low_stock' => (clone $baseStatsQuery)
-                    ->whereColumn('stock', '<=', 'min_stock')
-                    ->where('stock', '>', 0)
-                    ->count(),
-
-                'out_of_stock' => (clone $baseStatsQuery)
-                    ->where('stock', '<=', 0)
-                    ->count(),
-
-                'expiring_soon' => (clone $batchAlertsQuery)
-                    ->whereDate('expiration_date', '>=', $today)
-                    ->whereDate('expiration_date', '<=', $nearExpirationLimit)
-                    ->count(),
-
-                'inactive_candidates' => (clone $inactiveCandidateProductsQuery)->count(),
-
-                'inventory_value' => (clone $baseStatsQuery)
-                    ->join('products', 'products.id', '=', 'branch_products.product_id')
-                    ->selectRaw('COALESCE(SUM(branch_products.stock * products.sale_price), 0) as total')
-                    ->value('total'),
+                'total_products' => (int) ($inventoryAggregate->total_products ?? 0),
+                'total_stock' => (float) ($inventoryAggregate->total_stock ?? 0),
+                'low_stock' => (int) ($inventoryAggregate->low_stock ?? 0),
+                'out_of_stock' => (int) ($inventoryAggregate->out_of_stock ?? 0),
+                'expiring_soon' => (int) ($batchAggregate->near_expiration_batches ?? 0),
+                'inactive_candidates' => (int) ($inventoryAggregate->inactive_candidates ?? 0),
+                'inventory_value' => (float) ($inventoryAggregate->inventory_value ?? 0),
             ],
 
             'inventoryAlerts' => [
-                'expired_batches' => (clone $batchAlertsQuery)
-                    ->whereDate('expiration_date', '<', $today)
-                    ->count(),
-
-                'near_expiration_batches' => (clone $batchAlertsQuery)
-                    ->whereDate('expiration_date', '>=', $today)
-                    ->whereDate('expiration_date', '<=', $nearExpirationLimit)
-                    ->count(),
-
-                'low_stock_products' => (clone $baseStatsQuery)
-                    ->whereColumn('stock', '<=', 'min_stock')
-                    ->where('stock', '>', 0)
-                    ->count(),
-
-                'inactive_candidate_products' => (clone $inactiveCandidateProductsQuery)->count(),
+                'expired_batches' => (int) ($batchAggregate->expired_batches ?? 0),
+                'near_expiration_batches' => (int) ($batchAggregate->near_expiration_batches ?? 0),
+                'low_stock_products' => (int) ($inventoryAggregate->low_stock ?? 0),
+                'inactive_candidate_products' => (int) ($inventoryAggregate->inactive_candidates ?? 0),
 
                 'expired_batches_list' => $expiredBatchesList,
                 'near_expiration_batches_list' => $nearExpirationBatchesList,

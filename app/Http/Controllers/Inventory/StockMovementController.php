@@ -7,6 +7,7 @@ use App\Models\BranchProduct;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use App\Services\StockMovementService;
+use App\Support\TablePagination;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -170,22 +171,27 @@ class StockMovementController extends Controller
         ]);
     }
 
-    public function index()
+    public function index(Request $request)
     {
         return Inertia::render('Inventory/Movements', [
             'movementsDB' => StockMovement::with([
-                'branchProduct.product',
-                'branchProduct.branch',
-                'user',
+                'branchProduct:id,branch_id,product_id',
+                'branchProduct.product:id,name',
+                'branchProduct.branch:id,name',
+                'user:id,name',
             ])
                 ->latest()
-                ->get(),
+                ->paginate(TablePagination::resolvePerPage($request, 50))
+                ->withQueryString(),
 
             'branchProductsDB' => BranchProduct::with([
-                'product',
-                'branch',
+                'product:id,name',
+                'branch:id,name',
             ])
-                ->get(),
+                ->where('status', BranchProduct::STATUS_ACTIVE)
+                ->orderBy('branch_id')
+                ->orderBy('product_id')
+                ->get(['id', 'branch_id', 'product_id']),
         ]);
     }
 

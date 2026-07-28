@@ -1,8 +1,13 @@
 <script setup>
+import { computed, useSlots } from 'vue'
 import ToolbarMobile from './ToolbarMobile.vue'
 import ToolbarDesktop from './ToolbarDesktop.vue'
 
+const slots = useSlots()
+const hasActionsSlot = computed(() => Boolean(slots.actions))
+
 defineProps({
+    icon: String,
     title: String,
     subtitle: String,
 
@@ -90,7 +95,7 @@ defineEmits([
 
 <template>
     <div>
-        <ToolbarDesktop :title="title" :subtitle="subtitle" :back-button="backButton" :back-label="backLabel"
+        <ToolbarDesktop :icon="icon" :title="title" :subtitle="subtitle" :back-button="backButton" :back-label="backLabel"
             :search="search" :search-placeholder="searchPlaceholder" :show-search="showSearch" :filters="filters"
             :actions="actions" :tabs="tabs" :active-tab="activeTab" :records-per-page="recordsPerPage"
             :compact-filters="compactFilters"
@@ -99,9 +104,11 @@ defineEmits([
             @back="$emit('back')" @update:search="$emit('update:search', $event)"
             @update:filter="$emit('update:filter', $event)"
             @update:records-per-page="$emit('update:records-per-page', $event)"
-            @update:active-tab="$emit('update:active-tab', $event)" @action="$emit('action', $event)" />
+            @update:active-tab="$emit('update:active-tab', $event)" @action="$emit('action', $event)">
+            <template v-if="hasActionsSlot" #actions><slot name="actions" /></template>
+        </ToolbarDesktop>
 
-        <ToolbarMobile :title="title" :subtitle="subtitle" :back-button="backButton" :back-label="backLabel"
+        <ToolbarMobile :icon="icon" :title="title" :subtitle="subtitle" :back-button="backButton" :back-label="backLabel"
             :search="search" :search-placeholder="searchPlaceholder" :show-search="showSearch" :filters="filters"
             :actions="actions" :tabs="tabs" :active-tab="activeTab" :records-per-page="recordsPerPage"
             :compact-filters="compactFilters"
@@ -110,6 +117,8 @@ defineEmits([
             @back="$emit('back')" @update:search="$emit('update:search', $event)"
             @update:filter="$emit('update:filter', $event)"
             @update:records-per-page="$emit('update:records-per-page', $event)"
-            @update:active-tab="$emit('update:active-tab', $event)" @action="$emit('action', $event)" />
+            @update:active-tab="$emit('update:active-tab', $event)" @action="$emit('action', $event)">
+            <template v-if="hasActionsSlot" #actions><slot name="actions" /></template>
+        </ToolbarMobile>
     </div>
 </template>

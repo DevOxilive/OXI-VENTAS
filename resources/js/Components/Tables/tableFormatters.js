@@ -19,7 +19,7 @@ export const formatters = {
 
   date: (value, options = {}) => {
     if (!value) return options.fallback || '-'
-    const date = typeof value === 'string' ? new Date(value) : value
+    const date = normalizeDateValue(value, options.format || 'short')
     const locale = options.locale || 'es-MX'
     const format = options.format || 'short'
 
@@ -33,7 +33,7 @@ export const formatters = {
       return date.toLocaleTimeString(locale)
     }
     if (format === 'datetime') {
-      return `${date.toLocaleDateString(locale)} ${date.toLocaleTimeString(locale)}`
+      return `${date.toLocaleDateString(locale)} ${date.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}`
     }
     return date.toLocaleDateString(locale)
   },
@@ -123,6 +123,20 @@ export function truncateText(text, length) {
   if (!text) return ''
   if (text.length <= length) return text
   return text.substring(0, length) + '...'
+}
+
+function normalizeDateValue(value, format = 'short') {
+  if (value instanceof Date) return value
+
+  const stringValue = String(value)
+  const dateOnlyMatch = stringValue.match(/^(\d{4})-(\d{2})-(\d{2})/)
+
+  if (format !== 'datetime' && dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch
+    return new Date(Number(year), Number(month) - 1, Number(day))
+  }
+
+  return new Date(value)
 }
 
 export default formatters

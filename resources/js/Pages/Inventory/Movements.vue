@@ -6,8 +6,11 @@ import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
+import GlobalTable from '@/Components/Tables/GlobalTable.vue'
+import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { getInventoryMovementModalConfig } from '@/config/ModalConfigs/inventoryMovementModalConfig'
+import { inventoryMovementsTableConfig } from '@/config/TableConfigs/inventoryMovementsTableConfig'
 
 defineOptions({
     layout: AdminLayout,
@@ -15,11 +18,12 @@ defineOptions({
 
 const props = defineProps({
     branchProductsDB: Array,
-    movementsDB: Array,
+    movementsDB: Object,
 })
 
 const branchProducts = computed(() => props.branchProductsDB ?? [])
-const movements = computed(() => props.movementsDB ?? [])
+const movements = computed(() => props.movementsDB?.data ?? [])
+const { handlePageChange } = useGlobalTablePagination()
 const showModal = ref(false)
 
 const typeOptions = [
@@ -39,20 +43,6 @@ const reasonOptions = [
     { label: 'Ajuste manual', value: 'MANUAL' },
 ]
 
-const movementLabels = {
-    PURCHASE: 'Compra',
-    SALE: 'Venta',
-    DAMAGED: 'Producto danado',
-    STOLEN: 'Producto robado',
-    EXPIRED: 'Producto caducado',
-    OTHER: 'Otros',
-    TRANSFER: 'Transferencia',
-    MANUAL: 'Ajuste manual',
-    IN: 'Entrada',
-    OUT: 'Salida',
-    ADJUSTMENT: 'Ajuste manual',
-}
-
 const form = useForm({
     branch_product_id: '',
     type: 'OUT',
@@ -67,10 +57,6 @@ const modalConfig = computed(() => getInventoryMovementModalConfig({
     totalErrors: totalErrors.value,
     processing: form.processing,
 }))
-
-function translateMovement(value) {
-    return movementLabels[value] || value
-}
 
 function openModal() {
     form.reset()
@@ -117,95 +103,12 @@ function submit() {
             </button>
         </div>
 
-        <div class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-secondary">
-                        <tr class="text-left text-sm text-text opacity-80">
-                            <th class="px-5 py-4 font-semibold">
-                                Producto
-                            </th>
-                            <th class="px-5 py-4 font-semibold">
-                                Sucursal
-                            </th>
-                            <th class="px-5 py-4 font-semibold">
-                                Tipo
-                            </th>
-                            <th class="px-5 py-4 font-semibold">
-                                Motivo
-                            </th>
-                            <th class="px-5 py-4 font-semibold">
-                                Cantidad
-                            </th>
-                            <th class="px-5 py-4 font-semibold">
-                                Stock anterior
-                            </th>
-                            <th class="px-5 py-4 font-semibold">
-                                Nuevo stock
-                            </th>
-                            <th class="px-5 py-4 font-semibold">
-                                Fecha
-                            </th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        <tr
-                            v-for="movement in movements"
-                            :key="movement.id"
-                            class="border-t border-secondary transition hover:bg-secondary"
-                        >
-                            <td class="px-5 py-4 font-medium text-text">
-                                {{ movement.branch_product?.product?.name }}
-                            </td>
-
-                            <td class="px-5 py-4 text-text opacity-80">
-                                {{ movement.branch_product?.branch?.name }}
-                            </td>
-
-                            <td class="px-5 py-4">
-                                <span
-                                    class="px-3 py-1 rounded-full text-xs font-medium"
-                                    :class="movement.type === 'IN'
-                                        ? 'bg-secondary text-accent'
-                                        : movement.type === 'OUT'
-                                            ? 'bg-secondary text-primary'
-                                            : 'bg-secondary text-accent'"
-                                >
-                                    {{ translateMovement(movement.type) }}
-                                </span>
-                            </td>
-
-                            <td class="px-5 py-4 text-text opacity-80">
-                                {{ translateMovement(movement.reason) }}
-                            </td>
-
-                            <td class="px-5 py-4 text-text opacity-80">
-                                {{ movement.quantity }}
-                            </td>
-
-                            <td class="px-5 py-4 text-text opacity-80">
-                                {{ movement.previous_stock }}
-                            </td>
-
-                            <td class="px-5 py-4 text-text opacity-80">
-                                {{ movement.new_stock }}
-                            </td>
-
-                            <td class="px-5 py-4 text-sm text-text opacity-70">
-                                {{ movement.created_at }}
-                            </td>
-                        </tr>
-
-                        <tr v-if="movements.length === 0">
-                            <td colspan="8" class="py-10 text-center text-text opacity-50">
-                                No hay movimientos registrados.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <GlobalTable
+            :items="movements"
+            v-bind="inventoryMovementsTableConfig"
+            :pagination="movementsDB"
+            @page-change="handlePageChange"
+        />
 
         <GlobalModal
             v-if="showModal"
