@@ -78,6 +78,11 @@ const DEFAULT_ENABLED = Object.fromEntries(
 );
 
 const TICKET_TEMPLATE_STORAGE_KEY = "ticket_template_settings";
+const CASH_DRAWER_OPEN_COMMANDS = [
+  "\x1B\x70\x00\x19\xFA",
+  "\x1B\x70\x01\x19\xFA",
+  "\x10\x14\x01\x00\x05",
+];
 
 export function getTicketBlockCatalog() {
   return BLOCK_CATALOG.map((block) => ({ ...block }));
@@ -1027,7 +1032,7 @@ export function buildEscPosTicketData(template, printJob) {
   });
 
   if (resolved.open_cash_drawer) {
-    lines.push("\x1B\x70\x00\x19\xFA");
+    lines.push(...CASH_DRAWER_OPEN_COMMANDS);
   }
 
   if (resolved.auto_cut) {

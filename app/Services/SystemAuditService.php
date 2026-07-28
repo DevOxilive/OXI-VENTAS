@@ -49,7 +49,35 @@ class SystemAuditService
                 'occurred_at' => now(),
             ]);
 
-            DB::afterCommit(fn () => broadcast(new SystemAuditChanged($module, $action)));
+            $this->announceChange($module, $action, $result, $request, $user?->id);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /**
+     * Publica una sola señal común para que las interfaces abiertas actualicen
+     * sus datos sin que cada tabla o modal tenga que crear su propio canal.
+     */
+    public function announceChange(
+        string $module,
+        string $action,
+        string $result = 'success',
+        ?Request $request = null,
+        ?int $actorId = null,
+    ): void {
+        $request ??= request();
+        $actorId ??= $request?->user()?->id;
+        $routeName = $request?->route()?->getName();
+
+        try {
+            DB::afterCommit(fn () => broadcast(new SystemAuditChanged(
+                $module,
+                $action,
+                $actorId,
+                $routeName,
+                $result,
+            ))->toOthers());
         } catch (Throwable $exception) {
             report($exception);
         }

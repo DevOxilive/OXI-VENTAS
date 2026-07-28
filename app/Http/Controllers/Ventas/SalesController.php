@@ -36,36 +36,9 @@ class SalesController extends Controller
             throw new AuthorizationException('No tienes una sucursal disponible para generar ventas.');
         }
 
-        $products = $selectorMode
+        $nearExpirationProducts = $selectorMode
             ? collect()
-            : BranchProduct::query()
-                ->with([
-                    'product.category',
-                    'product.barcodes:id,product_id,code',
-                    'branch:id,name,slug',
-                    'batches' => fn ($query) => $query
-                        ->whereIn('status', [
-                            ProductBatch::STATUS_ACTIVE,
-                            ProductBatch::STATUS_SEASONAL,
-                        ])
-                        ->where('quantity', '>', 0)
-                        ->whereNotNull('expiration_date')
-                        ->whereDate('expiration_date', '>=', today())
-                        ->whereDate('expiration_date', '<=', now()->addDays(20))
-                        ->orderBy('expiration_date')
-                        ->orderBy('received_at')
-                        ->orderBy('id'),
-                ])
-                ->where('branch_id', $branch->id)
-                ->where('status', BranchProduct::STATUS_ACTIVE)
-                ->whereHas('product', fn ($query) => $query->where('active', true))
-                ->orderBy('id')
-                ->get();
-
-        $mappedProducts = $products instanceof Collection
-            ? $products->map(fn ($branchProduct) => $this->mapBranchProduct($branchProduct))
-                ->values()
-            : collect();
+            : $this->nearExpirationProducts($branch, 12);
 
         $ticketTemplate = TicketTemplate::salesTemplate();
 
@@ -80,12 +53,12 @@ class SalesController extends Controller
                 'color' => $branch->color,
             ] : null,
             'branchesDB' => $allowedBranches,
-            'productsDB' => $mappedProducts,
+            'productsDB' => [],
             'paymentMethodsDB' => $paymentMethods,
             'defaultPaymentMethodId' => $this->defaultPaymentMethodId($paymentMethods),
             'nearExpirationAlerts' => $selectorMode
                 ? []
-                : $this->buildNearExpirationAlerts($products)->take(12)->values(),
+                : $this->buildNearExpirationAlerts($nearExpirationProducts)->values(),
             'ticketTemplate' => [
                 'id' => $ticketTemplate->id,
                 'name' => $ticketTemplate->name,
@@ -93,6 +66,67 @@ class SalesController extends Controller
                 'settings' => TicketTemplate::sanitizeSettings($ticketTemplate->settings ?? []),
             ],
         ]);
+    }
+
+    public function searchProducts(Request $request)
+    {
+        $data = $request->validate([
+            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'search' => ['required', 'string', 'max:100'],
+        ]);
+
+        $user = $request->user()->loadMissing(['branches', 'role']);
+        $branch = $this->resolveBranchById($data['branch_id'], $user);
+        $term = trim($data['search']);
+        $pattern = "%{$term}%";
+
+        $products = BranchProduct::query()
+            ->with([
+                'product:id,name,image,category_id,cost,sale_price,margin_percentage,active',
+                'product.category:id,name',
+                'product.barcodes:id,product_id,code',
+                'batches' => fn ($query) => $this->applyNearExpirationBatchConstraints($query),
+            ])
+            ->where('branch_id', $branch->id)
+            ->where('status', BranchProduct::STATUS_ACTIVE)
+            ->whereHas('product', fn ($query) => $query->where('active', true))
+            ->where(function ($query) use ($term, $pattern) {
+                $query->where('branch_products.barcode', 'like', $pattern)
+                    ->orWhereHas('product', function ($productQuery) use ($term, $pattern) {
+                        $productQuery->where('name', 'like', $pattern)
+                            ->orWhereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery
+                                ->where('code', $term)
+                                ->orWhere('code', 'like', $pattern));
+                    });
+            })
+            ->orderByRaw(
+                'CASE
+                    WHEN branch_products.barcode = ? OR EXISTS (
+                        SELECT 1 FROM barcodes
+                        WHERE barcodes.product_id = branch_products.product_id
+                        AND barcodes.code = ?
+                    ) THEN 0
+                    WHEN EXISTS (
+                        SELECT 1 FROM products
+                        WHERE products.id = branch_products.product_id
+                        AND LOWER(products.name) = LOWER(?)
+                    ) THEN 1
+                    ELSE 2
+                END',
+                [$term, $term, $term]
+            )
+            ->orderBy(
+                \App\Models\Product::query()
+                    ->select('name')
+                    ->whereColumn('products.id', 'branch_products.product_id')
+                    ->limit(1)
+            )
+            ->limit(10)
+            ->get()
+            ->map(fn (BranchProduct $branchProduct) => $this->mapBranchProduct($branchProduct))
+            ->values();
+
+        return response()->json(['products' => $products]);
     }
 
     public function store(Request $request, StockMovementService $stockService)
@@ -284,6 +318,41 @@ class SalesController extends Controller
             'print_job' => $this->buildPrintJobPayload($sale),
             'expiration_alerts' => $expirationAlerts,
         ]);
+    }
+
+    private function nearExpirationProducts(Branch $branch, int $limit): Collection
+    {
+        return BranchProduct::query()
+            ->with([
+                'product:id,name',
+                'batches' => fn ($query) => $this->applyNearExpirationBatchConstraints($query),
+            ])
+            ->withMin([
+                'batches as near_expiration_date' => fn ($query) => $this->applyNearExpirationBatchConstraints($query),
+            ], 'expiration_date')
+            ->where('branch_id', $branch->id)
+            ->where('status', BranchProduct::STATUS_ACTIVE)
+            ->whereHas('product', fn ($query) => $query->where('active', true))
+            ->whereHas('batches', fn ($query) => $this->applyNearExpirationBatchConstraints($query))
+            ->orderBy('near_expiration_date')
+            ->limit($limit)
+            ->get();
+    }
+
+    private function applyNearExpirationBatchConstraints($query)
+    {
+        return $query
+            ->whereIn('status', [
+                ProductBatch::STATUS_ACTIVE,
+                ProductBatch::STATUS_SEASONAL,
+            ])
+            ->where('quantity', '>', 0)
+            ->whereNotNull('expiration_date')
+            ->whereDate('expiration_date', '>=', today())
+            ->whereDate('expiration_date', '<=', now()->addDays(20))
+            ->orderBy('expiration_date')
+            ->orderBy('received_at')
+            ->orderBy('id');
     }
 
     private function mapBranchProduct(BranchProduct $branchProduct): array

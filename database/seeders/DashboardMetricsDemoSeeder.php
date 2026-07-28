@@ -41,8 +41,10 @@ class DashboardMetricsDemoSeeder extends Seeder
                 throw new \RuntimeException('Se requieren al menos dos sucursales activas para el demo del dashboard.');
             }
 
-            $start = now(config('app.timezone'))->subMonthNoOverflow()->startOfMonth();
-            $end = $start->copy()->endOfMonth();
+            // El dashboard abre por defecto en la semana actual, por eso los
+            // datos demo se crean en ese mismo rango visible.
+            $start = now(config('app.timezone'))->startOfWeek();
+            $end = now(config('app.timezone'))->endOfDay();
 
             foreach ($branches as $branchIndex => $branch) {
                 $products = BranchProduct::query()
@@ -103,6 +105,7 @@ class DashboardMetricsDemoSeeder extends Seeder
                     'discount_percentage' => 0,
                     'discount_amount' => 0,
                     'unit_price' => $unitPrice,
+                    'unit_cost' => (float) $branchProduct->product->cost,
                     'subtotal' => $subtotal,
                 ]);
                 StockMovement::create([
@@ -110,6 +113,7 @@ class DashboardMetricsDemoSeeder extends Seeder
                     'type' => StockMovement::TYPE_OUT,
                     'reason' => StockMovement::REASON_SALE,
                     'quantity' => $quantity,
+                    'unit_cost' => (float) $branchProduct->product->cost,
                     'previous_stock' => 100,
                     'new_stock' => 100 - $quantity,
                     'user_id' => $user->id,
@@ -194,6 +198,7 @@ class DashboardMetricsDemoSeeder extends Seeder
             'type' => StockMovement::TYPE_OUT,
             'reason' => $date->day % 10 === 0 ? StockMovement::REASON_EXPIRED : StockMovement::REASON_DAMAGED,
             'quantity' => $quantity,
+            'unit_cost' => (float) $branchProduct->product->cost,
             'previous_stock' => 100,
             'new_stock' => 100 - $quantity,
             'user_id' => $user->id,

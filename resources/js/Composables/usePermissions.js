@@ -3,6 +3,8 @@ import { usePage } from "@inertiajs/vue3";
 
 const livePermissions = ref([]);
 const liveRole = ref(null);
+const liveUserId = ref(null);
+const hasRealtimePermissions = ref(false);
 const permissionsInitialized = ref(false);
 
 export function initializePermissions() {
@@ -12,14 +14,31 @@ export function initializePermissions() {
         return;
     }
 
-    livePermissions.value = page.props.auth?.permissions || [];
-    liveRole.value = page.props.auth?.user?.role?.name || null;
+    syncPermissionsFromPage(page.props.auth);
     permissionsInitialized.value = true;
 }
 
-export function updateLivePermissions({ permissions = [], role = null }) {
+export function updateLivePermissions({ permissions = [], role = null, userId = null }) {
+    liveUserId.value = userId ?? liveUserId.value;
     livePermissions.value = permissions;
     liveRole.value = role;
+    hasRealtimePermissions.value = true;
+}
+
+function syncPermissionsFromPage(auth = {}) {
+    const pageUserId = auth?.user?.id ?? null;
+
+    if (pageUserId !== liveUserId.value) {
+        liveUserId.value = pageUserId;
+        hasRealtimePermissions.value = false;
+    }
+
+    if (hasRealtimePermissions.value) {
+        return;
+    }
+
+    livePermissions.value = auth?.permissions || [];
+    liveRole.value = auth?.user?.role?.name || null;
 }
 
 export function usePermissions() {
@@ -28,14 +47,8 @@ export function usePermissions() {
     initializePermissions();
 
     watch(
-        () => [
-            page.props.auth?.permissions || [],
-            page.props.auth?.user?.role?.name || null,
-        ],
-        ([permissions, role]) => {
-            livePermissions.value = permissions;
-            liveRole.value = role;
-        },
+        () => page.props.auth,
+        (auth) => syncPermissionsFromPage(auth),
         {
             immediate: true,
             deep: true,

@@ -154,7 +154,7 @@ const permissionLabels = {
     "attendance.schedule-assignments.view": "Ver horarios asignados al personal",
     "attendance.schedule-assignments.create": "Asignar horarios al personal",
     "attendance.schedule-assignments.update": "Editar asignaciones de horarios",
-    "attendance.schedule-assignments.delete": "Desactivar asignaciones de horarios",
+    "attendance.schedule-assignments.delete": "Eliminar asignaciones de horarios",
     "attendance.incidents.view": "Ver incidencias registradas",
     "attendance.incidents.create": "Registrar incidencias",
     "attendance.incidents.update": "Editar incidencias pendientes",

@@ -63,6 +63,7 @@ const hasLeftAddon = computed(() => props.icon || props.prefix)
 const hasRightAddon = computed(() => props.suffix
 )
 const isDisabled = computed(() => Boolean(attrs.disabled))
+const isTextarea = computed(() => props.type === 'textarea')
 
 function preventNumberWheel(e) {
     if (props.type !== 'number') return
@@ -140,7 +141,16 @@ function blockExtraInput(e) {
                     {{ icon }}
                 </span>
             </span>
-            <input ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
+            <textarea v-if="isTextarea" ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :placeholder="placeholder" :value="modelValue"
+                :readonly="readonly" @keydown="(e) => { blockExtraInput(e); emit('keydown', e) }"
+                @input="handleInput" @blur="emit('validate', field)" :class="[
+                    'min-h-28 w-full resize-y rounded-xl border py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
+                    hasLeftAddon ? 'pl-11 pr-4' : 'px-4',
+                    hasRightAddon ? 'pr-12' : '',
+                    readonly || isDisabled ? 'cursor-not-allowed border-secondary bg-secondary text-text opacity-60' : 'bg-background text-text',
+                    error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'
+                ]" />
+            <input v-else ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
                 :readonly="readonly" @keydown="(e) => { blockExtraInput(e); emit('keydown', e) }"
                 @wheel="preventNumberWheel" @input="handleInput" @blur="emit('validate', field)" :class="[
                     'w-full rounded-xl border py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',

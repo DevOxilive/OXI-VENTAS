@@ -38,6 +38,11 @@ export const REALTIME_EVENTS = Object.freeze({
     userChanged: '.UserChanged',
 })
 
+/** Evento interno que distribuye una señal Reverb a la interfaz activa. */
+export const REALTIME_BROWSER_EVENTS = Object.freeze({
+    dataChanged: 'oxiventas:realtime-data-changed',
+})
+
 /**
  * Toda opcion de transporte, reconexion y timeout se administra aqui.
  * Los timeouts nulos conservan los valores predeterminados de Pusher/Reverb.
@@ -49,7 +54,9 @@ export const REALTIME_CONFIG = Object.freeze({
     port,
     scheme,
     secure: isSecure,
-    transports: Object.freeze([isSecure ? 'wss' : 'ws']),
+    // Pusher necesita conocer ambas estrategias. forceTLS selecciona WSS
+    // automáticamente cuando la aplicación se abre mediante HTTPS.
+    transports: Object.freeze(['ws', 'wss']),
     reconnect: Object.freeze({
         enabled: true,
         activityTimeout: envNumber(import.meta.env.VITE_REALTIME_ACTIVITY_TIMEOUT),

@@ -30,7 +30,7 @@ const columns = [{ key: 'employee', label: 'Empleado' }, { key: 'department', la
 const actions = [
   { id: 'view', label: 'Ver', icon: 'visibility', variant: 'blue', mobile: 'button', permission: 'attendance.schedule-assignments.view' },
   { id: 'edit', label: 'Editar', icon: 'edit', variant: 'amber', mobile: 'button', permission: 'attendance.schedule-assignments.update' },
-  { id: 'delete', label: 'Desactivar', icon: 'delete', variant: 'red', mobile: 'button', permission: 'attendance.schedule-assignments.delete' },
+  { id: 'delete', label: 'Eliminar', icon: 'delete', variant: 'red', mobile: 'button', permission: 'attendance.schedule-assignments.delete' },
 ]
 const title = computed(() => ({ create: 'Nueva asignación', edit: 'Editar asignación', view: 'Detalle de asignación' }[mode.value]))
 
@@ -39,7 +39,7 @@ function openCreate() { mode.value = 'create'; selected.value = null; reset(); s
 function load(row, nextMode) { selected.value = row; mode.value = nextMode; form.clearErrors(); Object.assign(form, { employee_id: String(row.employee_id), attendance_schedule_id: String(row.attendance_schedule_id), effective_from: row.effective_from || '', effective_to: row.effective_to || '', active: Boolean(row.active), observations: row.observations || '', working_days: [...(row.working_days || defaultDays)] }); showModal.value = true }
 function close() { showModal.value = false; form.clearErrors() }
 function submit() { if (mode.value === 'view') return close(); const options = getModalRequestOptions({ mode: mode.value === 'edit' ? 'edit' : 'create', entityName: 'Asignación', close }); if (mode.value === 'edit') form.put(route('human-resources.attendance-schedule-assignments.update', selected.value.id), options); else form.post(route('human-resources.attendance-schedule-assignments.store'), options) }
-async function remove(row) { const result = await confirmModalAction({ mode: 'delete', entityName: 'asignación', title: 'Desactivar asignación', message: `¿Deseas desactivar la asignación de ${row.employee}?`, confirmText: 'Sí, desactivar' }); if (result.isConfirmed) form.delete(route('human-resources.attendance-schedule-assignments.destroy', row.id), getModalRequestOptions({ mode: 'delete', entityName: 'Asignación' })) }
+async function remove(row) { const result = await confirmModalAction({ mode: 'delete', entityName: 'asignación', title: 'Eliminar asignación', message: `¿Deseas eliminar únicamente la asignación de horario de ${row.employee}? El empleado se conservará.`, confirmText: 'Sí, eliminar' }); if (result.isConfirmed) form.delete(route('human-resources.attendance-schedule-assignments.destroy', row.id), getModalRequestOptions({ mode: 'delete', entityName: 'Asignación' })) }
 function action({ action, row }) { if (action === 'view') load(row, 'view'); if (action === 'edit') load(row, 'edit'); if (action === 'delete') remove(row) }
 function toggleWorkingDay(day) { form.working_days = form.working_days.includes(day) ? form.working_days.filter((value) => value !== day) : [...form.working_days, day] }
 

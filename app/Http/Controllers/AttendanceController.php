@@ -28,13 +28,13 @@ class AttendanceController extends Controller
             || $request->user()->hasPermission('attendance.manage')
             || $request->user()->hasPermission('attendance.export.excel')
             || $request->user()->hasPermission('attendance.export.pdf');
-        $filters = $this->validatedFilters($request);
+        $filters = $this->listingFilters($this->validatedFilters($request));
         $canManage = $request->user()->hasPermission('attendance.manage')
             || $request->user()->hasPermission('attendance.export.excel')
             || $request->user()->hasPermission('attendance.export.pdf');
         $canViewEvidence = $request->user()->hasPermission('attendance.manage');
         $records = $canViewAttendance
-            ? $this->recordsQuery($request, $canManage, $filters)->paginate(30)->withQueryString()
+            ? $this->recordsQuery($request, $canViewAttendance, $filters)->paginate(30)->withQueryString()
             : null;
         $todayRecords = $canViewAttendance
             ? AttendanceRecord::query()->whereDate('attendance_date', Carbon::today())->get()
@@ -53,7 +53,7 @@ class AttendanceController extends Controller
                 'remote' => $todayRecords->where('type', 'remote_work')->pluck('user_id')->unique()->count(),
                 'activeEmployees' => Employee::query()->where('employment_status', '!=', 'Inactivo')->count(),
             ] : [],
-            'filters' => array_merge(['from' => $request->input('from'), 'to' => $request->input('to'), 'branch' => $request->input('branch'), 'department' => $request->input('department'), 'employee' => $request->input('employee'), 'type' => $request->input('type')], $filters),
+            'filters' => $filters,
             'options' => [
                 'types' => collect(AttendanceRecord::TYPES)->map(fn ($type) => ['value' => $type, 'label' => $this->typeLabel($type)])->values(),
                 'branches' => $canViewAttendance ? Branch::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->map(fn ($branch) => ['value' => $branch->id, 'label' => $branch->name]) : [],
@@ -211,10 +211,45 @@ class AttendanceController extends Controller
             'branch' => ['nullable', 'integer', 'exists:branches,id'],
             'department' => ['nullable', 'integer', 'exists:departments,id'],
             'employee' => ['nullable', 'integer', 'exists:employees,id'],
+            'search' => ['nullable', 'string', 'max:100'],
             'type' => ['nullable', 'in:'.implode(',', AttendanceRecord::TYPES)],
         ]);
     }
-    private function recordsQuery(Request $request, bool $canManage, array $filters) { return AttendanceRecord::query()->with(['user.role', 'employee.position.department', 'branch'])->when(!$canManage, fn ($query) => $query->where('user_id', $request->user()->id))->when($filters['from'] ?? null, fn ($query, $value) => $query->whereDate('attendance_date', '>=', $value))->when($filters['to'] ?? null, fn ($query, $value) => $query->whereDate('attendance_date', '<=', $value))->when($filters['branch'] ?? null, fn ($query, $value) => $query->where('branch_id', $value))->when($filters['department'] ?? null, fn ($query, $value) => $query->whereHas('employee.position', fn ($position) => $position->where('department_id', $value)))->when($filters['employee'] ?? null, fn ($query, $value) => $query->where('employee_id', $value))->when($filters['type'] ?? null, fn ($query, $value) => $query->where('type', $value))->latest('recorded_at'); }
+    private function listingFilters(array $filters): array
+    {
+        return array_merge($filters, [
+            'from' => $filters['from'] ?? Carbon::today()->toDateString(),
+            'to' => $filters['to'] ?? Carbon::today()->toDateString(),
+        ]);
+    }
+
+    private function recordsQuery(Request $request, bool $canViewAllAttendance, array $filters)
+    {
+        return AttendanceRecord::query()
+            ->with(['user.role', 'employee.position.department', 'branch'])
+            ->when(! $canViewAllAttendance, fn ($query) => $query->where('user_id', $request->user()->id))
+            ->when($filters['from'] ?? null, fn ($query, $value) => $query->whereDate('attendance_date', '>=', $value))
+            ->when($filters['to'] ?? null, fn ($query, $value) => $query->whereDate('attendance_date', '<=', $value))
+            ->when($filters['branch'] ?? null, fn ($query, $value) => $query->where('branch_id', $value))
+            ->when($filters['department'] ?? null, fn ($query, $value) => $query->whereHas('employee.position', fn ($position) => $position->where('department_id', $value)))
+            ->when($filters['employee'] ?? null, fn ($query, $value) => $query->where('employee_id', $value))
+            ->when($filters['search'] ?? null, function ($query, $value) {
+                $term = '%'.trim($value).'%';
+
+                $query->where(function ($records) use ($term) {
+                    $records->whereHas('employee', fn ($employee) => $employee
+                        ->where('first_name', 'like', $term)
+                        ->orWhere('last_name', 'like', $term)
+                        ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", [$term])
+                        ->orWhere('email', 'like', $term))
+                        ->orWhereHas('user', fn ($user) => $user
+                            ->where('name', 'like', $term)
+                            ->orWhere('email', 'like', $term));
+                });
+            })
+            ->when($filters['type'] ?? null, fn ($query, $value) => $query->where('type', $value))
+            ->latest('recorded_at');
+    }
     private function recordPayload(AttendanceRecord $record): array { return ['id' => $record->id, 'employee' => $record->employee ? trim($record->employee->first_name.' '.$record->employee->last_name) : $record->user?->name, 'role' => $record->user?->role?->name, 'branch' => $record->branch?->name ?? 'Sin sucursal', 'date' => $record->attendance_date?->format('d/m/Y'), 'time' => $record->recorded_at?->format('H:i'), 'type' => $this->typeLabel($record->type), 'status' => $this->statusLabel($record->status), 'authentication' => 'Biometría del dispositivo']; }
     private function evidencePayload(AttendanceRecord $record): ?array
     {

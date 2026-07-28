@@ -16,7 +16,6 @@ import {
   getDefaultQzPrinter,
   getQzPrinters,
   getStoredPrinterName,
-  isQzTrayActive,
   printEscPosTicket,
   saveStoredPrinterName,
 } from "@/Composables/useQzTray";
@@ -78,6 +77,8 @@ const CASH_BOX_STORAGE_KEY = "ventas_cash_box_by_branch";
 
 const search = ref("");
 const searchInput = ref(null);
+const remoteSearchProducts = ref([]);
+const searchLoading = ref(false);
 const selectedBranchId = ref(props.currentBranch?.id ?? "");
 const selectedCashBoxNumber = ref("1");
 const cart = ref([]);
@@ -93,6 +94,8 @@ const selectedPrinterName = ref(getStoredPrinterName());
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para imprimir tickets.");
 let printerRetryInterval = null;
+let searchDebounceTimer = null;
+let searchRequestId = 0;
 
 const saleForm = useForm({
   branch_id: props.currentBranch?.id ?? "",
@@ -145,6 +148,11 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  if (searchDebounceTimer) {
+    window.clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = null;
+  }
+
   if (printerRetryInterval) {
     window.clearInterval(printerRetryInterval);
     printerRetryInterval = null;
@@ -173,6 +181,10 @@ const filteredProducts = computed(() => {
   const query = search.value.trim().toLowerCase();
 
   if (!query) return props.productsDB;
+
+  if (remoteSearchProducts.value.length) {
+    return remoteSearchProducts.value;
+  }
 
   return props.productsDB.filter((product) =>
     (product.searchable || "").includes(query)
@@ -213,6 +225,28 @@ watch(searchSuggestions, (suggestions) => {
     highlightedSuggestionIndex.value = 0;
   }
 });
+
+watch(
+  () => [search.value, selectedBranchId.value],
+  ([value, branchId]) => {
+    const query = String(value || "").trim();
+
+    if (searchDebounceTimer) {
+      window.clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = null;
+    }
+
+    if (!query || !branchId || props.selectorMode) {
+      remoteSearchProducts.value = [];
+      searchLoading.value = false;
+      return;
+    }
+
+    searchDebounceTimer = window.setTimeout(() => {
+      fetchProductsForSearch(query);
+    }, 180);
+  }
+);
 
 const totalItems = computed(() =>
   cart.value.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
@@ -560,15 +594,25 @@ async function printTicket(printJob) {
     throw new Error("No hay una impresora seleccionada para el ticket.");
   }
 
-  if (!printerBridgeReady.value || !isQzTrayActive()) {
-    throw new Error("QZ Tray no esta conectado. La venta se guardo sin imprimir ticket.");
-  }
+  await ensurePrinterReadyForPrint({ silent: true });
 
   const printData = buildEscPosTicketData(resolvedTicketTemplate.value, resolvePrintJob(printJob));
-  await printEscPosTicket(selectedPrinterName.value, printData, { connectIfNeeded: false });
+  await printEscPosTicket(selectedPrinterName.value, printData, {
+    freshConnection: true,
+    disconnectAfterPrint: true,
+    timeoutMs: 10000,
+  });
+  printerBridgeReady.value = true;
+  printerBridgeMessage.value = `Impresora lista: ${selectedPrinterName.value}`;
 }
 
-function queueTicketPrint(printJob) {
+function reloadSalesPage() {
+  window.setTimeout(() => {
+    window.location.reload();
+  }, 400);
+}
+
+function queueTicketPrint(printJob, { reloadAfter = false } = {}) {
   window.setTimeout(async () => {
     try {
       await printTicket(printJob);
@@ -577,6 +621,10 @@ function queueTicketPrint(printJob) {
         title: "Venta guardada sin ticket",
         message: error?.message || "La venta se registro, pero no se pudo imprimir el ticket en la impresora.",
       });
+    } finally {
+      if (reloadAfter) {
+        reloadSalesPage();
+      }
     }
   }, 0);
 }
@@ -683,12 +731,55 @@ function addProduct(product) {
 function findExactProduct(query) {
   const normalized = query.toLowerCase();
 
-  return props.productsDB.find((product) => {
-    if (String(product.barcode || "").trim() === query) return true;
+  return filteredProducts.value.find((product) => {
+    if (String(product.barcode || "").trim().toLowerCase() === normalized) return true;
     if (String(product.name || "").trim().toLowerCase() === normalized) return true;
 
-    return (product.barcodes || []).some((code) => String(code).trim() === query);
+    return (product.barcodes || []).some((code) => String(code).trim().toLowerCase() === normalized);
   });
+}
+
+async function fetchProductsForSearch(query, { force = false } = {}) {
+  const term = String(query || "").trim();
+
+  if (!term || !selectedBranchId.value || props.selectorMode) {
+    remoteSearchProducts.value = [];
+    return [];
+  }
+
+  const requestId = ++searchRequestId;
+  searchLoading.value = true;
+
+  try {
+    const { data } = await window.axios.get(route("ventas.products.search"), {
+      params: {
+        branch_id: selectedBranchId.value,
+        search: term,
+      },
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (requestId !== searchRequestId && !force) {
+      return remoteSearchProducts.value;
+    }
+
+    const products = Array.isArray(data?.products) ? data.products : [];
+    remoteSearchProducts.value = products;
+
+    return products;
+  } catch (error) {
+    if (requestId === searchRequestId) {
+      remoteSearchProducts.value = [];
+    }
+
+    throw error;
+  } finally {
+    if (requestId === searchRequestId) {
+      searchLoading.value = false;
+    }
+  }
 }
 
 function selectSuggestion(product) {
@@ -714,7 +805,7 @@ function moveSuggestion(delta) {
   highlightedSuggestionIndex.value = nextIndex;
 }
 
-function handleSearchKeydown(event) {
+async function handleSearchKeydown(event) {
   if (event.key === "ArrowDown") {
     event.preventDefault();
     moveSuggestion(1);
@@ -742,6 +833,27 @@ function handleSearchKeydown(event) {
 
   const query = search.value.trim();
   if (!query) return;
+
+  if (!searchSuggestions.value.length) {
+    try {
+      await fetchProductsForSearch(query, { force: true });
+    } catch (error) {
+      ErrorAlert({
+        title: "No se pudo buscar",
+        message: "Revisa la conexion e intenta escanear o escribir de nuevo.",
+      });
+      return;
+    }
+  }
+
+  if (searchSuggestions.value.length) {
+    selectSuggestion(
+      searchSuggestions.value[
+        Math.min(highlightedSuggestionIndex.value, searchSuggestions.value.length - 1)
+      ]
+    );
+    return;
+  }
 
   const exact = findExactProduct(query);
   if (exact) {
@@ -1096,7 +1208,9 @@ function submitSale() {
       saleForm.payment_method_id = props.defaultPaymentMethodId ?? "";
 
       if (lastPrintJob.value) {
-        queueTicketPrint(lastPrintJob.value);
+        queueTicketPrint(lastPrintJob.value, { reloadAfter: true });
+      } else {
+        reloadSalesPage();
       }
     },
     onError: () => {
@@ -1383,6 +1497,7 @@ function submitSale() {
                   ref="searchInput"
                   label="Buscar o escanear"
                   field="sales_search"
+                  validation-field="toolbar_search"
                   v-model="search"
                   icon="barcode_scanner"
                   placeholder="Codigo de barras o nombre del producto"
@@ -1390,9 +1505,16 @@ function submitSale() {
                 />
 
                 <div
-                  v-if="searchSuggestions.length"
+                  v-if="searchSuggestions.length || searchLoading"
                   class="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 overflow-hidden rounded-2xl border border-secondary bg-background shadow-xl"
                 >
+                  <div
+                    v-if="searchLoading && !searchSuggestions.length"
+                    class="px-4 py-3 text-sm font-semibold text-text opacity-70"
+                  >
+                    Buscando productos...
+                  </div>
+
                   <button
                     v-for="(product, index) in searchSuggestions"
                     :key="`${product.branch_product_id}-${index}`"

@@ -2,6 +2,10 @@
 import { computed } from 'vue'
 
 const props = defineProps({
+    as: {
+        type: String,
+        default: 'button',
+    },
     type: {
         type: String,
         default: 'button',
@@ -30,7 +34,7 @@ const buttonClass = computed(() => [
 </script>
 
 <template>
-    <button :type="type" :class="buttonClass">
+    <component :is="as" :type="as === 'button' ? type : undefined" :class="buttonClass">
         <slot />
-    </button>
+    </component>
 </template>

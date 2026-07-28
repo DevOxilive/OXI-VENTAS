@@ -41,7 +41,7 @@ class DashboardController extends Controller
             ->unique()
             ->values();
         $selectedCategories = $categories->whereIn('id', $selectedCategoryIds)->values();
-        $chartPayload = $this->metrics->payload($chartBranches->pluck('id'), $chart['start'], $chart['end']);
+        $chartPayload = $this->metrics->summaryPayload($chartBranches->pluck('id'), $chart['start'], $chart['end']);
         $radarProductId = $request->integer('radar_product_id') ?: null;
 
         return Inertia::render('Dashboard', [

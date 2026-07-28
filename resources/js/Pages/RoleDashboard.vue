@@ -5,7 +5,7 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import { usePermissions } from '@/Composables/usePermissions'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
 
@@ -480,7 +480,7 @@ onMounted(() => {
         })
     }
 
-    unsubscribeUserChanged = subscribeRealtime(
+    unsubscribeUserChanged = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.userChanged,
         handleUserChanged,

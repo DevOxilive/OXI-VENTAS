@@ -228,25 +228,26 @@ class UserController extends Controller
         $statusFilter = trim((string) $request->input('status', ''));
         $roleFilter = trim((string) $request->input('role', ''));
 
-        $users = User::with([
+        $usersQuery = User::with([
             'employee:id,first_name,last_name,email,employment_status',
             'role.permissions' => fn ($query) => $query->where('name', 'not like', 'roles.%'),
             'permissions' => fn ($query) => $query->where('name', 'not like', 'roles.%'),
-            'branches',
+            'branches:id,name,slug',
         ])
+            ->leftJoin('employees as sort_employees', 'sort_employees.id', '=', 'users.employee_id')
             ->select([
-                'id',
-                'employee_id',
-                'name',
-                'email',
-                'role_id',
-                'is_active',
+                'users.id',
+                'users.employee_id',
+                'users.name',
+                'users.email',
+                'users.role_id',
+                'users.is_active',
             ])
             ->when($search, function ($query) use ($search) {
                 FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
                     FlexibleSearch::orWhereColumns($subQuery, [
-                        'name',
-                        'email',
+                        'users.name',
+                        'users.email',
                     ], $phrase, $terms);
                     FlexibleSearch::orWhereHasColumns($subQuery, 'role', [
                         'name',
@@ -257,9 +258,9 @@ class UserController extends Controller
                 $query->whereRaw('1 = 0');
             })
             ->when($statusFilter === 'active', function ($query) {
-                $query->where('is_active', true)
+                $query->where('users.is_active', true)
                     ->where(function ($statusQuery) {
-                        $statusQuery->whereNull('employee_id')
+                        $statusQuery->whereNull('users.employee_id')
                             ->orWhereHas('employee', function ($employeeQuery) {
                                 $employeeQuery->where('employment_status', '!=', 'Inactivo');
                             });
@@ -267,7 +268,7 @@ class UserController extends Controller
             })
             ->when($statusFilter === 'inactive', function ($query) {
                 $query->where(function ($statusQuery) {
-                    $statusQuery->where('is_active', false)
+                    $statusQuery->where('users.is_active', false)
                         ->orWhereHas('employee', function ($employeeQuery) {
                             $employeeQuery->where('employment_status', 'Inactivo');
                         });
@@ -275,29 +276,48 @@ class UserController extends Controller
             })
             ->when($roleFilter !== '', function ($query) use ($roleFilter) {
                 if ($roleFilter === 'without_role') {
-                    $query->whereNull('role_id');
+                    $query->whereNull('users.role_id');
 
                     return;
                 }
 
-                $query->where('role_id', $roleFilter);
-            })
-            ->orderBy('id', 'desc')
-            ->get();
+                $query->where('users.role_id', $roleFilter);
+            });
 
-        $employees = Employee::doesntHave('user')
+        $employeesQuery = Employee::doesntHave('user')
+            ->select([
+                'employees.id',
+                'employees.first_name',
+                'employees.last_name',
+                'employees.email',
+                'employees.employment_status',
+            ])
             ->when($search, function ($query) use ($search) {
                 FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
                     FlexibleSearch::orWhereColumns($subQuery, [
-                        'first_name',
-                        'last_name',
-                        'email',
-                        'phone',
-                        'position',
-                        'department',
-                        'nss',
-                        'rfc',
+                        'employees.first_name',
+                        'employees.last_name',
+                        'employees.email',
+                        'employees.phone',
+                        'employees.nss',
+                        'employees.rfc',
                     ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns(
+                        $subQuery,
+                        'position',
+                        ['name'],
+                        $phrase,
+                        $terms
+                    );
+
+                    FlexibleSearch::orWhereHasColumns(
+                        $subQuery,
+                        'position.department',
+                        ['name'],
+                        $phrase,
+                        $terms
+                    );
                 });
             })
             ->when($userStatus === 'with_user', function ($query) {
@@ -313,21 +333,43 @@ class UserController extends Controller
                 if ($roleFilter !== 'without_role') {
                     $query->whereRaw('1 = 0');
                 }
-            })
-            ->orderBy('id', 'desc')
-            ->get();
+            });
+
+        $userCount = (clone $usersQuery)->count('users.id');
+        $employeeCount = (clone $employeesQuery)->count('employees.id');
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $offset = max(0, ($currentPage - 1) * $perPage);
+        $remaining = $perPage;
+
+        $users = collect();
+        $employees = collect();
+
+        if ($offset < $userCount) {
+            $users = (clone $usersQuery)
+                ->orderByRaw("LOWER(TRIM(CONCAT_WS(' ', sort_employees.first_name, sort_employees.last_name, users.name)))")
+                ->orderBy('users.id')
+                ->skip($offset)
+                ->take($remaining)
+                ->get();
+
+            $remaining -= $users->count();
+        }
+
+        if ($remaining > 0) {
+            $employeeOffset = max(0, $offset - $userCount);
+            $employees = (clone $employeesQuery)
+                ->orderByRaw("LOWER(TRIM(CONCAT_WS(' ', employees.first_name, employees.last_name)))")
+                ->orderBy('employees.id')
+                ->skip($employeeOffset)
+                ->take($remaining)
+                ->get();
+        }
 
         $combinedRows = $users
             ->map(function (User $user) {
                 $user->setAttribute('row_id', 'user-' . $user->id);
                 $user->setAttribute('entity_type', 'user');
                 $user->setAttribute('has_user', true);
-                $user->setAttribute('sort_group', 0);
-                $user->setAttribute('sort_name', mb_strtolower(trim(implode(' ', array_filter([
-                    data_get($user, 'employee.first_name'),
-                    data_get($user, 'employee.last_name'),
-                    $user->name,
-                ])))));
 
                 return $user;
             })
@@ -336,28 +378,15 @@ class UserController extends Controller
                     $employee->setAttribute('row_id', 'employee-' . $employee->id);
                     $employee->setAttribute('entity_type', 'employee');
                     $employee->setAttribute('has_user', false);
-                    $employee->setAttribute('sort_group', 1);
-                    $employee->setAttribute('sort_name', mb_strtolower(trim(implode(' ', array_filter([
-                        $employee->first_name,
-                        $employee->last_name,
-                    ])))));
 
                     return $employee;
                 })
             )
-            ->sortBy([
-                ['sort_group', 'asc'],
-                ['sort_name', 'asc'],
-                ['id', 'asc'],
-            ])
             ->values();
 
-        $currentPage = LengthAwarePaginator::resolveCurrentPage();
-        $items = $combinedRows->forPage($currentPage, $perPage)->values();
-
         $recordsPaginator = new LengthAwarePaginator(
-            $items,
-            $combinedRows->count(),
+            $combinedRows,
+            $userCount + $employeeCount,
             $perPage,
             $currentPage,
             [

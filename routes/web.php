@@ -347,6 +347,10 @@ Route::middleware([
                 ->middleware($salesAccess)
                 ->name('home');
 
+            Route::get('/productos/buscar', [SalesController::class, 'searchProducts'])
+                ->middleware($salesAccess)
+                ->name('products.search');
+
             Route::post('/', [SalesController::class, 'store'])
                 ->middleware('permission:sales.create')
                 ->name('store');

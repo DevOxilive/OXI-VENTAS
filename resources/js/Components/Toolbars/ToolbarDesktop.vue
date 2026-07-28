@@ -13,6 +13,7 @@ const props = defineProps({
         type: String,
         default: 'Volver',
     },
+    icon: String,
     title: String,
     subtitle: String,
     search: String,
@@ -159,18 +160,27 @@ function multiFilterLabel(filter) {
                 </button>
             </div>
         </div>
-        <div class="flex items-start justify-between gap-6">
-            <div class="min-w-0">
-                <h2 v-if="title" class="text-xl font-black text-text">
-                    {{ title }}
-                </h2>
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div class="flex min-w-0 items-start gap-4">
+                <div v-if="icon" class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-secondary text-primary">
+                    <span class="material-symbols-outlined text-[28px]">
+                        {{ icon }}
+                    </span>
+                </div>
 
-                <p v-if="subtitle" class="mt-1 text-sm text-text opacity-70">
-                    {{ subtitle }}
-                </p>
+                <div class="min-w-0">
+                    <h2 v-if="title" class="text-xl font-black text-text">
+                        {{ title }}
+                    </h2>
+
+                    <p v-if="subtitle" class="mt-1 text-sm text-text opacity-70">
+                        {{ subtitle }}
+                    </p>
+                </div>
             </div>
 
-            <div v-if="hasActions" class="flex items-center justify-end gap-2 shrink-0">
+            <div v-if="hasActions || $slots.actions" class="flex min-w-0 flex-wrap items-center justify-start gap-2 xl:shrink-0 xl:justify-end">
+                <slot name="actions">
                 <button v-for="action in visibleActions" :key="action.id" type="button"
                     class="h-10 px-4 rounded-xl text-sm font-bold transition flex items-center gap-2 whitespace-nowrap"
                     :class="[
@@ -192,6 +202,7 @@ function multiFilterLabel(filter) {
                         {{ action.badge }}
                     </span>
                 </button>
+                </slot>
             </div>
         </div>
 

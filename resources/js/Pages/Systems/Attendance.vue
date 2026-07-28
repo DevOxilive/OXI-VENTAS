@@ -4,15 +4,15 @@ import { router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import MetricCard from '@/Components/Cards/MetricCard.vue'
-import GlobalCard from '@/Components/Cards/GlobalCard.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
-import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
+import { GlobalToolbar } from '@/Components/Toolbars'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
 import { usePermissions } from '@/Composables/usePermissions'
+import { getAttendanceFiltersToolbarConfig } from '@/config/ToolbarConfigs/attendanceToolbarConfig'
 
 defineOptions({ layout: AdminLayout })
 
@@ -36,31 +36,27 @@ const canExportExcel = computed(() => can('attendance.export.excel'))
 const canExportPdf = computed(() => can('attendance.export.pdf'))
 const registering = ref(false)
 let unsubscribeAttendance = null
+let unsubscribeUserChanged = null
 let filterTimer = null
 const filters = reactive({
     from: props.filters.from || '', to: props.filters.to || '', branch: props.filters.branch || '',
-    department: props.filters.department || '', employee: props.filters.employee || '', type: props.filters.type || '',
+    department: props.filters.department || '', employee: props.filters.employee || '', search: props.filters.search || '', type: props.filters.type || '',
 })
 const attendanceType = ref('check_in')
 const passkeyReady = ref(props.passkeyEnabled)
+const biometricActionLabel = computed(() => (
+    passkeyReady.value ? 'Agregar o cambiar Face ID/huella' : 'Configurar Face ID o huella'
+))
 const selfie = ref(null)
 const evidenceRecord = ref(null)
-const typeFilterOptions = computed(() => [
-    { value: '', label: 'Todos los tipos' },
-    ...(props.options.types || []),
-])
-const branchFilterOptions = computed(() => [
-    { value: '', label: 'Todas las sucursales' },
-    ...(props.options.branches || []),
-])
-const departmentFilterOptions = computed(() => [
-    { value: '', label: 'Todos los departamentos' },
-    ...(props.options.departments || []),
-])
-const employeeFilterOptions = computed(() => [
-    { value: '', label: 'Todo el personal' },
-    ...(props.options.employees || []),
-])
+const attendanceFiltersToolbarConfig = computed(() => getAttendanceFiltersToolbarConfig({
+    filters,
+    types: props.options.types || [],
+    branches: props.options.branches || [],
+    departments: props.options.departments || [],
+    employees: props.options.employees || [],
+    canManage: props.canManage,
+}))
 
 const columns = [
     { key: 'employee', label: 'Empleado' }, { key: 'role', label: 'Rol' }, { key: 'branch', label: 'Sucursal' },
@@ -94,6 +90,10 @@ watch(filters, () => {
 }, { deep: true })
 
 function pageChange(url) { router.visit(url, { preserveScroll: true, preserveState: true }) }
+
+function handleAttendanceFilter({ key, value }) {
+    filters[key] = value
+}
 
 function handleAttendanceAction({ action, row }) {
     if (action === 'view-evidence' && row.evidence) evidenceRecord.value = row
@@ -135,9 +135,7 @@ async function registerAttendance() {
 }
 
 async function verifyDeviceAuthentication() {
-    if (!window.PublicKeyCredential || !navigator.credentials?.get) {
-        throw new Error('Este navegador no permite autenticación segura del dispositivo.')
-    }
+    await assertPlatformBiometricsAvailable()
     if (!passkeyReady.value) throw new Error('Primero configura la biometría de este dispositivo.')
 
     const { data } = await window.axios.get('/passkeys/confirm/options', { headers: { Accept: 'application/json' } })
@@ -149,9 +147,7 @@ async function verifyDeviceAuthentication() {
 async function registerPasskey() {
     registering.value = true
     try {
-        if (!window.PublicKeyCredential || !navigator.credentials?.create) {
-            throw new Error('Este navegador no permite configurar una credencial segura. En iPhone, abre la aplicación directamente en Safari.')
-        }
+        await assertPlatformBiometricsAvailable()
         const { data } = await window.axios.get('/user/passkeys/options', { headers: { Accept: 'application/json' } })
         const credential = await navigator.credentials.create({ publicKey: toPublicKeyOptions(data.options) })
         await window.axios.post('/user/passkeys', {
@@ -163,6 +159,19 @@ async function registerPasskey() {
     } catch (error) {
         ErrorAlert({ title: 'No fue posible configurar la biometría', message: error?.response?.data?.message || error?.message || 'Inténtalo nuevamente.' })
     } finally { registering.value = false }
+}
+
+async function assertPlatformBiometricsAvailable() {
+    if (!window.PublicKeyCredential || !navigator.credentials?.create || !navigator.credentials?.get) {
+        throw new Error('Este navegador no permite autenticación segura. En iPhone abre la aplicación desde Safari; en Android usa Chrome.')
+    }
+
+    if (typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
+        const available = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        if (!available) {
+            throw new Error('Configura primero una huella, Face ID o bloqueo seguro en este dispositivo.')
+        }
+    }
 }
 
 function base64UrlToBuffer(value) {
@@ -222,82 +231,81 @@ onMounted(() => {
         REALTIME_EVENTS.attendanceChanged,
         () => router.reload({ only: ['records', 'dashboard'], preserveScroll: true, preserveState: true }),
     )
+    unsubscribeUserChanged = subscribePrivateRealtime(
+        REALTIME_CHANNELS.user(page.props.auth.user.id),
+        REALTIME_EVENTS.userChanged,
+        (event) => {
+            if (Number(event?.userId) !== Number(page.props.auth.user.id)) return
+
+            router.reload({
+                only: [
+                    'records', 'dashboard', 'filters', 'options', 'canViewAttendance',
+                    'canManage', 'canViewEvidence', 'canRegister', 'canRequestCorrection',
+                    'canReviewCorrections', 'passkeyEnabled',
+                ],
+                preserveScroll: true,
+                preserveState: true,
+            })
+        },
+    )
 })
 onBeforeUnmount(() => {
     clearTimeout(filterTimer)
     unsubscribeAttendance?.()
+    unsubscribeUserChanged?.()
 })
 </script>
 
 <template>
     <PageLayout>
-        <GlobalCard title="Sistema de Asistencias" icon="" :clickable="false" class="p-5 md:p-6">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                    <p class="text-xl font-bold text-text">Sistema de Asistencias</p>
-                    <p class="mt-1 text-sm text-text opacity-70">Registra y consulta la asistencia del personal con validación del dispositivo.</p>
-                </div>
-                <div v-if="canRegister" class="flex flex-col gap-3 sm:flex-row sm:items-end">
-                    <SelectField v-model="attendanceType" hide-label field="attendance-type" :options="options.types" />
-                    <label class="flex h-11 cursor-pointer items-center rounded-xl border border-secondary bg-background px-3 text-sm font-medium text-text hover:border-primary">
+        <GlobalToolbar
+            title="Sistema de Asistencias"
+            subtitle="Registra y consulta la asistencia del personal con validación del dispositivo."
+            :show-search="false"
+            :show-records-per-page="false"
+            :show-counter="false"
+        >
+            <template #actions>
+                <div v-if="canRegister || canExportExcel || canExportPdf" class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
+                    <div v-if="canRegister" class="min-w-48">
+                        <SelectField v-model="attendanceType" hide-label field="attendance-type" :options="options.types" />
+                    </div>
+                    <AppButton v-if="canRegister" as="label" variant="secondary" class="h-11 cursor-pointer">
                         <span class="material-symbols-outlined mr-2 text-lg">photo_camera</span>
                         {{ selfie ? 'Foto lista' : 'Tomar foto de asistencia' }}
                         <input class="sr-only" type="file" accept="image/jpeg,image/png,image/webp" capture="user" @change="selfie = $event.target.files?.[0] || null">
-                    </label>
-                    <AppButton :disabled="registering" @click="registerAttendance">
+                    </AppButton>
+                    <AppButton v-if="canRegister" :disabled="registering" @click="registerAttendance">
                         <span class="material-symbols-outlined mr-2 text-[19px]">fingerprint</span>
                         {{ registering ? 'Validando dispositivo...' : 'Registrar asistencia' }}
                     </AppButton>
-                    <AppButton v-if="!passkeyReady" :disabled="registering" variant="secondary" @click="registerPasskey">
-                        {{ passkeyReady ? 'Reconfigurar biometría' : 'Configurar biometría' }}
+                    <AppButton v-if="canRegister" :disabled="registering" variant="secondary" @click="registerPasskey">
+                        <span class="material-symbols-outlined mr-2 text-[19px]">face</span>
+                        {{ biometricActionLabel }}
+                    </AppButton>
+                    <AppButton v-if="canExportExcel" as="a" :href="route('human-resources.attendance.export-excel', filters)" variant="secondary">
+                        <span class="material-symbols-outlined mr-2 text-[19px]">download</span>
+                        Exportar Excel
+                    </AppButton>
+                    <AppButton v-if="canExportPdf" as="a" :href="route('human-resources.attendance.export-pdf', filters)" variant="secondary">
+                        <span class="material-symbols-outlined mr-2 text-[19px]">picture_as_pdf</span>
+                        Exportar PDF
                     </AppButton>
                 </div>
-            </div>
-        </GlobalCard>
+            </template>
+        </GlobalToolbar>
 
         <template v-if="canViewAttendance">
             <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard v-for="([label, value, tone]) in metricCards" :key="label" :label="label" :value="value" :tone="tone" />
             </section>
 
-            <GlobalCard title="Filtros de asistencia" icon="" :clickable="false" class="p-4 md:p-5">
-                <div class="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div>
-                        <p class="text-sm font-semibold text-text">Fecha inicial</p>
-                        <p class="mb-2 text-xs text-text opacity-60">Muestra registros desde esta fecha.</p>
-                        <InputField v-model="filters.from" hide-label type="date" field="attendance-from" />
-                    </div>
-                    <div>
-                        <p class="text-sm font-semibold text-text">Fecha final</p>
-                        <p class="mb-2 text-xs text-text opacity-60">Muestra registros hasta esta fecha.</p>
-                        <InputField v-model="filters.to" hide-label type="date" field="attendance-to" />
-                    </div>
-                    <div v-if="canManage">
-                        <p class="text-sm font-semibold text-text">Sucursal</p>
-                        <p class="mb-2 text-xs text-text opacity-60">Limita los resultados a una sucursal.</p>
-                        <SelectField v-model="filters.branch" hide-label field="attendance-branch" placeholder="Todas las sucursales" :options="branchFilterOptions" />
-                    </div>
-                    <div v-if="canManage">
-                        <p class="text-sm font-semibold text-text">Departamento</p>
-                        <p class="mb-2 text-xs text-text opacity-60">Consulta un departamento específico.</p>
-                        <SelectField v-model="filters.department" hide-label field="attendance-department" placeholder="Todos los departamentos" :options="departmentFilterOptions" />
-                    </div>
-                    <div v-if="canManage">
-                        <p class="text-sm font-semibold text-text">Personal</p>
-                        <p class="mb-2 text-xs text-text opacity-60">Consulta la asistencia de una persona.</p>
-                        <SelectField v-model="filters.employee" hide-label field="attendance-employee" placeholder="Todo el personal" :options="employeeFilterOptions" />
-                    </div>
-                    <div>
-                        <p class="text-sm font-semibold text-text">Tipo de registro</p>
-                        <p class="mb-2 text-xs text-text opacity-60">Filtra entradas, comida o salidas.</p>
-                        <SelectField v-model="filters.type" hide-label field="attendance-filter-type" placeholder="Todos los tipos" :options="typeFilterOptions" />
-                    </div>
-                    <div v-if="canExportExcel || canExportPdf" class="flex flex-wrap gap-2 xl:col-span-2">
-                        <a v-if="canExportExcel" :href="route('human-resources.attendance.export-excel', filters)"><AppButton variant="secondary" type="button">Exportar Excel</AppButton></a>
-                        <a v-if="canExportPdf" :href="route('human-resources.attendance.export-pdf', filters)"><AppButton variant="secondary" type="button">Exportar PDF</AppButton></a>
-                    </div>
-                </div>
-            </GlobalCard>
+            <GlobalToolbar
+                v-bind="attendanceFiltersToolbarConfig"
+                :search="filters.search"
+                @update:search="filters.search = $event"
+                @update:filter="handleAttendanceFilter"
+            />
 
             <GlobalTable
                 :items="records.data || []"

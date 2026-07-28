@@ -1,4 +1,4 @@
-const VERSION = 'oxi-ventas-pwa-v6';
+const VERSION = 'oxi-ventas-pwa-v7';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 

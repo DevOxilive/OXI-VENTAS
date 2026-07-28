@@ -67,6 +67,7 @@ const form = useForm({
 
 let unsubscribeEmployeeChanged = null
 let unsubscribeUserChanged = null
+let searchReloadTimeout = null
 
 function getEmployeeFullName(employee) {
   return `${employee.first_name || employee.firstName || ''} ${employee.last_name || employee.lastName || ''}`.trim()
@@ -249,7 +250,8 @@ function reloadUsers() {
 }
 
 watch(search, () => {
-  reloadUsers()
+  clearTimeout(searchReloadTimeout)
+  searchReloadTimeout = setTimeout(reloadUsers, 300)
 })
 
 watch(recordsPerPage, () => {
@@ -540,6 +542,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(searchReloadTimeout)
   unsubscribeEmployeeChanged?.()
   unsubscribeUserChanged?.()
 })
