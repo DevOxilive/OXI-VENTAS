@@ -15,8 +15,8 @@ use App\Models\TicketTemplate;
 use App\Services\StockMovementService;
 use App\Support\SystemPermission;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Support\Collection;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -32,7 +32,7 @@ class SalesController extends Controller
             ? null
             : $this->resolveBranch($request, $user, $allowedBranches);
 
-        if (!$selectorMode && !$branch) {
+        if (! $selectorMode && ! $branch) {
             throw new AuthorizationException('No tienes una sucursal disponible para generar ventas.');
         }
 
@@ -118,13 +118,13 @@ class SalesController extends Controller
         $paymentMethod = $this->allowedPaymentMethods()
             ->firstWhere('id', (int) $data['payment_method_id']);
 
-        if (!$paymentMethod) {
+        if (! $paymentMethod) {
             throw ValidationException::withMessages([
                 'payment_method_id' => 'La forma de pago debe ser efectivo o pago con tarjeta.',
             ]);
         }
 
-        if (!$user->employee_id) {
+        if (! $user->employee_id) {
             throw ValidationException::withMessages([
                 'employee_id' => 'Tu usuario no tiene un empleado asociado para registrar la venta.',
             ]);
@@ -228,6 +228,7 @@ class SalesController extends Controller
                         'type' => StockMovement::TYPE_OUT,
                         'reason' => StockMovement::REASON_SALE,
                         'quantity' => $quantity,
+                        'unit_cost' => $branchProduct->product?->cost ?? 0,
                         'previous_stock' => $previousStock,
                         'new_stock' => $newStock,
                         'user_id' => $user->id,
@@ -248,6 +249,7 @@ class SalesController extends Controller
                     'discount_percentage' => $discountPercentage,
                     'discount_amount' => $discountAmount,
                     'unit_price' => $unitPrice,
+                    'unit_cost' => $branchProduct->product?->cost ?? 0,
                     'subtotal' => $subtotal,
                 ]);
             }
@@ -265,7 +267,7 @@ class SalesController extends Controller
             }
 
             $sale->update([
-                'folio' => 'V-' . str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
+                'folio' => 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
                 'total' => $total,
                 'cash_received' => $cashReceived,
                 'change_due' => $isCashPayment ? round($cashReceived - $total, 2) : 0,
@@ -326,7 +328,7 @@ class SalesController extends Controller
     private function shouldShowBranchSelector(Request $request, $user, $allowedBranches): bool
     {
         return $user->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL)
-            && !$request->filled('branch')
+            && ! $request->filled('branch')
             && $allowedBranches->isNotEmpty();
     }
 
@@ -334,15 +336,15 @@ class SalesController extends Controller
     {
         $branchId = $request->query('branch');
 
-        if (!$branchId && $allowedBranches->count() === 1) {
+        if (! $branchId && $allowedBranches->count() === 1) {
             $branchId = $allowedBranches->first()->id;
         }
 
-        if (!$branchId && $allowedBranches->isNotEmpty()) {
+        if (! $branchId && $allowedBranches->isNotEmpty()) {
             $branchId = $allowedBranches->first()->id;
         }
 
-        if (!$branchId) {
+        if (! $branchId) {
             return null;
         }
 
@@ -353,7 +355,7 @@ class SalesController extends Controller
     {
         $query = Branch::query()->whereKey($branchId)->where('active', true);
 
-        if (!$user->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL)) {
+        if (! $user->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL)) {
             $query->whereIn('id', $user->accessibleBranchIds());
         }
 
@@ -411,7 +413,7 @@ class SalesController extends Controller
     {
         $batch = $branchProduct->batches->first();
 
-        if (!$batch) {
+        if (! $batch) {
             return null;
         }
 
@@ -494,7 +496,7 @@ class SalesController extends Controller
             ->map(function (BranchProduct $branchProduct) {
                 $alert = $this->mapNearExpirationBatch($branchProduct);
 
-                if (!$alert) {
+                if (! $alert) {
                     return null;
                 }
 
@@ -559,7 +561,7 @@ class SalesController extends Controller
                 ? $this->displayPaymentMethodName($sale->paymentMethod->name)
                 : 'Sin metodo',
             'employee_name' => trim(
-                ($sale->employee?->first_name ?? '') . ' ' . ($sale->employee?->last_name ?? '')
+                ($sale->employee?->first_name ?? '').' '.($sale->employee?->last_name ?? '')
             ) ?: 'Sin empleado',
             'user_name' => auth()->user()?->name ?? null,
             'total' => (float) $sale->total,

@@ -7,14 +7,21 @@ use Illuminate\Database\Eloquent\Model;
 class StockMovement extends Model
 {
     public const TYPE_IN = 'IN';
+
     public const TYPE_OUT = 'OUT';
+
     public const TYPE_ADJUSTMENT = 'ADJUSTMENT';
 
     public const REASON_PURCHASE = 'PURCHASE';
+
     public const REASON_SALE = 'SALE';
+
     public const REASON_DAMAGED = 'DAMAGED';
+
     public const REASON_EXPIRED = 'EXPIRED';
+
     public const REASON_OTHER = 'OTHER';
+
     public const REASON_INVENTORY_DIFFERENCE = 'INVENTORY_DIFFERENCE';
 
     protected $fillable = [
@@ -22,6 +29,7 @@ class StockMovement extends Model
         'type',
         'reason',
         'quantity',
+        'unit_cost',
         'previous_stock',
         'new_stock',
         'user_id',
@@ -30,6 +38,7 @@ class StockMovement extends Model
 
     protected $casts = [
         'quantity' => 'decimal:2',
+        'unit_cost' => 'decimal:4',
         'previous_stock' => 'decimal:2',
         'new_stock' => 'decimal:2',
     ];

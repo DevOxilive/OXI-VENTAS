@@ -28,8 +28,6 @@ class DatabaseSeeder extends Seeder
             TripDetailSeeder::class,
             IncidentSeeder::class,
             InventoryReportSeeder::class,
-            ExecutiveDashboardSeeder::class,
-
         ]);
     }
 }

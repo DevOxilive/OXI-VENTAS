@@ -33,6 +33,20 @@
         })();
     </script>
 
+    @if (app()->environment('production'))
+        @php
+            $realtimeConfig = [
+                'key' => config('broadcasting.connections.reverb.key'),
+                'host' => request()->getHost(),
+                'port' => request()->isSecure() ? 443 : request()->getPort(),
+                'scheme' => request()->getScheme(),
+            ];
+        @endphp
+        <script>
+            window.__OXIVENTAS_REALTIME__ = @json($realtimeConfig);
+        </script>
+    @endif
+
     <!-- Scripts -->
     @routes
     @vite('resources/js/app.js')

@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Inventory;
 use App\Events\InventoryStockUpdated;
 use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Controller;
-use App\Models\ProductBatch;
 use App\Models\BranchProduct;
+use App\Models\ProductBatch;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use Illuminate\Http\Request;
@@ -72,7 +72,7 @@ class ProductBatchController extends Controller
             ];
 
             $changedFields = collect($newData)
-                ->filter(fn($value, $field) => (string) ($previousData[$field] ?? '') !== (string) ($value ?? ''))
+                ->filter(fn ($value, $field) => (string) ($previousData[$field] ?? '') !== (string) ($value ?? ''))
                 ->keys()
                 ->values()
                 ->all();
@@ -116,6 +116,7 @@ class ProductBatchController extends Controller
                 'type' => StockMovement::TYPE_ADJUSTMENT,
                 'reason' => StockMovement::REASON_INVENTORY_DIFFERENCE,
                 'quantity' => abs($difference),
+                'unit_cost' => $branchProduct->product?->cost ?? 0,
                 'previous_stock' => $previousStock,
                 'new_stock' => $newStock,
                 'notes' => $movementNotes,
@@ -168,7 +169,7 @@ class ProductBatchController extends Controller
             'product.category:id,name',
             'product.barcodes:id,product_id,code',
 
-            'batches' => fn($query) => $query
+            'batches' => fn ($query) => $query
                 ->select([
                     'id',
                     'branch_product_id',
@@ -187,7 +188,7 @@ class ProductBatchController extends Controller
                 ->orderBy('expiration_date')
                 ->orderBy('id'),
 
-            'movements' => fn($query) => $query
+            'movements' => fn ($query) => $query
                 ->with([
                     'user:id,name',
                     'batches.productBatch:id,lot_number',
@@ -210,7 +211,7 @@ class ProductBatchController extends Controller
         ];
 
         $changedLabels = collect($changedFields)
-            ->map(fn($field) => $labels[$field] ?? $field)
+            ->map(fn ($field) => $labels[$field] ?? $field)
             ->implode(', ');
 
         $baseNote = "Ajuste manual de lote. Campos modificados: {$changedLabels}.";

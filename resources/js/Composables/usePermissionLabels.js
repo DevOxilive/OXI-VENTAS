@@ -14,6 +14,8 @@ const permissionModuleOrder = [
     "employees",
     "departments",
     "positions",
+    "departments",
+    "positions",
     "attendance",
     "attendance.schedules",
     "attendance.schedule-assignments",
@@ -51,8 +53,14 @@ const permissionModules = {
         label: "Registro de empleados",
         section: "human-resources",
     },
-    departments: { label: "Registro de departamentos", section: "human-resources" },
-    positions: { label: "Registro de puestos", section: "human-resources" },
+    departments: {
+        label: "Registro de departamentos",
+        section: "human-resources",
+    },
+    positions: {
+        label: "Registro de puestos",
+        section: "human-resources",
+    },
     attendance: {
         label: "Asistencias",
         section: "human-resources",
@@ -126,19 +134,12 @@ const permissionModules = {
 const permissionLabels = {
     "dashboard.executive.view": "Ver dashboard ejecutivo",
 
-    "employees.view": "Ver empleados y consultar sus datos",
-    "employees.create": "Registrar empleados nuevos",
-    "employees.update": "Editar información de empleados",
+    "employees.view": "Ver modulo de empleados",
+    "employees.create": "Crear empleados",
+    "employees.update": "Editar empleados",
     "employees.delete": "Eliminar empleados",
-    "departments.view": "Ver registro de departamentos",
-    "departments.create": "Crear departamentos",
-    "departments.update": "Editar departamentos",
-    "departments.delete": "Eliminar departamentos",
-    "positions.view": "Ver registro de puestos",
-    "positions.create": "Crear puestos",
-    "positions.update": "Editar puestos",
-    "positions.delete": "Eliminar puestos",
 
+<<<<<<<<< Temporary merge branch 1
     "attendance.view": "Ver métricas, filtros y registros de asistencia",
     "attendance.register": "Registrar entrada, comida y salida",
     "attendance.manage": "Ver fotografías y ubicaciones de asistencia",
@@ -160,6 +161,15 @@ const permissionLabels = {
     "attendance.incidents.delete": "Eliminar incidencias pendientes",
     "attendance.incidents.approve": "Aprobar incidencias pendientes",
     "attendance.incidents.reject": "Rechazar incidencias pendientes",
+
+    "departments.view": "Ver registro de departamentos",
+    "departments.create": "Crear departamentos",
+    "departments.update": "Editar departamentos",
+    "departments.delete": "Eliminar departamentos",
+    "positions.view": "Ver registro de puestos",
+    "positions.create": "Crear puestos",
+    "positions.update": "Editar puestos",
+    "positions.delete": "Eliminar puestos",
 
     "users.view": "Ver modulo de usuarios",
     "users.create": "Crear usuarios",
@@ -255,18 +265,6 @@ function getPermissionModule(permissionName = "") {
         return "dashboard";
     }
 
-    if (permissionName.startsWith("attendance.schedule-assignments.")) {
-        return "attendance.schedule-assignments";
-    }
-
-    if (permissionName.startsWith("attendance.schedules.")) {
-        return "attendance.schedules";
-    }
-
-    if (permissionName.startsWith("attendance.incidents.")) {
-        return "attendance.incidents";
-    }
-
     if (permissionName.startsWith("systems.tickets.")) {
         return "systems.tickets";
     }
@@ -288,7 +286,27 @@ function getPermissionModule(permissionName = "") {
     }
 
     if (permissionName.startsWith("inventory.purchase-reports.")) {
-        return "inventory.purchase-reports";
+        return "purchases.purchase-lists";
+    }
+
+    if (permissionName === "attendance.view" || permissionName === "attendance.register" || permissionName === "attendance.manage" || permissionName.startsWith("attendance.export.") || permissionName.startsWith("attendance.corrections.")) {
+        return "attendance";
+    }
+
+    if (permissionName.startsWith("attendance.schedules.")) {
+        return "attendance.schedules";
+    }
+
+    if (permissionName.startsWith("attendance.schedule-assignments.")) {
+        return "attendance.schedule-assignments";
+    }
+
+    if (permissionName.startsWith("attendance.incidents.")) {
+        return "attendance.incidents";
+    }
+
+    if (permissionName.startsWith("inventory.purchase-orders.generate.")) {
+        return "purchases.general-orders";
     }
 
     if (permissionName.startsWith("inventory.purchase-orders.")) {

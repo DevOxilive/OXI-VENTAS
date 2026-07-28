@@ -1,36 +1,37 @@
 <?php
 
-use Inertia\Inertia;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\QzTrayController;
-use App\Http\Controllers\BranchController;
-use App\Http\Controllers\EmployeeController;
-use App\Http\Controllers\DepartmentController;
-use App\Http\Controllers\PositionController;
 use App\Http\Controllers\AttendanceController;
-use App\Http\Controllers\AttendanceScheduleController;
 use App\Http\Controllers\AttendanceIncidentController;
 use App\Http\Controllers\AttendanceScheduleAssignmentController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\SystemAdministrationController;
-use App\Http\Controllers\SystemAuditController;
-use App\Http\Controllers\SystemTrashController;
-use App\Http\Controllers\SystemRoleController;
-use App\Http\Controllers\TicketTemplateController;
+use App\Http\Controllers\AttendanceScheduleController;
 use App\Http\Controllers\Audits\PhysicalCountController;
 use App\Http\Controllers\Audits\PhysicalCountReportController;
-use App\Http\Controllers\Inventory\ReportController;
-use App\Http\Controllers\Inventory\ProductController;
-use App\Http\Controllers\Inventory\ProductBatchController;
-use App\Http\Controllers\Inventory\StockMovementController;
-use App\Http\Controllers\Inventory\PurchaseReportController;
-use App\Http\Controllers\Inventory\GeneralPurchaseOrderController;
+use App\Http\Controllers\BranchController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\Inventory\BranchInventoryController;
 use App\Http\Controllers\Inventory\CategoryController;
+use App\Http\Controllers\Inventory\GeneralPurchaseOrderController;
+use App\Http\Controllers\Inventory\ProductBatchController;
+use App\Http\Controllers\Inventory\ProductController;
+use App\Http\Controllers\Inventory\PurchaseReportController;
+use App\Http\Controllers\Inventory\ReportController;
+use App\Http\Controllers\Inventory\StockMovementController;
+use App\Http\Controllers\PositionController;
+use App\Http\Controllers\QzTrayController;
+use App\Http\Controllers\SystemAdministrationController;
+use App\Http\Controllers\SystemAuditController;
+use App\Http\Controllers\SystemRoleController;
+use App\Http\Controllers\SystemTrashController;
+use App\Http\Controllers\TicketTemplateController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\Ventas\CashRegisterClosureController;
 use App\Http\Controllers\Ventas\SalesController;
+use App\Models\Branch;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 // Fortify disables the package auto-routes, so register the maintained
 // Laravel Passkeys routes explicitly for the attendance biometric flow.
@@ -53,7 +54,7 @@ Route::get('/register', function () {
             ->orderBy('name')
             ->get(),
 
-        'branches' => \App\Models\Branch::where('active', true)
+        'branches' => Branch::where('active', true)
             ->orderBy('name')
             ->get(),
     ]);
@@ -92,6 +93,8 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
+    Route::get('/dashboard/productos', [DashboardController::class, 'searchProducts'])
+        ->name('dashboard.products.search');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
     Route::prefix('system-administration')->name('system-administration.')->group(function () {
@@ -157,6 +160,25 @@ Route::middleware([
         Route::get('/users', [UserController::class, 'index'])
             ->middleware($usersAccess)
             ->name('users.index');
+
+        Route::get('/attendance', [AttendanceController::class, 'index'])
+            ->middleware('permission:attendance.view,attendance.register')
+            ->name('attendance.index');
+        Route::post('/attendance', [AttendanceController::class, 'store'])
+            ->middleware(['permission:attendance.register', 'password.confirm'])
+            ->name('attendance.store');
+        Route::post('/attendance/{attendanceRecord}/corrections', [AttendanceController::class, 'requestCorrection'])
+            ->middleware('permission:attendance.corrections.request,attendance.corrections.review')
+            ->name('attendance.corrections.store');
+        Route::patch('/attendance/corrections/{attendanceCorrectionRequest}', [AttendanceController::class, 'reviewCorrection'])
+            ->middleware('permission:attendance.corrections.review')
+            ->name('attendance.corrections.review');
+        Route::get('/attendance/export/excel', [AttendanceController::class, 'exportExcel'])
+            ->middleware(['permission:attendance.reports', 'permission:files.export'])
+            ->name('attendance.export-excel');
+        Route::get('/attendance/export/pdf', [AttendanceController::class, 'exportPdf'])
+            ->middleware(['permission:attendance.reports', 'permission:files.export'])
+            ->name('attendance.export-pdf');
 
         Route::post('/users', [UserController::class, 'store'])
             ->middleware('permission:users.create')
@@ -244,13 +266,33 @@ Route::middleware([
             ->middleware('permission:files.export')
             ->name('employees.export-excel');
 
-        Route::get('/departments', [DepartmentController::class, 'index'])->middleware($organizationAccess)->name('departments.index');
-        Route::post('/departments', [DepartmentController::class, 'store'])->middleware('permission:departments.create')->name('departments.store');
-        Route::put('/departments/{department}', [DepartmentController::class, 'update'])->middleware('permission:departments.update')->name('departments.update');
-        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->middleware('permission:departments.delete')->name('departments.destroy');
-        Route::post('/positions', [PositionController::class, 'store'])->middleware('permission:positions.create')->name('positions.store');
-        Route::put('/positions/{position}', [PositionController::class, 'update'])->middleware('permission:positions.update')->name('positions.update');
-        Route::delete('/positions/{position}', [PositionController::class, 'destroy'])->middleware('permission:positions.delete')->name('positions.destroy');
+        Route::get('/departments', [DepartmentController::class, 'index'])
+            ->middleware($organizationAccess)
+            ->name('departments.index');
+
+        Route::post('/departments', [DepartmentController::class, 'store'])
+            ->middleware('permission:departments.create')
+            ->name('departments.store');
+
+        Route::put('/departments/{department}', [DepartmentController::class, 'update'])
+            ->middleware('permission:departments.update')
+            ->name('departments.update');
+
+        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])
+            ->middleware('permission:departments.delete')
+            ->name('departments.destroy');
+
+        Route::post('/positions', [PositionController::class, 'store'])
+            ->middleware('permission:positions.create')
+            ->name('positions.store');
+
+        Route::put('/positions/{position}', [PositionController::class, 'update'])
+            ->middleware('permission:positions.update')
+            ->name('positions.update');
+
+        Route::delete('/positions/{position}', [PositionController::class, 'destroy'])
+            ->middleware('permission:positions.delete')
+            ->name('positions.destroy');
 
         Route::get('/attendance', [AttendanceController::class, 'index'])
             ->middleware('permission:attendance.view,attendance.register,attendance.export.excel,attendance.export.pdf')
@@ -380,7 +422,7 @@ Route::middleware([
         $purchaseReportsAccess,
         $cashClosuresAccess
     ) {
-        Route::get('/dashboard', fn() => Inertia::render('Inventory/Dashboard'))
+        Route::get('/dashboard', fn () => Inertia::render('Inventory/Dashboard'))
             ->middleware($reportsAccess)
             ->name('dashboard');
 
@@ -454,15 +496,15 @@ Route::middleware([
             ->middleware($branchInventoryAccess)
             ->name('movements');
 
-        Route::get('/expirations', fn() => Inertia::render('Inventory/Expirations'))
+        Route::get('/expirations', fn () => Inertia::render('Inventory/Expirations'))
             ->middleware($inventoryReportsAccess)
             ->name('expirations');
 
-        Route::get('/transfers', fn() => Inertia::render('Inventory/Transfers'))
+        Route::get('/transfers', fn () => Inertia::render('Inventory/Transfers'))
             ->middleware('permission:inventory.update,inventory.branches.update')
             ->name('transfers');
 
-        Route::get('/adjustments', fn() => Inertia::render('Inventory/Adjustments'))
+        Route::get('/adjustments', fn () => Inertia::render('Inventory/Adjustments'))
             ->middleware('permission:inventory.update,inventory.branches.update')
             ->name('adjustments');
 
@@ -559,7 +601,7 @@ Route::middleware([
             ->middleware('permission:inventory.purchase-orders.update')
             ->name('branches.reports.purchase-orders.complete');
 
-        Route::get('/branches/{branch}/reports/audits', function (\App\Models\Branch $branch) {
+        Route::get('/branches/{branch}/reports/audits', function (Branch $branch) {
             return redirect()->route('audits.physical-counts.reports', [
                 'branch' => $branch->slug,
             ]);
@@ -571,7 +613,7 @@ Route::middleware([
             ->middleware($cashClosuresAccess)
             ->name('branches.reports.cash-closures');
 
-        Route::get('/reports', fn() => Inertia::render('Inventory/Reports/Index'))
+        Route::get('/reports', fn () => Inertia::render('Inventory/Reports/Index'))
             ->middleware($reportsAccess)
             ->name('reports');
 
@@ -635,7 +677,6 @@ Route::middleware([
         Route::get('/physical-counts/reports/export-pdf', [PhysicalCountReportController::class, 'exportPdf'])
             ->middleware(['permission:audits.physical-counts.reports', 'permission:files.export'])
             ->name('physical-counts.reports.export-pdf');
-
 
         Route::get('/physical-count-entries/{entry}', [PhysicalCountController::class, 'showEntry'])
             ->middleware($auditsAccess)

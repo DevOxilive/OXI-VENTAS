@@ -11,8 +11,8 @@ use App\Models\Category;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\User;
-use App\Services\PurchaseCycleService;
 use App\Services\PendingPurchaseOrderEditor;
+use App\Services\PurchaseCycleService;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
 use Illuminate\Http\Request;
@@ -317,7 +317,7 @@ class PurchaseReportController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($purchaseReport, $receivedItems, $request, $validated) {
+        DB::transaction(function () use ($purchaseReport, $receivedItems, $request) {
             foreach ($purchaseReport->items as $item) {
                 $received = $receivedItems->get((int) $item->id);
                 $receivedQuantity = (float) $received['received_quantity'];
@@ -326,6 +326,7 @@ class PurchaseReportController extends Controller
                 $item->update([
                     'received_quantity' => $receivedQuantity,
                     'receipt_notes' => $received['receipt_notes'] ?? null,
+                    'actual_total' => round($receivedQuantity * (float) $item->actual_price, 2),
                     'status' => $receivedQuantity <= 0
                         ? PurchaseOrderItem::STATUS_UNAVAILABLE
                         : (abs($receivedQuantity - $requestedQuantity) < 0.001
@@ -333,6 +334,8 @@ class PurchaseReportController extends Controller
                             : PurchaseOrderItem::STATUS_ADJUSTED),
                 ]);
             }
+
+            $this->refreshTotals($purchaseReport);
 
             $purchaseReport->update([
                 'status' => PurchaseOrder::STATUS_COMPLETED,
@@ -614,8 +617,7 @@ class PurchaseReportController extends Controller
         $requestedBranch = trim((string) $request->query('branch', ''));
 
         if ($requestedBranch !== '') {
-            $branch = $branches->first(fn (Branch $branch) =>
-                (string) $branch->id === $requestedBranch
+            $branch = $branches->first(fn (Branch $branch) => (string) $branch->id === $requestedBranch
                 || (string) $branch->slug === $requestedBranch
             );
 
@@ -721,8 +723,7 @@ class PurchaseReportController extends Controller
     private function validateOrderPayload(
         Request $request,
         bool $requireAssignedInventoryUser = false
-    ): array
-    {
+    ): array {
         $rules = [
             'assigned_to_user_id' => [
                 $requireAssignedInventoryUser ? 'required' : 'nullable',

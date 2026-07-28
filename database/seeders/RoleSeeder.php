@@ -180,7 +180,7 @@ class RoleSeeder extends Seeder
             }
         }
 
-        $adminUser = User::where('email', 'admin@oxilive.com.mx')->first();
+        $adminUser = User::where('email', 'carlos@oxilive.com.mx')->first();
 
         if ($adminUser && $adminRole) {
             $adminUser->role_id = $adminRole->id;
