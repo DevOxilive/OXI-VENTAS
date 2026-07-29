@@ -382,6 +382,7 @@ class PurchaseCycleService
 
                 if (
                     $branchOrder->status !== PurchaseOrder::STATUS_GENERATED
+                    || $branchOrder->review_status !== PurchaseOrder::REVIEW_APPROVED
                     || ! $branchOrder->assigned_to_user_id
                     || ($branchOrder->general_purchase_order_id && ! $belongsToThisDraft)
                     || ! $accessibleBranchIds->contains((int) $branchOrder->branch_id)

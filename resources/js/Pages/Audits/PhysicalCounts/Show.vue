@@ -5,6 +5,7 @@ import { router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
+import EmptyStateCard from '@/Components/Cards/EmptyStateCard.vue'
 import ProductScanForm from '@/Components/Audits/PhysicalCounts/ProductScanForm.vue'
 import ProductFoundCard from '@/Components/Audits/PhysicalCounts/ProductFoundCard.vue'
 import CountEntryForm from '@/Components/Audits/PhysicalCounts/CountEntryForm.vue'
@@ -36,7 +37,7 @@ const { can } = usePermissions()
 const isCaptureStatus = computed(() => ['open', 'applied'].includes(props.physicalCount.status))
 const canCapture = computed(() =>
     isCaptureStatus.value &&
-    (can('audits.physical-counts.count') || can('audits.physical-counts.update'))
+    can('audits.physical-counts.count')
 )
 const canViewAuditStock = computed(() => can('audits.physical-counts.view-stock'))
 
@@ -93,6 +94,7 @@ onBeforeUnmount(() => {
                 :show-search="false"
                 :show-records-per-page="false"
                 :show-counter="false"
+                @back="handleToolbarAction('back')"
                 @action="handleToolbarAction"
             />
         </template>
@@ -100,28 +102,31 @@ onBeforeUnmount(() => {
         <div class="space-y-4">
             <div
                 v-if="physicalCount.status === 'closed'"
-                class="rounded-2xl border border-secondary bg-secondary px-4 py-3 text-sm text-text opacity-80"
+                class="flex items-start gap-3 rounded-xl border border-secondary bg-secondary px-4 py-3 text-sm text-text"
             >
-                Esta auditoria ya fue finalizada. La captura esta bloqueada.
+                <span class="material-symbols-outlined text-xl opacity-70">lock</span>
+                <span>Esta auditoría ya fue finalizada. La captura está bloqueada.</span>
             </div>
 
             <div
                 v-if="physicalCount.status === 'applied'"
-                class="rounded-xl border border-accent bg-secondary px-4 py-3 text-sm text-accent"
+                class="flex items-start gap-3 rounded-xl border border-accent bg-secondary px-4 py-3 text-sm text-accent"
             >
-                Esta auditoria ya fue aplicada al inventario. Puedes seguir capturando conteos dentro de la misma auditoria.
+                <span class="material-symbols-outlined text-xl">inventory</span>
+                <span>Esta auditoría ya fue aplicada al inventario. Puedes seguir capturando conteos dentro de la misma auditoría.</span>
             </div>
 
             <div
                 v-if="physicalCount.recapture_scope === 'zero_stock'"
-                class="rounded-xl border border-accent bg-secondary px-4 py-3 text-sm text-accent"
+                class="flex items-start gap-3 rounded-xl border border-accent bg-secondary px-4 py-3 text-sm text-accent"
             >
-                Este conteo fue reactivado solo para productos con stock en cero. La busqueda y captura se limitan a esos productos.
+                <span class="material-symbols-outlined text-xl">filter_alt</span>
+                <span>Este conteo fue reactivado solo para productos sin existencias. La búsqueda y la captura se limitan a esos productos.</span>
             </div>
 
             <div class="space-y-3">
                 <template v-if="canCapture">
-                    <div class="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(220px,320px)_minmax(520px,1fr)]">
+                    <div class="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(300px,0.75fr)_minmax(540px,1.5fr)]">
                         <ProductScanForm :physical-count-id="physicalCount.id" />
 
                         <ProductFoundCard
@@ -137,24 +142,30 @@ onBeforeUnmount(() => {
                         :can-view-stock="canViewAuditStock"
                     />
 
-                    <div
+                    <EmptyStateCard
                         v-else
-                        class="rounded-xl border border-dashed border-secondary bg-secondary p-6 text-sm text-text opacity-70"
-                    >
-                        Selecciona un producto para habilitar la captura de conteo.
-                    </div>
+                        icon="barcode_scanner"
+                        title="Selecciona un producto"
+                        description="Escanea un código o utiliza la búsqueda para habilitar la captura del conteo."
+                        min-height-class="min-h-[150px]"
+                    />
                 </template>
 
-                <div
+                <EmptyStateCard
                     v-else
-                    class="rounded-2xl border border-secondary bg-secondary p-6 text-sm text-text opacity-80"
-                >
-                    {{
+                    icon="lock"
+                    :title="
                         isCaptureStatus
-                            ? 'No tienes permiso para capturar conteos en esta auditoria.'
-                            : 'Esta auditoria esta cerrada. Solo puede consultarse desde reportes.'
-                    }}
-                </div>
+                            ? 'No tienes permiso para capturar conteos en esta auditoría.'
+                            : 'Esta auditoría está cerrada.'
+                    "
+                    :description="
+                        isCaptureStatus
+                            ? 'Puedes consultar la información, pero no modificar sus registros.'
+                            : 'El detalle final está disponible desde los reportes de auditoría.'
+                    "
+                    min-height-class="min-h-[180px]"
+                />
             </div>
         </div>
     </PageLayout>

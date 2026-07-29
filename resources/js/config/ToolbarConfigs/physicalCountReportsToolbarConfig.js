@@ -80,7 +80,7 @@ export function getPhysicalCountReportsToolbarConfig({
                 placeholder: 'Todos los resultados',
                 value: form.status,
                 options: [
-                    { label: 'Macheado', value: 'matched' },
+                    { label: 'Coincidente', value: 'matched' },
                     { label: 'Faltantes', value: 'missing' },
                     { label: 'Sobrantes', value: 'surplus' },
                     { label: 'No encontrado', value: 'not_found' },
@@ -136,7 +136,7 @@ export function getPhysicalCountReportsToolbarConfig({
         tabs: [
             { key: 'summary', label: 'Resumen', icon: 'dashboard' },
             { key: 'branches', label: 'Sucursales', icon: 'store' },
-            { key: 'audits', label: 'Auditorias', icon: 'assignment' },
+            { key: 'audits', label: 'Auditorías', icon: 'assignment' },
             { key: 'detail', label: 'Detalle', icon: 'list_alt' },
             { key: 'users', label: 'Usuarios', icon: 'group' },
             { key: 'categories', label: 'Categorías', icon: 'category' },

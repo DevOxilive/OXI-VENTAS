@@ -1,9 +1,11 @@
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import InputField from '@/Components/Forms/InputField.vue'
+import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
+import SelectionGridSection from '@/Components/Forms/SelectionGridSection.vue'
 import { getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { getCreatePhysicalCountModalConfig } from '@/config/ModalConfigs/createPhysicalCountModalConfig'
 
@@ -23,29 +25,44 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
-
 const search = ref('')
 
 const form = useForm({
     name: '',
-    branch_id: '',
     participant_ids: [],
 })
 
 const totalErrors = computed(() => Object.keys(form.errors || {}).length)
-
 const modalConfig = computed(() => getCreatePhysicalCountModalConfig({
     totalErrors: totalErrors.value,
     processing: form.processing,
 }))
+const filteredUsers = computed(() => {
+    const term = search.value.trim().toLowerCase()
 
-watch(
-    () => props.branch,
-    (branch) => {
-        form.branch_id = branch?.id ?? ''
-    },
-    { immediate: true },
-)
+    if (!term) return props.users
+
+    return props.users.filter((user) =>
+        [user.name, user.email, user.role]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(term)),
+    )
+})
+
+watch(() => props.show, (show) => {
+    if (!show) return
+
+    form.clearErrors()
+    search.value = ''
+})
+
+function toggleParticipant(userId) {
+    const normalizedId = Number(userId)
+
+    form.participant_ids = form.participant_ids.includes(normalizedId)
+        ? form.participant_ids.filter((id) => id !== normalizedId)
+        : [...form.participant_ids, normalizedId]
+}
 
 function closeModal() {
     if (form.processing) return
@@ -54,11 +71,11 @@ function closeModal() {
 }
 
 function submit() {
-    if (!props.branch) return
+    if (!props.branch?.slug) return
 
-    form.branch_id = props.branch.id
-
-    form.post(route('audits.physical-counts.store'), getModalRequestOptions({
+    form.post(route('audits.physical-counts.store', {
+        branch: props.branch.slug,
+    }), getModalRequestOptions({
         mode: 'create',
         entityName: modalConfig.value.alerts.entityName,
         close: () => emit('close'),
@@ -67,21 +84,20 @@ function submit() {
         errorMessage: modalConfig.value.alerts.create.errorMessage,
         onSuccess: () => {
             form.reset()
+            search.value = ''
         },
     }))
 }
-</script><template>
+</script>
+
+<template>
     <GlobalModal
         v-if="show"
         v-bind="modalConfig"
         @save="submit"
         @close="closeModal"
     >
-        <form
-            class="space-y-5"
-            @submit.prevent="submit"
-        >
-            <!-- Nombre del conteo -->
+        <form class="space-y-5" @submit.prevent="submit">
             <InputField
                 v-model="form.name"
                 label="Nombre del conteo"
@@ -90,70 +106,67 @@ function submit() {
                 :error="form.errors.name"
             />
 
-            <!-- Participantes -->
-            <div>
-                <div class="mb-2 flex items-center justify-between gap-3">
-                    <label class="block text-sm font-medium text-gray-700">
-                        Participantes de la auditoría
-                    </label>
-
-                    <span class="text-xs text-gray-500">
+            <SelectionGridSection
+                title="Participantes de la auditoría"
+                description="Selecciona uno o varios participantes para este conteo."
+                grid-class="grid grid-cols-1 gap-2 sm:grid-cols-2"
+            >
+                <template #aside>
+                    <span class="text-xs font-semibold text-text opacity-60">
                         {{ form.participant_ids.length }} seleccionados
                     </span>
+                </template>
+
+                <div class="sm:col-span-2">
+                    <InputField
+                        v-model="search"
+                        hide-label
+                        field="participant_search"
+                        validation-field="toolbar_search"
+                        placeholder="Buscar por nombre, correo o rol"
+                    />
                 </div>
 
-                <div
-                    class="max-h-52 overflow-y-auto rounded-lg border border-gray-300 bg-white"
-                >
-                    <label
-                        v-for="user in props.users"
+                <div class="max-h-56 space-y-2 overflow-y-auto pr-1 sm:col-span-2">
+                    <SelectionCheckboxCard
+                        v-for="user in filteredUsers"
                         :key="user.id"
-                        class="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-3 py-2 text-sm last:border-b-0 hover:bg-gray-50"
-                    >
-                        <input
-                            v-model="form.participant_ids"
-                            type="checkbox"
-                            :value="user.id"
-                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        >
+                        class="w-full"
+                        compact
+                        variant="soft"
+                        :checked="form.participant_ids.includes(Number(user.id))"
+                        :title="user.name"
+                        :description="[user.role, user.email].filter(Boolean).join(' · ')"
+                        @toggle="toggleParticipant(user.id)"
+                    />
 
-                        <span class="truncate text-gray-700">
-                            {{ user.name }}
-                        </span>
-                    </label>
-
-                    <div
-                        v-if="!props.users || props.users.length === 0"
-                        class="px-3 py-4 text-sm text-gray-500"
+                    <p
+                        v-if="filteredUsers.length === 0"
+                        class="rounded-lg border border-secondary bg-secondary px-3 py-4 text-sm text-text opacity-60"
                     >
-                        No hay usuarios disponibles para seleccionar.
-                    </div>
+                        No hay usuarios disponibles para mostrar.
+                    </p>
                 </div>
-
-                <p class="mt-1 text-xs text-gray-500">
-                    Puedes seleccionar uno o varios participantes para esta auditoría.
-                </p>
 
                 <p
                     v-if="form.errors.participant_ids"
-                    class="mt-1 text-sm text-red-600"
+                    class="text-sm text-primary sm:col-span-2"
                 >
                     {{ form.errors.participant_ids }}
                 </p>
-            </div>
+            </SelectionGridSection>
 
-            <!-- Sucursal -->
-            <div class="rounded-lg bg-gray-50 p-3">
-                <p class="text-sm text-gray-600">
-                    <span class="font-medium text-gray-700">Sucursal:</span>
+            <div class="rounded-lg border border-secondary bg-secondary p-3">
+                <p class="text-sm text-text opacity-75">
+                    <span class="font-semibold">Sucursal:</span>
                     {{ branch?.name ?? 'Sin sucursal seleccionada' }}
                 </p>
 
                 <p
-                    v-if="form.errors.branch_id"
-                    class="mt-1 text-sm text-red-600"
+                    v-if="form.errors.branch"
+                    class="mt-1 text-sm text-primary"
                 >
-                    {{ form.errors.branch_id }}
+                    {{ form.errors.branch }}
                 </p>
             </div>
         </form>

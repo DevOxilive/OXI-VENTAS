@@ -25,6 +25,19 @@ export function getPurchaseOrdersTableConfig({ mode = 'view', viewPermission = n
                 mobileDisplay: true,
             },
             {
+                key: 'status_label',
+                label: 'Estado',
+                format: 'badge',
+                formatOptions: {
+                    statusMap: {
+                        'En compra': 'blue',
+                        Completada: 'green',
+                    },
+                },
+                mobileLabel: 'Estado',
+                mobileDisplay: true,
+            },
+            {
                 key: 'display_date',
                 label: 'Fecha',
                 format: 'date',
@@ -46,7 +59,7 @@ export function getPurchaseOrdersTableConfig({ mode = 'view', viewPermission = n
                 icon: 'edit',
                 variant: 'yellow',
                 permission: 'inventory.purchase-orders.costs',
-                hidden: () => !purchasing,
+                hidden: (row) => !purchasing || !row.can_edit,
             },
         ],
         mobileCardHeaderField: 'folio',

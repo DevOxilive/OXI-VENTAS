@@ -98,7 +98,7 @@ class PurchaseReportController extends Controller
                 'id' => $order->id,
                 'folio' => $order->folio,
                 'status' => $order->status,
-                'status_label' => $this->statusLabel($order->status),
+                'status_label' => $this->statusLabel($order->status, $order->review_status),
                 'inventory_edit_label' => $order->inventory_edited_at ? 'Editado' : null,
                 'items_count' => $order->items_count,
                 'display_date' => $order->completed_at ?? $order->generated_at ?? $order->created_at,
@@ -522,7 +522,7 @@ class PurchaseReportController extends Controller
             'id' => $purchaseReport->id,
             'folio' => $purchaseReport->folio,
             'status' => $purchaseReport->status,
-            'status_label' => $this->statusLabel($purchaseReport->status),
+            'status_label' => $this->statusLabel($purchaseReport->status, $purchaseReport->review_status),
             'requested_at' => $purchaseReport->generated_at ?? $purchaseReport->created_at,
             'items_count' => $purchaseReport->items->count(),
             'branch' => $purchaseReport->branch ? ['id' => $purchaseReport->branch->id, 'name' => $purchaseReport->branch->name] : null,
@@ -846,11 +846,18 @@ class PurchaseReportController extends Controller
         return sprintf('OC-%s-%04d', now()->format('Ymd'), $purchaseOrder->id);
     }
 
-    private function statusLabel(string $status): string
+    private function statusLabel(string $status, ?string $reviewStatus = null): string
     {
+        if ($status === PurchaseOrder::STATUS_GENERATED) {
+            return match ($reviewStatus) {
+                PurchaseOrder::REVIEW_APPROVED => 'Aprobada',
+                PurchaseOrder::REVIEW_REJECTED => 'Rechazada',
+                default => 'Pendiente',
+            };
+        }
+
         return match ($status) {
             PurchaseOrder::STATUS_DRAFT => 'Borrador',
-            PurchaseOrder::STATUS_GENERATED => 'Pendiente',
             PurchaseOrder::STATUS_REVIEW => 'Por revisar',
             PurchaseOrder::STATUS_COMPLETED => 'Completada',
             PurchaseOrder::STATUS_CANCELLED => 'Cancelada',

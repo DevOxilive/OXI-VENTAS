@@ -46,12 +46,12 @@ export function generateMenu(role, permissions = [], branches = []) {
             "inventory.purchase-orders.costs",
         ],
         audits: [
-            "audits.physical-counts.view",
             "audits.physical-counts.count",
-            "audits.physical-counts.reports",
             "audits.physical-counts.view-stock",
             "audits.physical-counts.create",
-            "audits.physical-counts.update",
+            "audits.physical-counts.close",
+            "audits.physical-counts.participants",
+            "audits.physical-counts.apply",
             "audits.physical-counts.delete",
         ],
         sales: ["sales.view", "sales.create", "sales.update", "sales.delete", "sales.reports"],
@@ -237,6 +237,7 @@ export function generateMenu(role, permissions = [], branches = []) {
             : []),
 
         ...(canUse("audits") ||
+        can("audits.physical-counts.reports") ||
         canUse("cashClosureReports") ||
         canUse("inventoryReports") ||
         canUse("branchInventory")
@@ -263,11 +264,12 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("inventory.branches.create") ||
         can("inventory.branches.update") ||
         can("inventory.branches.delete") ||
-        can("audits.physical-counts.view") ||
         can("audits.physical-counts.count") ||
-        can("audits.physical-counts.reports") ||
+        can("audits.physical-counts.view-stock") ||
         can("audits.physical-counts.create") ||
-        can("audits.physical-counts.update") ||
+        can("audits.physical-counts.close") ||
+        can("audits.physical-counts.participants") ||
+        can("audits.physical-counts.apply") ||
         can("audits.physical-counts.delete") ||
         can("sales.cash-closures.reports") ||
         can("inventory.view") ||

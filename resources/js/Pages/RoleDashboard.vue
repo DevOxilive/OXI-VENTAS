@@ -24,7 +24,7 @@ const props = defineProps({
 })
 
 const page = usePage()
-const { canAny, permissions } = usePermissions()
+const { can, canAny, permissions } = usePermissions()
 let unsubscribeUserChanged = null
 
 const roleName = computed(() => props.dashboardUser?.role || 'Usuario')
@@ -171,12 +171,13 @@ const permissionLabelMap = {
     'inventory.purchase-reports.create': 'Crear compras',
     'inventory.purchase-reports.update': 'Editar compras',
     'inventory.purchase-reports.delete': 'Eliminar compras',
-    'audits.physical-counts.view': 'Ver auditorias',
     'audits.physical-counts.count': 'Capturar conteos',
-    'audits.physical-counts.reports': 'Reportes auditoria',
+    'audits.physical-counts.reports': 'Ver reportes de auditoría',
     'audits.physical-counts.view-stock': 'Ver stock',
     'audits.physical-counts.create': 'Crear auditorias',
-    'audits.physical-counts.update': 'Editar auditorias',
+    'audits.physical-counts.close': 'Abrir/Cerrar auditoría',
+    'audits.physical-counts.participants': 'Agregar participantes',
+    'audits.physical-counts.apply': 'Aplicar auditoría',
     'audits.physical-counts.delete': 'Eliminar auditorias',
     'inventory.view': 'Reportes inventario',
     'inventory.create': 'Crear reportes',
@@ -238,7 +239,7 @@ const permissionCatalog = [
         key: 'audits',
         title: 'Auditorias',
         icon: 'fact_check',
-        permissions: ['audits.physical-counts.view', 'audits.physical-counts.count', 'audits.physical-counts.reports', 'audits.physical-counts.view-stock', 'audits.physical-counts.create', 'audits.physical-counts.update', 'audits.physical-counts.delete'],
+        permissions: ['audits.physical-counts.count', 'audits.physical-counts.view-stock', 'audits.physical-counts.create', 'audits.physical-counts.close', 'audits.physical-counts.participants', 'audits.physical-counts.apply', 'audits.physical-counts.delete'],
     },
     {
         key: 'purchases',
@@ -312,12 +313,13 @@ const permissionAction = (permission) => {
         'inventory.purchase-reports.create': { icon: 'add_shopping_cart', href: branchHref((branch) => route('inventory.branches.purchase-reports.index', { branch: branch.id })) },
         'inventory.purchase-reports.update': { icon: 'edit', href: branchHref((branch) => route('inventory.branches.purchase-reports.index', { branch: branch.id })) },
         'inventory.purchase-reports.delete': { icon: 'delete', href: branchHref((branch) => route('inventory.branches.purchase-reports.index', { branch: branch.id })) },
-        'audits.physical-counts.view': { icon: 'visibility', href: branchHref((branch) => route('audits.physical-counts.index', { branch: branch.slug })) },
         'audits.physical-counts.count': { icon: 'checklist', href: branchHref((branch) => route('audits.physical-counts.index', { branch: branch.slug })) },
         'audits.physical-counts.reports': { icon: 'bar_chart', href: branchHref((branch) => route('audits.physical-counts.reports', { branch: branch.slug })) },
         'audits.physical-counts.view-stock': { icon: 'inventory_2', href: branchHref((branch) => route('audits.physical-counts.index', { branch: branch.slug })) },
         'audits.physical-counts.create': { icon: 'add_task', href: branchHref((branch) => route('audits.physical-counts.index', { branch: branch.slug })) },
-        'audits.physical-counts.update': { icon: 'edit_note', href: branchHref((branch) => route('audits.physical-counts.index', { branch: branch.slug })) },
+        'audits.physical-counts.close': { icon: 'lock_reset', href: branchHref((branch) => route('audits.physical-counts.index', { branch: branch.slug })) },
+        'audits.physical-counts.participants': { icon: 'group_add', href: branchHref((branch) => route('audits.physical-counts.index', { branch: branch.slug })) },
+        'audits.physical-counts.apply': { icon: 'check_circle', href: branchHref((branch) => route('audits.physical-counts.index', { branch: branch.slug })) },
         'audits.physical-counts.delete': { icon: 'delete', href: branchHref((branch) => route('audits.physical-counts.index', { branch: branch.slug })) },
         'inventory.view': { icon: 'bar_chart', href: branchHref((branch) => route('inventory.branches.reports', { branch: branch.id })) },
         'inventory.create': { icon: 'add_chart', href: branchHref((branch) => route('inventory.branches.reports', { branch: branch.id })) },
@@ -422,10 +424,11 @@ const allQuickActions = computed(() => [
             ? route('audits.physical-counts.index', { branch: firstBranch.value.slug })
             : null,
         visible: Boolean(firstBranch.value) && canAny([
-            'audits.physical-counts.view',
             'audits.physical-counts.count',
             'audits.physical-counts.create',
-            'audits.physical-counts.update',
+            'audits.physical-counts.close',
+            'audits.physical-counts.participants',
+            'audits.physical-counts.apply',
             'audits.physical-counts.delete',
         ]),
     },

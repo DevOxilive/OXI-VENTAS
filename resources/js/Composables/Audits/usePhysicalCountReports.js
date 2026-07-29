@@ -58,7 +58,7 @@ export function usePhysicalCountReports(props) {
         { id: 'pending_products', indicator: 'No encontrados', value: props.summary.pending_products ?? 0 },
         { id: 'missing_products', indicator: 'Faltantes', value: props.summary.missing_products ?? 0 },
         { id: 'surplus_products', indicator: 'Sobrantes', value: props.summary.surplus_products ?? 0 },
-        { id: 'matched_products', indicator: 'Macheados', value: props.summary.matched_products ?? 0 },
+        { id: 'matched_products', indicator: 'Coincidentes', value: props.summary.matched_products ?? 0 },
     ])
 
     const reportTableItems = computed(() =>

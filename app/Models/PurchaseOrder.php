@@ -18,6 +18,12 @@ class PurchaseOrder extends Model
 
     public const STATUS_CANCELLED = 'CANCELLED';
 
+    public const REVIEW_PENDING = 'PENDING';
+
+    public const REVIEW_APPROVED = 'APPROVED';
+
+    public const REVIEW_REJECTED = 'REJECTED';
+
     protected $fillable = [
         'branch_id',
         'purchase_cycle_id',
@@ -29,12 +35,15 @@ class PurchaseOrder extends Model
         'folio',
         'source',
         'status',
+        'review_status',
         'estimated_total',
         'actual_total',
         'purchased_at',
         'generated_at',
         'completed_at',
         'inventory_edited_at',
+        'reviewed_by',
+        'reviewed_at',
     ];
 
     protected $casts = [
@@ -44,6 +53,7 @@ class PurchaseOrder extends Model
         'generated_at' => 'datetime',
         'completed_at' => 'datetime',
         'inventory_edited_at' => 'datetime',
+        'reviewed_at' => 'datetime',
     ];
 
     public function branch()
@@ -79,6 +89,16 @@ class PurchaseOrder extends Model
     public function inventoryEditedBy()
     {
         return $this->belongsTo(User::class, 'inventory_edited_by');
+    }
+
+    public function reviewedBy()
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function transfers()
+    {
+        return $this->hasMany(PurchaseOrderTransfer::class);
     }
 
     public function items()
