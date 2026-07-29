@@ -7,6 +7,7 @@ export function getProductToolbarConfig({
     canCreate,
 }) {
     return {
+        icon: "inventory_2",
         title: branch?.name ? `Productos - ${branch.name}` : "Productos",
 
         subtitle: branch?.name

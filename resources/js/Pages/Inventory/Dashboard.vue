@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import InventoryStatsCards from '@/Components/Inventory/BranchProducts/InventoryStatsCards.vue'
+import { GlobalToolbar } from '@/Components/Toolbars'
 
 defineOptions({ layout: AdminLayout })
 
@@ -238,39 +239,28 @@ function openCreateModal() {
 function exportExcel() {
     console.log('Exportar Excel')
 }
+
+function handleToolbarAction(action) {
+    if (action === 'create') openCreateModal()
+    if (action === 'export') exportExcel()
+}
 </script>
 
 <template>
     <section class="space-y-6">
-        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-                <h1 class="text-2xl font-bold text-text">
-                    Inventario
-                </h1>
-
-                <p class="mt-1 text-sm text-text opacity-70">
-                    Panel general para controlar productos, stock, sucursales, movimientos y alertas operativas.
-                </p>
-            </div>
-
-            <div class="flex items-center gap-3">
-                <button @click="openCreateModal"
-                    class="flex items-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-sm text-white shadow-sm">
-                    <span class="material-symbols-outlined text-[18px]">
-                        add_circle
-                    </span>
-                    Nuevo producto
-                </button>
-
-                <button @click="exportExcel"
-                    class="flex items-center gap-2 rounded-lg border border-accent bg-accent px-4 py-2 text-sm text-background shadow-sm">
-                    <span class="material-symbols-outlined text-[18px]">
-                        download
-                    </span>
-                    Excel
-                </button>
-            </div>
-        </div>
+        <GlobalToolbar
+            icon="inventory_2"
+            title="Inventario"
+            subtitle="Panel general para controlar productos, stock, sucursales, movimientos y alertas operativas."
+            :show-search="false"
+            :show-records-per-page="false"
+            :show-counter="false"
+            :actions="[
+                { id: 'create', label: 'Nuevo producto', icon: 'add_circle', variant: 'primary' },
+                { id: 'export', label: 'Exportar Excel', icon: 'download', variant: 'secondary' },
+            ]"
+            @action="handleToolbarAction"
+        />
 
         <InventoryStatsCards :stats="stats" />
 

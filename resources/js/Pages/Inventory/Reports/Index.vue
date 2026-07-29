@@ -37,7 +37,7 @@ const reportGroups = [
         disabled: false,
         routeName: 'ventas.cash-closures.reports',
         usesBranch: false,
-        permissions: ['sales.cash-closures.view'],
+        permissions: ['sales.cash-closures.reports'],
     },
     {
         key: 'inventory',

@@ -134,6 +134,7 @@ function handleTableAction(targetEntity, { action, row }) {
     <PageLayout>
         <template #toolbar>
             <GlobalToolbar
+                icon="account_tree"
                 title="Registro de Departamentos"
                 subtitle="Administra departamentos y los puestos que pertenecen a cada uno"
                 :show-search="false"
@@ -144,6 +145,7 @@ function handleTableAction(targetEntity, { action, row }) {
 
         <div class="grid items-start gap-5 2xl:grid-cols-2">
             <OrganizationTablePanel
+                :icon="departmentToolbarConfig.icon"
                 :title="departmentToolbarConfig.title"
                 :subtitle="departmentToolbarConfig.subtitle"
                 :search-placeholder="departmentToolbarConfig.searchPlaceholder"
@@ -159,6 +161,7 @@ function handleTableAction(targetEntity, { action, row }) {
             />
 
             <OrganizationTablePanel
+                :icon="positionToolbarConfig.icon"
                 :title="positionToolbarConfig.title"
                 :subtitle="positionToolbarConfig.subtitle"
                 :search-placeholder="positionToolbarConfig.searchPlaceholder"

@@ -158,6 +158,7 @@ const permissionLabelMap = {
     'sales.cash-closures.create': 'Crear cortes',
     'sales.cash-closures.update': 'Editar cortes',
     'sales.cash-closures.delete': 'Eliminar cortes',
+    'sales.cash-closures.reports': 'Reportes de cortes',
     'inventory.products.view': 'Ver productos',
     'inventory.products.create': 'Crear productos',
     'inventory.products.update': 'Editar productos',
@@ -202,6 +203,12 @@ const permissionCatalog = [
         title: 'Cortes de caja',
         icon: 'payments',
         permissions: ['sales.cash-closures.view', 'sales.cash-closures.create', 'sales.cash-closures.update', 'sales.cash-closures.delete'],
+    },
+    {
+        key: 'cashClosureReports',
+        title: 'Reportes de cortes',
+        icon: 'assessment',
+        permissions: ['sales.cash-closures.reports'],
     },
     {
         key: 'printers',
@@ -292,6 +299,7 @@ const permissionAction = (permission) => {
         'sales.cash-closures.create': { icon: 'add_card', href: route('ventas.cash-closures.index') },
         'sales.cash-closures.update': { icon: 'edit', href: route('ventas.cash-closures.index') },
         'sales.cash-closures.delete': { icon: 'delete', href: route('ventas.cash-closures.index') },
+        'sales.cash-closures.reports': { icon: 'assessment', href: route('ventas.cash-closures.reports') },
         'inventory.products.view': { icon: 'visibility', href: branchHref((branch) => route('inventory.branches.products.index', { branch: branch.slug })) },
         'inventory.products.create': { icon: 'add_box', href: branchHref((branch) => route('inventory.branches.products.index', { branch: branch.slug })) },
         'inventory.products.update': { icon: 'edit_square', href: branchHref((branch) => route('inventory.branches.products.index', { branch: branch.slug })) },
@@ -366,6 +374,14 @@ const allQuickActions = computed(() => [
             'sales.cash-closures.update',
             'sales.cash-closures.delete',
         ]),
+    },
+    {
+        id: 'cash-closure-reports',
+        label: 'Reportes de cortes',
+        description: 'Consultar el historial de cortes de caja.',
+        icon: 'assessment',
+        routeName: 'ventas.cash-closures.reports',
+        visible: can('sales.cash-closures.reports'),
     },
     {
         id: 'products',
@@ -527,7 +543,7 @@ onBeforeUnmount(() => {
 
                     <div class="mascot-orbit">
                         <div class="mascot-card">
-                            <img src="/icons/super-kay-source.png" alt="Super Kay" class="mascot-logo">
+                            <img src="/icons/icon-192.png" alt="Super Kay" class="mascot-logo">
                         </div>
                     </div>
 

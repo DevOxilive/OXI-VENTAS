@@ -17,6 +17,7 @@ class RoleSeeder extends Seeder
             'Sistemas',
             'Recursos Humanos',
             'Ventas',
+            'Vendedor',
             'Inventario',
         ];
 
@@ -35,12 +36,16 @@ class RoleSeeder extends Seeder
         $systemsRole = DB::table('roles')->where('name', 'Sistemas')->first();
         $humanResourcesRole = DB::table('roles')->where('name', 'Recursos Humanos')->first();
         $salesRole = DB::table('roles')->where('name', 'Ventas')->first();
+        $sellerRole = DB::table('roles')->where('name', 'Vendedor')->first();
         $inventoryRole = DB::table('roles')->where('name', 'Inventario')->first();
 
         $permissions = DB::table('permissions')->get();
 
         foreach ($permissions as $permission) {
-            if (in_array($permission->name, SystemPermission::exclusive(), true)) {
+            if (
+                in_array($permission->name, SystemPermission::exclusive(), true)
+                || in_array($permission->name, ['attendance.register', 'attendance.corrections.request'], true)
+            ) {
                 continue;
             }
 
@@ -54,7 +59,11 @@ class RoleSeeder extends Seeder
             ->whereIn('name', ['attendance.register', 'attendance.corrections.request'])
             ->pluck('id');
 
-        foreach ([$superAdministratorRole, $adminRole, $systemsRole, $humanResourcesRole, $salesRole, $inventoryRole] as $role) {
+        foreach ([$salesRole, $sellerRole] as $role) {
+            if (! $role) {
+                continue;
+            }
+
             foreach ($attendanceSelfPermissionIds as $permissionId) {
                 DB::table('role_permission')->updateOrInsert(['role_id' => $role->id, 'permission_id' => $permissionId]);
             }
@@ -143,6 +152,11 @@ class RoleSeeder extends Seeder
                 str_starts_with($permission->name, 'employees.')
                 || str_starts_with($permission->name, 'departments.')
                 || str_starts_with($permission->name, 'positions.')
+                || in_array($permission->name, [
+                    'attendance.incidents.view',
+                    'attendance.incidents.create',
+                    'attendance.incidents.update',
+                ], true)
             ) {
                 DB::table('role_permission')->updateOrInsert([
                     'role_id' => $humanResourcesRole->id,
@@ -153,13 +167,23 @@ class RoleSeeder extends Seeder
 
         foreach ($permissions as $permission) {
             if (
-                str_starts_with($permission->name, 'sales.')
+                (
+                    str_starts_with($permission->name, 'sales.')
+                    && $permission->name !== 'sales.cash-closures.reports'
+                )
                 || str_starts_with($permission->name, 'inventory.purchase-reports.')
             ) {
                 DB::table('role_permission')->updateOrInsert([
                     'role_id' => $salesRole->id,
                     'permission_id' => $permission->id,
                 ]);
+
+                if ($sellerRole) {
+                    DB::table('role_permission')->updateOrInsert([
+                        'role_id' => $sellerRole->id,
+                        'permission_id' => $permission->id,
+                    ]);
+                }
             }
         }
 

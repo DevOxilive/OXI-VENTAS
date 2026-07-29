@@ -2,6 +2,7 @@
 
 export function getUsersToolbarConfig({ roles = [], activeFilters = {} }) {
     return {
+        icon: "manage_accounts",
         showSearch: true,
         showRecordsPerPage: true,
         searchPlaceholder: "Buscar nombre, correo, usuario o rol...",

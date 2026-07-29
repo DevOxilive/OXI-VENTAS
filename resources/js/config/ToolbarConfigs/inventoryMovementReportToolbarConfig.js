@@ -8,6 +8,7 @@ export function getInventoryMovementReportToolbarConfig({
     movementReasons = [],
 } = {}) {
     return {
+        icon: 'swap_horiz',
         title: 'Reportes de movimientos',
         subtitle: branch?.name
             ? `Sucursal ${branch.name}`

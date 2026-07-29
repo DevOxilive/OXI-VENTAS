@@ -36,7 +36,7 @@ defineEmits([
 </script>
 
 <template>
-    <GlobalToolbar title="Empleados" subtitle="Administracion del personal registrado"
+    <GlobalToolbar
         v-bind="getEmployeeToolbarConfig({ canCreate, canExport, activeFilters, positions, departments, statuses })"
         :search="search" :records-per-page="recordsPerPage" :filtered-records="filteredRecords"
         :total-records="totalRecords" @action="$emit('action', $event)"

@@ -15,6 +15,7 @@ export function getPhysicalCountReportsToolbarConfig({
         : users
 
     return {
+        icon: 'assessment',
         title: 'Reportes de auditoría',
         subtitle: branch?.name
             ? `Sucursal ${branch.name}`

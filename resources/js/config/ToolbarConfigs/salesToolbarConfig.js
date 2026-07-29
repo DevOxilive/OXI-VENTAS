@@ -16,6 +16,7 @@ export function getSalesToolbarConfig({
 } = {}) {
   if (selectorMode) {
     return {
+      icon: "point_of_sale",
       title: "Ventas",
       subtitle:
         selectorDescription ||
@@ -30,6 +31,7 @@ export function getSalesToolbarConfig({
   }
 
   return {
+    icon: "point_of_sale",
     title: "Ventas",
     subtitle: `${branchName || "Sin sucursal"} · Escanea, agrega productos y cobra una venta real.`,
     showSearch: false,

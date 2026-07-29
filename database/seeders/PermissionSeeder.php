@@ -76,6 +76,7 @@ class PermissionSeeder extends Seeder
             'sales.cash-closures.create',
             'sales.cash-closures.update',
             'sales.cash-closures.delete',
+            'sales.cash-closures.reports',
 
             'inventory.view',
             'inventory.create',
@@ -125,6 +126,7 @@ class PermissionSeeder extends Seeder
             'sales.cash-closures.create',
             'sales.cash-closures.update',
             'sales.cash-closures.delete',
+            'sales.cash-closures.reports',
             'inventory.purchase-reports.view',
             'inventory.purchase-reports.create',
             'inventory.purchase-reports.update',

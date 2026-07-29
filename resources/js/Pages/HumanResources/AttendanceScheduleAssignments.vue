@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
-import GlobalCard from '@/Components/Cards/GlobalCard.vue'
+import { GlobalToolbar } from '@/Components/Toolbars'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales'
@@ -14,6 +14,7 @@ import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import { usePermissions } from '@/Composables/usePermissions'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
+import { getAttendanceScheduleAssignmentsToolbarConfig } from '@/config/ToolbarConfigs/attendanceScheduleAssignmentsToolbarConfig'
 
 defineOptions({ layout: AdminLayout })
 const props = defineProps({ assignments: { type: Object, default: () => ({ data: [] }) }, employees: { type: Array, default: () => [] }, schedules: { type: Array, default: () => [] } })
@@ -25,6 +26,9 @@ const days = [{ key: 'monday', label: 'Lunes' }, { key: 'tuesday', label: 'Marte
 const showModal = ref(false)
 const mode = ref('create')
 const selected = ref(null)
+const toolbarConfig = computed(() => getAttendanceScheduleAssignmentsToolbarConfig({
+  canCreate: can('attendance.schedule-assignments.create'),
+}))
 const form = useForm({ employee_id: '', attendance_schedule_id: '', effective_from: new Date().toISOString().slice(0, 10), effective_to: '', active: true, observations: '', working_days: [...defaultDays] })
 const columns = [{ key: 'employee', label: 'Empleado' }, { key: 'department', label: 'Departamento' }, { key: 'position', label: 'Puesto' }, { key: 'schedule', label: 'Horario asignado' }, { key: 'effective_from', label: 'Inicio', format: 'date' }, { key: 'effective_to', label: 'Término', format: 'date', formatOptions: { fallback: 'Vigente' } }, { key: 'active', label: 'Estado', format: 'badge', formatOptions: { labelMap: { true: 'Activa', false: 'Inactiva' }, colorMap: { true: 'green', false: 'slate' } } }]
 const actions = [
@@ -41,6 +45,7 @@ function close() { showModal.value = false; form.clearErrors() }
 function submit() { if (mode.value === 'view') return close(); const options = getModalRequestOptions({ mode: mode.value === 'edit' ? 'edit' : 'create', entityName: 'Asignación', close }); if (mode.value === 'edit') form.put(route('human-resources.attendance-schedule-assignments.update', selected.value.id), options); else form.post(route('human-resources.attendance-schedule-assignments.store'), options) }
 async function remove(row) { const result = await confirmModalAction({ mode: 'delete', entityName: 'asignación', title: 'Eliminar asignación', message: `¿Deseas eliminar únicamente la asignación de horario de ${row.employee}? El empleado se conservará.`, confirmText: 'Sí, eliminar' }); if (result.isConfirmed) form.delete(route('human-resources.attendance-schedule-assignments.destroy', row.id), getModalRequestOptions({ mode: 'delete', entityName: 'Asignación' })) }
 function action({ action, row }) { if (action === 'view') load(row, 'view'); if (action === 'edit') load(row, 'edit'); if (action === 'delete') remove(row) }
+function handleToolbarAction(action) { if (action === 'create') openCreate() }
 function toggleWorkingDay(day) { form.working_days = form.working_days.includes(day) ? form.working_days.filter((value) => value !== day) : [...form.working_days, day] }
 
 onMounted(() => {
@@ -60,9 +65,7 @@ onBeforeUnmount(() => unsubscribeAssignments?.())
 
 <template>
   <PageLayout>
-    <GlobalCard title="Asignación de horarios" icon="assignment_ind" :clickable="false" class="p-5 md:p-6">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><p class="text-sm text-text opacity-70">Asigna un horario y define los días laborables de cada empleado.</p><AppButton v-if="can('attendance.schedule-assignments.create')" @click="openCreate"><span class="material-symbols-outlined mr-2 text-[18px]">add</span>Nueva asignación</AppButton></div>
-    </GlobalCard>
+    <GlobalToolbar v-bind="toolbarConfig" @action="handleToolbarAction" />
     <GlobalTable :items="assignments.data || []" :columns="columns" :actions="actions" :pagination="assignments" mobile-card-header-field="employee" no-data-message="No hay asignaciones registradas." @action="action" />
     <GlobalModal v-if="showModal" :title="title" subtitle="Define horario, vigencia y días laborables." :mode="mode" :total-errors="Object.keys(form.errors).length" :processing="form.processing" :show-save="mode !== 'view'" :save-button-text="mode === 'edit' ? 'Guardar cambios' : 'Guardar asignación'" :close-button-text="mode === 'view' ? 'Cerrar' : 'Cancelar'" size="md" height="auto" :columns="1" @save="submit" @close="close">
       <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="submit">

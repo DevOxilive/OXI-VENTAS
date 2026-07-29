@@ -7,7 +7,10 @@ const slots = useSlots()
 const hasActionsSlot = computed(() => Boolean(slots.actions))
 
 defineProps({
-    icon: String,
+    icon: {
+        type: String,
+        default: 'dashboard_customize',
+    },
     title: String,
     subtitle: String,
 

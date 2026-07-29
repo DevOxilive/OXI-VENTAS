@@ -89,6 +89,7 @@ export function getInventoryReportToolbarConfig({
     products = [],
 } = {}) {
     return {
+        icon: 'analytics',
         title: 'Reportes de inventario',
         subtitle: branch?.name
             ? `Sucursal ${branch.name}`

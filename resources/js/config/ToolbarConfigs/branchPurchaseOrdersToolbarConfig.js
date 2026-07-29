@@ -1,5 +1,6 @@
 export function getBranchPurchaseOrdersToolbarConfig({ filters = {}, total = 0, branchName = '' } = {}) {
     return {
+        icon: 'receipt_long',
         title: 'Órdenes de compra',
         subtitle: `Consulta las órdenes pendientes, por revisar y completadas de ${branchName || 'la sucursal'}.`,
         backButton: false,

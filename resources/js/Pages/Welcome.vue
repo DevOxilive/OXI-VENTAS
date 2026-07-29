@@ -14,7 +14,7 @@ defineProps({
     <main class="flex min-h-screen items-center justify-center bg-background px-6 py-12 text-text">
         <section class="w-full max-w-xl rounded-[2rem] border border-secondary bg-background p-8 text-center shadow-xl">
             <img
-                src="/icons/super-kay-source.png"
+                src="/icons/icon-192.png"
                 alt="Logotipo de Super Kay"
                 class="mx-auto h-28 w-28 rounded-3xl object-cover"
             >

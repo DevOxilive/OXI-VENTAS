@@ -1,5 +1,6 @@
 export function getReportsToolbarConfig({ tabs = [], activeTab = "" } = {}) {
     return {
+        icon: "bar_chart",
         title: "Reportes de inventario",
         subtitle:
             "Consulta movimientos, caducidades, rotación y productos que requieren atención.",

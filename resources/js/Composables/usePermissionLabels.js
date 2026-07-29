@@ -203,6 +203,7 @@ const permissionLabels = {
     "sales.cash-closures.create": "Crear cortes de caja",
     "sales.cash-closures.update": "Editar cortes de caja",
     "sales.cash-closures.delete": "Eliminar cortes de caja",
+    "sales.cash-closures.reports": "Consultar reportes de cortes de caja",
 
     "inventory.products.view": "Ver modulo de productos",
     "inventory.products.create": "Crear productos",

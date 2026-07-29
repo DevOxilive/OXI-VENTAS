@@ -1,14 +1,14 @@
-export function getAttendanceFiltersToolbarConfig({
+export function getAttendanceRegistrationToolbarConfig({
     filters = {},
     types = [],
     branches = [],
     departments = [],
-    employees = [],
     canManage = false,
-}) {
+} = {}) {
     return {
-        title: 'Filtros de asistencia',
-        subtitle: 'La tabla muestra el día actual de forma inicial. Ajusta el periodo o busca a una persona para consultar otros registros.',
+        icon: 'fact_check',
+        title: 'Sistema de Asistencias',
+        subtitle: 'Registra, consulta y filtra la asistencia del personal con validación del dispositivo.',
         showSearch: true,
         searchPlaceholder: 'Buscar por empleado, usuario o correo...',
         showRecordsPerPage: false,
@@ -20,7 +20,6 @@ export function getAttendanceFiltersToolbarConfig({
             { key: 'type', label: 'Tipo de registro', placeholder: 'Todos los tipos', value: filters.type ?? '', options: types },
             { key: 'branch', label: 'Sucursal', placeholder: 'Todas las sucursales', value: filters.branch ?? '', options: branches, visible: canManage },
             { key: 'department', label: 'Departamento', placeholder: 'Todos los departamentos', value: filters.department ?? '', options: departments, visible: canManage },
-            { key: 'employee', label: 'Empleado', placeholder: 'Todo el personal', value: filters.employee ?? '', options: employees, visible: canManage },
         ],
     }
 }

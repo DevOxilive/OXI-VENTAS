@@ -273,6 +273,7 @@ onBeforeUnmount(() => {
   <PageLayout>
     <template #toolbar>
       <GlobalToolbar
+        :icon="toolbarConfig.icon"
         :title="toolbarConfig.title"
         :subtitle="toolbarConfig.subtitle"
         :search="search"
