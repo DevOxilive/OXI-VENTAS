@@ -22,10 +22,15 @@ export const physicalCountTableConfig = {
             mobileLabel: "Estado",
             mobileDisplay: true,
             formatOptions: {
-                statusMap: {
+                labelMap: {
                     open: "Abierto",
                     closed: "Cerrado",
                     applied: "Aplicado",
+                },
+                statusMap: {
+                    open: "green",
+                    closed: "slate",
+                    applied: "blue",
                 },
                 colorMap: {
                     open: "green",
@@ -42,18 +47,14 @@ export const physicalCountTableConfig = {
             label: "Ingresar a auditoría",
             icon: "login",
             variant: "blue",
-            permission: [
-                "audits.physical-counts.view",
-                "audits.physical-counts.count",
-                "audits.physical-counts.update",
-            ],
+            permission: "audits.physical-counts.count",
         },
         {
             id: "close",
             label: "Cerrar auditoría",
             icon: "lock",
             variant: "amber",
-            permission: "audits.physical-counts.update",
+            permission: "audits.physical-counts.close",
             hidden: (item) => !["open", "applied"].includes(item.status),
         },
         {
@@ -61,7 +62,7 @@ export const physicalCountTableConfig = {
             label: "Reabrir auditoría",
             icon: "restart_alt",
             variant: "green",
-            permission: "audits.physical-counts.update",
+            permission: "audits.physical-counts.close",
             hidden: (item) => !["closed", "applied"].includes(item.status),
         },
         {
@@ -69,14 +70,14 @@ export const physicalCountTableConfig = {
             label: "Participantes",
             icon: "group_add",
             variant: "indigo",
-            permission: "audits.physical-counts.update",
+            permission: "audits.physical-counts.participants",
         },
         {
             id: "apply",
             label: "Aplicar ajustes",
             icon: "check_circle",
             variant: "green",
-            permission: "audits.physical-counts.update",
+            permission: "audits.physical-counts.apply",
             hidden: (item) => !["closed", "applied"].includes(item.status),
         },
         {

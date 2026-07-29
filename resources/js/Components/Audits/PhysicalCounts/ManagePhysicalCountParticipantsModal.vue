@@ -3,6 +3,9 @@ import { computed, ref, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import InputField from '@/Components/Forms/InputField.vue'
+import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
+import SelectionGridSection from '@/Components/Forms/SelectionGridSection.vue'
 import { getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 
 const props = defineProps({
@@ -21,7 +24,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'updated'])
-
 const search = ref('')
 
 const form = useForm({
@@ -30,17 +32,16 @@ const form = useForm({
 })
 
 const totalErrors = computed(() => Object.keys(form.errors || {}).length)
-
 const filteredUsers = computed(() => {
     const term = search.value.trim().toLowerCase()
 
     if (!term) return props.users
 
-    return props.users.filter((user) => {
-        return [user.name, user.email, user.role]
+    return props.users.filter((user) =>
+        [user.name, user.email, user.role]
             .filter(Boolean)
-            .some((value) => String(value).toLowerCase().includes(term))
-    })
+            .some((value) => String(value).toLowerCase().includes(term)),
+    )
 })
 
 watch(
@@ -48,7 +49,8 @@ watch(
     (physicalCount) => {
         form.clearErrors()
         form.name = physicalCount?.name ?? ''
-        form.participant_ids = (physicalCount?.participants || []).map((participant) => participant.id)
+        form.participant_ids = (physicalCount?.participants || [])
+            .map((participant) => Number(participant.id))
         search.value = ''
     },
     { immediate: true },
@@ -60,6 +62,14 @@ function closeModal() {
     emit('close')
 }
 
+function toggleParticipant(userId) {
+    const normalizedId = Number(userId)
+
+    form.participant_ids = form.participant_ids.includes(normalizedId)
+        ? form.participant_ids.filter((id) => id !== normalizedId)
+        : [...form.participant_ids, normalizedId]
+}
+
 function submit() {
     if (!props.physicalCount) return
 
@@ -69,7 +79,7 @@ function submit() {
         close: () => emit('close'),
         successTitle: 'Participantes actualizados correctamente',
         errorTitle: 'Error al actualizar participantes',
-        errorMessage: 'No fue posible actualizar los participantes de la auditoria.',
+        errorMessage: 'No fue posible actualizar los participantes de la auditoría.',
         onSuccess: () => {
             emit('updated')
         },
@@ -80,11 +90,12 @@ function submit() {
 <template>
     <GlobalModal
         v-if="show"
-        title="Participantes de auditoria"
+        title="Participantes de auditoría"
         :subtitle="physicalCount?.folio ?? physicalCount?.name ?? ''"
         mode="update"
-        size="lg"
-        height="auto"
+        size="md"
+        height="compact"
+        :columns="1"
         :total-errors="totalErrors"
         :processing="form.processing"
         save-button-text="Guardar participantes"
@@ -93,64 +104,55 @@ function submit() {
         @close="closeModal"
     >
         <form class="space-y-4" @submit.prevent="submit">
-            <div>
-                <div class="mb-2 flex items-center justify-between gap-3">
-                    <label class="block text-sm font-medium text-gray-700">
-                        Usuarios asignados
-                    </label>
-
-                    <span class="text-xs text-gray-500">
+            <SelectionGridSection
+                title="Usuarios asignados"
+                description="Define quiénes participarán en esta auditoría."
+                grid-class="grid grid-cols-1 gap-2 sm:grid-cols-2"
+            >
+                <template #aside>
+                    <span class="text-xs font-semibold text-text opacity-60">
                         {{ form.participant_ids.length }} seleccionados
                     </span>
+                </template>
+
+                <div class="sm:col-span-2">
+                    <InputField
+                        v-model="search"
+                        hide-label
+                        field="participant_search"
+                        validation-field="toolbar_search"
+                        placeholder="Buscar por nombre, correo o rol"
+                    />
                 </div>
 
-                <input
-                    v-model="search"
-                    type="text"
-                    placeholder="Buscar usuario"
-                    class="mb-3 h-9 w-full rounded-lg border-gray-300 text-sm"
-                    autocomplete="off"
-                >
-
-                <div class="max-h-72 overflow-y-auto rounded-lg border border-gray-300 bg-white">
-                    <label
+                <div class="max-h-72 space-y-2 overflow-y-auto pr-1 sm:col-span-2">
+                    <SelectionCheckboxCard
                         v-for="user in filteredUsers"
                         :key="user.id"
-                        class="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-3 py-2 text-sm last:border-b-0 hover:bg-gray-50"
-                    >
-                        <input
-                            v-model="form.participant_ids"
-                            type="checkbox"
-                            :value="user.id"
-                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        >
+                        class="w-full"
+                        compact
+                        variant="soft"
+                        :checked="form.participant_ids.includes(Number(user.id))"
+                        :title="user.name"
+                        :description="[user.role, user.email].filter(Boolean).join(' · ')"
+                        @toggle="toggleParticipant(user.id)"
+                    />
 
-                        <span class="min-w-0 flex-1">
-                            <span class="block truncate font-medium text-gray-700">
-                                {{ user.name }}
-                            </span>
-
-                            <span class="block truncate text-xs text-gray-500">
-                                {{ user.role }} - {{ user.email }}
-                            </span>
-                        </span>
-                    </label>
-
-                    <div
+                    <p
                         v-if="filteredUsers.length === 0"
-                        class="px-3 py-4 text-sm text-gray-500"
+                        class="rounded-lg border border-secondary bg-secondary px-3 py-4 text-sm text-text opacity-60"
                     >
                         No hay usuarios para mostrar.
-                    </div>
+                    </p>
                 </div>
 
                 <p
                     v-if="form.errors.participant_ids"
-                    class="mt-2 text-sm text-red-600"
+                    class="text-sm text-primary sm:col-span-2"
                 >
                     {{ form.errors.participant_ids }}
                 </p>
-            </div>
+            </SelectionGridSection>
         </form>
     </GlobalModal>
 </template>

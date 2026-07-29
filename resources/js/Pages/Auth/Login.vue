@@ -39,7 +39,7 @@ const submit = () => {
                 <div class="mb-8 flex flex-col items-center text-center">
                     <div class="login-logo rounded-[2.25rem] bg-white/90 p-4 shadow-lg shadow-amber-900/10 ring-1 ring-amber-100 sm:p-5">
                         <img
-                            src="/icons/super-kay-source.png"
+                            src="/icons/icon-192.png"
                             alt="Logotipo de Super Kay"
                             class="h-28 w-28 rounded-[1.7rem] object-cover sm:h-32 sm:w-32"
                         />

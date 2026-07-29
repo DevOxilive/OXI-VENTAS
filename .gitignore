@@ -19,6 +19,7 @@
 /public/storage
 /tools/cloudflared.exe
 /storage/*.key
+/storage/framework/realtime-tunnel.json
 /storage/pail
 /vendor
 /tools/face-recognition/.venv/

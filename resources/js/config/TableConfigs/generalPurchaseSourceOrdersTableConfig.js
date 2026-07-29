@@ -8,9 +8,23 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
                 mobileSecondary: false,
             },
             {
-                key: 'assigned_to_name',
-                label: 'Encargado de tienda',
-                mobileLabel: 'Encargado de tienda',
+                key: 'requested_by_name',
+                label: 'Solicitado por',
+                mobileLabel: 'Solicitado por',
+                mobileDisplay: true,
+            },
+            {
+                key: 'review_status_label',
+                label: 'Estado',
+                format: 'badge',
+                formatOptions: {
+                    statusMap: {
+                        Pendiente: 'amber',
+                        Aprobada: 'green',
+                        Rechazada: 'red',
+                    },
+                },
+                mobileLabel: 'Estado',
                 mobileDisplay: true,
             },
             {
@@ -44,12 +58,28 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
                 permission: 'inventory.purchase-orders.generate.view',
             },
             {
+                id: 'approve',
+                label: 'Aprobar',
+                icon: 'check_circle',
+                variant: 'green',
+                permission: 'inventory.purchase-orders.generate.update',
+                hidden: (row) => row.review_status === 'APPROVED' || row.selected || row.in_draft,
+            },
+            {
+                id: 'reject',
+                label: 'Rechazar',
+                icon: 'cancel',
+                variant: 'red',
+                permission: 'inventory.purchase-orders.generate.update',
+                hidden: (row) => row.review_status === 'REJECTED' || row.selected || row.in_draft,
+            },
+            {
                 id: 'transfer',
                 label: 'Transferir',
                 icon: 'swap_horiz',
                 variant: 'secondary',
                 permission: 'inventory.purchase-orders.generate.transfer',
-                hidden: (row) => row.selected || row.in_draft,
+                hidden: (row) => row.review_status !== 'APPROVED' || row.selected || row.in_draft,
             },
             {
                 id: 'edit',
@@ -60,12 +90,20 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
                 hidden: (row) => row.selected || row.in_draft,
             },
             {
+                id: 'history',
+                label: 'Historial de transferencias',
+                icon: 'history',
+                variant: 'blue',
+                permission: 'inventory.purchase-orders.generate.view',
+                hidden: (row) => Number(row.transfer_history_count || 0) === 0,
+            },
+            {
                 id: 'add',
                 label: 'Agregar a Orden de compra general',
                 icon: 'add_circle',
                 variant: 'green',
                 permission: 'inventory.purchase-orders.generate.create',
-                hidden: (row) => row.selected,
+                hidden: (row) => row.review_status !== 'APPROVED' || row.selected,
             },
             {
                 id: 'remove',

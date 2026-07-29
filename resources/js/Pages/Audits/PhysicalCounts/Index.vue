@@ -9,6 +9,7 @@ import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import CreatePhysicalCountModal from '@/Components/Audits/PhysicalCounts/CreatePhysicalCountModal.vue'
 import ManagePhysicalCountParticipantsModal from '@/Components/Audits/PhysicalCounts/ManagePhysicalCountParticipantsModal.vue'
+import ReopenPhysicalCountModal from '@/Components/Audits/PhysicalCounts/ReopenPhysicalCountModal.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 
 import { usePermissions } from '@/Composables/usePermissions'
@@ -58,7 +59,9 @@ const statusFilter = ref(props.filters.status || '')
 const recordsPerPage = ref(Number(props.filters.per_page || 25))
 const showCreateModal = ref(false)
 const showParticipantsModal = ref(false)
+const showReopenModal = ref(false)
 const selectedPhysicalCount = ref(null)
+const reopeningPhysicalCount = ref(false)
 let filterTimeout = null
 
 const physicalCounts = computed(() => props.physicalCounts?.data || [])
@@ -137,50 +140,8 @@ async function handleTableAction({ action, row }) {
     }
 
     if (action === 'reopen') {
-        const result = await confirmModalAction({
-            mode: 'update',
-            title: row.status === 'applied' ? 'Reactivar conteo' : 'Reabrir auditoria',
-            html: '<div class="text-left text-xs text-[#0f0001cc] dark:text-[#fff0f1cc]">Selecciona que productos se van a contar en esta nueva ronda.</div>',
-            icon: 'question',
-            input: 'radio',
-            inputValue: 'all',
-            inputOptions: {
-                all: 'Todos los productos',
-                zero_stock: 'Solo productos con stock en cero',
-            },
-            confirmButtonText: 'Continuar',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#2563eb',
-            width: 420,
-            customClass: {
-                popup: 'rounded-2xl !p-5',
-                title: '!text-xl !pt-2',
-                icon: '!mt-2 !mb-2',
-                htmlContainer: '!mt-2 !mb-1',
-                input: '!mt-3 !mb-2 grid grid-cols-1 gap-2 text-left sm:grid-cols-2',
-                actions: '!mt-4',
-                confirmButton: 'px-4 py-2 rounded-full',
-                cancelButton: 'px-4 py-2 rounded-full',
-            },
-            inputValidator: (value) => {
-                if (!value) return 'Selecciona una opcion para continuar.'
-            },
-        })
-
-        if (!result.isConfirmed) return
-
-        router.patch(route('audits.physical-counts.reopen', row.id), {
-            recapture_scope: result.value || 'all',
-        }, getModalRequestOptions({
-            mode: 'update',
-            entityName: 'Auditoria',
-            successTitle: 'Conteo reactivado correctamente',
-            errorTitle: 'Error al reactivar conteo',
-            errorMessage: 'No fue posible reactivar el conteo.',
-            onSuccess: () => {
-                reloadPhysicalCounts()
-            },
-        }))
+        selectedPhysicalCount.value = row
+        showReopenModal.value = true
 
         return
     }
@@ -236,6 +197,29 @@ async function handleTableAction({ action, row }) {
             },
         }))
     }
+}
+
+function reopenPhysicalCount(scope) {
+    if (!selectedPhysicalCount.value || reopeningPhysicalCount.value) return
+
+    reopeningPhysicalCount.value = true
+
+    router.patch(route('audits.physical-counts.reopen', selectedPhysicalCount.value.id), {
+        recapture_scope: scope,
+    }, getModalRequestOptions({
+        mode: 'update',
+        entityName: 'Auditoría',
+        close: () => {
+            showReopenModal.value = false
+        },
+        successTitle: 'Auditoría reabierta correctamente',
+        errorTitle: 'Error al reabrir la auditoría',
+        errorMessage: 'No fue posible reabrir la auditoría.',
+        onSuccess: reloadPhysicalCounts,
+        onFinish: () => {
+            reopeningPhysicalCount.value = false
+        },
+    }))
 }
 
 onMounted(() => {
@@ -300,12 +284,20 @@ watch(search, () => {
         />
 
         <ManagePhysicalCountParticipantsModal
-            v-if="can('audits.physical-counts.update')"
+            v-if="can('audits.physical-counts.participants')"
             :show="showParticipantsModal"
             :physical-count="selectedPhysicalCount"
             :users="props.users"
             @close="showParticipantsModal = false"
             @updated="reloadPhysicalCounts"
+        />
+
+        <ReopenPhysicalCountModal
+            :show="showReopenModal"
+            :physical-count="selectedPhysicalCount"
+            :processing="reopeningPhysicalCount"
+            @close="showReopenModal = false"
+            @confirm="reopenPhysicalCount"
         />
     </PageLayout>
 </template>

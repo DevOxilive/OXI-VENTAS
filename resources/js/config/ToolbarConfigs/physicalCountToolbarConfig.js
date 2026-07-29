@@ -1,5 +1,6 @@
 export function getPhysicalCountToolbarConfig({ branch, canCreate, status = '' }) {
     return {
+        icon: 'inventory',
         title: 'Conteo físico',
         subtitle: `Sucursal: ${branch?.name ?? 'No seleccionada'}`,
         searchPlaceholder: 'Buscar conteo, folio, usuario o estado...',

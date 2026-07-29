@@ -9,6 +9,9 @@ export function getEmployeeToolbarConfig({
     statuses = [],
 }) {
     return {
+        icon: "group",
+        title: "Empleados",
+        subtitle: "Administración del personal registrado",
         showSearch: true,
         showRecordsPerPage: true,
         searchPlaceholder: "Buscar empleado por nombre, correo o puesto...",

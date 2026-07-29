@@ -1,5 +1,6 @@
 export function getBranchToolbarConfig({ canCreate }) {
     return {
+        icon: "store",
         title: "Registro de sucursales",
         subtitle: "Administra las sucursales y asigna su color de identificacion.",
         showSearch: true,

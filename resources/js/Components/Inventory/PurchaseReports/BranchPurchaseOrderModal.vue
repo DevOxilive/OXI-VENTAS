@@ -17,15 +17,21 @@ const form = useForm({
 const itemLookup = computed(() => new Map((props.order.items ?? []).map((item) => [Number(item.id), item])))
 const summary = computed(() => [
     { label: 'Orden', value: props.order.folio },
-    { label: 'Fecha de solicitud', value: date(props.order.requested_at) },
+    { label: 'Fecha de solicitud', value: dateTime(props.order.requested_at) },
+    { label: 'Estado de revisión', value: props.order.review_status_label || props.order.status_label },
     { label: 'Productos solicitados', value: `${props.order.items_count || props.order.items?.length || 0} productos` },
     { label: 'Solicitado por', value: props.order.user?.name || props.order.requested_by_name },
+    { label: 'Responsable actual', value: props.order.assigned_to?.name },
     { label: 'Sucursal', value: props.order.branch?.name || props.order.branch_name },
 ])
 
 function sourceItem(item) { return itemLookup.value.get(Number(item.id)) ?? {} }
 function quantity(value) { return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(Number(value || 0)) }
-function date(value) { return value ? new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value)) : 'Sin fecha' }
+function dateTime(value) {
+    return value
+        ? new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+        : 'Sin fecha'
+}
 function status(item) {
     const received = Number(item.received_quantity || 0)
     const requested = Number(sourceItem(item).requested_quantity || 0)

@@ -152,7 +152,7 @@ class CashRegisterClosureController extends Controller
 
         $closure->load(['branch:id,name,slug', 'user:id,name']);
 
-        return to_route('inventory.branches.reports.cash-closures', ['branch' => $branch->id])->with([
+        return to_route('ventas.cash-closures.index', ['branch' => $branch->id])->with([
             'success' => "Corte {$closure->folio} registrado correctamente.",
             'cash_closure_print_jobs' => $this->buildClosurePrintJobs($closure),
         ]);

@@ -8,6 +8,7 @@ export function getPurchaseReportToolbarConfig({
     canClear = false,
 } = {}) {
     return {
+        icon: 'playlist_add',
         title: editingFolio ? `Editando ${editingFolio}` : 'Generar lista de compra',
         subtitle: cycleSubmitted
             ? `${branchName || 'La sucursal'} ya tiene solicitudes enviadas en ${cycleFolio || 'el ciclo actual'}, pero puede crear otra lista.`

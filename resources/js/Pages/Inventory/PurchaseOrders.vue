@@ -12,6 +12,7 @@ import AppButton from '@/Components/Buttons/AppButton.vue'
 import GeneralPurchaseOrderModal from '@/Components/Inventory/PurchaseReports/GeneralPurchaseOrderModal.vue'
 import BranchPurchaseOrderModal from '@/Components/Inventory/PurchaseReports/BranchPurchaseOrderModal.vue'
 import PurchaseOrderTransferModal from '@/Components/Inventory/PurchaseReports/PurchaseOrderTransferModal.vue'
+import PurchaseOrderTransferHistoryModal from '@/Components/Inventory/PurchaseReports/PurchaseOrderTransferHistoryModal.vue'
 import PendingPurchaseOrderEditModal from '@/Components/Inventory/PurchaseReports/PendingPurchaseOrderEditModal.vue'
 import { ErrorAlert } from '@/Components/Modales/UniversalActionModal'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
@@ -43,6 +44,7 @@ const { handlePageChange } = useGlobalTablePagination()
 const selectedOrder = ref(null)
 const selectedSourceOrder = ref(null)
 const transferOrder = ref(null)
+const transferHistoryOrder = ref(null)
 const editingSourceOrder = ref(null)
 const loadingSourceOrder = ref(false)
 const selectedOrderIds = ref((props.generation?.draft?.order_ids ?? []).map(Number))
@@ -52,6 +54,8 @@ const initialBranch = initialSelectedOrder?.branch_id
     ?? props.generation?.branches?.[0]?.id
     ?? null
 const selectedBranchId = ref(initialBranch ? Number(initialBranch) : null)
+const sourcePage = ref(1)
+const sourcePerPage = 10
 let unsubscribeOrderActivity = null
 
 const activeStatus = computed(() => orders.localFilters.value.status || 'GENERATE')
@@ -64,12 +68,36 @@ const tableConfig = computed(() => getPurchaseOrdersTableConfig({
     viewPermission: activeViewPermission.value,
 }))
 const sourceTableConfig = getGeneralPurchaseSourceOrdersTableConfig()
-const sourceRows = computed(() => (props.generation?.orders ?? [])
+const allSourceRows = computed(() => (props.generation?.orders ?? [])
     .filter((order) => Number(order.branch_id) === Number(selectedBranchId.value))
     .map((order) => ({
         ...order,
         selected: selectedOrderIds.value.includes(Number(order.id)),
     })))
+const sourceRows = computed(() => {
+    const start = (sourcePage.value - 1) * sourcePerPage
+    return allSourceRows.value.slice(start, start + sourcePerPage)
+})
+const sourcePagination = computed(() => {
+    const total = allSourceRows.value.length
+    const lastPage = Math.max(1, Math.ceil(total / sourcePerPage))
+    const currentPage = Math.min(sourcePage.value, lastPage)
+    const pageUrl = (pageNumber) => `?source_page=${pageNumber}`
+
+    return {
+        current_page: currentPage,
+        last_page: lastPage,
+        per_page: sourcePerPage,
+        total,
+        prev_page_url: currentPage > 1 ? pageUrl(currentPage - 1) : null,
+        next_page_url: currentPage < lastPage ? pageUrl(currentPage + 1) : null,
+        links: Array.from({ length: lastPage }, (_, index) => ({
+            url: pageUrl(index + 1),
+            label: String(index + 1),
+            active: index + 1 === currentPage,
+        })),
+    }
+})
 const selectedSourceOrders = computed(() => (props.generation?.orders ?? [])
     .filter((order) => selectedOrderIds.value.includes(Number(order.id))))
 const selectedBranchesCount = computed(() => new Set(
@@ -102,6 +130,9 @@ watch(() => props.generation?.orders, (availableOrders = []) => {
             ?? 0,
         ) || null
     }
+
+    const lastPage = Math.max(1, Math.ceil(allSourceRows.value.length / sourcePerPage))
+    sourcePage.value = Math.min(sourcePage.value, lastPage)
 })
 
 onMounted(() => {
@@ -167,6 +198,7 @@ function updateStatus(status) {
 
 function selectBranch(branch) {
     selectedBranchId.value = Number(branch.id)
+    sourcePage.value = 1
 }
 
 function addSourceOrder(order) {
@@ -182,10 +214,72 @@ function removeSourceOrder(order) {
 
 function handleSourceTableAction({ action, row }) {
     if (action === 'view') openSourceOrder(row)
+    if (action === 'approve') reviewSourceOrder(row, 'APPROVED')
+    if (action === 'reject') reviewSourceOrder(row, 'REJECTED')
     if (action === 'transfer') transferOrder.value = row
     if (action === 'edit') openSourceOrder(row, true)
+    if (action === 'history') openTransferHistory(row)
     if (action === 'add') addSourceOrder(row)
     if (action === 'remove') removeSourceOrder(row)
+}
+
+function handleSourcePageChange(url) {
+    if (!url) return
+
+    const parsed = new URL(url, window.location.origin)
+    sourcePage.value = Math.max(1, Number(parsed.searchParams.get('source_page') || 1))
+}
+
+async function reviewSourceOrder(order, reviewStatus) {
+    const approved = reviewStatus === 'APPROVED'
+    const result = await confirmModalAction({
+        mode: approved ? 'update' : 'delete',
+        entityName: 'Orden de compra',
+        title: approved ? `Aprobar ${order.folio}` : `Rechazar ${order.folio}`,
+        confirmText: approved ? 'Aprobar orden' : 'Rechazar orden',
+        message: approved
+            ? 'La orden quedará disponible para transferirse y agregarse a una Orden de compra general.'
+            : 'La orden no podrá transferirse ni agregarse a una Orden de compra general.',
+    })
+
+    if (!result.isConfirmed) return
+
+    router.put(
+        route('inventory.branches.reports.purchase-orders.source-orders.review', {
+            branch: props.currentBranch.id,
+            purchaseOrder: order.id,
+        }),
+        { review_status: reviewStatus },
+        getModalRequestOptions({
+            mode: approved ? 'update' : 'delete',
+            entityName: 'Orden de compra',
+            successTitle: approved ? 'Orden aprobada correctamente' : 'Orden rechazada correctamente',
+            errorTitle: 'No se pudo revisar la orden',
+            errorMessage: 'Actualiza la página y verifica que la orden siga disponible.',
+        }),
+    )
+}
+
+async function openTransferHistory(order) {
+    if (!order?.id || loadingSourceOrder.value) return
+    loadingSourceOrder.value = true
+
+    try {
+        const { data } = await window.axios.get(
+            route('inventory.branches.reports.purchase-orders.source-orders.show', {
+                branch: props.currentBranch.id,
+                purchaseOrder: order.id,
+            }),
+        )
+        transferHistoryOrder.value = data
+    } catch {
+        ErrorAlert({
+            title: 'No se pudo abrir el historial',
+            message: 'Actualiza la página y vuelve a intentarlo.',
+        })
+    } finally {
+        loadingSourceOrder.value = false
+    }
 }
 
 function handleGeneralTableAction({ action, row }) {
@@ -306,10 +400,11 @@ async function generateGeneralOrder() {
 
                 <GlobalTable
                     :items="sourceRows"
-                    :pagination="{}"
+                    :pagination="sourcePagination"
                     :loading="false"
                     v-bind="sourceTableConfig"
                     @action="handleSourceTableAction"
+                    @page-change="handleSourcePageChange"
                 />
             </FormPanel>
 
@@ -415,6 +510,12 @@ async function generateGeneralOrder() {
             :context-branch-id="currentBranch.id"
             @close="transferOrder = null"
             @transferred="transferOrder = null"
+        />
+
+        <PurchaseOrderTransferHistoryModal
+            v-if="transferHistoryOrder"
+            :order="transferHistoryOrder"
+            @close="transferHistoryOrder = null"
         />
 
         <PendingPurchaseOrderEditModal

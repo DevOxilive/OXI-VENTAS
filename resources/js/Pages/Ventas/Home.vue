@@ -4,6 +4,7 @@ import { router, useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
 import { GlobalToolbar } from "@/Components/Toolbars";
+import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import InputField from "@/Components/Forms/InputField.vue";
 import EmptyStateCard from "@/Components/Cards/EmptyStateCard.vue";
 import InfoCard from "@/Components/Cards/InfoCard.vue";
@@ -1098,28 +1099,27 @@ function showExpirationAlert(alerts) {
   const summary = topExpirationAlerts.value
     .map((alert) => {
       const days = Number(alert.days_to_expire ?? 999);
-      const urgencyColor = days <= 3 ? "#e60012" : days <= 7 ? "#c81e2b" : "#8f1d2c";
       const badgeLabel = escapeHtml(expirationBadgeLabel(alert));
       const productName = escapeHtml(alert.product_name || "Producto sin nombre");
       const lot = escapeHtml(alert.lot_number || "Sin lote");
       const quantity = Number(alert.quantity || 0).toFixed(0);
       const expirationDate = escapeHtml(alert.formatted_expiration_date || alert.expiration_date || "Fecha no disponible");
 
-      return `<article style="margin:0 0 10px;padding:12px;border:1px solid #704047;border-radius:14px;background:#1d1315;text-align:left;">
+      return `<article style="margin:0 0 10px;padding:12px;border:1px solid color-mix(in srgb, var(--primary) 34%, var(--secondary));border-radius:14px;background:var(--secondary);color:var(--text);text-align:left;">
         <div style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;">
-          <strong style="color:#fff0f1;font-size:14px;line-height:1.35;">${productName}</strong>
-          <span style="flex:0 0 auto;border-radius:999px;background:${urgencyColor};color:#fff;padding:4px 8px;font-size:11px;font-weight:700;white-space:nowrap;">${badgeLabel}</span>
+          <strong style="color:var(--text);font-size:14px;line-height:1.35;">${productName}</strong>
+          <span style="flex:0 0 auto;border-radius:999px;background:var(--primary);color:var(--text-on-primary);padding:4px 8px;font-size:11px;font-weight:700;white-space:nowrap;">${badgeLabel}</span>
         </div>
-        <p style="margin:7px 0 0;color:#d6b8bd;font-size:12px;line-height:1.4;">Lote ${lot} · ${quantity} unidades</p>
-        <p style="margin:3px 0 0;color:#b9969c;font-size:12px;line-height:1.4;">Caduca: ${expirationDate}</p>
+        <p style="margin:7px 0 0;color:var(--text-muted);font-size:12px;line-height:1.4;">Lote ${lot} · ${quantity} unidades</p>
+        <p style="margin:3px 0 0;color:var(--text-subtle);font-size:12px;line-height:1.4;">Caduca: ${expirationDate}</p>
       </article>`;
     })
     .join("");
 
   BlockingWarningAlert({
     title: "Lotes próximos a vencer",
-    message: `<div style="margin:0 0 12px;color:#c9aaaf;font-size:13px;line-height:1.45;">Revisa estos lotes antes de continuar con la venta.</div><div style="max-height:300px;overflow-y:auto;padding-right:4px;">${summary}</div><p style="margin:12px 0 0;color:#b9969c;font-size:12px;line-height:1.4;">La campana permanecerá disponible arriba para consultarlos durante la venta.</p>`,
-    confirmButtonColor: "#e60012",
+    message: `<div style="margin:0 0 12px;color:var(--text-muted);font-size:13px;line-height:1.45;">Revisa estos lotes antes de continuar con la venta.</div><div style="max-height:300px;overflow-y:auto;padding-right:4px;">${summary}</div><p style="margin:12px 0 0;color:var(--text-subtle);font-size:12px;line-height:1.4;">La campana permanecerá disponible arriba para consultarlos durante la venta.</p>`,
+    confirmButtonColor: "var(--primary)",
   });
 }
 
@@ -1414,20 +1414,27 @@ function submitSale() {
         </div>
       </div>
 
-      <div class="relative">
-        <div
+      <GlobalModal
           v-if="expirationAlertPanelOpen"
-          class="absolute right-0 top-0 z-30 w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-secondary bg-background shadow-2xl"
-        >
-          <div class="border-b border-secondary bg-primary px-4 py-4 text-white">
+          title="Alertas de caducidad"
+          size="md"
+          height="auto"
+          :columns="1"
+          :show-header="false"
+          :show-footer="false"
+          :show-save="false"
+          @close="closeExpirationAlerts"
+      >
+        <template #header="{ close }">
+          <header class="border-b border-secondary bg-primary px-5 py-4 text-white">
             <div class="flex items-start justify-between gap-3">
               <div>
                 <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-white/80">
                   Alertas de caducidad
                 </p>
-                <h3 class="mt-1 text-lg font-black">
+                <h2 class="mt-1 text-lg font-black">
                   {{ expirationAlertCount ? `${expirationAlertCount} lote(s) por atender` : "Sin alertas" }}
-                </h3>
+                </h2>
                 <p v-if="urgentExpirationAlertCount" class="mt-1 text-xs text-white/80">
                   {{ urgentExpirationAlertCount }} urgente(s) en 7 dias o menos.
                 </p>
@@ -1436,12 +1443,14 @@ function submitSale() {
               <button
                 type="button"
                 class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
-                @click="closeExpirationAlerts"
+                aria-label="Cerrar alertas de caducidad"
+                @click="close"
               >
                 <span class="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
-          </div>
+          </header>
+        </template>
 
           <div v-if="expirationAlertCount" class="max-h-[360px] space-y-2 overflow-y-auto bg-secondary p-3">
             <article
@@ -1485,8 +1494,7 @@ function submitSale() {
               No hay lotes por caducar en esta sucursal.
             </p>
           </div>
-        </div>
-      </div>
+      </GlobalModal>
 
       <div class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_480px]">
         <section class="rounded-2xl border border-secondary bg-background p-4 shadow-sm">

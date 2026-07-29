@@ -233,13 +233,13 @@ class PhysicalCountController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'branch_id' => ['required', 'exists:branches,id'],
+            'branch' => ['required', 'string', 'exists:branches,slug'],
             'name' => ['required', 'string', 'max:255'],
             'participant_ids' => ['required', 'array', 'min:1'],
             'participant_ids.*' => ['exists:users,id'],
         ]);
 
-        $branch = Branch::findOrFail($data['branch_id']);
+        $branch = $this->resolveBranch($data['branch']);
         $nextId = (PhysicalCount::max('id') ?? 0) + 1;
         $folio = 'AUD-'.now()->format('Ymd').'-'.str_pad($nextId, 4, '0', STR_PAD_LEFT);
 
@@ -271,7 +271,7 @@ class PhysicalCountController extends Controller
 
     public function update(Request $request, PhysicalCount $physicalCount)
     {
-        $this->abortIfCannotManageAudit($request, $physicalCount);
+        $this->abortUnless($request, 'audits.physical-counts.participants');
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -299,7 +299,7 @@ class PhysicalCountController extends Controller
 
     public function destroy(Request $request, PhysicalCount $physicalCount)
     {
-        $this->abortIfCannotManageAudit($request, $physicalCount);
+        $this->abortUnless($request, 'audits.physical-counts.delete');
 
         if ($physicalCount->status !== 'open') {
             return back()->withErrors([
@@ -428,7 +428,7 @@ class PhysicalCountController extends Controller
     public function updateEntry(Request $request, PhysicalCountEntry $entry)
     {
         $entry->load('physicalCount');
-        $this->abortIfCannotManageAudit($request, $entry->physicalCount);
+        $this->abortIfCannotCapture($request, $entry->physicalCount);
 
         if (! $this->canCaptureInStatus($entry->physicalCount)) {
             return back()->withErrors([
@@ -465,7 +465,7 @@ class PhysicalCountController extends Controller
     public function destroyEntry(Request $request, PhysicalCountEntry $entry)
     {
         $entry->load('physicalCount');
-        $this->abortIfCannotManageAudit($request, $entry->physicalCount);
+        $this->abortUnless($request, 'audits.physical-counts.delete');
 
         if (! $this->canCaptureInStatus($entry->physicalCount)) {
             return back()->withErrors([
@@ -675,7 +675,7 @@ class PhysicalCountController extends Controller
 
     public function close(Request $request, PhysicalCount $physicalCount)
     {
-        $this->abortIfCannotManageAudit($request, $physicalCount);
+        $this->abortUnless($request, 'audits.physical-counts.close');
 
         if (! in_array($physicalCount->status, ['open', 'applied'], true)) {
             return back()->withErrors([
@@ -696,7 +696,7 @@ class PhysicalCountController extends Controller
 
     public function reopen(Request $request, PhysicalCount $physicalCount)
     {
-        $this->abortIfCannotManageAudit($request, $physicalCount);
+        $this->abortUnless($request, 'audits.physical-counts.close');
 
         if (! in_array($physicalCount->status, ['closed', 'applied'], true)) {
             return back()->withErrors([
@@ -729,7 +729,7 @@ class PhysicalCountController extends Controller
 
     public function applyAdjustments(Request $request, PhysicalCount $physicalCount)
     {
-        $this->abortIfCannotManageAudit($request, $physicalCount);
+        $this->abortUnless($request, 'audits.physical-counts.apply');
 
         if (! in_array($physicalCount->status, ['closed', 'applied'], true)) {
             return back()->withErrors([
@@ -864,7 +864,7 @@ class PhysicalCountController extends Controller
 
     public function exportPdf(Request $request, PhysicalCount $physicalCount)
     {
-        $this->abortIfCannotManageAudit($request, $physicalCount);
+        abort_unless($this->canViewReports($request), 403, 'No tienes permisos para exportar reportes de auditoría.');
 
         $physicalCount->load(['branch', 'creator', 'snapshot.items']);
         $entriesQuery = $this->currentRoundEntriesQuery($physicalCount);
@@ -895,7 +895,7 @@ class PhysicalCountController extends Controller
 
     public function exportExcel(Request $request, PhysicalCount $physicalCount)
     {
-        $this->abortIfCannotManageAudit($request, $physicalCount);
+        abort_unless($this->canViewReports($request), 403, 'No tienes permisos para exportar reportes de auditoría.');
 
         return Excel::download(
             new PhysicalCountExport($physicalCount),
@@ -1132,9 +1132,10 @@ class PhysicalCountController extends Controller
 
     private function canManageAudits(?User $user): bool
     {
-        return (bool) ($user?->hasPermission('audits.physical-counts.view')
-            || $user?->hasPermission('audits.physical-counts.create')
-            || $user?->hasPermission('audits.physical-counts.update')
+        return (bool) ($user?->hasPermission('audits.physical-counts.create')
+            || $user?->hasPermission('audits.physical-counts.close')
+            || $user?->hasPermission('audits.physical-counts.participants')
+            || $user?->hasPermission('audits.physical-counts.apply')
             || $user?->hasPermission('audits.physical-counts.delete'));
     }
 
@@ -1182,10 +1183,6 @@ class PhysicalCountController extends Controller
     {
         $user = $request->user();
 
-        if ($this->canManageAudits($user)) {
-            return;
-        }
-
         abort_unless(
             $user?->hasPermission('audits.physical-counts.count') && $this->isAssignedParticipant($user, $physicalCount),
             403,
@@ -1193,10 +1190,10 @@ class PhysicalCountController extends Controller
         );
     }
 
-    private function abortIfCannotManageAudit(Request $request, PhysicalCount $physicalCount): void
+    private function abortUnless(Request $request, string $permission): void
     {
         abort_unless(
-            $this->canManageAudits($request->user()),
+            $request->user()?->hasPermission($permission),
             403,
             'No tienes permisos para administrar esta auditoría.'
         );

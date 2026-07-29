@@ -1,4 +1,4 @@
-const VERSION = 'oxi-ventas-pwa-v7';
+const VERSION = 'oxi-ventas-pwa-v8';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -7,10 +7,11 @@ const PRECACHE_URLS = [
     '/manifest.webmanifest',
     '/favicon.ico',
     '/icons/icon-192.png',
-    '/icons/icon-512.png',
-    '/icons/maskable-192.png',
-    '/icons/maskable-512.png',
-    '/icons/apple-touch-icon.png',
+];
+
+const CACHEABLE_DESTINATIONS = new Set(['font']);
+const CACHEABLE_PATHS = [
+    /^\/icons\/(?:icon-192|apple-touch-icon)\.png$/,
 ];
 
 self.addEventListener('install', (event) => {
@@ -62,13 +63,15 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    if (!['style', 'script', 'image', 'font', 'worker'].includes(request.destination)) {
+    if (url.pathname.startsWith('/build/')) {
         return;
     }
 
-    if (url.pathname.startsWith('/build/')) {
-        event.respondWith(fetch(request));
+    const shouldUseRuntimeCache =
+        CACHEABLE_DESTINATIONS.has(request.destination)
+        || CACHEABLE_PATHS.some((pattern) => pattern.test(url.pathname));
 
+    if (!shouldUseRuntimeCache) {
         return;
     }
 
@@ -83,7 +86,9 @@ self.addEventListener('fetch', (event) => {
                     if (response && response.ok) {
                         const clone = response.clone();
 
-                        caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, clone));
+                        caches.open(RUNTIME_CACHE)
+                            .then((cache) => cache.put(request, clone))
+                            .catch(() => {});
                     }
 
                     return response;

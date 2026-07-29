@@ -5,6 +5,7 @@ export function getPrinterTicketsToolbarConfig({
   subtitle = "Ajusta el ticket con una plantilla visual y libre para impresion.",
 } = {}) {
   return {
+    icon: "receipt_long",
     title,
     subtitle,
     showSearch: false,

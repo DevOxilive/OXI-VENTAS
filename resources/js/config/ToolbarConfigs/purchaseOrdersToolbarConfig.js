@@ -7,6 +7,7 @@ export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, mode =
     const [title, subtitle] = headings[mode] || headings.view
 
     return {
+        icon: mode === 'tracking' ? 'local_shipping' : mode === 'history' ? 'history' : 'shopping_cart',
         title,
         subtitle,
         backButton: true,

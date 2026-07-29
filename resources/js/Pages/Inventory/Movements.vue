@@ -7,6 +7,7 @@ import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
+import { GlobalToolbar } from '@/Components/Toolbars'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { getInventoryMovementModalConfig } from '@/config/ModalConfigs/inventoryMovementModalConfig'
@@ -84,24 +85,17 @@ function submit() {
 
 <template>
     <div class="min-h-screen rounded-3xl bg-background p-6">
-        <div class="flex items-center justify-between mb-6">
-            <div>
-                <h1 class="text-2xl font-bold text-text">
-                    Movimientos de inventario
-                </h1>
-
-                <p class="mt-1 text-sm text-text opacity-70">
-                    Entradas, salidas, robos, danos y caducidades
-                </p>
-            </div>
-
-            <button
-                class="rounded-xl border border-primary bg-primary px-5 py-3 text-sm font-medium text-white transition hover:brightness-110"
-                @click="openModal"
-            >
-                Nuevo movimiento
-            </button>
-        </div>
+        <GlobalToolbar
+            icon="swap_horiz"
+            title="Movimientos de inventario"
+            subtitle="Entradas, salidas, robos, daños y caducidades."
+            class="mb-6"
+            :show-search="false"
+            :show-records-per-page="false"
+            :show-counter="false"
+            :actions="[{ id: 'create', label: 'Nuevo movimiento', icon: 'add', variant: 'primary' }]"
+            @action="openModal"
+        />
 
         <GlobalTable
             :items="movements"

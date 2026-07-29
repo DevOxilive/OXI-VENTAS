@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
-import GlobalCard from '@/Components/Cards/GlobalCard.vue'
+import { GlobalToolbar } from '@/Components/Toolbars'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales'
@@ -13,6 +13,7 @@ import TimeField from '@/Components/Forms/TimeField.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import { usePermissions } from '@/Composables/usePermissions'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
+import { getAttendanceSchedulesToolbarConfig } from '@/config/ToolbarConfigs/attendanceSchedulesToolbarConfig'
 
 defineOptions({ layout: AdminLayout })
 
@@ -24,6 +25,9 @@ let unsubscribeSchedules = null
 const showModal = ref(false)
 const modalMode = ref('create')
 const selectedSchedule = ref(null)
+const toolbarConfig = computed(() => getAttendanceSchedulesToolbarConfig({
+  canCreate: can('attendance.schedules.create'),
+}))
 
 const days = [{ key: 'monday', label: 'Lunes' }, { key: 'tuesday', label: 'Martes' }, { key: 'wednesday', label: 'Miercoles' }, { key: 'thursday', label: 'Jueves' }, { key: 'friday', label: 'Viernes' }, { key: 'saturday', label: 'Sabado' }, { key: 'sunday', label: 'Domingo' }]
 const daily = () => ({})
@@ -164,6 +168,10 @@ function handleTableAction({ action, row }) {
   if (action === 'delete') deleteSchedule(row)
 }
 
+function handleToolbarAction(action) {
+  if (action === 'create') openCreateModal()
+}
+
 onMounted(() => {
   unsubscribeSchedules = subscribePrivateRealtime(
     REALTIME_CHANNELS.user(page.props.auth.user.id),
@@ -181,15 +189,7 @@ onBeforeUnmount(() => unsubscribeSchedules?.())
 
 <template>
   <PageLayout>
-    <GlobalCard title="Horarios" icon="schedule" :clickable="false" class="p-5 md:p-6">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <p class="text-sm text-text opacity-70">Configura jornadas y tolerancias para el registro de asistencia.</p>
-        <AppButton v-if="can('attendance.schedules.create')" class="shrink-0" @click="openCreateModal">
-          <span class="material-symbols-outlined mr-2 text-[18px]">add</span>
-          Crear horario
-        </AppButton>
-      </div>
-    </GlobalCard>
+    <GlobalToolbar v-bind="toolbarConfig" @action="handleToolbarAction" />
 
     <GlobalTable
       :items="schedules"

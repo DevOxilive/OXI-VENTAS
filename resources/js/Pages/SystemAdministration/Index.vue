@@ -62,6 +62,7 @@ onBeforeUnmount(() => {
         <PageLayout>
             <template #toolbar>
                 <GlobalToolbar
+                    icon="admin_panel_settings"
                     title="Centro de Administración del Sistema"
                     subtitle="Seguridad, trazabilidad, recuperación y control de accesos en un solo lugar."
                     :show-search="false"

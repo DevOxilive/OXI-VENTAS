@@ -12,7 +12,7 @@ import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
 import { usePermissions } from '@/Composables/usePermissions'
-import { getAttendanceFiltersToolbarConfig } from '@/config/ToolbarConfigs/attendanceToolbarConfig'
+import { getAttendanceRegistrationToolbarConfig } from '@/config/ToolbarConfigs/attendanceToolbarConfig'
 
 defineOptions({ layout: AdminLayout })
 
@@ -28,6 +28,7 @@ const props = defineProps({
     canRequestCorrection: Boolean,
     canReviewCorrections: Boolean,
     passkeyEnabled: Boolean,
+    registeredTypesToday: { type: Array, default: () => [] },
 })
 
 const page = usePage()
@@ -38,23 +39,43 @@ const registering = ref(false)
 let unsubscribeAttendance = null
 let unsubscribeUserChanged = null
 let filterTimer = null
+const attendanceRoutePrefix = computed(() => {
+    const currentRoute = typeof route === 'function' ? route().current() : null
+
+    return currentRoute?.startsWith('ventas.attendance')
+        ? 'ventas.attendance'
+        : 'human-resources.attendance'
+})
 const filters = reactive({
     from: props.filters.from || '', to: props.filters.to || '', branch: props.filters.branch || '',
-    department: props.filters.department || '', employee: props.filters.employee || '', search: props.filters.search || '', type: props.filters.type || '',
+    department: props.filters.department || '', search: props.filters.search || '', type: props.filters.type || '',
 })
 const attendanceType = ref('check_in')
+const registeredTypesTodaySet = computed(() => new Set(props.registeredTypesToday || []))
+const attendanceTypeOptions = computed(() => (props.options.types || []).map((option) => {
+    const alreadyRegistered = registeredTypesTodaySet.value.has(option.value)
+
+    return {
+        ...option,
+        disabled: alreadyRegistered,
+        label: alreadyRegistered ? `${option.label} (registrado hoy)` : option.label,
+    }
+}))
+const availableAttendanceTypeOptions = computed(() =>
+    attendanceTypeOptions.value.filter((option) => !option.disabled),
+)
+const hasAvailableAttendanceTypes = computed(() => availableAttendanceTypeOptions.value.length > 0)
 const passkeyReady = ref(props.passkeyEnabled)
 const biometricActionLabel = computed(() => (
     passkeyReady.value ? 'Agregar o cambiar Face ID/huella' : 'Configurar Face ID o huella'
 ))
 const selfie = ref(null)
 const evidenceRecord = ref(null)
-const attendanceFiltersToolbarConfig = computed(() => getAttendanceFiltersToolbarConfig({
+const attendanceRegistrationToolbarConfig = computed(() => getAttendanceRegistrationToolbarConfig({
     filters,
     types: props.options.types || [],
     branches: props.options.branches || [],
     departments: props.options.departments || [],
-    employees: props.options.employees || [],
     canManage: props.canManage,
 }))
 
@@ -82,12 +103,20 @@ watch(filters, () => {
     clearTimeout(filterTimer)
     filterTimer = setTimeout(() => {
         router.get(
-            route('human-resources.attendance.index'),
+            route(`${attendanceRoutePrefix.value}.index`),
             { ...filters },
             { preserveState: true, preserveScroll: true, replace: true },
         )
     }, 350)
 }, { deep: true })
+
+watch(availableAttendanceTypeOptions, (options) => {
+    if (options.some((option) => option.value === attendanceType.value)) {
+        return
+    }
+
+    attendanceType.value = options[0]?.value || ''
+}, { immediate: true })
 
 function pageChange(url) { router.visit(url, { preserveScroll: true, preserveState: true }) }
 
@@ -113,7 +142,7 @@ async function registerAttendance() {
             return
         }
         if (!location) throw new Error('Activa y permite la ubicación precisa para registrar asistencia dentro del perímetro de tu sucursal.')
-        router.post(route('human-resources.attendance.store'), {
+        router.post(route(`${attendanceRoutePrefix.value}.store`), {
             type: attendanceType.value,
             latitude: location?.latitude ?? null,
             longitude: location?.longitude ?? null,
@@ -124,7 +153,10 @@ async function registerAttendance() {
         }, {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => ToastAlert({ title: 'Asistencia registrada correctamente' }),
+            onSuccess: () => {
+                selfie.value = null
+                ToastAlert({ title: 'Asistencia registrada correctamente' })
+            },
             onError: (errors) => ErrorAlert({ title: 'No fue posible registrar la asistencia', message: Object.values(errors || {})[0] || 'Revisa los datos e inténtalo nuevamente.' }),
         })
     } catch (error) {
@@ -229,7 +261,7 @@ onMounted(() => {
     unsubscribeAttendance = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.attendanceChanged,
-        () => router.reload({ only: ['records', 'dashboard'], preserveScroll: true, preserveState: true }),
+        () => router.reload({ only: ['records', 'dashboard', 'registeredTypesToday'], preserveScroll: true, preserveState: true }),
     )
     unsubscribeUserChanged = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
@@ -241,7 +273,7 @@ onMounted(() => {
                 only: [
                     'records', 'dashboard', 'filters', 'options', 'canViewAttendance',
                     'canManage', 'canViewEvidence', 'canRegister', 'canRequestCorrection',
-                    'canReviewCorrections', 'passkeyEnabled',
+                    'canReviewCorrections', 'passkeyEnabled', 'registeredTypesToday',
                 ],
                 preserveScroll: true,
                 preserveState: true,
@@ -259,25 +291,24 @@ onBeforeUnmount(() => {
 <template>
     <PageLayout>
         <GlobalToolbar
-            title="Sistema de Asistencias"
-            subtitle="Registra y consulta la asistencia del personal con validación del dispositivo."
-            :show-search="false"
-            :show-records-per-page="false"
-            :show-counter="false"
+            v-bind="attendanceRegistrationToolbarConfig"
+            :search="filters.search"
+            @update:search="filters.search = $event"
+            @update:filter="handleAttendanceFilter"
         >
             <template #actions>
                 <div v-if="canRegister || canExportExcel || canExportPdf" class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
                     <div v-if="canRegister" class="min-w-48">
-                        <SelectField v-model="attendanceType" hide-label field="attendance-type" :options="options.types" />
+                        <SelectField v-model="attendanceType" hide-label field="attendance-type" :options="attendanceTypeOptions" :disabled="!hasAvailableAttendanceTypes" />
                     </div>
-                    <AppButton v-if="canRegister" as="label" variant="secondary" class="h-11 cursor-pointer">
+                    <AppButton v-if="canRegister && hasAvailableAttendanceTypes" as="label" variant="secondary" class="h-11 cursor-pointer">
                         <span class="material-symbols-outlined mr-2 text-lg">photo_camera</span>
                         {{ selfie ? 'Foto lista' : 'Tomar foto de asistencia' }}
                         <input class="sr-only" type="file" accept="image/jpeg,image/png,image/webp" capture="user" @change="selfie = $event.target.files?.[0] || null">
                     </AppButton>
-                    <AppButton v-if="canRegister" :disabled="registering" @click="registerAttendance">
+                    <AppButton v-if="canRegister" :disabled="registering || !hasAvailableAttendanceTypes" @click="registerAttendance">
                         <span class="material-symbols-outlined mr-2 text-[19px]">fingerprint</span>
-                        {{ registering ? 'Validando dispositivo...' : 'Registrar asistencia' }}
+                        {{ !hasAvailableAttendanceTypes ? 'Asistencia del dia completa' : registering ? 'Validando dispositivo...' : 'Registrar asistencia' }}
                     </AppButton>
                     <AppButton v-if="canRegister" :disabled="registering" variant="secondary" @click="registerPasskey">
                         <span class="material-symbols-outlined mr-2 text-[19px]">face</span>
@@ -299,13 +330,6 @@ onBeforeUnmount(() => {
             <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard v-for="([label, value, tone]) in metricCards" :key="label" :label="label" :value="value" :tone="tone" />
             </section>
-
-            <GlobalToolbar
-                v-bind="attendanceFiltersToolbarConfig"
-                :search="filters.search"
-                @update:search="filters.search = $event"
-                @update:filter="handleAttendanceFilter"
-            />
 
             <GlobalTable
                 :items="records.data || []"

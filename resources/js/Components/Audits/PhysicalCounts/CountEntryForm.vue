@@ -1,12 +1,14 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useForm } from '@inertiajs/vue3'
-import AuditBatchModal from '@/Components/Audits/PhysicalCounts/AuditBatchModal.vue'
 
-import {
-    ErrorAlert,
-    ToastAlert,
-} from '@/Components/Modales/UniversalActionModal'
+import AuditBatchModal from '@/Components/Audits/PhysicalCounts/AuditBatchModal.vue'
+import FormPanel from '@/Components/Cards/FormPanel.vue'
+import AppButton from '@/Components/Buttons/AppButton.vue'
+import InputField from '@/Components/Forms/InputField.vue'
+import SelectField from '@/Components/Forms/SelectField.vue'
+import TextareaField from '@/Components/Forms/TextareaField.vue'
+import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
 
 const props = defineProps({
     physicalCountId: {
@@ -38,6 +40,19 @@ const form = useForm({
 const showCreateBatch = ref(false)
 const pendingLotNumber = ref('')
 
+const batchOptions = computed(() =>
+    (props.product?.batches || []).map((batch) => ({
+        value: batch.id,
+        label: batchOptionLabel(batch),
+    })),
+)
+const countedQuantity = computed(() => Number(form.counted_quantity || 0))
+const damagedQuantity = computed(() => Number(form.damaged_quantity || 0))
+const expiredQuantity = computed(() => Number(form.expired_quantity || 0))
+const invalidQuantities = computed(() =>
+    damagedQuantity.value + expiredQuantity.value > countedQuantity.value,
+)
+
 watch(
     () => props.product,
     (product) => {
@@ -53,21 +68,13 @@ watch(
 
         form.product_batch_id = pendingBatch?.id ?? ''
     },
-    { immediate: true }
+    { immediate: true },
 )
-
-const countedQuantity = computed(() => Number(form.counted_quantity || 0))
-const damagedQuantity = computed(() => Number(form.damaged_quantity || 0))
-const expiredQuantity = computed(() => Number(form.expired_quantity || 0))
-
-const invalidQuantities = computed(() => {
-    return damagedQuantity.value + expiredQuantity.value > countedQuantity.value
-})
 
 function batchOptionLabel(batch) {
     const parts = [
         `Lote: ${batch.lot_number ?? 'Sin lote'}`,
-        `Caduca: ${batch.expiration_date ?? 'Sin fecha'}`,
+        `Caducidad: ${batch.expiration_date ?? 'Sin fecha'}`,
     ]
 
     if (props.canViewStock) {
@@ -89,149 +96,105 @@ function submit() {
         onSuccess: () => {
             form.reset()
             pendingLotNumber.value = ''
-            ToastAlert({
-                title: 'Conteo guardado correctamente',
-            })
+            ToastAlert({ title: 'Conteo guardado correctamente' })
         },
         onError: () => {
             ErrorAlert({
-                title: 'Error al guardar conteo',
-                message: 'No fue posible registrar las cantidades del conteo.',
+                title: 'Error al guardar el conteo',
+                message: 'No fue posible registrar las cantidades capturadas.',
             })
-        }
+        },
     })
 }
 </script>
 
 <template>
-    <div class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-        <h2 class="text-base font-semibold text-gray-900">
-            Captura del producto escaneado
-        </h2>
+    <FormPanel
+        title="Captura del producto seleccionado"
+        description="Registra las cantidades físicas encontradas y el lote correspondiente."
+        panel-class="bg-background"
+    >
+        <template #header>
+            <AppButton variant="secondary" @click="showCreateBatch = true">
+                <span class="material-symbols-outlined mr-2 text-[18px]">add_box</span>
+                Crear lote
+            </AppButton>
+        </template>
 
-        <p class="mt-0.5 text-xs text-gray-500">
-            Registra las cantidades fisicas encontradas para el producto seleccionado.
-        </p>
-
-        <div v-if="product" class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <label class="block text-xs font-semibold text-gray-700">
-                    Lote / caducidad
-                </label>
-
-                <button
-                    type="button"
-                    class="h-8 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                    @click="showCreateBatch = true"
-                >
-                    Crear lote
-                </button>
-            </div>
-
-            <select v-model="form.product_batch_id" class="mt-2 h-9 w-full rounded-md border-gray-300 text-xs">
-                <option value="">
-                    Selecciona un lote
-                </option>
-
-                <option v-for="batch in product.batches || []" :key="batch.id" :value="batch.id">
-                    {{ batchOptionLabel(batch) }}
-                </option>
-            </select>
-
-            <p v-if="product && !form.product_batch_id" class="mt-1.5 text-xs text-amber-600">
-                Selecciona el lote antes de guardar el conteo.
-            </p>
-        </div>
-
-        <form class="mt-3" @submit.prevent="submit">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-gray-700">
-                        Cantidad contada
-                    </label>
-
-                    <input
-                        v-model="form.counted_quantity"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Ej. 10"
-                        class="h-9 w-full rounded-md border-gray-300 text-xs"
-                    >
-                </div>
-
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-gray-700">
-                        Cantidad danada
-                    </label>
-
-                    <input
-                        v-model="form.damaged_quantity"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Ej. 2"
-                        class="h-9 w-full rounded-md border-gray-300 text-xs"
-                    >
-                </div>
-
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-gray-700">
-                        Cantidad caducada
-                    </label>
-
-                    <input
-                        v-model="form.expired_quantity"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Ej. 1"
-                        class="h-9 w-full rounded-md border-gray-300 text-xs"
-                    >
-                </div>
-            </div>
-
-            <p
-                v-if="invalidQuantities"
-                class="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
-            >
-                La suma de danados y caducados no puede ser mayor a la cantidad contada.
-            </p>
-
-            <textarea
-                v-model="form.notes"
-                placeholder="Observaciones del conteo"
-                rows="2"
-                class="mt-3 w-full rounded-md border-gray-300 text-xs"
+        <form class="space-y-4" @submit.prevent="submit">
+            <SelectField
+                v-model="form.product_batch_id"
+                label="Lote y caducidad"
+                field="product_batch_id"
+                :options="batchOptions"
+                placeholder="Selecciona un lote"
+                :error="form.errors.product_batch_id"
             />
 
-            <p v-if="form.errors.product_batch_id" class="mt-1.5 text-xs text-red-600">
-                {{ form.errors.product_batch_id }}
-            </p>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <InputField
+                    v-model="form.counted_quantity"
+                    label="Cantidad contada"
+                    field="counted_quantity"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Ej. 10"
+                    :error="form.errors.counted_quantity"
+                />
 
-            <p v-if="form.errors.counted_quantity" class="mt-1.5 text-xs text-red-600">
-                {{ form.errors.counted_quantity }}
-            </p>
+                <InputField
+                    v-model="form.damaged_quantity"
+                    label="Cantidad dañada"
+                    field="damaged_quantity"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Ej. 2"
+                    :error="form.errors.damaged_quantity"
+                />
 
-            <p v-if="form.errors.damaged_quantity" class="mt-1.5 text-xs text-red-600">
-                {{ form.errors.damaged_quantity }}
-            </p>
+                <InputField
+                    v-model="form.expired_quantity"
+                    label="Cantidad caducada"
+                    field="expired_quantity"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Ej. 1"
+                    :error="form.errors.expired_quantity"
+                />
+            </div>
 
-            <p v-if="form.errors.expired_quantity" class="mt-1.5 text-xs text-red-600">
-                {{ form.errors.expired_quantity }}
-            </p>
+            <div
+                v-if="invalidQuantities"
+                class="rounded-xl border border-primary bg-secondary px-4 py-3 text-sm text-primary"
+            >
+                La suma de productos dañados y caducados no puede superar la cantidad contada.
+            </div>
 
-            <p v-if="form.errors.status" class="mt-1.5 text-xs text-red-600">
+            <TextareaField
+                v-model="form.notes"
+                label="Observaciones"
+                field="notes"
+                placeholder="Agrega información relevante del conteo."
+                :rows="3"
+                :error="form.errors.notes"
+            />
+
+            <p v-if="form.errors.status" class="text-sm text-primary">
                 {{ form.errors.status }}
             </p>
 
-            <button
-                type="submit"
-                class="mt-3 h-9 rounded-md bg-slate-900 px-4 text-xs font-semibold text-white disabled:opacity-50"
-                :disabled="form.processing || !product || !form.product_batch_id || invalidQuantities"
-            >
-                Guardar conteo
-            </button>
+            <div class="flex justify-end">
+                <AppButton
+                    type="submit"
+                    :disabled="form.processing || !product || !form.product_batch_id || invalidQuantities"
+                >
+                    <span class="material-symbols-outlined mr-2 text-[18px]">save</span>
+                    Guardar conteo
+                </AppButton>
+            </div>
         </form>
 
         <AuditBatchModal
@@ -241,5 +204,5 @@ function submit() {
             @created="handleBatchCreated"
             @close="showCreateBatch = false"
         />
-    </div>
+    </FormPanel>
 </template>

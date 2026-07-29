@@ -13,8 +13,8 @@ export function getAuditBatchModalConfig({
         processing,
         saveButtonText: 'Guardar lote',
         closeButtonText: 'Cancelar',
-        ...modalPresets.workspace,
-        size: 'xl',
+        ...modalPresets.standard,
+        size: 'md',
         alerts: {
             entityName: 'Lote',
             create: {

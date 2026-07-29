@@ -10,6 +10,17 @@ export function getBranchPurchaseOrdersTableConfig({ status = 'GENERATED' } = {}
             {
                 key: 'status_label',
                 label: 'Estado',
+                format: 'badge',
+                formatOptions: {
+                    statusMap: {
+                        Pendiente: 'amber',
+                        Aprobada: 'green',
+                        Rechazada: 'red',
+                        'Por revisar': 'blue',
+                        Completada: 'green',
+                        Cancelada: 'red',
+                    },
+                },
                 subKey: 'inventory_edit_label',
                 subKeyBadge: true,
                 mobileLabel: 'Estado',

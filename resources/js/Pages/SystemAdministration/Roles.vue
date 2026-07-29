@@ -20,7 +20,7 @@ const save = () => router.put(route('system-administration.roles.update', select
     <Head title="Roles y permisos" />
     <AdminLayout>
         <PageLayout>
-            <GlobalToolbar title="Roles y permisos" subtitle="Las autorizaciones se administran por permisos, no por usuarios específicos." :back-button="true" back-label="Centro de Administración" :show-search="false" :show-records-per-page="false" :show-counter="false" @back="router.get(route('system-administration.index'))" />
+            <GlobalToolbar icon="admin_panel_settings" title="Roles y permisos" subtitle="Las autorizaciones se administran por permisos, no por usuarios específicos." :back-button="true" back-label="Centro de Administración" :show-search="false" :show-records-per-page="false" :show-counter="false" @back="router.get(route('system-administration.index'))" />
             <div class="grid gap-4 lg:grid-cols-[20rem_1fr]">
                 <aside class="space-y-2 rounded-2xl border border-secondary bg-background p-3">
                     <AppButton v-for="role in roles" :key="role.id" variant="secondary" block @click="edit(role)">{{ role.name }} ({{ role.permissions.length }})</AppButton>

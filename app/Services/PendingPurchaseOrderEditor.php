@@ -99,6 +99,10 @@ class PendingPurchaseOrderEditor
                 $changes['inventory_edited_at'] = now();
             }
 
+            $changes['review_status'] = PurchaseOrder::REVIEW_PENDING;
+            $changes['reviewed_by'] = null;
+            $changes['reviewed_at'] = null;
+
             $purchaseOrder->update($changes);
 
             return $purchaseOrder->fresh(['branch', 'user', 'items.branchProduct.product']);

@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Vite Prefetch
+    |--------------------------------------------------------------------------
+    |
+    | Keep this disabled by default on the local PWA tunnel. Prefetching every
+    | page chunk can overload low-resource devices and Cloudflare quick tunnels.
+    |
+    */
+
+    'vite_prefetch' => (bool) env('VITE_PREFETCH', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
