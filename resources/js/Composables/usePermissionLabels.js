@@ -5,7 +5,6 @@ const permissionSectionOrder = [
     "human-resources",
     "systems",
     "branches",
-    "purchases",
     "sales",
     "printers",
 ];
@@ -13,6 +12,8 @@ const permissionSectionOrder = [
 const permissionModuleOrder = [
     "dashboard",
     "employees",
+    "departments",
+    "positions",
     "departments",
     "positions",
     "attendance",
@@ -24,12 +25,11 @@ const permissionModuleOrder = [
     "files",
     "inventory.products",
     "inventory.branches",
-    "purchases.purchase-lists",
-    "purchases.general-orders",
+    "inventory.purchase-reports",
+    "inventory.purchase-orders",
     "audits",
     "inventory",
     "sales",
-    "inventory.purchase-reports",
     "systems.tickets",
     "systems.cash-closure-tickets",
     "systems.labels",
@@ -40,7 +40,6 @@ const permissionSectionsMap = {
     "human-resources": "Capital Humano",
     systems: "Sistemas",
     branches: "Sucursales",
-    purchases: "Compras",
     sales: "Ventas",
     printers: "Impresoras",
 };
@@ -98,25 +97,13 @@ const permissionModules = {
         label: "Stock",
         section: "branches",
     },
-    "purchases.purchase-lists": {
-        label: "Listas de compra y Órdenes de compra",
-        section: "purchases",
+    "inventory.purchase-reports": {
+        label: "Listas de compra",
+        section: "branches",
     },
-    "purchases.general-orders.generate": {
-        label: "Órdenes de compra generales · Generar",
-        section: "purchases",
-    },
-    "purchases.general-orders.purchasing": {
-        label: "Órdenes de compra generales · En compra",
-        section: "purchases",
-    },
-    "purchases.general-orders.completed": {
-        label: "Órdenes de compra generales · Completadas",
-        section: "purchases",
-    },
-    "purchases.general-orders": {
-        label: "Órdenes de compra generales",
-        section: "purchases",
+    "inventory.purchase-orders": {
+        label: "Ordenes generales",
+        section: "branches",
     },
     audits: {
         label: "Auditorias",
@@ -152,6 +139,7 @@ const permissionLabels = {
     "employees.update": "Editar empleados",
     "employees.delete": "Eliminar empleados",
 
+<<<<<<<<< Temporary merge branch 1
     "attendance.view": "Ver métricas, filtros y registros de asistencia",
     "attendance.register": "Registrar entrada, comida y salida",
     "attendance.manage": "Ver fotografías y ubicaciones de asistencia",
@@ -224,21 +212,14 @@ const permissionLabels = {
     "audits.physical-counts.apply": "Aplicar auditoría",
     "audits.physical-counts.delete": "Eliminar auditorías",
 
-    "inventory.purchase-reports.view": "Ver listas y órdenes de compra",
-    "inventory.purchase-reports.create": "Crear listas de compra",
-    "inventory.purchase-reports.update": "Editar listas de compra",
-    "inventory.purchase-reports.delete": "Eliminar listas de compra",
+    "inventory.purchase-reports.view": "Ver modulo de listas/reportes de compra",
+    "inventory.purchase-reports.create": "Crear reportes de compra",
+    "inventory.purchase-reports.update": "Editar reportes de compra",
+    "inventory.purchase-reports.delete": "Eliminar reportes de compra",
     "inventory.purchase-orders.view": "Consultar ordenes generales",
     "inventory.purchase-orders.create": "Generar ordenes generales",
     "inventory.purchase-orders.update": "Dar seguimiento a compras",
-    "inventory.purchase-orders.costs": "Consultar y capturar costos de compra",
     "inventory.purchase-orders.history": "Consultar compras completadas",
-    "inventory.purchase-orders.generate.view": "Ver Órdenes de compra",
-    "inventory.purchase-orders.generate.create": "Crear Órdenes de compra generales",
-    "inventory.purchase-orders.generate.update": "Editar Órdenes de compra",
-    "inventory.purchase-orders.generate.transfer": "Transferir Órdenes de compra",
-    "inventory.purchase-orders.purchasing.view": "Ver Órdenes de compra generales",
-    "inventory.purchase-orders.completed.view": "Ver Órdenes de compra generales completadas",
 
     "inventory.view": "Ver modulo de reportes de inventario",
     "inventory.create": "Crear reportes de inventario",
@@ -330,15 +311,8 @@ function getPermissionModule(permissionName = "") {
         return "purchases.general-orders";
     }
 
-    if (
-        permissionName.startsWith("inventory.purchase-orders.purchasing.")
-        || permissionName === "inventory.purchase-orders.costs"
-    ) {
-        return "purchases.general-orders";
-    }
-
-    if (permissionName.startsWith("inventory.purchase-orders.completed.")) {
-        return "purchases.general-orders";
+    if (permissionName.startsWith("inventory.purchase-orders.")) {
+        return "inventory.purchase-orders";
     }
 
     if (permissionName === "audits.physical-counts.reports") {
