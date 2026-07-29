@@ -6,6 +6,7 @@ import PageLayout from "@/Layouts/PageLayout.vue";
 import { GlobalToolbar } from "@/Components/Toolbars";
 import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import InputField from "@/Components/Forms/InputField.vue";
+import SelectField from "@/Components/Forms/SelectField.vue";
 import EmptyStateCard from "@/Components/Cards/EmptyStateCard.vue";
 import InfoCard from "@/Components/Cards/InfoCard.vue";
 import MetricCard from "@/Components/Cards/MetricCard.vue";
@@ -94,9 +95,9 @@ const availablePrinters = ref([]);
 const selectedPrinterName = ref(getStoredPrinterName());
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para imprimir tickets.");
-let printerRetryInterval = null;
 let searchDebounceTimer = null;
 let searchRequestId = 0;
+let searchAbortController = null;
 
 const saleForm = useForm({
   branch_id: props.currentBranch?.id ?? "",
@@ -143,8 +144,6 @@ watch(
 onMounted(() => {
   if (!props.selectorMode) {
     focusSearch();
-    initializePrinterBridge({ silent: true });
-    window.addEventListener("focus", handleWindowFocus);
   }
 });
 
@@ -154,12 +153,8 @@ onBeforeUnmount(() => {
     searchDebounceTimer = null;
   }
 
-  if (printerRetryInterval) {
-    window.clearInterval(printerRetryInterval);
-    printerRetryInterval = null;
-  }
-
-  window.removeEventListener("focus", handleWindowFocus);
+  searchAbortController?.abort();
+  searchAbortController = null;
 });
 
 watch(
@@ -237,6 +232,10 @@ watch(
       searchDebounceTimer = null;
     }
 
+    searchAbortController?.abort();
+    searchAbortController = null;
+    searchRequestId += 1;
+
     if (!query || !branchId || props.selectorMode) {
       remoteSearchProducts.value = [];
       searchLoading.value = false;
@@ -244,7 +243,9 @@ watch(
     }
 
     searchDebounceTimer = window.setTimeout(() => {
-      fetchProductsForSearch(query);
+      fetchProductsForSearch(query).catch(() => {
+        // La búsqueda automática puede cancelarse al cambiar de sucursal o limpiar el campo.
+      });
     }, 180);
   }
 );
@@ -480,7 +481,6 @@ async function initializePrinterBridge({ silent = true } = {}) {
 
     selectedPrinterName.value = printerName || "";
     saveStoredPrinterName(selectedPrinterName.value);
-    stopPrinterRetry();
 
     printerBridgeMessage.value = selectedPrinterName.value
       ? `Impresora lista: ${selectedPrinterName.value}`
@@ -499,8 +499,6 @@ async function initializePrinterBridge({ silent = true } = {}) {
           "QZ Tray no responde. Abre QZ Tray y vuelve a intentar imprimir.",
       });
     }
-
-    startPrinterRetry();
   }
 }
 
@@ -514,7 +512,6 @@ async function ensurePrinterReadyForPrint({ silent = true } = {}) {
     await connectQzTray();
     printerBridgeReady.value = true;
     printerBridgeMessage.value = `Impresora lista: ${selectedPrinterName.value}`;
-    stopPrinterRetry();
   } catch (error) {
     printerBridgeReady.value = false;
     printerBridgeMessage.value =
@@ -528,50 +525,17 @@ async function ensurePrinterReadyForPrint({ silent = true } = {}) {
           "QZ Tray no responde. Abre QZ Tray y vuelve a intentar imprimir.",
       });
     }
-
-    startPrinterRetry();
     throw error;
   }
-}
-
-function startPrinterRetry() {
-  if (printerRetryInterval || props.selectorMode) {
-    return;
-  }
-
-  printerRetryInterval = window.setInterval(() => {
-    if (printerBridgeReady.value) {
-      stopPrinterRetry();
-      return;
-    }
-
-    initializePrinterBridge({ silent: true });
-  }, 5000);
-}
-
-function stopPrinterRetry() {
-  if (!printerRetryInterval) {
-    return;
-  }
-
-  window.clearInterval(printerRetryInterval);
-  printerRetryInterval = null;
-}
-
-function handleWindowFocus() {
-  if (printerBridgeReady.value) {
-    return;
-  }
-
-  initializePrinterBridge({ silent: true });
 }
 
 function handlePrinterChange(value) {
   selectedPrinterName.value = value || "";
   saveStoredPrinterName(selectedPrinterName.value);
+  printerBridgeReady.value = false;
 
   printerBridgeMessage.value = selectedPrinterName.value
-    ? `Impresora lista: ${selectedPrinterName.value}`
+    ? `Impresora seleccionada: ${selectedPrinterName.value}. Falta verificar la conexión.`
     : "Selecciona una impresora para continuar.";
 }
 
@@ -595,7 +559,9 @@ async function printTicket(printJob) {
     throw new Error("No hay una impresora seleccionada para el ticket.");
   }
 
-  await ensurePrinterReadyForPrint({ silent: true });
+  if (!printerBridgeReady.value) {
+    throw new Error("La impresora no esta verificada. Conectala y usa Reconectar antes de imprimir.");
+  }
 
   const printData = buildEscPosTicketData(resolvedTicketTemplate.value, resolvePrintJob(printJob));
   await printEscPosTicket(selectedPrinterName.value, printData, {
@@ -607,13 +573,7 @@ async function printTicket(printJob) {
   printerBridgeMessage.value = `Impresora lista: ${selectedPrinterName.value}`;
 }
 
-function reloadSalesPage() {
-  window.setTimeout(() => {
-    window.location.reload();
-  }, 400);
-}
-
-function queueTicketPrint(printJob, { reloadAfter = false } = {}) {
+function queueTicketPrint(printJob) {
   window.setTimeout(async () => {
     try {
       await printTicket(printJob);
@@ -622,10 +582,6 @@ function queueTicketPrint(printJob, { reloadAfter = false } = {}) {
         title: "Venta guardada sin ticket",
         message: error?.message || "La venta se registro, pero no se pudo imprimir el ticket en la impresora.",
       });
-    } finally {
-      if (reloadAfter) {
-        reloadSalesPage();
-      }
     }
   }, 0);
 }
@@ -748,7 +704,11 @@ async function fetchProductsForSearch(query, { force = false } = {}) {
     return [];
   }
 
+  searchAbortController?.abort();
+
+  const controller = new AbortController();
   const requestId = ++searchRequestId;
+  searchAbortController = controller;
   searchLoading.value = true;
 
   try {
@@ -760,6 +720,8 @@ async function fetchProductsForSearch(query, { force = false } = {}) {
       headers: {
         Accept: "application/json",
       },
+      signal: controller.signal,
+      timeout: 8000,
     });
 
     if (requestId !== searchRequestId && !force) {
@@ -771,12 +733,20 @@ async function fetchProductsForSearch(query, { force = false } = {}) {
 
     return products;
   } catch (error) {
+    if (controller.signal.aborted || error?.code === "ERR_CANCELED") {
+      return remoteSearchProducts.value;
+    }
+
     if (requestId === searchRequestId) {
       remoteSearchProducts.value = [];
     }
 
     throw error;
   } finally {
+    if (searchAbortController === controller) {
+      searchAbortController = null;
+    }
+
     if (requestId === searchRequestId) {
       searchLoading.value = false;
     }
@@ -1208,9 +1178,14 @@ function submitSale() {
       saleForm.payment_method_id = props.defaultPaymentMethodId ?? "";
 
       if (lastPrintJob.value) {
-        queueTicketPrint(lastPrintJob.value, { reloadAfter: true });
-      } else {
-        reloadSalesPage();
+        if (printerBridgeReady.value && selectedPrinterName.value) {
+          queueTicketPrint(lastPrintJob.value);
+        } else {
+          ToastAlert({
+            icon: "warning",
+            title: "Venta registrada sin ticket: impresora no verificada",
+          });
+        }
       }
     },
     onError: () => {

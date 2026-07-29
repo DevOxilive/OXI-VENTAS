@@ -85,7 +85,6 @@ class SalesController extends Controller
                 'product:id,name,image,category_id,cost,sale_price,margin_percentage,active',
                 'product.category:id,name',
                 'product.barcodes:id,product_id,code',
-                'batches' => fn ($query) => $this->applyNearExpirationBatchConstraints($query),
             ])
             ->where('branch_id', $branch->id)
             ->where('status', BranchProduct::STATUS_ACTIVE)
@@ -123,7 +122,7 @@ class SalesController extends Controller
             )
             ->limit(10)
             ->get()
-            ->map(fn (BranchProduct $branchProduct) => $this->mapBranchProduct($branchProduct))
+            ->map(fn (BranchProduct $branchProduct) => $this->mapBranchProduct($branchProduct, false))
             ->values();
 
         return response()->json(['products' => $products]);
@@ -355,7 +354,7 @@ class SalesController extends Controller
             ->orderBy('id');
     }
 
-    private function mapBranchProduct(BranchProduct $branchProduct): array
+    private function mapBranchProduct(BranchProduct $branchProduct, bool $includeNearExpirationAlert = true): array
     {
         $product = $branchProduct->product;
         $primaryBarcode = $product?->barcodes?->first();
@@ -376,7 +375,10 @@ class SalesController extends Controller
             'margin_percentage' => (float) ($product?->margin_percentage ?? 0),
             'stock' => (float) ($branchProduct->stock ?? 0),
             'tracks_batches' => (bool) $branchProduct->tracks_batches,
-            'near_expiration_alert' => $this->mapNearExpirationBatch($branchProduct),
+            // La alerta de caducidad se calcula fuera del buscador para mantenerlo inmediato.
+            'near_expiration_alert' => $includeNearExpirationAlert
+                ? $this->mapNearExpirationBatch($branchProduct)
+                : null,
             'searchable' => mb_strtolower(implode(' ', array_filter([
                 $product?->name,
                 $branchProduct->barcode,
