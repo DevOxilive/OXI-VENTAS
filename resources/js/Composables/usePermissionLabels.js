@@ -191,6 +191,7 @@ const permissionLabels = {
     "sales.cash-closures.create": "Crear cortes de caja",
     "sales.cash-closures.update": "Editar cortes de caja",
     "sales.cash-closures.delete": "Eliminar cortes de caja",
+    "sales.cash-closures.reports": "Consultar reportes de cortes de caja",
 
     "inventory.products.view": "Ver modulo de productos",
     "inventory.products.create": "Crear productos",
@@ -202,13 +203,14 @@ const permissionLabels = {
     "inventory.branches.update": "Registrar salidas y ajustes de stock",
     "inventory.branches.delete": "Editar lotes y configuracion de stock",
 
-    "audits.physical-counts.view": "Ver modulo de auditorias",
-    "audits.physical-counts.count": "Capturar conteos de auditoria",
-    "audits.physical-counts.reports": "Ver reportes de auditoria",
-    "audits.physical-counts.view-stock": "Ver stock en auditorias",
-    "audits.physical-counts.create": "Crear auditorias",
-    "audits.physical-counts.update": "Editar auditorias",
-    "audits.physical-counts.delete": "Eliminar auditorias",
+    "audits.physical-counts.count": "Capturar conteos de auditoría",
+    "audits.physical-counts.reports": "Ver reportes de auditoría",
+    "audits.physical-counts.view-stock": "Ver stock en auditorías",
+    "audits.physical-counts.create": "Crear auditorías",
+    "audits.physical-counts.close": "Abrir/Cerrar auditoría",
+    "audits.physical-counts.participants": "Agregar participantes",
+    "audits.physical-counts.apply": "Aplicar auditoría",
+    "audits.physical-counts.delete": "Eliminar auditorías",
 
     "inventory.purchase-reports.view": "Ver modulo de listas/reportes de compra",
     "inventory.purchase-reports.create": "Crear reportes de compra",
@@ -311,6 +313,10 @@ function getPermissionModule(permissionName = "") {
 
     if (permissionName.startsWith("inventory.purchase-orders.")) {
         return "inventory.purchase-orders";
+    }
+
+    if (permissionName === "audits.physical-counts.reports") {
+        return "inventory";
     }
 
     if (permissionName.startsWith("audits.")) {

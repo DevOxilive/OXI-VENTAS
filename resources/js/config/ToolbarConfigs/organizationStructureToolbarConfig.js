@@ -5,6 +5,7 @@ export function getOrganizationTableToolbarConfig({
     const isDepartment = entity === "department";
 
     return {
+        icon: isDepartment ? "domain" : "badge",
         title: isDepartment ? "Departamentos" : "Puestos",
         subtitle: isDepartment
             ? "Departamentos y puestos relacionados"

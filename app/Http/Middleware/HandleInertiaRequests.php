@@ -38,6 +38,12 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user()?->loadMissing(['role', 'permissions', 'branches']);
+        $navigationBranches = fn () => $user
+            ? $user->accessibleBranchesQuery()
+                ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
+                ->orderBy('branches.name')
+                ->get()
+            : collect();
 
         return array_merge(parent::share($request), [
             'auth' => [
@@ -50,12 +56,8 @@ class HandleInertiaRequests extends Middleware
     : [],
             ],
 
-            'branches' => fn () => $user
-                ? $user->accessibleBranchesQuery()
-                    ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
-                    ->orderBy('branches.name')
-                    ->get()
-                : collect(),
+            'branches' => $navigationBranches,
+            'sidebarBranches' => $navigationBranches,
 
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

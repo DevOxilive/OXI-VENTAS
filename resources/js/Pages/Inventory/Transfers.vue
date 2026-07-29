@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { GlobalToolbar } from '@/Components/Toolbars'
 
 defineOptions({ layout: AdminLayout })
 
@@ -48,19 +49,15 @@ function statusClass(status) {
 
 <template>
     <section class="space-y-5">
-        <div class="flex items-center justify-between gap-3">
-            <div>
-                <h1 class="text-xl font-bold text-text">Transferencias</h1>
-                <p class="mt-1 text-sm text-text opacity-70">
-                    Control visual de movimientos de stock entre sucursales.
-                </p>
-            </div>
-
-            <button class="flex items-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-sm text-white">
-                <span class="material-symbols-outlined text-[18px]">compare_arrows</span>
-                Nueva transferencia
-            </button>
-        </div>
+        <GlobalToolbar
+            icon="compare_arrows"
+            title="Transferencias"
+            subtitle="Control visual de movimientos de stock entre sucursales."
+            :show-search="false"
+            :show-records-per-page="false"
+            :show-counter="false"
+            :actions="[{ id: 'create', label: 'Nueva transferencia', icon: 'add', variant: 'primary' }]"
+        />
 
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <div class="rounded-2xl border border-secondary bg-background p-5 shadow-sm">

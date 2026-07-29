@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { GlobalToolbar } from '@/Components/Toolbars'
 
 defineOptions({ layout: AdminLayout })
 
@@ -51,19 +52,15 @@ function differenceClass(value) {
 
 <template>
     <section class="space-y-5">
-        <div class="flex items-center justify-between gap-3">
-            <div>
-                <h1 class="text-xl font-bold text-text">Ajustes de inventario</h1>
-                <p class="mt-1 text-sm text-text opacity-70">
-                    Correcciones auditadas entre stock del sistema y conteo físico.
-                </p>
-            </div>
-
-            <button class="flex items-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-sm text-white">
-                <span class="material-symbols-outlined text-[18px]">tune</span>
-                Nuevo ajuste
-            </button>
-        </div>
+        <GlobalToolbar
+            icon="tune"
+            title="Ajustes de inventario"
+            subtitle="Correcciones auditadas entre stock del sistema y conteo físico."
+            :show-search="false"
+            :show-records-per-page="false"
+            :show-counter="false"
+            :actions="[{ id: 'create', label: 'Nuevo ajuste', icon: 'add', variant: 'primary' }]"
+        />
 
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <div class="rounded-2xl border border-secondary bg-background p-5 shadow-sm">

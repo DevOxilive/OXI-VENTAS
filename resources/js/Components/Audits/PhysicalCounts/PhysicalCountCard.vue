@@ -1,14 +1,21 @@
 <script setup>
+import { computed } from 'vue'
 import { Link } from '@inertiajs/vue3'
 import { usePermissions } from '@/Composables/usePermissions'
 
-defineProps({
+const props = defineProps({
     physicalCount: {
         type: Object,
         required: true
     }
 })
 const { can } = usePermissions()
+
+const statusLabel = computed(() => ({
+    open: 'Abierto',
+    closed: 'Cerrado',
+    applied: 'Aplicado',
+}[props.physicalCount.status] || 'Sin estado'))
 </script>
 
 <template>
@@ -26,12 +33,12 @@ const { can } = usePermissions()
     Folio: {{ physicalCount.folio ?? 'Sin folio' }}
 </p>
                 <p class="mt-1 text-xs text-gray-400">
-                    Estado: {{ physicalCount.status }}
+                    Estado: {{ statusLabel }}
                 </p>
             </div>
 
          <Link
-    v-if="can('audits.physical-counts.view')"
+    v-if="can('audits.physical-counts.count')"
     :href="route('audits.physical-counts.show', physicalCount.id)"
     class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
 >

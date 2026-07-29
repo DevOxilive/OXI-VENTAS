@@ -27,7 +27,7 @@ const { permissions, role } = usePermissions()
 const menuItems = computed(() => generateMenu(
     role.value,
     permissions.value,
-    page.props.branches ?? [],
+    page.props.sidebarBranches ?? page.props.branches ?? [],
 ))
 
 const branchKeys = computed(() =>
@@ -70,6 +70,7 @@ const routesWithDedicatedRealtime = [
     'system-administration.trash.index',
     'systems.attendance.index',
     'systems.users.index',
+    'ventas.attendance.index',
 ]
 
 const relatedRealtimeScopes = Object.freeze({
@@ -325,7 +326,7 @@ watch(desktopSidebarCollapsed, (value) => {
                             @click="toggleDesktopSidebar"
                         >
                             <img
-                                src="/icons/super-kay-source.png"
+                                src="/icons/icon-192.png"
                                 alt="Super Kay Logo"
                                 class="h-full w-full object-contain p-1"
                             />

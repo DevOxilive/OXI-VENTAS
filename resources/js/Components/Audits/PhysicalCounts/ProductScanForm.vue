@@ -1,7 +1,11 @@
 <script setup>
 import axios from 'axios'
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { router, useForm } from '@inertiajs/vue3'
+
+import FormPanel from '@/Components/Cards/FormPanel.vue'
+import InputField from '@/Components/Forms/InputField.vue'
+import AppButton from '@/Components/Buttons/AppButton.vue'
 
 const props = defineProps({
     physicalCountId: {
@@ -13,7 +17,6 @@ const props = defineProps({
 const searchInput = ref(null)
 const results = ref([])
 const loading = ref(false)
-
 let timeout = null
 
 const form = useForm({
@@ -49,13 +52,13 @@ watch(
             try {
                 const response = await axios.get(
                     route('audits.physical-counts.search-products', props.physicalCountId),
-                    { params: { search: value } }
+                    { params: { search: value } },
                 )
 
                 results.value = response.data
 
                 const exactMatch = results.value.find((product) =>
-                    isExactCodeMatch(product, value)
+                    isExactCodeMatch(product, value),
                 )
 
                 if (exactMatch) {
@@ -65,7 +68,7 @@ watch(
                 loading.value = false
             }
         }, 300)
-    }
+    },
 )
 
 function scan() {
@@ -93,73 +96,68 @@ function selectProduct(product, scannedCode = form.code) {
                 form.reset('code')
                 focusInput()
             },
-        }
+        },
     )
 }
 
-onMounted(() => {
-    focusInput()
-})
+onMounted(focusInput)
+onBeforeUnmount(() => clearTimeout(timeout))
 </script>
 
 <template>
-    <div class="relative h-fit rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm">
-        <h2 class="text-xs font-semibold text-gray-900">
-            Buscar producto
-        </h2>
-
-        <p class="sr-only">
-            Escanea un código o escribe el nombre del producto.
-        </p>
-
-        <form class="mt-1.5 flex flex-col gap-1.5 sm:flex-row" @submit.prevent="scan">
-            <div class="relative w-full">
-                <input
+    <FormPanel
+        title="Buscar producto"
+        description="Escanea un código o escribe el nombre del producto."
+        panel-class="relative h-fit"
+        body-class="relative"
+    >
+        <form class="flex flex-col gap-2 sm:flex-row sm:items-start" @submit.prevent="scan">
+            <div class="relative min-w-0 flex-1">
+                <InputField
                     ref="searchInput"
                     v-model="form.code"
-                    type="text"
-                    placeholder="Escanea código o escribe el nombre del producto"
-                    class="h-8 w-full rounded-md border-gray-300 px-2 text-xs"
+                    hide-label
+                    field="audit_product_search"
+                    validation-field="toolbar_search"
+                    icon="barcode_scanner"
+                    placeholder="Código, nombre o categoría"
+                    :show-counter="false"
+                    :error="form.errors.code"
                     autocomplete="off"
-                >
+                />
 
                 <div
                     v-if="results.length"
-                    class="absolute z-30 mt-1.5 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl"
+                    class="absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto rounded-xl border border-secondary bg-background p-1.5 shadow-xl"
                 >
                     <button
                         v-for="product in results"
                         :key="product.branch_product_id"
                         type="button"
-                        class="block w-full border-b px-3 py-2 text-left hover:bg-slate-50 last:border-b-0"
+                        class="block w-full rounded-lg px-3 py-2.5 text-left transition hover:bg-secondary"
                         @click="selectProduct(product)"
                     >
-                        <p class="text-xs font-semibold text-slate-900">
+                        <p class="text-sm font-semibold text-text">
                             {{ product.name }}
                         </p>
-
-                        <p class="mt-0.5 text-[11px] text-slate-500">
+                        <p class="mt-0.5 text-xs text-text opacity-60">
                             Código: {{ product.barcode ?? 'Sin código' }}
                         </p>
                     </button>
                 </div>
             </div>
 
-            <button
+            <AppButton
                 type="submit"
-                class="h-8 rounded-md bg-slate-900 px-3 text-xs font-semibold text-white disabled:opacity-50"
-                :disabled="form.processing"
+                class="sm:min-h-12"
+                :disabled="form.processing || !form.code"
             >
                 Buscar
-            </button>
+            </AppButton>
         </form>
 
-        <p v-if="loading" class="mt-1.5 text-xs text-gray-500">
+        <p v-if="loading" class="mt-2 text-xs text-text opacity-60">
             Buscando productos...
         </p>
-
-        <p v-if="form.errors.code" class="mt-1.5 text-xs text-red-600">
-            {{ form.errors.code }}
-        </p>
-    </div>
+    </FormPanel>
 </template>

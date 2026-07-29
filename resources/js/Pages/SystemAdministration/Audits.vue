@@ -83,7 +83,7 @@ onBeforeUnmount(() => {
     <Head title="Auditoría del Sistema" />
     <AdminLayout>
         <PageLayout>
-            <GlobalToolbar title="Auditoría del Sistema" subtitle="Historial centralizado de actividades críticas." :back-button="true" back-label="Centro de Administración" :show-search="false" :show-records-per-page="false" :show-counter="false" @back="router.get(route('system-administration.index'))" />
+            <GlobalToolbar icon="history" title="Auditoría del Sistema" subtitle="Historial centralizado de actividades críticas." :back-button="true" back-label="Centro de Administración" :show-search="false" :show-records-per-page="false" :show-counter="false" @back="router.get(route('system-administration.index'))" />
             <form class="grid gap-3 rounded-2xl border border-secondary bg-background p-4 md:grid-cols-4" @submit.prevent="filter">
                 <InputField v-model="form.search" hide-label placeholder="Buscar" />
                 <SelectField v-model="form.module" hide-label :options="moduleOptions" />

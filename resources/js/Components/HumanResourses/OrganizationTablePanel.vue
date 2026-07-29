@@ -3,6 +3,7 @@ import GlobalTable from "@/Components/Tables/GlobalTable.vue";
 import GlobalToolbar from "@/Components/Toolbars/GlobalToolbar.vue";
 
 defineProps({
+    icon: String,
     title: String,
     subtitle: String,
     search: String,
@@ -36,6 +37,7 @@ defineEmits(["update:search", "create", "action"]);
     <section class="min-w-0 overflow-hidden rounded-3xl border border-secondary bg-background shadow-sm">
         <div class="border-b border-secondary p-3 sm:p-4">
             <GlobalToolbar
+                :icon="icon"
                 :title="title"
                 :subtitle="subtitle"
                 :search="search"

@@ -3,6 +3,7 @@ export function getPrinterLabelsToolbarConfig({
   printing = false,
 } = {}) {
   return {
+    icon: "barcode",
     title: "Etiquetas",
     subtitle: "Edita etiquetas de producto con codigo de barras, categoria, nombre, precio y variables.",
     showSearch: false,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\AttendanceChanged;
+use App\Events\RealtimeActivityLogged;
 use App\Models\AttendanceIncident;
 use App\Models\Employee;
 use App\Services\SystemAuditService;
@@ -23,7 +24,7 @@ class AttendanceIncidentController extends Controller
         ]);
 
         $incidents = AttendanceIncident::query()
-            ->with(['employee', 'authorizedBy'])
+            ->with(['employee', 'authorizedBy', 'submittedBy'])
             ->when($filters['from'] ?? null, fn ($query, $date) => $query->whereDate('incident_date', '>=', $date))
             ->when($filters['to'] ?? null, fn ($query, $date) => $query->whereDate('incident_date', '<=', $date))
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
@@ -54,6 +55,7 @@ class AttendanceIncidentController extends Controller
                 'created_at' => $incident->created_at,
                 'authorized_at' => $incident->authorized_at,
                 'authorized_by' => $incident->authorizedBy?->name,
+                'submitted_by' => $incident->submittedBy?->name,
             ])
             ->withQueryString();
 
@@ -70,6 +72,7 @@ class AttendanceIncidentController extends Controller
                 ['value' => 'approved', 'label' => 'Aprobada'],
                 ['value' => 'rejected', 'label' => 'Denegada'],
             ],
+            'notificationSummary' => $this->notificationSummary($request),
         ]);
     }
 
@@ -77,9 +80,17 @@ class AttendanceIncidentController extends Controller
     {
         $data = $this->validateIncident($request);
         $data['type'] = 'attendance';
+        $data['submitted_by'] = $request->user()->id;
         $incident = AttendanceIncident::create($data);
+        $incident->load('employee');
         $this->audit->record('attendance_incident', 'create', 'success', $request, ['record_type' => AttendanceIncident::class, 'record_id' => $incident->id, 'record_label' => $incident->type]);
-        broadcast(new AttendanceChanged(0, 'incident_created', $request->user()->id));
+        event(new RealtimeActivityLogged(
+            'Nueva incidencia pendiente de autorizacion: '.$this->employeeName($incident),
+            'Capital Humano',
+            'attendance_incident_created',
+            $this->employeeName($incident),
+        ));
+        broadcast(new AttendanceChanged($incident->id, 'incident_created', $request->user()->id));
         return back()->with('success', 'Incidencia enviada para autorización.');
     }
 
@@ -91,8 +102,16 @@ class AttendanceIncidentController extends Controller
             : 'attendance.incidents.reject';
         abort_unless($request->user()->hasPermission($requiredPermission), 403);
         $attendanceIncident->update($data + ['authorized_by' => $request->user()->id, 'authorized_at' => now()]);
+        $attendanceIncident->load(['employee', 'submittedBy']);
         $this->audit->record('attendance_incident', 'review', 'success', $request, ['record_type' => AttendanceIncident::class, 'record_id' => $attendanceIncident->id, 'record_label' => $attendanceIncident->type]);
-        broadcast(new AttendanceChanged(0, 'incident_'.$data['status'], $request->user()->id));
+        event(new RealtimeActivityLogged(
+            'Incidencia '.$this->statusLabel($data['status']).': '.$this->employeeName($attendanceIncident),
+            'Capital Humano',
+            'attendance_incident_'.$data['status'],
+            $this->employeeName($attendanceIncident),
+            [$attendanceIncident->submitted_by],
+        ));
+        broadcast(new AttendanceChanged($attendanceIncident->id, 'incident_'.$data['status'], $request->user()->id));
         return back()->with('success', 'Incidencia actualizada correctamente.');
     }
 
@@ -101,7 +120,7 @@ class AttendanceIncidentController extends Controller
         abort_if($attendanceIncident->status !== 'pending', 422, 'Solo se pueden editar incidencias pendientes.');
         $data = $this->validateIncident($request);
         $attendanceIncident->update($data);
-        broadcast(new AttendanceChanged(0, 'incident_updated', $request->user()->id));
+        broadcast(new AttendanceChanged($attendanceIncident->id, 'incident_updated', $request->user()->id));
         return back()->with('success', 'Incidencia actualizada correctamente.');
     }
 
@@ -109,7 +128,7 @@ class AttendanceIncidentController extends Controller
     {
         abort_if($attendanceIncident->status !== 'pending', 422, 'Solo se pueden eliminar incidencias pendientes.');
         $attendanceIncident->delete();
-        broadcast(new AttendanceChanged(0, 'incident_deleted', $request->user()->id));
+        broadcast(new AttendanceChanged($attendanceIncident->id, 'incident_deleted', $request->user()->id));
         return back()->with('success', 'Incidencia eliminada correctamente.');
     }
 
@@ -134,5 +153,57 @@ class AttendanceIncidentController extends Controller
         }
 
         return $data;
+    }
+
+    private function notificationSummary(Request $request): array
+    {
+        $user = $request->user();
+        $canReview = $user->hasPermission('attendance.incidents.approve')
+            || $user->hasPermission('attendance.incidents.reject');
+
+        $query = AttendanceIncident::query()
+            ->with('employee')
+            ->latest('updated_at')
+            ->latest();
+
+        if ($canReview) {
+            $query->where('status', 'pending');
+        } else {
+            $query
+                ->where('submitted_by', $user->id)
+                ->whereIn('status', ['approved', 'rejected']);
+        }
+
+        $items = $query
+            ->limit(8)
+            ->get()
+            ->map(fn (AttendanceIncident $incident) => [
+                'id' => $incident->id,
+                'employee_name' => $this->employeeName($incident),
+                'status' => $incident->status,
+                'status_label' => $this->statusLabel($incident->status),
+                'incident_date' => $incident->incident_date,
+                'updated_at' => $incident->updated_at,
+            ]);
+
+        return [
+            'mode' => $canReview ? 'review' : 'submitted',
+            'count' => $items->count(),
+            'items' => $items,
+        ];
+    }
+
+    private function employeeName(AttendanceIncident $incident): string
+    {
+        return trim(($incident->employee?->first_name ?? '').' '.($incident->employee?->last_name ?? '')) ?: 'Empleado sin nombre';
+    }
+
+    private function statusLabel(string $status): string
+    {
+        return [
+            'pending' => 'pendiente',
+            'approved' => 'aprobada',
+            'rejected' => 'denegada',
+        ][$status] ?? $status;
     }
 }

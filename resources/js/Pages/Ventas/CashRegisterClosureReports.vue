@@ -28,6 +28,16 @@ const props = defineProps({
 });
 
 const rows = computed(() => props.closures?.data || []);
+const toolbarActions = computed(() => can("sales.cash-closures.create")
+  ? [
+      {
+        id: "new-cut",
+        label: "Nuevo corte",
+        icon: "payments",
+        variant: "primary",
+      },
+    ]
+  : []);
 const selectedClosure = ref(null);
 const modalMode = ref("view");
 const showClosureModal = ref(false);
@@ -175,7 +185,7 @@ const closureActions = computed(() => [
     label: "Ver",
     icon: "visibility",
     variant: "blue",
-    permission: "sales.cash-closures.view",
+    permission: "sales.cash-closures.reports",
   },
   {
     id: "edit",
@@ -233,7 +243,7 @@ function closeClosureModal() {
 }
 
 function handleTableAction({ action, row }) {
-  if (action === "view" && can("sales.cash-closures.view")) {
+  if (action === "view" && can("sales.cash-closures.reports")) {
     openClosure(row, "view");
   }
 
@@ -339,6 +349,7 @@ function backToReportsCenter() {
   <PageLayout>
     <div class="space-y-6">
       <GlobalToolbar
+        icon="assessment"
         title="Reportes de corte de cajas"
         :subtitle="selectorMode ? 'Selecciona una sucursal para consultar su historial de cortes.' : currentBranch ? `Historial de cortes de ${currentBranch.name}` : 'Historial de cortes registrados por sucursal y usuario'"
         back-button
@@ -346,14 +357,7 @@ function backToReportsCenter() {
         :show-search="false"
         :show-records-per-page="false"
         :show-counter="false"
-        :actions="[
-          {
-            id: 'new-cut',
-            label: 'Nuevo corte',
-            icon: 'payments',
-            variant: 'primary',
-          },
-        ]"
+        :actions="toolbarActions"
         @back="backToReportsCenter"
         @action="goToCut"
       />

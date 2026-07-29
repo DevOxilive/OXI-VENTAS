@@ -26,7 +26,9 @@ class JetstreamServiceProvider extends ServiceProvider
 
         Jetstream::deleteUsersUsing(DeleteUser::class);
 
-        Vite::prefetch(concurrency: 3);
+        if (config('app.vite_prefetch', false)) {
+            Vite::prefetch(concurrency: 1);
+        }
     }
 
     /**

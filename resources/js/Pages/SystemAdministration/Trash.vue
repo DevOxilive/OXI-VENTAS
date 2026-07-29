@@ -164,6 +164,7 @@ function handleToolbarAction(action) {
     <AdminLayout>
         <PageLayout>
             <GlobalToolbar
+                icon="delete_sweep"
                 title="Papelera Global"
                 subtitle="Los registros eliminados permanecen disponibles para recuperación."
                 :back-button="true"

@@ -131,7 +131,7 @@ function removeCategory(categoryId) {
     <Head title="Dashboard" />
     <PageLayout>
         <template #toolbar>
-            <GlobalToolbar title="Dashboard" subtitle="Consulta el desempeño de sucursales, ventas, inversión, utilidad y merma." :show-search="false" :show-records-per-page="false" :show-counter="false" />
+            <GlobalToolbar icon="dashboard" title="Dashboard" subtitle="Consulta el desempeño de sucursales, ventas, inversión, utilidad y merma." :show-search="false" :show-records-per-page="false" :show-counter="false" />
         </template>
 
         <div class="space-y-5">

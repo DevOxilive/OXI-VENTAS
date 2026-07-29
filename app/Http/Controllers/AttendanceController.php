@@ -24,6 +24,7 @@ class AttendanceController extends Controller
 
     public function index(Request $request)
     {
+        $canRegisterAttendance = $this->canRegisterAttendance($request->user());
         $canViewAttendance = $request->user()->hasPermission('attendance.view')
             || $request->user()->hasPermission('attendance.manage')
             || $request->user()->hasPermission('attendance.export.excel')
@@ -33,6 +34,7 @@ class AttendanceController extends Controller
             || $request->user()->hasPermission('attendance.export.excel')
             || $request->user()->hasPermission('attendance.export.pdf');
         $canViewEvidence = $request->user()->hasPermission('attendance.manage');
+        $registeredTypesToday = $this->registeredTypesToday($request->user()->id);
         $records = $canViewAttendance
             ? $this->recordsQuery($request, $canViewAttendance, $filters)->paginate(30)->withQueryString()
             : null;
@@ -60,15 +62,15 @@ class AttendanceController extends Controller
                 'departments' => $canViewAttendance
                     ? Department::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->map(fn ($department) => ['value' => $department->id, 'label' => $department->name])
                     : [],
-                'employees' => $canViewAttendance ? Employee::query()->where('employment_status', '!=', 'Inactivo')->orderBy('first_name')->get()->map(fn ($employee) => ['value' => $employee->id, 'label' => trim($employee->first_name.' '.$employee->last_name)]) : [],
             ],
             'canViewAttendance' => $canViewAttendance,
             'canManage' => $canManage,
             'canViewEvidence' => $canViewEvidence,
-            'canRegister' => $request->user()->hasPermission('attendance.register'),
+            'canRegister' => $canRegisterAttendance,
             'canRequestCorrection' => $request->user()->hasPermission('attendance.corrections.request'),
             'canReviewCorrections' => $request->user()->hasPermission('attendance.corrections.review'),
             'passkeyEnabled' => $request->user()->hasPasskeysEnabled(),
+            'registeredTypesToday' => $registeredTypesToday,
         ]);
     }
 
@@ -91,6 +93,17 @@ class AttendanceController extends Controller
         ]);
 
         $user = $request->user();
+        if (! $this->canRegisterAttendance($user)) {
+            return back()->withErrors([
+                'type' => 'Solo los usuarios con rol Ventas o Vendedor pueden registrar asistencia.',
+            ]);
+        }
+        if ($this->hasRegisteredTypeToday($user->id, $data['type'])) {
+            return back()->withErrors([
+                'type' => sprintf('Ya registraste %s el dia de hoy.', mb_strtolower($this->typeLabel($data['type']))),
+            ]);
+        }
+
         $branch = Branch::query()->find($user->branch_id);
         if (! $branch) {
             $temporaryGeofence = config('attendance.temporary_geofence');
@@ -210,7 +223,6 @@ class AttendanceController extends Controller
             'to' => ['nullable', 'date', 'after_or_equal:from'],
             'branch' => ['nullable', 'integer', 'exists:branches,id'],
             'department' => ['nullable', 'integer', 'exists:departments,id'],
-            'employee' => ['nullable', 'integer', 'exists:employees,id'],
             'search' => ['nullable', 'string', 'max:100'],
             'type' => ['nullable', 'in:'.implode(',', AttendanceRecord::TYPES)],
         ]);
@@ -232,7 +244,6 @@ class AttendanceController extends Controller
             ->when($filters['to'] ?? null, fn ($query, $value) => $query->whereDate('attendance_date', '<=', $value))
             ->when($filters['branch'] ?? null, fn ($query, $value) => $query->where('branch_id', $value))
             ->when($filters['department'] ?? null, fn ($query, $value) => $query->whereHas('employee.position', fn ($position) => $position->where('department_id', $value)))
-            ->when($filters['employee'] ?? null, fn ($query, $value) => $query->where('employee_id', $value))
             ->when($filters['search'] ?? null, function ($query, $value) {
                 $term = '%'.trim($value).'%';
 
@@ -250,6 +261,36 @@ class AttendanceController extends Controller
             ->when($filters['type'] ?? null, fn ($query, $value) => $query->where('type', $value))
             ->latest('recorded_at');
     }
+
+    private function canRegisterAttendance($user): bool
+    {
+        if (! $user?->hasPermission('attendance.register')) {
+            return false;
+        }
+
+        return in_array($user->role?->name, ['Ventas', 'Vendedor'], true);
+    }
+
+    private function registeredTypesToday(int $userId): array
+    {
+        return AttendanceRecord::query()
+            ->where('user_id', $userId)
+            ->whereDate('attendance_date', Carbon::today())
+            ->pluck('type')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function hasRegisteredTypeToday(int $userId, string $type): bool
+    {
+        return AttendanceRecord::query()
+            ->where('user_id', $userId)
+            ->whereDate('attendance_date', Carbon::today())
+            ->where('type', $type)
+            ->exists();
+    }
+
     private function recordPayload(AttendanceRecord $record): array { return ['id' => $record->id, 'employee' => $record->employee ? trim($record->employee->first_name.' '.$record->employee->last_name) : $record->user?->name, 'role' => $record->user?->role?->name, 'branch' => $record->branch?->name ?? 'Sin sucursal', 'date' => $record->attendance_date?->format('d/m/Y'), 'time' => $record->recorded_at?->format('H:i'), 'type' => $this->typeLabel($record->type), 'status' => $this->statusLabel($record->status), 'authentication' => 'Biometría del dispositivo']; }
     private function evidencePayload(AttendanceRecord $record): ?array
     {

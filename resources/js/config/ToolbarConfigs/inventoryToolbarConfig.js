@@ -10,6 +10,7 @@ export function getInventoryToolbarConfig({
     inactiveCandidateFilter,
 }) {
     return {
+        icon: "inventory_2",
         title: branch?.name ? `Inventario - ${branch.name}` : "Inventario",
         subtitle: "Consulta y movimientos por sucursal",
         searchPlaceholder: "Buscar producto, código, lote o barcode...",

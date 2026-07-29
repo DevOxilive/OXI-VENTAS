@@ -13,7 +13,7 @@ export function getPhysicalCountEntryModalConfig({
             delete: 'Eliminar registro',
         },
         subtitle: mode === 'delete'
-            ? 'Confirma la eliminacion del registro seleccionado'
+            ? 'Confirma la eliminación del registro seleccionado'
             : 'Información del registro de conteo físico',
         totalErrors,
         processing,
@@ -21,7 +21,7 @@ export function getPhysicalCountEntryModalConfig({
             ? 'Eliminar registro'
             : 'Guardar cambios',
         closeButtonText: 'Cancelar',
-        ...modalPresets.workspace,
+        ...modalPresets.standard,
         size: 'lg',
         alerts: {
             entityName: 'Registro',

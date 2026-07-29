@@ -48,6 +48,10 @@ function getOptionLabel(item) {
     return item
 }
 
+function isOptionDisabled(item) {
+    return Boolean(item && typeof item === 'object' && item.disabled)
+}
+
 function handleChange(e) {
     emit('update:modelValue', e.target.value)
     emit('validate', props.field)
@@ -76,7 +80,8 @@ function handleBlur() {
             </option>
 
             <option v-for="item in options" :key="getOptionValue(item)"
-                :value="getOptionValue(item)">
+                :value="getOptionValue(item)"
+                :disabled="isOptionDisabled(item)">
                 {{ getOptionLabel(item) }}
             </option>
         </select>

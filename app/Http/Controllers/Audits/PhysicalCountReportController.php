@@ -33,7 +33,7 @@ class PhysicalCountReportController extends Controller
 
     public function index(Request $request)
     {
-        abort_unless($this->canViewReports($request), 403, 'No tienes permisos para ver reportes de auditoria.');
+        abort_unless($this->canViewReports($request), 403, 'No tienes permisos para ver reportes de auditoría.');
 
         $branches = $this->resolveReportBranches($request);
         $branch = $branches->count() === 1 ? $branches->first() : null;
@@ -74,7 +74,7 @@ class PhysicalCountReportController extends Controller
 
     public function exportExcel(Request $request)
     {
-        abort_unless($this->canViewReports($request), 403, 'No tienes permisos para exportar reportes de auditoria.');
+        abort_unless($this->canViewReports($request), 403, 'No tienes permisos para exportar reportes de auditoría.');
 
         $branches = $this->resolveReportBranches($request);
         $branch = $branches->count() === 1 ? $branches->first() : null;
@@ -92,7 +92,7 @@ class PhysicalCountReportController extends Controller
 
     public function exportPdf(Request $request)
     {
-        abort_unless($this->canViewReports($request), 403, 'No tienes permisos para exportar reportes de auditoria.');
+        abort_unless($this->canViewReports($request), 403, 'No tienes permisos para exportar reportes de auditoría.');
 
         $branches = $this->resolveReportBranches($request);
         $branch = $branches->count() === 1 ? $branches->first() : null;
@@ -208,7 +208,7 @@ class PhysicalCountReportController extends Controller
                 $row['status_label'] = match ($row['status']) {
                     'missing' => 'Faltante',
                     'surplus' => 'Sobrante',
-                    'matched' => 'Macheado',
+                    'matched' => 'Coincidente',
                     default => 'Pendiente',
                 };
 
@@ -321,7 +321,7 @@ class PhysicalCountReportController extends Controller
 
                 return [
                     'branch_name' => $first['branch_name'] ?? 'Sin sucursal',
-                    'audit_name' => $first['audit_name'] ?? 'Sin auditoria',
+                    'audit_name' => $first['audit_name'] ?? 'Sin auditoría',
                     'folio' => $first['folio'] ?? 'Sin folio',
                     'audit_date' => $first['audit_date'] ?? null,
                     'products' => $totalProducts,
@@ -418,7 +418,7 @@ class PhysicalCountReportController extends Controller
                     'row_type' => 'counted',
                     'status' => $difference < 0 ? 'missing' : ($difference > 0 ? 'surplus' : 'matched'),
                     'physical_count_id' => $first->physical_count_id,
-                    'audit_name' => $audit?->name ?? 'Sin auditoria',
+                    'audit_name' => $audit?->name ?? 'Sin auditoría',
                     'folio' => $audit?->folio ?? 'Sin folio',
                     'audit_date' => optional($audit?->started_at)->toDateString(),
                     'branch_name' => $audit?->branch?->name ?? 'Sin sucursal',
@@ -491,7 +491,7 @@ class PhysicalCountReportController extends Controller
                     'row_type' => 'pending',
                     'status' => 'pending',
                     'physical_count_id' => null,
-                    'audit_name' => $firstAudit?->name ?? 'Sin auditoria filtrada',
+                    'audit_name' => $firstAudit?->name ?? 'Sin auditoría filtrada',
                     'folio' => $firstAudit?->folio ?? 'Sin folio',
                     'audit_date' => optional($firstAudit?->started_at)->toDateString(),
                     'branch_name' => $branchProduct->branch?->name ?? 'Sin sucursal',
@@ -541,7 +541,7 @@ class PhysicalCountReportController extends Controller
             ],
             'categories' => [
                 'title' => 'Resumen por categoria',
-                'headings' => ['Categoria', 'Productos', 'Contados', 'Pendientes', 'Faltantes', 'Sobrantes', 'Correctos'],
+                'headings' => ['Categoría', 'Productos', 'Contados', 'Pendientes', 'Faltantes', 'Sobrantes', 'Correctos'],
                 'rows' => $payload['categorySummary']->map(fn ($row) => [
                     $row['category_name'],
                     $row['products'],
@@ -554,7 +554,7 @@ class PhysicalCountReportController extends Controller
             ],
             'branches' => [
                 'title' => 'Resumen por sucursal',
-                'headings' => ['Sucursal', 'Auditorias', 'Productos', 'Contados', 'No encontrados', 'Macheados', 'Faltantes', 'Sobrantes', 'Avance', 'Dif. neta', 'Dif. absoluta'],
+                'headings' => ['Sucursal', 'Auditorías', 'Productos', 'Contados', 'No encontrados', 'Coincidentes', 'Faltantes', 'Sobrantes', 'Avance', 'Dif. neta', 'Dif. absoluta'],
                 'rows' => $payload['branchSummary']->map(fn ($row) => [
                     $row['branch_name'],
                     $row['audits'],
@@ -570,8 +570,8 @@ class PhysicalCountReportController extends Controller
                 ])->all(),
             ],
             'audits' => [
-                'title' => 'Resumen por auditoria',
-                'headings' => ['Sucursal', 'Auditoria', 'Folio', 'Fecha', 'Productos', 'Contados', 'No encontrados', 'Macheados', 'Faltantes', 'Sobrantes', 'Avance', 'Dif. absoluta'],
+                'title' => 'Resumen por auditoría',
+                'headings' => ['Sucursal', 'Auditoría', 'Folio', 'Fecha', 'Productos', 'Contados', 'No encontrados', 'Coincidentes', 'Faltantes', 'Sobrantes', 'Avance', 'Dif. absoluta'],
                 'rows' => $payload['auditSummary']->map(fn ($row) => [
                     $row['branch_name'],
                     $row['audit_name'],
@@ -589,7 +589,7 @@ class PhysicalCountReportController extends Controller
             ],
             'differences' => [
                 'title' => 'Ranking de diferencias',
-                'headings' => ['Auditoria', 'Producto', 'Categoria', 'Codigo', 'Sistema', 'Conteo', 'Diferencia', 'Resultado'],
+                'headings' => ['Auditoría', 'Producto', 'Categoría', 'Código', 'Sistema', 'Conteo', 'Diferencia', 'Resultado'],
                 'rows' => $payload['topDifferences']->map(fn ($row) => [
                     trim(($row['branch_name'] ?? 'Sin sucursal') . ' / ' . $row['audit_name']),
                     $row['product_name'],
@@ -605,7 +605,7 @@ class PhysicalCountReportController extends Controller
                 'title' => 'Resumen general',
                 'headings' => ['Indicador', 'Valor'],
                 'rows' => [
-                    ['Auditorias', $payload['summary']['audits'] ?? 0],
+                    ['Auditorías', $payload['summary']['audits'] ?? 0],
                     ['Registros', $payload['summary']['records'] ?? 0],
                     ['Usuarios', $payload['summary']['participants'] ?? 0],
                     ['Contados', $payload['summary']['counted_products'] ?? 0],
@@ -625,9 +625,9 @@ class PhysicalCountReportController extends Controller
                     'Tipo',
                     'Resultado',
                     'Producto',
-                    'Categoria',
+                    'Categoría',
                     'Subcategoria',
-                    'Codigo',
+                    'Código',
                     'Stock sistema',
                     'Conteo fisico',
                     'Danado',
@@ -709,7 +709,7 @@ class PhysicalCountReportController extends Controller
             'user' => $selectedUsers->isNotEmpty() ? $selectedUsers->pluck('name')->join(', ') : 'Todos',
             'category' => $selectedCategory?->name ?: 'Todas',
             'status' => match ($filters['status']) {
-                'matched' => 'Macheado',
+                'matched' => 'Coincidente',
                 'missing' => 'Faltantes',
                 'surplus' => 'Sobrantes',
                 'not_found' => 'No encontrado',

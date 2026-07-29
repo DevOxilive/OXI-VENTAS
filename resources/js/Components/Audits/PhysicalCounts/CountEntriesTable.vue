@@ -166,8 +166,7 @@ const actions = [
     icon: 'visibility',
     variant: 'blue',
     permission: [
-      'audits.physical-counts.view',
-      'audits.physical-counts.update',
+      'audits.physical-counts.count',
       'audits.physical-counts.delete',
     ],
     handler: (row) => emits('view', row)
@@ -177,7 +176,7 @@ const actions = [
     label: 'Editar',
     icon: 'edit',
     variant: 'amber',
-    permission: 'audits.physical-counts.update',
+    permission: 'audits.physical-counts.count',
     hidden: () => props.status !== 'open',
     handler: (row) => emits('edit', row)
   },

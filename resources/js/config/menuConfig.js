@@ -1,6 +1,8 @@
 export function generateMenu(role, permissions = [], branches = []) {
     const can = (permission) => permissions.includes(permission);
     const canAny = (permissionList) => permissionList.some((permission) => can(permission));
+    const canRegisterSalesAttendance =
+        ["Ventas", "Vendedor"].includes(role) && can("attendance.register");
 
     const modulePermissions = {
         employees: ["employees.view", "employees.create", "employees.update", "employees.delete"],
@@ -32,12 +34,12 @@ export function generateMenu(role, permissions = [], branches = []) {
             "inventory.purchase-orders.history",
         ],
         audits: [
-            "audits.physical-counts.view",
             "audits.physical-counts.count",
-            "audits.physical-counts.reports",
             "audits.physical-counts.view-stock",
             "audits.physical-counts.create",
-            "audits.physical-counts.update",
+            "audits.physical-counts.close",
+            "audits.physical-counts.participants",
+            "audits.physical-counts.apply",
             "audits.physical-counts.delete",
         ],
         sales: ["sales.view", "sales.create", "sales.update", "sales.delete", "sales.reports"],
@@ -47,6 +49,7 @@ export function generateMenu(role, permissions = [], branches = []) {
             "sales.cash-closures.update",
             "sales.cash-closures.delete",
         ],
+        cashClosureReports: ["sales.cash-closures.reports"],
         tickets: ["systems.tickets.view", "systems.tickets.update"],
         cashClosureTickets: [
             "systems.cash-closure-tickets.view",
@@ -83,7 +86,7 @@ export function generateMenu(role, permissions = [], branches = []) {
     |--------------------------------------------------------------------------
     */
     if (canUse("employees") || canUse("organizationStructure") || canUse("attendance") || canUse("attendanceSchedules") || canUse("attendanceScheduleAssignments") || canUse("attendanceIncidents")) {
-    if (canUse("employees") || canUse("organizationStructure") || canUse("attendance") || canUse("attendanceSchedules") || canUse("attendanceScheduleAssignments") || canUse("attendanceIncidents")) {
+    if (canUse("employees") || canUse("organizationStructure") || can("attendance.view") || can("attendance.export.excel") || can("attendance.export.pdf") || canUse("attendanceSchedules") || canUse("attendanceScheduleAssignments") || canUse("attendanceIncidents")) {
         menu.push({
             text: "Capital Humano",
             key: "human-resources",
@@ -98,7 +101,7 @@ export function generateMenu(role, permissions = [], branches = []) {
                         url: route("human-resources.employees.index"),
                     }]
                     : []),
-                ...(canUse("attendance")
+                ...(can("attendance.view") || can("attendance.export.excel") || can("attendance.export.pdf")
                     ? [{
                         text: "Asistencias",
                         key: "human-resources.attendance",
@@ -227,7 +230,8 @@ export function generateMenu(role, permissions = [], branches = []) {
             : []),
 
         ...(canUse("audits") ||
-        canUse("cashClosures") ||
+        can("audits.physical-counts.reports") ||
+        canUse("cashClosureReports") ||
         canUse("inventoryReports") ||
         canUse("branchInventory") ||
         canUse("purchaseReports") ||
@@ -263,14 +267,14 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("inventory.purchase-orders.create") ||
         can("inventory.purchase-orders.update") ||
         can("inventory.purchase-orders.history") ||
-        can("audits.physical-counts.view") ||
         can("audits.physical-counts.count") ||
-        can("audits.physical-counts.reports") ||
+        can("audits.physical-counts.view-stock") ||
         can("audits.physical-counts.create") ||
-        can("audits.physical-counts.update") ||
+        can("audits.physical-counts.close") ||
+        can("audits.physical-counts.participants") ||
+        can("audits.physical-counts.apply") ||
         can("audits.physical-counts.delete") ||
-        can("sales.cash-closures.view") ||
-        can("sales.cash-closures.create") ||
+        can("sales.cash-closures.reports") ||
         can("inventory.view") ||
         can("inventory.branches.view") ||
         canUse("products") ||
@@ -278,7 +282,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         canUse("purchaseReports") ||
         canUse("purchaseOrders") ||
         canUse("audits") ||
-        canUse("cashClosures") ||
+        canUse("cashClosureReports") ||
         canUse("inventoryReports");
 
     if (canSeeBranchesSection) {
@@ -306,7 +310,8 @@ export function generateMenu(role, permissions = [], branches = []) {
 
     if (
         canUse("sales") ||
-        canUse("cashClosures")
+        canUse("cashClosures") ||
+        canRegisterSalesAttendance
     ) {
         menu.push({
             text: "Ventas",
@@ -329,6 +334,14 @@ export function generateMenu(role, permissions = [], branches = []) {
                               url: route("ventas.cash-closures.index"),
                           },
                       ]
+                    : []),
+                ...(canRegisterSalesAttendance
+                    ? [{
+                        text: "Asistencia",
+                        key: "sales.attendance",
+                        icon: "fact_check",
+                        url: route("ventas.attendance.index"),
+                    }]
                     : []),
             ],
         });
