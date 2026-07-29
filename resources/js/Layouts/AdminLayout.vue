@@ -71,6 +71,8 @@ const routesWithDedicatedRealtime = [
     'systems.attendance.index',
     'systems.users.index',
     'ventas.attendance.index',
+    // El punto de venta conserva su captura local; una señal global no debe recargarlo.
+    'ventas.home',
 ]
 
 const relatedRealtimeScopes = Object.freeze({
