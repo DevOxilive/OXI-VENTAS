@@ -139,7 +139,6 @@ const permissionLabels = {
     "employees.update": "Editar empleados",
     "employees.delete": "Eliminar empleados",
 
-<<<<<<<<< Temporary merge branch 1
     "attendance.view": "Ver métricas, filtros y registros de asistencia",
     "attendance.register": "Registrar entrada, comida y salida",
     "attendance.manage": "Ver fotografías y ubicaciones de asistencia",

@@ -85,7 +85,6 @@ export function generateMenu(role, permissions = [], branches = []) {
     | CAPITAL HUMANO
     |--------------------------------------------------------------------------
     */
-    if (canUse("employees") || canUse("organizationStructure") || canUse("attendance") || canUse("attendanceSchedules") || canUse("attendanceScheduleAssignments") || canUse("attendanceIncidents")) {
     if (canUse("employees") || canUse("organizationStructure") || can("attendance.view") || can("attendance.export.excel") || can("attendance.export.pdf") || canUse("attendanceSchedules") || canUse("attendanceScheduleAssignments") || canUse("attendanceIncidents")) {
         menu.push({
             text: "Capital Humano",
@@ -112,15 +111,6 @@ export function generateMenu(role, permissions = [], branches = []) {
                 ...(canUse("attendanceSchedules") ? [{ text: "Horarios", key: "human-resources.attendance-schedules", icon: "schedule", url: route("human-resources.attendance-schedules.index") }] : []),
                 ...(canUse("attendanceScheduleAssignments") ? [{ text: "Asignación de horarios", key: "human-resources.attendance-schedule-assignments", icon: "assignment_ind", url: route("human-resources.attendance-schedule-assignments.index") }] : []),
                 ...(canUse("attendanceIncidents") ? [{ text: "Incidencias", key: "human-resources.attendance-incidents", icon: "event_note", url: route("human-resources.attendance-incidents.index") }] : []),
-=========
-                ...(canUse("employees")
-                    ? [{
-                        text: "Registro de empleados",
-                        key: "human-resources.employees",
-                        icon: "group",
-                        url: route("human-resources.employees.index"),
-                    }]
-                    : []),
                 ...(canUse("organizationStructure")
                     ? [{
                         text: "Registro de Departamentos",
@@ -129,7 +119,6 @@ export function generateMenu(role, permissions = [], branches = []) {
                         url: route("human-resources.departments.index"),
                     }]
                     : []),
->>>>>>>>> Temporary merge branch 2
             ],
         });
     }

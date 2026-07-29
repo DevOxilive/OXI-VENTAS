@@ -441,7 +441,6 @@ Route::middleware([
         $branchInventoryAccess,
         $inventoryReportsAccess,
         $purchaseReportsAccess,
-        $generalPurchaseOrdersAccess,
         $cashClosureReportsAccess
     ) {
         Route::get('/dashboard', fn () => Inertia::render('Inventory/Dashboard'))
