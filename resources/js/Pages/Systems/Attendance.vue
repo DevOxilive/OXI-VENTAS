@@ -49,6 +49,7 @@ const attendanceRoutePrefix = computed(() => {
 const filters = reactive({
     from: props.filters.from || '', to: props.filters.to || '', branch: props.filters.branch || '',
     department: props.filters.department || '', search: props.filters.search || '', type: props.filters.type || '',
+    per_page: Number(props.filters.per_page ?? 30),
 })
 const attendanceType = ref('check_in')
 const registeredTypesTodaySet = computed(() => new Set(props.registeredTypesToday || []))
@@ -77,6 +78,7 @@ const attendanceRegistrationToolbarConfig = computed(() => getAttendanceRegistra
     branches: props.options.branches || [],
     departments: props.options.departments || [],
     canManage: props.canManage,
+    total: Number(props.records?.total ?? 0),
 }))
 
 const columns = [
@@ -295,6 +297,7 @@ onBeforeUnmount(() => {
             :search="filters.search"
             @update:search="filters.search = $event"
             @update:filter="handleAttendanceFilter"
+            @update:records-per-page="filters.per_page = $event"
         >
             <template #actions>
                 <div v-if="canRegister || canExportExcel || canExportPdf" class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">

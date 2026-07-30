@@ -21,11 +21,20 @@ class SystemAuditController extends SystemAdministrationController
             'result' => ['nullable', 'in:success,error'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
-            'perPage' => ['nullable', 'integer'],
+            'per_page' => ['nullable', 'integer'],
         ]);
 
         $audits = SystemAudit::query()
-            ->with('user:id,name,email')
+            ->select([
+                'id',
+                'user_name',
+                'role_name',
+                'module',
+                'action',
+                'record_label',
+                'result',
+                'occurred_at',
+            ])
             ->when($filters['search'] ?? null, fn ($query, $search) => $query->where(function ($inner) use ($search) {
                 $inner->where('user_name', 'like', "%{$search}%")
                     ->orWhere('record_label', 'like', "%{$search}%")

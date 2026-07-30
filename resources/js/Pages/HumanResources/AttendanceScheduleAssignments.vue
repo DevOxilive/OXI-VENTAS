@@ -15,19 +15,24 @@ import AppButton from '@/Components/Buttons/AppButton.vue'
 import { usePermissions } from '@/Composables/usePermissions'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
 import { getAttendanceScheduleAssignmentsToolbarConfig } from '@/config/ToolbarConfigs/attendanceScheduleAssignmentsToolbarConfig'
+import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
 defineOptions({ layout: AdminLayout })
-const props = defineProps({ assignments: { type: Object, default: () => ({ data: [] }) }, employees: { type: Array, default: () => [] }, schedules: { type: Array, default: () => [] } })
+const props = defineProps({ assignments: { type: Object, default: () => ({ data: [] }) }, employees: { type: Array, default: () => [] }, schedules: { type: Array, default: () => [] }, filters: { type: Object, default: () => ({}) } })
 const page = usePage()
 const { can } = usePermissions()
+const { handlePageChange } = useGlobalTablePagination()
 let unsubscribeAssignments = null
 const defaultDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
 const days = [{ key: 'monday', label: 'Lunes' }, { key: 'tuesday', label: 'Martes' }, { key: 'wednesday', label: 'Miércoles' }, { key: 'thursday', label: 'Jueves' }, { key: 'friday', label: 'Viernes' }, { key: 'saturday', label: 'Sábado' }, { key: 'sunday', label: 'Domingo' }]
 const showModal = ref(false)
 const mode = ref('create')
 const selected = ref(null)
+const perPage = ref(Number(props.filters?.per_page ?? 30))
 const toolbarConfig = computed(() => getAttendanceScheduleAssignmentsToolbarConfig({
   canCreate: can('attendance.schedule-assignments.create'),
+  perPage: perPage.value,
+  total: props.assignments?.total ?? 0,
 }))
 const form = useForm({ employee_id: '', attendance_schedule_id: '', effective_from: new Date().toISOString().slice(0, 10), effective_to: '', active: true, observations: '', working_days: [...defaultDays] })
 const columns = [{ key: 'employee', label: 'Empleado' }, { key: 'department', label: 'Departamento' }, { key: 'position', label: 'Puesto' }, { key: 'schedule', label: 'Horario asignado' }, { key: 'effective_from', label: 'Inicio', format: 'date' }, { key: 'effective_to', label: 'Término', format: 'date', formatOptions: { fallback: 'Vigente' } }, { key: 'active', label: 'Estado', format: 'badge', formatOptions: { labelMap: { true: 'Activa', false: 'Inactiva' }, colorMap: { true: 'green', false: 'slate' } } }]
@@ -46,6 +51,10 @@ function submit() { if (mode.value === 'view') return close(); const options = g
 async function remove(row) { const result = await confirmModalAction({ mode: 'delete', entityName: 'asignación', title: 'Eliminar asignación', message: `¿Deseas eliminar únicamente la asignación de horario de ${row.employee}? El empleado se conservará.`, confirmText: 'Sí, eliminar' }); if (result.isConfirmed) form.delete(route('human-resources.attendance-schedule-assignments.destroy', row.id), getModalRequestOptions({ mode: 'delete', entityName: 'Asignación' })) }
 function action({ action, row }) { if (action === 'view') load(row, 'view'); if (action === 'edit') load(row, 'edit'); if (action === 'delete') remove(row) }
 function handleToolbarAction(action) { if (action === 'create') openCreate() }
+function updatePerPage(value) {
+  perPage.value = Number(value)
+  router.get(route('human-resources.attendance-schedule-assignments.index'), { per_page: perPage.value }, { preserveState: true, preserveScroll: true, replace: true })
+}
 function toggleWorkingDay(day) { form.working_days = form.working_days.includes(day) ? form.working_days.filter((value) => value !== day) : [...form.working_days, day] }
 
 onMounted(() => {
@@ -65,8 +74,8 @@ onBeforeUnmount(() => unsubscribeAssignments?.())
 
 <template>
   <PageLayout>
-    <GlobalToolbar v-bind="toolbarConfig" @action="handleToolbarAction" />
-    <GlobalTable :items="assignments.data || []" :columns="columns" :actions="actions" :pagination="assignments" mobile-card-header-field="employee" no-data-message="No hay asignaciones registradas." @action="action" />
+    <GlobalToolbar v-bind="toolbarConfig" @action="handleToolbarAction" @update:records-per-page="updatePerPage" />
+    <GlobalTable :items="assignments.data || []" :columns="columns" :actions="actions" :pagination="assignments" mobile-card-header-field="employee" no-data-message="No hay asignaciones registradas." @action="action" @page-change="handlePageChange" />
     <GlobalModal v-if="showModal" :title="title" subtitle="Define horario, vigencia y días laborables." :mode="mode" :total-errors="Object.keys(form.errors).length" :processing="form.processing" :show-save="mode !== 'view'" :save-button-text="mode === 'edit' ? 'Guardar cambios' : 'Guardar asignación'" :close-button-text="mode === 'view' ? 'Cerrar' : 'Cancelar'" size="md" height="auto" :columns="1" @save="submit" @close="close">
       <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="submit">
         <SelectField v-model="form.employee_id" label="Empleado" field="assignment-employee" :options="employees" :disabled="mode === 'view'" :error="form.errors.employee_id" />

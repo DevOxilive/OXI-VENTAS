@@ -4,6 +4,7 @@ export function getAttendanceRegistrationToolbarConfig({
     branches = [],
     departments = [],
     canManage = false,
+    total = 0,
 } = {}) {
     return {
         icon: 'fact_check',
@@ -11,8 +12,12 @@ export function getAttendanceRegistrationToolbarConfig({
         subtitle: 'Registra, consulta y filtra la asistencia del personal con validación del dispositivo.',
         showSearch: true,
         searchPlaceholder: 'Buscar por empleado, usuario o correo...',
-        showRecordsPerPage: false,
-        showCounter: false,
+        recordsPerPage: Number(filters.per_page ?? 30),
+        recordsPerPageOptions: [10, 30, 50, 100],
+        showRecordsPerPage: true,
+        filteredRecords: Number(total),
+        totalRecords: Number(total),
+        showCounter: true,
         compactFilters: true,
         filters: [
             { key: 'from', type: 'date', label: 'Desde', value: filters.from ?? '', max: filters.to || undefined },

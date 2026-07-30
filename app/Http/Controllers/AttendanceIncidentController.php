@@ -7,6 +7,7 @@ use App\Events\RealtimeActivityLogged;
 use App\Models\AttendanceIncident;
 use App\Models\Employee;
 use App\Services\SystemAuditService;
+use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -21,12 +22,18 @@ class AttendanceIncidentController extends Controller
             'to' => ['nullable', 'date'],
             'search' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', 'in:pending,approved,rejected'],
+            'per_page' => ['nullable', 'integer'],
         ]);
+        $filters['per_page'] = TablePagination::resolvePerPage($request, 30, [10, 30, 50, 100]);
 
         $incidents = AttendanceIncident::query()
-            ->with(['employee', 'authorizedBy', 'submittedBy'])
-            ->when($filters['from'] ?? null, fn ($query, $date) => $query->whereDate('incident_date', '>=', $date))
-            ->when($filters['to'] ?? null, fn ($query, $date) => $query->whereDate('incident_date', '<=', $date))
+            ->with([
+                'employee:id,first_name,last_name',
+                'authorizedBy:id,name',
+                'submittedBy:id,name',
+            ])
+            ->when($filters['from'] ?? null, fn ($query, $date) => $query->where('incident_date', '>=', $date))
+            ->when($filters['to'] ?? null, fn ($query, $date) => $query->where('incident_date', '<=', $date))
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
             ->when($filters['search'] ?? null, function ($query, $search) {
                 $like = '%'.$search.'%';
@@ -40,7 +47,7 @@ class AttendanceIncidentController extends Controller
             })
             ->latest('incident_date')
             ->latest()
-            ->paginate(30)
+            ->paginate($filters['per_page'])
             ->through(fn (AttendanceIncident $incident) => [
                 'id' => $incident->id,
                 'employee_id' => $incident->employee_id,

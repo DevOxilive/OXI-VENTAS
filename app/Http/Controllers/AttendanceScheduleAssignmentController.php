@@ -7,6 +7,7 @@ use App\Models\AttendanceSchedule;
 use App\Models\AttendanceScheduleAssignment;
 use App\Models\Employee;
 use App\Services\SystemAuditService;
+use App\Support\TablePagination;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -17,8 +18,10 @@ class AttendanceScheduleAssignmentController extends Controller
 {
     public function __construct(private readonly SystemAuditService $audit) {}
 
-    public function index()
+    public function index(Request $request)
     {
+        $perPage = TablePagination::resolvePerPage($request, 30, [10, 30, 50, 100]);
+
         return Inertia::render('HumanResources/AttendanceScheduleAssignments', [
             'assignments' => AttendanceScheduleAssignment::query()
                 ->with([
@@ -32,7 +35,7 @@ class AttendanceScheduleAssignmentController extends Controller
                 ])
                 ->where('assignable_type', Employee::class)
                 ->latest()
-                ->paginate(30)
+                ->paginate($perPage)
                 ->through(fn ($assignment) => $this->payload($assignment)),
             'employees' => Employee::query()
                 ->where('employment_status', '!=', 'Inactivo')
@@ -40,6 +43,9 @@ class AttendanceScheduleAssignmentController extends Controller
                 ->get(['id', 'first_name', 'last_name'])
                 ->map(fn ($employee) => ['value' => $employee->id, 'label' => trim($employee->first_name . ' ' . $employee->last_name)]),
             'schedules' => AttendanceSchedule::query()->where('active', true)->orderBy('name')->get(['id','name'])->map(fn ($schedule) => ['value' => $schedule->id, 'label' => $schedule->name]),
+            'filters' => [
+                'per_page' => $perPage,
+            ],
         ]);
     }
 

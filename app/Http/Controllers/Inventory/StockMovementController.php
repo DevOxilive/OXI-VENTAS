@@ -7,8 +7,10 @@ use App\Models\BranchProduct;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use App\Services\StockMovementService;
+use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -115,6 +117,9 @@ class StockMovementController extends Controller
         $this->authorizeMovement($request, $validated['type']);
 
         $branchProduct = BranchProduct::findOrFail($validated['branch_product_id']);
+        if (! $request->user()->hasBranchAccess((int) $branchProduct->branch_id)) {
+            throw new AuthorizationException('No tienes acceso al inventario de esta sucursal.');
+        }
 
         try {
             $hasBranchAllocations = $validated['type'] === StockMovement::TYPE_IN
@@ -173,25 +178,137 @@ class StockMovementController extends Controller
 
     public function index(Request $request)
     {
-        return Inertia::render('Inventory/Movements', [
-            'movementsDB' => StockMovement::with([
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'type' => ['nullable', Rule::in([
+                StockMovement::TYPE_IN,
+                StockMovement::TYPE_OUT,
+                StockMovement::TYPE_ADJUSTMENT,
+            ])],
+            'reason' => ['nullable', Rule::in([
+                StockMovement::REASON_PURCHASE,
+                StockMovement::REASON_SALE,
+                StockMovement::REASON_DAMAGED,
+                StockMovement::REASON_EXPIRED,
+                StockMovement::REASON_OTHER,
+                StockMovement::REASON_INVENTORY_DIFFERENCE,
+            ])],
+            'per_page' => ['nullable', 'integer'],
+        ]);
+        $filters['search'] = trim((string) ($filters['search'] ?? ''));
+        $filters['per_page'] = TablePagination::resolvePerPage($request, 50);
+
+        $user = $request->user()->loadMissing(['role', 'branches']);
+        $accessibleBranches = $user->accessibleBranchesQuery()
+            ->select(['branches.id', 'branches.name'])
+            ->orderBy('branches.name')
+            ->get();
+        $accessibleBranchIds = $accessibleBranches->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        if (($filters['branch_id'] ?? null) && ! in_array((int) $filters['branch_id'], $accessibleBranchIds, true)) {
+            throw new AuthorizationException('No tienes acceso a la sucursal seleccionada.');
+        }
+
+        $movements = StockMovement::query()
+            ->select([
+                'stock_movements.id',
+                'stock_movements.branch_product_id',
+                'stock_movements.type',
+                'stock_movements.reason',
+                'stock_movements.quantity',
+                'stock_movements.previous_stock',
+                'stock_movements.new_stock',
+                'stock_movements.created_at',
+            ])
+            ->with([
                 'branchProduct:id,branch_id,product_id',
                 'branchProduct.product:id,name',
                 'branchProduct.branch:id,name',
-                'user:id,name',
             ])
-                ->latest()
-                ->paginate(TablePagination::resolvePerPage($request, 50))
-                ->withQueryString(),
+            ->whereHas('branchProduct', fn ($query) => $query
+                ->whereIn('branch_id', $accessibleBranchIds)
+                ->when($filters['branch_id'] ?? null, fn ($branchQuery, $branchId) => $branchQuery
+                    ->where('branch_id', $branchId)))
+            ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
+            ->when($filters['reason'] ?? null, fn ($query, $reason) => $query->where('reason', $reason));
 
-            'branchProductsDB' => BranchProduct::with([
+        FlexibleSearch::apply($movements, $filters['search'], function ($query, $phrase, $terms) {
+            FlexibleSearch::orWhereHasColumns($query, 'branchProduct', ['barcode'], $phrase, $terms);
+            FlexibleSearch::orWhereHasColumns($query, 'branchProduct.product', ['name'], $phrase, $terms);
+            FlexibleSearch::orWhereHasColumns($query, 'branchProduct.product.barcodes', ['code'], $phrase, $terms);
+            FlexibleSearch::orWhereHasColumns($query, 'branchProduct.branch', ['name'], $phrase, $terms);
+        });
+
+        return Inertia::render('Inventory/Movements', [
+            'movementsDB' => $movements
+                ->latest()
+                ->paginate($filters['per_page'])
+                ->withQueryString(),
+            'filters' => $filters,
+            'branchOptions' => $accessibleBranches
+                ->map(fn ($branch) => ['value' => $branch->id, 'label' => $branch->name])
+                ->values(),
+        ]);
+    }
+
+    public function searchProducts(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'search' => ['required', 'string', 'max:100'],
+        ]);
+        $term = trim($data['search']);
+
+        if ($term === '') {
+            return response()->json(['products' => []]);
+        }
+
+        $user = $request->user()->loadMissing(['role', 'branches']);
+        $accessibleBranchIds = $user->accessibleBranchIds();
+
+        $products = BranchProduct::query()
+            ->select([
+                'branch_products.id',
+                'branch_products.branch_id',
+                'branch_products.product_id',
+                'branch_products.barcode',
+                'branch_products.stock',
+            ])
+            ->with([
                 'product:id,name',
+                'product.barcodes:id,product_id,code',
                 'branch:id,name',
             ])
-                ->where('status', BranchProduct::STATUS_ACTIVE)
-                ->orderBy('branch_id')
-                ->orderBy('product_id')
-                ->get(['id', 'branch_id', 'product_id']),
+            ->whereIn('branch_id', $accessibleBranchIds)
+            ->where('status', BranchProduct::STATUS_ACTIVE)
+            ->whereHas('product', fn ($query) => $query->where('active', true));
+
+        FlexibleSearch::apply($products, $term, function ($query, $phrase, $terms) {
+            FlexibleSearch::orWhereColumns($query, ['branch_products.barcode'], $phrase, $terms);
+            FlexibleSearch::orWhereHasColumns($query, 'product', ['name'], $phrase, $terms);
+            FlexibleSearch::orWhereHasColumns($query, 'product.barcodes', ['code'], $phrase, $terms);
+            FlexibleSearch::orWhereHasColumns($query, 'branch', ['name'], $phrase, $terms);
+        });
+
+        return response()->json([
+            'products' => $products
+                ->orderBy(
+                    \App\Models\Product::query()
+                        ->select('name')
+                        ->whereColumn('products.id', 'branch_products.product_id')
+                        ->limit(1)
+                )
+                ->limit(20)
+                ->get()
+                ->map(fn (BranchProduct $branchProduct) => [
+                    'id' => $branchProduct->id,
+                    'name' => $branchProduct->product?->name ?? 'Producto sin nombre',
+                    'branch' => $branchProduct->branch?->name ?? 'Sucursal no disponible',
+                    'code' => $branchProduct->barcode
+                        ?? $branchProduct->product?->barcodes?->first()?->code,
+                    'stock' => (float) $branchProduct->stock,
+                ])
+                ->values(),
         ]);
     }
 

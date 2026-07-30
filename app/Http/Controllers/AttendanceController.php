@@ -11,6 +11,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Services\SystemAuditService;
 use App\Services\AttendanceRuleEngine;
+use App\Support\TablePagination;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -36,25 +37,20 @@ class AttendanceController extends Controller
         $canViewEvidence = $request->user()->hasPermission('attendance.manage');
         $registeredTypesToday = $this->registeredTypesToday($request->user()->id);
         $records = $canViewAttendance
-            ? $this->recordsQuery($request, $canViewAttendance, $filters)->paginate(30)->withQueryString()
+            ? $this->recordsQuery($request, $canViewAttendance, $filters)
+                ->paginate(TablePagination::resolvePerPage($request, 30, [10, 30, 50, 100]))
+                ->withQueryString()
             : null;
-        $todayRecords = $canViewAttendance
-            ? AttendanceRecord::query()->whereDate('attendance_date', Carbon::today())->get()
-            : collect();
+        $dashboard = $canViewAttendance
+            ? $this->attendanceDashboard()
+            : [];
 
         return Inertia::render('HumanResources/Attendance', [
             'records' => $records?->through(fn (AttendanceRecord $record) => array_merge(
                 $this->recordPayload($record),
                 $canViewEvidence ? ['evidence' => $this->evidencePayload($record)] : [],
             )) ?? ['data' => []],
-            'dashboard' => $canViewAttendance ? [
-                'present' => $todayRecords->where('type', 'check_in')->pluck('user_id')->unique()->count(),
-                'late' => $todayRecords->where('status', 'late')->pluck('user_id')->unique()->count(),
-                'meal' => $this->activeCount($todayRecords, 'meal_start', 'meal_end'),
-                'break' => $this->activeCount($todayRecords, 'break_start', 'break_end'),
-                'remote' => $todayRecords->where('type', 'remote_work')->pluck('user_id')->unique()->count(),
-                'activeEmployees' => Employee::query()->where('employment_status', '!=', 'Inactivo')->count(),
-            ] : [],
+            'dashboard' => $dashboard,
             'filters' => $filters,
             'options' => [
                 'types' => collect(AttendanceRecord::TYPES)->map(fn ($type) => ['value' => $type, 'label' => $this->typeLabel($type)])->values(),
@@ -225,6 +221,7 @@ class AttendanceController extends Controller
             'department' => ['nullable', 'integer', 'exists:departments,id'],
             'search' => ['nullable', 'string', 'max:100'],
             'type' => ['nullable', 'in:'.implode(',', AttendanceRecord::TYPES)],
+            'per_page' => ['nullable', 'integer'],
         ]);
     }
     private function listingFilters(array $filters): array
@@ -240,8 +237,8 @@ class AttendanceController extends Controller
         return AttendanceRecord::query()
             ->with(['user.role', 'employee.position.department', 'branch'])
             ->when(! $canViewAllAttendance, fn ($query) => $query->where('user_id', $request->user()->id))
-            ->when($filters['from'] ?? null, fn ($query, $value) => $query->whereDate('attendance_date', '>=', $value))
-            ->when($filters['to'] ?? null, fn ($query, $value) => $query->whereDate('attendance_date', '<=', $value))
+            ->when($filters['from'] ?? null, fn ($query, $value) => $query->where('attendance_date', '>=', $value))
+            ->when($filters['to'] ?? null, fn ($query, $value) => $query->where('attendance_date', '<=', $value))
             ->when($filters['branch'] ?? null, fn ($query, $value) => $query->where('branch_id', $value))
             ->when($filters['department'] ?? null, fn ($query, $value) => $query->whereHas('employee.position', fn ($position) => $position->where('department_id', $value)))
             ->when($filters['search'] ?? null, function ($query, $value) {
@@ -275,7 +272,7 @@ class AttendanceController extends Controller
     {
         return AttendanceRecord::query()
             ->where('user_id', $userId)
-            ->whereDate('attendance_date', Carbon::today())
+            ->where('attendance_date', Carbon::today()->toDateString())
             ->pluck('type')
             ->unique()
             ->values()
@@ -286,7 +283,7 @@ class AttendanceController extends Controller
     {
         return AttendanceRecord::query()
             ->where('user_id', $userId)
-            ->whereDate('attendance_date', Carbon::today())
+            ->where('attendance_date', Carbon::today()->toDateString())
             ->where('type', $type)
             ->exists();
     }
@@ -312,7 +309,43 @@ class AttendanceController extends Controller
         ];
     }
 
-    private function activeCount($records, string $start, string $end): int { return $records->groupBy('user_id')->filter(fn ($userRecords) => optional($userRecords->sortByDesc('recorded_at')->first())->type === $start)->count(); }
+    private function attendanceDashboard(): array
+    {
+        $today = Carbon::today();
+        $aggregate = AttendanceRecord::query()
+            ->where('attendance_date', $today->toDateString())
+            ->selectRaw("COUNT(DISTINCT CASE WHEN type = 'check_in' THEN user_id END) as present")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN status = 'late' THEN user_id END) as late")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN type = 'remote_work' THEN user_id END) as remote")
+            ->first();
+
+        return [
+            'present' => (int) ($aggregate->present ?? 0),
+            'late' => (int) ($aggregate->late ?? 0),
+            'meal' => $this->activeAttendanceTypeCount($today, 'meal_start', 'meal_end'),
+            'break' => $this->activeAttendanceTypeCount($today, 'break_start', 'break_end'),
+            'remote' => (int) ($aggregate->remote ?? 0),
+            'activeEmployees' => Employee::query()
+                ->where('employment_status', '!=', 'Inactivo')
+                ->count(),
+        ];
+    }
+
+    private function activeAttendanceTypeCount(Carbon $date, string $startType, string $endType): int
+    {
+        return AttendanceRecord::query()
+            ->where('attendance_date', $date->toDateString())
+            ->where('type', $startType)
+            ->whereNotExists(function ($query) use ($date, $endType) {
+                $query->selectRaw('1')
+                    ->from('attendance_records as completed_attendance')
+                    ->whereColumn('completed_attendance.user_id', 'attendance_records.user_id')
+                    ->where('completed_attendance.attendance_date', $date->toDateString())
+                    ->where('completed_attendance.type', $endType);
+            })
+            ->distinct()
+            ->count('user_id');
+    }
     private function statusFor(string $type, Carbon $now): string { return $type === 'check_in' ? ($now->format('H:i') > '09:10' ? 'late' : 'on_time') : 'on_time'; }
     private function distanceInMeters(float $latitude, float $longitude, float $branchLatitude, float $branchLongitude): float { $earthRadius = 6371000; $latDelta = deg2rad($branchLatitude - $latitude); $lonDelta = deg2rad($branchLongitude - $longitude); $a = sin($latDelta / 2) ** 2 + cos(deg2rad($latitude)) * cos(deg2rad($branchLatitude)) * sin($lonDelta / 2) ** 2; return $earthRadius * 2 * atan2(sqrt($a), sqrt(1 - $a)); }
     private function typeLabel(string $type): string { return ['check_in'=>'Entrada','check_out'=>'Salida','meal_start'=>'Inicio de comida','meal_end'=>'Fin de comida','break_start'=>'Inicio de descanso','break_end'=>'Fin de descanso','remote_work'=>'Trabajo remoto','commission'=>'Comisión','training'=>'Capacitación'][$type] ?? $type; }
