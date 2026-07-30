@@ -32,7 +32,6 @@ export function usePhysicalCountReports(props) {
         user_scope: props.filters.user_scope || 'participants',
         category_id: props.filters.category_id || '',
         report_date: props.filters.report_date || '',
-        date_scope: props.filters.date_scope || 'day',
         status: props.filters.status || '',
         search: props.filters.search || '',
         report_type: props.filters.report_type || 'summary',
@@ -105,7 +104,6 @@ export function usePhysicalCountReports(props) {
             user_scope: form.user_scope || 'participants',
             category_id: form.category_id || '',
             report_date: form.report_date || '',
-            date_scope: form.date_scope || 'day',
             status: form.status || '',
             search: form.search || '',
             report_type: form.report_type || 'summary',
@@ -164,7 +162,6 @@ export function usePhysicalCountReports(props) {
         form.user_scope = 'participants'
         form.category_id = ''
         form.report_date = ''
-        form.date_scope = 'day'
         form.status = ''
         form.search = ''
         form.report_type = 'summary'
@@ -241,7 +238,6 @@ export function usePhysicalCountReports(props) {
             form.user_scope = filters.user_scope || 'participants'
             form.category_id = filters.category_id || ''
             form.report_date = filters.report_date || ''
-            form.date_scope = filters.date_scope || 'day'
             form.status = filters.status || ''
             form.search = filters.search || ''
             form.report_type = filters.report_type || 'summary'
@@ -261,7 +257,6 @@ export function usePhysicalCountReports(props) {
             user_scope: form.user_scope,
             category_id: form.category_id,
             report_date: form.report_date,
-            date_scope: form.date_scope,
             status: form.status,
             search: form.search,
             report_type: form.report_type,

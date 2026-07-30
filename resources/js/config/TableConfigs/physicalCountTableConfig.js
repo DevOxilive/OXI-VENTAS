@@ -62,7 +62,7 @@ export const physicalCountTableConfig = {
             label: "Reabrir auditoría",
             icon: "restart_alt",
             variant: "green",
-            permission: "audits.physical-counts.close",
+            permission: "audits.physical-counts.reopen",
             hidden: (item) => !["closed", "applied"].includes(item.status),
         },
         {

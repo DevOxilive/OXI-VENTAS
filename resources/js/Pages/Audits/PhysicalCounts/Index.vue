@@ -95,25 +95,25 @@ function reloadPhysicalCounts() {
 }
 
 function handleToolbarAction(action) {
-    if (action === 'create') {
+    if (action === 'create' && can('audits.physical-counts.create')) {
         showCreateModal.value = true
         return
     }
 }
 
 async function handleTableAction({ action, row }) {
-    if (action === 'open') {
+    if (action === 'open' && can('audits.physical-counts.count')) {
         router.visit(route('audits.physical-counts.show', row.id))
         return
     }
 
-    if (action === 'participants') {
+    if (action === 'participants' && can('audits.physical-counts.participants')) {
         selectedPhysicalCount.value = row
         showParticipantsModal.value = true
         return
     }
 
-    if (action === 'close') {
+    if (action === 'close' && can('audits.physical-counts.close')) {
         const result = await confirmModalAction({
             mode: 'update',
             title: 'Cerrar auditoría',
@@ -139,14 +139,14 @@ async function handleTableAction({ action, row }) {
         return
     }
 
-    if (action === 'reopen') {
+    if (action === 'reopen' && can('audits.physical-counts.reopen')) {
         selectedPhysicalCount.value = row
         showReopenModal.value = true
 
         return
     }
 
-    if (action === 'apply') {
+    if (action === 'apply' && can('audits.physical-counts.apply')) {
         const result = await confirmModalAction({
             mode: 'update',
             title: 'Aplicar ajustes',
@@ -174,7 +174,7 @@ async function handleTableAction({ action, row }) {
         return
     }
 
-    if (action === 'delete') {
+    if (action === 'delete' && can('audits.physical-counts.delete')) {
         const result = await confirmModalAction({
             mode: 'delete',
             title: 'Eliminar auditoría',
@@ -200,7 +200,11 @@ async function handleTableAction({ action, row }) {
 }
 
 function reopenPhysicalCount(scope) {
-    if (!selectedPhysicalCount.value || reopeningPhysicalCount.value) return
+    if (
+        !can('audits.physical-counts.reopen')
+        || !selectedPhysicalCount.value
+        || reopeningPhysicalCount.value
+    ) return
 
     reopeningPhysicalCount.value = true
 
@@ -293,6 +297,7 @@ watch(search, () => {
         />
 
         <ReopenPhysicalCountModal
+            v-if="can('audits.physical-counts.reopen')"
             :show="showReopenModal"
             :physical-count="selectedPhysicalCount"
             :processing="reopeningPhysicalCount"

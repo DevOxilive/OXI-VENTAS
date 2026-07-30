@@ -17,6 +17,7 @@ use PhpOffice\PhpSpreadsheet\Chart\Legend;
 use PhpOffice\PhpSpreadsheet\Chart\PlotArea;
 use PhpOffice\PhpSpreadsheet\Chart\Title;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -145,6 +146,7 @@ class PhysicalCountBranchSummarySheet implements FromArray, ShouldAutoSize, With
                 $sheet->freezePane('A2');
                 $sheet->getTabColor()->setRGB('0F766E');
                 $sheet->getStyle("A1:K{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle("A1:K{$highestRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
                 $sheet->getStyle("A1:K1")->getAlignment()->setWrapText(true);
                 $sheet->setShowGridlines(false);
             },

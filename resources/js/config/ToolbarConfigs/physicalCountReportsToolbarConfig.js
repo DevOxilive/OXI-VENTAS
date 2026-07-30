@@ -87,19 +87,8 @@ export function getPhysicalCountReportsToolbarConfig({
                 ],
             },
             {
-                key: 'date_scope',
-                label: 'Lectura',
-                placeholder: 'Tipo de fecha',
-                value: form.date_scope,
-                options: [
-                    { label: 'Por día', value: 'day' },
-                    { label: 'Por mes', value: 'month' },
-                    { label: 'Por año', value: 'year' },
-                ],
-            },
-            {
                 key: 'report_date',
-                label: 'Fecha',
+                label: 'Fecha de auditoría',
                 type: 'date',
                 value: form.report_date,
             },

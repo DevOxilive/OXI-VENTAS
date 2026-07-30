@@ -76,11 +76,18 @@ class PhysicalCountReportController extends Controller
     {
         abort_unless($this->canViewReports($request), 403, 'No tienes permisos para exportar reportes de auditoría.');
 
+        // El libro contiene varias hojas, gráficas y resúmenes; ampliamos el
+        // margen solo durante esta descarga para evitar que el navegador aborte
+        // la petición en auditorías grandes.
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
         $branches = $this->resolveReportBranches($request);
         $branch = $branches->count() === 1 ? $branches->first() : null;
         $filters = $this->normalizeFilters($request, $branch);
         $payload = $this->buildReportPayload($branches, $filters, false);
         $filterLabels = $this->buildFilterLabels($filters, $payload['audits']);
+        $filterLabels['generated_by'] = $request->user()?->name ?? 'Usuario autenticado';
         $branchLabel = $branch?->name ?? 'Todas las sucursales';
         $fileBranch = $branch?->slug ?? 'todas-las-sucursales';
 
@@ -125,15 +132,10 @@ class PhysicalCountReportController extends Controller
         $audits = PhysicalCount::with(['branch', 'creator', 'participants:id,name'])
             ->whereIn('branch_id', $branchIds)
             ->when($filters['physical_count_id'], fn ($query, $id) => $query->where('id', $id))
-            ->when($filters['report_date'], function ($query) use ($filters) {
-                return match ($filters['date_scope']) {
-                    'year' => $query->whereYear('started_at', substr($filters['report_date'], 0, 4)),
-                    'month' => $query
-                        ->whereYear('started_at', substr($filters['report_date'], 0, 4))
-                        ->whereMonth('started_at', substr($filters['report_date'], 5, 2)),
-                    default => $query->whereDate('started_at', $filters['report_date']),
-                };
-            })
+            ->when(
+                $filters['report_date'],
+                fn ($query, $date) => $query->whereDate('started_at', $date)
+            )
             ->latest()
             ->get();
 
@@ -354,12 +356,19 @@ class PhysicalCountReportController extends Controller
             'audits' => $audits->count(),
             'records' => $entries->count(),
             'participants' => $entries->pluck('user_id')->filter()->unique()->count(),
+            'total_products' => $reportRows->count(),
             'counted_products' => $reportRows->where('row_type', 'counted')->count(),
             'pending_products' => $reportRows->where('row_type', 'pending')->count(),
             'missing_products' => $reportRows->where('status', 'missing')->count(),
             'surplus_products' => $reportRows->where('status', 'surplus')->count(),
             'matched_products' => $reportRows->where('status', 'matched')->count(),
         ];
+        $summary['advance'] = $summary['total_products'] > 0
+            ? $summary['counted_products'] / $summary['total_products']
+            : 0;
+        $summary['accuracy'] = $summary['counted_products'] > 0
+            ? $summary['matched_products'] / $summary['counted_products']
+            : 0;
 
         $reportPagination = null;
         if ($paginate) {
@@ -669,7 +678,6 @@ class PhysicalCountReportController extends Controller
             'user_scope' => $request->input('user_scope', 'participants'),
             'category_id' => $request->input('category_id'),
             'report_date' => $request->input('report_date'),
-            'date_scope' => $request->input('date_scope', 'day'),
             'status' => $request->input('status', ''),
             'search' => trim((string) $request->input('search', '')),
             'report_type' => $request->input('report_type', 'summary'),
@@ -714,11 +722,6 @@ class PhysicalCountReportController extends Controller
                 'surplus' => 'Sobrantes',
                 'not_found' => 'No encontrado',
                 default => 'Todos',
-            },
-            'date_scope' => match ($filters['date_scope']) {
-                'year' => 'Por ano',
-                'month' => 'Por mes',
-                default => 'Por dia',
             },
             'report_date' => $filters['report_date'] ?: 'Sin fecha',
             'search' => $filters['search'] ?: 'Sin filtro',
