@@ -8,6 +8,7 @@ return new class extends Migration
     private array $replacements = [
         'audits.physical-counts.update' => [
             'audits.physical-counts.close',
+            'audits.physical-counts.reopen',
             'audits.physical-counts.participants',
             'audits.physical-counts.apply',
         ],

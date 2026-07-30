@@ -4,19 +4,20 @@ namespace App\Exports;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithColumnFormatting, WithEvents, WithStyles, WithTitle
+class PhysicalCountConcentratedSheet implements FromArray, WithColumnFormatting, WithEvents, WithStyles, WithTitle
 {
     protected Collection $entries;
 
@@ -31,42 +32,46 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
 
     public function array(): array
     {
-        return [
-            $this->headings(),
-            ...$this->rows(),
-        ];
+        return [$this->headings(), ...$this->rows()];
     }
 
     public function headings(): array
     {
         $headings = [
-            null,
-            'Codigo de barras',
-            'Descripcion Producto',
-            'Stock Actual',
-            'Stock.Nuevo',
+            'Sucursal',
+            'Auditoría',
+            'Folio',
+            'Fecha',
+            'Código de barras',
+            'Descripción del producto',
+            'Categoría',
+            'Stock inicial',
+            'Stock nuevo',
         ];
 
         foreach ($this->users as $user) {
-            $headings[] = 'Conteo Fisico ' . $user->name;
-            $headings[] = 'Dañado detec. ' . $user->name;
-            $headings[] = 'Caducado detec. ' . $user->name;
+            $headings[] = 'Conteo físico ' . $user->name;
+            $headings[] = 'Dañado ' . $user->name;
+            $headings[] = 'Caducado ' . $user->name;
         }
 
         return [
             ...$headings,
-            'Total Conteo fisico',
-            'Total Dañado',
-            'Total Caducado',
-            'Ventas del dia',
-            'Diferencias Total',
+            'Total conteo físico',
+            'Total dañado',
+            'Total caducado',
+            'Diferencia',
+            'Diferencia %',
+            'Resultado',
+            'Participantes',
+            'Última captura',
         ];
     }
 
     protected function rows(): array
     {
-        $entriesByProductUser = $this->entries
-            ->groupBy(fn ($entry) => $entry->branch_product_id . ':' . $entry->user_id)
+        $entriesByAuditProductUser = $this->entries
+            ->groupBy(fn ($entry) => $entry->physical_count_id . ':' . $entry->branch_product_id . ':' . $entry->user_id)
             ->map(fn ($group) => [
                 'counted' => (float) $group->sum('counted_quantity'),
                 'damaged' => (float) $group->sum('damaged_quantity'),
@@ -75,40 +80,55 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
 
         return $this->filteredRows()
             ->values()
-            ->map(function (array $row, int $index) use ($entriesByProductUser) {
+            ->map(function (array $row, int $index) use ($entriesByAuditProductUser) {
                 $sheetRow = $index + 2;
-                $countCells = $this->userColumnCells($sheetRow, 6);
-                $damagedCells = $this->userColumnCells($sheetRow, 7);
-                $expiredCells = $this->userColumnCells($sheetRow, 8);
+                $countCells = $this->userColumnCells($sheetRow, 10);
+                $damagedCells = $this->userColumnCells($sheetRow, 11);
+                $expiredCells = $this->userColumnCells($sheetRow, 12);
+                $userGroups = $this->users->mapWithKeys(function ($user) use ($row, $entriesByAuditProductUser) {
+                    $key = ($row['physical_count_id'] ?? 0) . ':' . ($row['branch_product_id'] ?? 0) . ':' . $user->id;
+                    return [$user->id => $entriesByAuditProductUser->get($key, ['counted' => 0, 'damaged' => 0, 'expired' => 0])];
+                });
+                $totalCounted = (float) $userGroups->sum('counted');
+                $totalDamaged = (float) $userGroups->sum('damaged');
+                $totalExpired = (float) $userGroups->sum('expired');
+                $hasCount = $userGroups->contains(fn ($values) => ($values['counted'] ?? 0) > 0 || ($values['damaged'] ?? 0) > 0 || ($values['expired'] ?? 0) > 0);
+                $newStock = $hasCount ? max(0, $totalCounted - $totalDamaged - $totalExpired) : null;
+                $systemStock = (float) ($row['system_stock'] ?? 0);
+                $difference = $newStock === null ? null : $newStock - $systemStock;
+
                 $line = [
-                    null,
+                    $row['branch_name'] ?? 'Sin sucursal',
+                    $row['audit_name'] ?? 'Sin auditoría',
+                    $row['folio'] ?? 'Sin folio',
+                    $row['audit_date'] ?? null,
                     $row['scanned_code'] ?? '-',
                     $row['product_name'] ?? 'Sin producto',
+                    $row['category_name'] ?? 'Sin categoría',
                     (float) ($row['system_stock'] ?? 0),
-                    $this->users->isEmpty()
-                        ? 'S/D'
-                        : '=IF(COUNT(' . implode(',', $countCells) . ')=0,"S/D",SUM(' . implode(',', $countCells) . ')-SUM(' . implode(',', $damagedCells) . ')-SUM(' . implode(',', $expiredCells) . '))',
+                    $newStock ?? 'Sin datos de conteo',
                 ];
 
                 foreach ($this->users as $user) {
-                    $key = ($row['branch_product_id'] ?? 0) . ':' . $user->id;
-                    $userCount = $entriesByProductUser->get($key, ['counted' => '', 'damaged' => '', 'expired' => '']);
-
-                    $line[] = $userCount['counted'] === 0.0 ? '' : $userCount['counted'];
-                    $line[] = $userCount['damaged'] === 0.0 ? '' : $userCount['damaged'];
-                    $line[] = $userCount['expired'] === 0.0 ? '' : $userCount['expired'];
+                    $key = ($row['physical_count_id'] ?? 0) . ':' . ($row['branch_product_id'] ?? 0) . ':' . $user->id;
+                    $values = $entriesByAuditProductUser->get($key, ['counted' => '', 'damaged' => '', 'expired' => '']);
+                    $line[] = $values['counted'] === 0.0 ? '' : $values['counted'];
+                    $line[] = $values['damaged'] === 0.0 ? '' : $values['damaged'];
+                    $line[] = $values['expired'] === 0.0 ? '' : $values['expired'];
                 }
 
                 return [
                     ...$line,
-                    $this->users->isEmpty() ? 'S/TF' : '=IF(COUNT(' . implode(',', $countCells) . ')=0,"S/TF",SUM(' . implode(',', $countCells) . '))',
-                    $this->users->isEmpty() ? 'S/TD' : '=IF(COUNT(' . implode(',', $countCells) . ')=0,"S/TD",SUM(' . implode(',', $damagedCells) . '))',
-                    $this->users->isEmpty() ? 'S/TC' : '=IF(COUNT(' . implode(',', $countCells) . ')=0,"S/TC",SUM(' . implode(',', $expiredCells) . '))',
-                    0,
-                    "=IF(D{$sheetRow}=\"\",\"----\",IFERROR(E{$sheetRow}-D{$sheetRow},\"S/DIF\"))",
+                    $hasCount ? $totalCounted : 'Sin datos de conteo',
+                    $hasCount ? $totalDamaged : 'Sin datos de conteo',
+                    $hasCount ? $totalExpired : 'Sin datos de conteo',
+                    $difference ?? 'Sin diferencia calculable',
+                    ($difference !== null && $systemStock != 0) ? $difference / abs($systemStock) : 0,
+                    $row['status_label'] ?? 'Pendiente',
+                    implode(', ', $row['participants'] ?? []),
+                    $row['last_entry_at'] ?? null,
                 ];
             })
-            ->values()
             ->all();
     }
 
@@ -117,25 +137,15 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
         $rows = collect($this->payload['reportRows'] ?? []);
 
         if ($this->statusFilter === 'not_found') {
-            return collect();
+            return $rows->where('row_type', 'pending')->values();
         }
 
         if (! $this->statusFilter) {
-            return $rows
-                ->where('row_type', 'counted')
-                ->values();
+            return $rows->values();
         }
 
-        return $rows
-            ->filter(function (array $row) {
-                return match ($this->statusFilter) {
-                    'matched' => ($row['row_type'] ?? null) === 'counted' && ($row['status'] ?? null) === 'matched',
-                    'missing' => ($row['row_type'] ?? null) === 'counted' && ($row['status'] ?? null) === 'missing',
-                    'surplus' => ($row['row_type'] ?? null) === 'counted' && ($row['status'] ?? null) === 'surplus',
-                    default => true,
-                };
-            })
-            ->values();
+        return $rows->filter(fn (array $row) => ($row['row_type'] ?? null) === 'counted'
+            && ($row['status'] ?? null) === $this->statusFilter)->values();
     }
 
     protected function userColumnCells(int $row, int $firstColumn): array
@@ -148,52 +158,55 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
 
     public function styles(Worksheet $sheet): array
     {
-        return [
-            1 => [
-                'font' => ['bold' => false, 'color' => ['rgb' => $this->headerFontColor()]],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $this->headerColor()]],
-            ],
-        ];
+        return [1 => ['font' => ['bold' => true, 'color' => ['rgb' => $this->headerFontColor()]], 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $this->headerColor()]]]];
     }
 
     public function columnFormats(): array
     {
+        $differencePercentColumn = Coordinate::stringFromColumnIndex(15 + ($this->users->count() * 3));
+
         return [
-            'B' => NumberFormat::FORMAT_TEXT,
+            'D' => 'yyyy-mm-dd',
+            'E' => NumberFormat::FORMAT_TEXT,
+            'H:'.$differencePercentColumn => '#,##0.00',
+            $differencePercentColumn => '0.00%',
         ];
     }
 
     public function registerEvents(): array
     {
-        return [
-            AfterSheet::class => function (AfterSheet $event) {
-                $sheet = $event->sheet->getDelegate();
-                $highestRow = $sheet->getHighestRow();
-                $highestColumn = $sheet->getHighestColumn();
+        return [AfterSheet::class => function (AfterSheet $event) {
+            $sheet = $event->sheet->getDelegate();
+            $highestRow = $sheet->getHighestRow();
+            $highestColumn = $sheet->getHighestColumn();
+            $lastColumnIndex = Coordinate::columnIndexFromString($highestColumn);
+            $resultColumn = Coordinate::stringFromColumnIndex($lastColumnIndex - 2);
 
-                $sheet->setAutoFilter("A1:{$highestColumn}{$highestRow}");
-                $sheet->freezePane('A2');
-                $sheet->getTabColor()->setRGB($this->headerColor());
-                $sheet->getStyle("A1:{$highestColumn}1")->getAlignment()->setWrapText(true);
-                $sheet->getStyle("A1:{$highestColumn}{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-                $lastNumericColumn = Coordinate::stringFromColumnIndex(max(4, Coordinate::columnIndexFromString($highestColumn) - 1));
-                $sheet->getStyle("D2:{$lastNumericColumn}{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
-
-                $this->applyResultColors($sheet, $highestColumn);
-
-                for ($column = 1; $column <= Coordinate::columnIndexFromString($highestColumn); $column++) {
-                    $letter = Coordinate::stringFromColumnIndex($column);
-                    $sheet->getColumnDimension($letter)->setWidth(match ($column) {
-                        1 => 12.63,
-                        2 => 36.38,
-                        3 => 43.88,
-                        4 => 15.88,
-                        5 => 15.38,
-                        default => $column % 2 === 0 ? 16.75 : 13,
-                    });
-                }
-            },
-        ];
+            $sheet->setAutoFilter("A1:{$highestColumn}{$highestRow}");
+            $sheet->freezePane('F2');
+            $sheet->setShowGridlines(false);
+            $sheet->getTabColor()->setRGB($this->headerColor());
+            $sheet->getStyle("A1:{$highestColumn}{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            $sheet->getStyle("A1:{$highestColumn}1")->getAlignment()->setWrapText(true);
+            $sheet->getStyle("A1:{$highestColumn}{$highestRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+            for ($row = 2; $row <= $highestRow; $row++) {
+                $sheet->getCell("E{$row}")->setValueExplicit((string) $sheet->getCell("E{$row}")->getValue(), DataType::TYPE_STRING);
+            }
+            $sheet->getColumnDimension('A')->setWidth(24);
+            $sheet->getColumnDimension('B')->setWidth(30);
+            $sheet->getColumnDimension('C')->setWidth(18);
+            $sheet->getColumnDimension('D')->setWidth(14);
+            $sheet->getColumnDimension('E')->setWidth(24);
+            $sheet->getColumnDimension('F')->setWidth(44);
+            $sheet->getColumnDimension('G')->setWidth(24);
+            for ($column = 9; $column <= $lastColumnIndex; $column++) {
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($column))->setWidth($column >= $lastColumnIndex - 2 ? 24 : 15);
+            }
+            $sheet->getStyle("{$resultColumn}2:{$resultColumn}{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $this->applyResultColors($sheet, $highestColumn);
+            $sheet->getPageSetup()->setOrientation('landscape')->setFitToWidth(1)->setFitToHeight(0);
+            $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd(1, 1);
+        }];
     }
 
     public function title(): string
@@ -203,62 +216,29 @@ class PhysicalCountConcentratedSheet implements FromArray, ShouldAutoSize, WithC
 
     protected function applyResultColors(Worksheet $sheet, string $highestColumn): void
     {
-        $this->filteredRows()
-            ->values()
-            ->each(function (array $row, int $index) use ($sheet, $highestColumn) {
-                $sheetRow = $index + 2;
-                $color = $this->resultFillColor($this->resultKey($row));
-
-                if (! $color) {
-                    return;
-                }
-
-                $sheet->getStyle("A{$sheetRow}:{$highestColumn}{$sheetRow}")
-                    ->getFill()
-                    ->setFillType(Fill::FILL_SOLID)
-                    ->getStartColor()
-                    ->setRGB($color);
-            });
-    }
-
-    protected function resultKey(array $row): ?string
-    {
-        if (($row['row_type'] ?? null) === 'pending') {
-            return 'not_found';
-        }
-
-        return $row['status'] ?? $this->statusFilter;
+        $this->filteredRows()->values()->each(function (array $row, int $index) use ($sheet, $highestColumn) {
+            $color = match (($row['row_type'] ?? null) === 'pending' ? 'not_found' : ($row['status'] ?? null)) {
+                'matched' => 'DCFCE7',
+                'missing' => 'FFEDD5',
+                'surplus' => 'FEF9C3',
+                'not_found' => 'DBEAFE',
+                default => null,
+            };
+            if ($color) {
+                $sheet->getStyle('A' . ($index + 2) . ':' . $highestColumn . ($index + 2))->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($color);
+            }
+        });
     }
 
     protected function headerColor(): string
     {
-        return $this->resultHeaderColor($this->statusFilter) ?? '5B3F86';
+        return match ($this->statusFilter) {
+            'matched' => '16A34A', 'missing' => 'FB923C', 'surplus' => 'FDE047', 'not_found' => '2563EB', default => '5B3F86',
+        };
     }
 
     protected function headerFontColor(): string
     {
         return $this->statusFilter === 'surplus' ? '111827' : 'FFFFFF';
-    }
-
-    protected function resultHeaderColor(?string $result): ?string
-    {
-        return match ($result) {
-            'matched' => '16A34A',
-            'missing' => 'FB923C',
-            'surplus' => 'FDE047',
-            'not_found' => '2563EB',
-            default => null,
-        };
-    }
-
-    protected function resultFillColor(?string $result): ?string
-    {
-        return match ($result) {
-            'matched' => 'DCFCE7',
-            'missing' => 'FFEDD5',
-            'surplus' => 'FEF9C3',
-            'not_found' => 'DBEAFE',
-            default => null,
-        };
     }
 }

@@ -19,11 +19,12 @@ class DeleteAccountTest extends TestCase
 
         $this->actingAs($user = User::factory()->create());
 
-        $this->delete('/user', [
+        $response = $this->delete('/user', [
             'password' => 'password',
         ]);
 
-        $this->assertNull($user->fresh());
+        $response->assertSessionHasNoErrors();
+        $this->assertSoftDeleted($user);
     }
 
     public function test_correct_password_must_be_provided_before_account_can_be_deleted(): void
@@ -38,6 +39,6 @@ class DeleteAccountTest extends TestCase
             'password' => 'wrong-password',
         ]);
 
-        $this->assertNotNull($user->fresh());
+        $this->assertNotSoftDeleted($user);
     }
 }

@@ -65,8 +65,8 @@
             <td>{{ $filterLabels['status'] ?? 'Todos' }}</td>
         </tr>
         <tr>
-            <th>Periodo</th>
-            <td>{{ $filterLabels['report_date'] ?? 'Sin fecha' }} ({{ $filterLabels['date_scope'] ?? 'Por día' }})</td>
+            <th>Fecha de auditoría</th>
+            <td>{{ $filterLabels['report_date'] ?? 'Sin fecha' }}</td>
             <th>Búsqueda</th>
             <td>{{ $filterLabels['search'] ?? 'Sin filtro' }}</td>
         </tr>

@@ -272,6 +272,7 @@ class PhysicalCountController extends Controller
     public function update(Request $request, PhysicalCount $physicalCount)
     {
         $this->abortUnless($request, 'audits.physical-counts.participants');
+        $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -300,6 +301,7 @@ class PhysicalCountController extends Controller
     public function destroy(Request $request, PhysicalCount $physicalCount)
     {
         $this->abortUnless($request, 'audits.physical-counts.delete');
+        $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
 
         if ($physicalCount->status !== 'open') {
             return back()->withErrors([
@@ -339,8 +341,20 @@ class PhysicalCountController extends Controller
         ]);
     }
 
-    public function showEntry(PhysicalCountEntry $entry)
+    public function showEntry(Request $request, PhysicalCountEntry $entry)
     {
+        $entry->load('physicalCount.branch');
+        $this->abortIfUserCannotAccessBranch($request, $entry->physicalCount->branch);
+
+        $user = $request->user();
+        abort_unless(
+            ($user?->hasPermission('audits.physical-counts.count')
+                && $this->isAssignedParticipant($user, $entry->physicalCount))
+            || $user?->hasPermission('audits.physical-counts.delete'),
+            403,
+            'No tienes permisos para consultar este registro de auditoría.'
+        );
+
         return response()->json(
             $entry->load(['branchProduct.product', 'productBatch', 'user', 'physicalCount'])
         );
@@ -466,6 +480,7 @@ class PhysicalCountController extends Controller
     {
         $entry->load('physicalCount');
         $this->abortUnless($request, 'audits.physical-counts.delete');
+        $this->abortIfUserCannotAccessBranch($request, $entry->physicalCount->branch);
 
         if (! $this->canCaptureInStatus($entry->physicalCount)) {
             return back()->withErrors([
@@ -676,6 +691,7 @@ class PhysicalCountController extends Controller
     public function close(Request $request, PhysicalCount $physicalCount)
     {
         $this->abortUnless($request, 'audits.physical-counts.close');
+        $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
 
         if (! in_array($physicalCount->status, ['open', 'applied'], true)) {
             return back()->withErrors([
@@ -696,7 +712,8 @@ class PhysicalCountController extends Controller
 
     public function reopen(Request $request, PhysicalCount $physicalCount)
     {
-        $this->abortUnless($request, 'audits.physical-counts.close');
+        $this->abortUnless($request, 'audits.physical-counts.reopen');
+        $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
 
         if (! in_array($physicalCount->status, ['closed', 'applied'], true)) {
             return back()->withErrors([
@@ -730,6 +747,7 @@ class PhysicalCountController extends Controller
     public function applyAdjustments(Request $request, PhysicalCount $physicalCount)
     {
         $this->abortUnless($request, 'audits.physical-counts.apply');
+        $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
 
         if (! in_array($physicalCount->status, ['closed', 'applied'], true)) {
             return back()->withErrors([
@@ -865,6 +883,7 @@ class PhysicalCountController extends Controller
     public function exportPdf(Request $request, PhysicalCount $physicalCount)
     {
         abort_unless($this->canViewReports($request), 403, 'No tienes permisos para exportar reportes de auditoría.');
+        $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
 
         $physicalCount->load(['branch', 'creator', 'snapshot.items']);
         $entriesQuery = $this->currentRoundEntriesQuery($physicalCount);
@@ -896,6 +915,7 @@ class PhysicalCountController extends Controller
     public function exportExcel(Request $request, PhysicalCount $physicalCount)
     {
         abort_unless($this->canViewReports($request), 403, 'No tienes permisos para exportar reportes de auditoría.');
+        $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
 
         return Excel::download(
             new PhysicalCountExport($physicalCount),
@@ -1134,6 +1154,7 @@ class PhysicalCountController extends Controller
     {
         return (bool) ($user?->hasPermission('audits.physical-counts.create')
             || $user?->hasPermission('audits.physical-counts.close')
+            || $user?->hasPermission('audits.physical-counts.reopen')
             || $user?->hasPermission('audits.physical-counts.participants')
             || $user?->hasPermission('audits.physical-counts.apply')
             || $user?->hasPermission('audits.physical-counts.delete'));
@@ -1182,6 +1203,7 @@ class PhysicalCountController extends Controller
     private function abortIfCannotCapture(Request $request, PhysicalCount $physicalCount): void
     {
         $user = $request->user();
+        $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
 
         abort_unless(
             $user?->hasPermission('audits.physical-counts.count') && $this->isAssignedParticipant($user, $physicalCount),

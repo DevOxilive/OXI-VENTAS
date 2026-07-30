@@ -109,6 +109,7 @@ class PermissionSeeder extends Seeder
             'audits.physical-counts.view-stock',
             'audits.physical-counts.create',
             'audits.physical-counts.close',
+            'audits.physical-counts.reopen',
             'audits.physical-counts.participants',
             'audits.physical-counts.apply',
             'audits.physical-counts.delete',

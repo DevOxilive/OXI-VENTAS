@@ -12,9 +12,11 @@ return new class extends Migration
             return;
         }
 
-        DB::statement(
-            "ALTER TABLE purchase_orders MODIFY status ENUM('DRAFT', 'GENERATED', 'COMPLETED', 'CANCELLED') NOT NULL DEFAULT 'DRAFT'"
-        );
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement(
+                "ALTER TABLE purchase_orders MODIFY status ENUM('DRAFT', 'GENERATED', 'COMPLETED', 'CANCELLED') NOT NULL DEFAULT 'DRAFT'"
+            );
+        }
 
         DB::transaction(function () {
             DB::table('purchase_reports')

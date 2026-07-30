@@ -50,11 +50,30 @@ class PhysicalCountAuditWorkbookExport implements WithMultipleSheets
     {
         $sheets = [
             new PhysicalCountDashboardSheet($this->payload, $this->filterLabels, $this->branchName, $this->mainSheetTitle, $this->users, $this->statusFilter),
+            new PhysicalCountControlSheet($this->payload, $this->filterLabels, $this->branchName),
             new PhysicalCountConcentratedSheet($this->payload, $this->users, $this->mainSheetTitle, $this->statusFilter),
+            new PhysicalCountConsolidatedCountsSheet($this->payload),
+            new PhysicalCountPendingSheet($this->payload),
+            new PhysicalCountDifferencesSheet($this->payload),
+            new PhysicalCountAuditSummarySheet($this->payload),
+            new PhysicalCountBranchSummarySheet($this->payload),
+            new PhysicalCountCategorySummarySheet($this->payload),
         ];
 
+        $usedTitles = collect($sheets)->map(fn ($sheet) => mb_strtolower($sheet->title()))->all();
+
         foreach ($this->users as $user) {
-            $sheets[] = new PhysicalCountUserSheet($this->payload, $user, $this->mainSheetTitle);
+            $baseTitle = $this->safeSheetTitle((string) $user->name);
+            $title = $baseTitle;
+            $suffix = 2;
+
+            while (in_array(mb_strtolower($title), $usedTitles, true)) {
+                $suffixText = ' ' . $suffix++;
+                $title = mb_substr($baseTitle, 0, 31 - mb_strlen($suffixText)) . $suffixText;
+            }
+
+            $usedTitles[] = mb_strtolower($title);
+            $sheets[] = new PhysicalCountUserSheet($this->payload, $user, $title);
         }
 
         return $sheets;
@@ -69,5 +88,12 @@ class PhysicalCountAuditWorkbookExport implements WithMultipleSheets
             'not_found' => 'No encontrado',
             default => null,
         };
+    }
+
+    protected function safeSheetTitle(string $title): string
+    {
+        $title = preg_replace('/[\\\\\\/?*\\[\\]:]/', '', $title);
+
+        return mb_substr(trim((string) $title) ?: 'Usuario', 0, 31);
     }
 }
