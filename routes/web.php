@@ -509,6 +509,10 @@ Route::middleware([
             ->middleware($branchInventoryAccess)
             ->name('stock-movements.index');
 
+        Route::get('/stock-movements/products/search', [StockMovementController::class, 'searchProducts'])
+            ->middleware($branchInventoryAccess)
+            ->name('stock-movements.products.search');
+
         Route::post('/stock-movements', [StockMovementController::class, 'store'])
             ->middleware('permission:inventory.branches.create,inventory.branches.update')
             ->name('stock-movements.store');

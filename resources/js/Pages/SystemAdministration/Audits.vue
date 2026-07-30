@@ -11,7 +11,13 @@ import SelectField from '@/Components/Forms/SelectField.vue'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
 
 const props = defineProps({ audits: Object, filters: Object, modules: Array })
-const form = reactive({ search: props.filters.search ?? '', module: props.filters.module ?? '', from: props.filters.from ?? '', to: props.filters.to ?? '' })
+const form = reactive({
+    search: props.filters.search ?? '',
+    module: props.filters.module ?? '',
+    from: props.filters.from ?? '',
+    to: props.filters.to ?? '',
+    per_page: Number(props.filters.per_page ?? 50),
+})
 const filter = () => router.get(route('system-administration.audits.index'), form, { preserveState: true, replace: true })
 const moduleLabels = {
     authentication: 'Autenticación',
@@ -83,7 +89,20 @@ onBeforeUnmount(() => {
     <Head title="Auditoría del Sistema" />
     <AdminLayout>
         <PageLayout>
-            <GlobalToolbar icon="history" title="Auditoría del Sistema" subtitle="Historial centralizado de actividades críticas." :back-button="true" back-label="Centro de Administración" :show-search="false" :show-records-per-page="false" :show-counter="false" @back="router.get(route('system-administration.index'))" />
+            <GlobalToolbar
+                icon="history"
+                title="Auditoría del Sistema"
+                subtitle="Historial centralizado de actividades críticas."
+                :back-button="true"
+                back-label="Centro de Administración"
+                :show-search="false"
+                :records-per-page="form.per_page"
+                :records-per-page-options="[10, 25, 50, 100]"
+                :filtered-records="Number(audits.total ?? 0)"
+                :total-records="Number(audits.total ?? 0)"
+                @back="router.get(route('system-administration.index'))"
+                @update:records-per-page="form.per_page = $event; filter()"
+            />
             <form class="grid gap-3 rounded-2xl border border-secondary bg-background p-4 md:grid-cols-4" @submit.prevent="filter">
                 <InputField v-model="form.search" hide-label placeholder="Buscar" />
                 <SelectField v-model="form.module" hide-label :options="moduleOptions" />

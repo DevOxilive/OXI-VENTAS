@@ -15,6 +15,7 @@ import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales
 import { usePermissions } from '@/Composables/usePermissions'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
 import { getAttendanceIncidentsToolbarConfig } from '@/config/ToolbarConfigs/attendanceIncidentsToolbarConfig'
+import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
 defineOptions({ layout: AdminLayout })
 
@@ -28,11 +29,13 @@ const props = defineProps({
 
 const page = usePage()
 const { can } = usePermissions()
+const { handlePageChange } = useGlobalTablePagination()
 const filters = reactive({
   from: props.filters.from ?? '',
   to: props.filters.to ?? '',
   search: props.filters.search ?? '',
   status: props.filters.status ?? '',
+  per_page: Number(props.filters.per_page ?? 30),
 })
 const form = useForm({
   employee_id: '',
@@ -84,6 +87,7 @@ const actions = [
 const toolbarConfig = computed(() => getAttendanceIncidentsToolbarConfig({
   filters,
   statuses: props.statuses,
+  total: props.incidents?.total ?? 0,
 }))
 
 const modalTitle = computed(() => ({
@@ -300,6 +304,7 @@ onBeforeUnmount(() => {
       :search="filters.search"
       @update:search="filters.search = $event"
       @update:filter="handleToolbarFilter"
+      @update:records-per-page="filters.per_page = $event"
     >
       <template #actions>
         <div class="relative">
@@ -402,6 +407,7 @@ onBeforeUnmount(() => {
       mobile-card-header-field="employee_name"
       no-data-message="No hay incidencias registradas."
       @action="handleAction"
+      @page-change="handlePageChange"
     />
 
     <GlobalModal
