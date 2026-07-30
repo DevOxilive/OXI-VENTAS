@@ -6,11 +6,8 @@ import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import { usePhysicalCountReports } from '@/Composables/Audits/usePhysicalCountReports'
 import { physicalCountReportSummaryTableConfig } from '@/config/TableConfigs/physicalCountReportSummaryTableConfig'
 import { physicalCountReportDetailTableConfig } from '@/config/TableConfigs/physicalCountReportDetailTableConfig'
-import { physicalCountReportUsersTableConfig } from '@/config/TableConfigs/physicalCountReportUsersTableConfig'
-import { physicalCountReportCategoriesTableConfig } from '@/config/TableConfigs/physicalCountReportCategoriesTableConfig'
 import { physicalCountReportDifferencesTableConfig } from '@/config/TableConfigs/physicalCountReportDifferencesTableConfig'
-import { physicalCountReportBranchesTableConfig } from '@/config/TableConfigs/physicalCountReportBranchesTableConfig'
-import { physicalCountReportAuditsTableConfig } from '@/config/TableConfigs/physicalCountReportAuditsTableConfig'
+import { physicalCountReportRoundsTableConfig } from '@/config/TableConfigs/physicalCountReportRoundsTableConfig'
 
 defineOptions({ layout: AdminLayout })
 
@@ -28,6 +25,7 @@ const props = defineProps({
     categorySummary: { type: Array, default: () => [] },
     branchSummary: { type: Array, default: () => [] },
     auditSummary: { type: Array, default: () => [] },
+    roundSummary: { type: Array, default: () => [] },
     topDifferences: { type: Array, default: () => [] },
 })
 
@@ -37,8 +35,7 @@ const {
     summaryTableItems,
     reportTableItems,
     differencesTableItems,
-    branchSummaryItems,
-    auditSummaryItems,
+    roundSummaryItems,
     backToReportsCenter,
     updateSearch,
     updateFilter,
@@ -83,38 +80,11 @@ const {
                 />
             </template>
 
-            <template v-else-if="form.report_type === 'branches'">
+            <template v-else-if="form.report_type === 'rounds'">
                 <GlobalTable
-                    :items="branchSummaryItems"
-                    v-bind="physicalCountReportBranchesTableConfig"
-                    row-key="branch_name"
-                    :show-pagination="false"
-                />
-            </template>
-
-            <template v-else-if="form.report_type === 'audits'">
-                <GlobalTable
-                    :items="auditSummaryItems"
-                    v-bind="physicalCountReportAuditsTableConfig"
-                    row-key="folio"
-                    :show-pagination="false"
-                />
-            </template>
-
-            <template v-else-if="form.report_type === 'users'">
-                <GlobalTable
-                    :items="userSummary"
-                    v-bind="physicalCountReportUsersTableConfig"
-                    row-key="user_name"
-                    :show-pagination="false"
-                />
-            </template>
-
-            <template v-else-if="form.report_type === 'categories'">
-                <GlobalTable
-                    :items="categorySummary"
-                    v-bind="physicalCountReportCategoriesTableConfig"
-                    row-key="category_name"
+                    :items="roundSummaryItems"
+                    v-bind="physicalCountReportRoundsTableConfig"
+                    row-key="id"
                     :show-pagination="false"
                 />
             </template>

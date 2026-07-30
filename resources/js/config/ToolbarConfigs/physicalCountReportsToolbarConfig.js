@@ -124,11 +124,8 @@ export function getPhysicalCountReportsToolbarConfig({
         ],
         tabs: [
             { key: 'summary', label: 'Resumen', icon: 'dashboard' },
-            { key: 'branches', label: 'Sucursales', icon: 'store' },
-            { key: 'audits', label: 'Auditorías', icon: 'assignment' },
-            { key: 'detail', label: 'Detalle', icon: 'list_alt' },
-            { key: 'users', label: 'Usuarios', icon: 'group' },
-            { key: 'categories', label: 'Categorías', icon: 'category' },
+            { key: 'detail', label: 'Concentrado', icon: 'list_alt' },
+            { key: 'rounds', label: 'Rondas', icon: 'history' },
             { key: 'differences', label: 'Diferencias', icon: 'analytics' },
         ],
     }

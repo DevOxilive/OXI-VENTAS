@@ -208,6 +208,7 @@ const permissionLabels = {
     "audits.physical-counts.create": "Crear auditorías",
     "audits.physical-counts.close": "Cerrar auditoría",
     "audits.physical-counts.reopen": "Reabrir auditoría",
+    "audits.physical-counts.finalize": "Finalizar auditoría",
     "audits.physical-counts.participants": "Agregar participantes",
     "audits.physical-counts.apply": "Aplicar auditoría",
     "audits.physical-counts.delete": "Eliminar auditorías",

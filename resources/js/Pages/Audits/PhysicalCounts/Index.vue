@@ -146,6 +146,30 @@ async function handleTableAction({ action, row }) {
         return
     }
 
+    if (action === 'finalize' && can('audits.physical-counts.finalize')) {
+        const result = await confirmModalAction({
+            mode: 'update',
+            title: 'Finalizar auditoría',
+            message: '¿Confirmas que todas las rondas fueron revisadas? Después de finalizar ya no se podrá reabrir ni capturar.',
+            confirmText: 'Sí, finalizar',
+            cancelText: 'Cancelar',
+            confirmButtonColor: '#4f46e5',
+        })
+
+        if (!result.isConfirmed) return
+
+        router.patch(route('audits.physical-counts.finalize', row.id), {}, getModalRequestOptions({
+            mode: 'update',
+            entityName: 'Auditoría',
+            successTitle: 'Auditoría finalizada correctamente',
+            errorTitle: 'Error al finalizar auditoría',
+            errorMessage: 'No fue posible finalizar la auditoría.',
+            onSuccess: reloadPhysicalCounts,
+        }))
+
+        return
+    }
+
     if (action === 'apply' && can('audits.physical-counts.apply')) {
         const result = await confirmModalAction({
             mode: 'update',

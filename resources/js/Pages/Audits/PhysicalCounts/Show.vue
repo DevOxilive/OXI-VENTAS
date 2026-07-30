@@ -34,7 +34,7 @@ const props = defineProps({
 
 const { can } = usePermissions()
 
-const isCaptureStatus = computed(() => ['open', 'applied'].includes(props.physicalCount.status))
+const isCaptureStatus = computed(() => props.physicalCount.status === 'open')
 const canCapture = computed(() =>
     isCaptureStatus.value &&
     can('audits.physical-counts.count')
@@ -100,6 +100,29 @@ onBeforeUnmount(() => {
         </template>
 
         <div class="space-y-4">
+            <div
+                v-if="physicalCount.current_round"
+                class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-secondary bg-secondary px-4 py-3 text-sm text-text"
+            >
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-xl text-accent">history</span>
+                    <div>
+                        <p class="font-semibold">
+                            Ronda {{ physicalCount.current_round.round_number }}
+                            ·
+                            {{ physicalCount.current_round.type === 'original' ? 'Conteo original' : 'Reapertura' }}
+                        </p>
+                        <p class="opacity-70">
+                            Alcance:
+                            {{ physicalCount.current_round.scope === 'zero_stock' ? 'productos con stock en cero' : 'todos los productos' }}
+                        </p>
+                    </div>
+                </div>
+                <span class="opacity-70">
+                    Iniciada por {{ physicalCount.current_round.opener?.name || 'Sin usuario' }}
+                </span>
+            </div>
+
             <div
                 v-if="physicalCount.status === 'closed'"
                 class="flex items-start gap-3 rounded-xl border border-secondary bg-secondary px-4 py-3 text-sm text-text"

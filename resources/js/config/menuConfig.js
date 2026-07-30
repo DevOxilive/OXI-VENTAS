@@ -39,6 +39,7 @@ export function generateMenu(role, permissions = [], branches = []) {
             "audits.physical-counts.create",
             "audits.physical-counts.close",
             "audits.physical-counts.reopen",
+            "audits.physical-counts.finalize",
             "audits.physical-counts.participants",
             "audits.physical-counts.apply",
             "audits.physical-counts.delete",
@@ -262,6 +263,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("audits.physical-counts.create") ||
         can("audits.physical-counts.close") ||
         can("audits.physical-counts.reopen") ||
+        can("audits.physical-counts.finalize") ||
         can("audits.physical-counts.participants") ||
         can("audits.physical-counts.apply") ||
         can("audits.physical-counts.delete") ||

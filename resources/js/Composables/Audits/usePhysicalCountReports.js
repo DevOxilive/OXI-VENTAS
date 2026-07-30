@@ -21,6 +21,7 @@ export function usePhysicalCountReports(props) {
             'categorySummary',
             'branchSummary',
             'auditSummary',
+            'roundSummary',
             'topDifferences',
         ],
     })
@@ -89,6 +90,8 @@ export function usePhysicalCountReports(props) {
         }))
     )
 
+    const roundSummaryItems = computed(() => props.roundSummary || [])
+
     function backToReportsCenter() {
         router.get(route('inventory.branches.reports', {
             branch: props.branch?.id,
@@ -127,6 +130,7 @@ export function usePhysicalCountReports(props) {
                 'categorySummary',
                 'branchSummary',
                 'auditSummary',
+                'roundSummary',
                 'topDifferences',
             ],
         })
@@ -180,6 +184,7 @@ export function usePhysicalCountReports(props) {
                 'categorySummary',
                 'branchSummary',
                 'auditSummary',
+                'roundSummary',
                 'topDifferences',
             ],
         })
@@ -220,6 +225,7 @@ export function usePhysicalCountReports(props) {
                 'categorySummary',
                 'branchSummary',
                 'auditSummary',
+                'roundSummary',
                 'topDifferences',
             ],
             preserveScroll: true,
@@ -297,6 +303,7 @@ export function usePhysicalCountReports(props) {
         differencesTableItems,
         branchSummaryItems,
         auditSummaryItems,
+        roundSummaryItems,
         backToReportsCenter,
         updateSearch,
         updateFilter,

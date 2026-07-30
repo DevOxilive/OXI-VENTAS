@@ -5,6 +5,8 @@ namespace Tests\Unit;
 use App\Exports\PhysicalCountConcentratedSheet;
 use App\Exports\PhysicalCountDashboardSheet;
 use App\Exports\PhysicalCountAuditWorkbookExport;
+use App\Exports\PhysicalCountRoundsComparisonSheet;
+use App\Models\PhysicalCountRound;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -111,6 +113,57 @@ class PhysicalCountAuditWorkbookTest extends TestCase
         }
     }
 
+    public function test_round_comparison_keeps_original_values_and_uses_latest_recapture_as_final(): void
+    {
+        $original = new PhysicalCountRound([
+            'round_number' => 1,
+            'type' => 'original',
+            'scope' => 'all',
+            'started_at' => now()->subDay(),
+        ]);
+        $original->id = 101;
+        $original->physical_count_id = 10;
+
+        $reopening = new PhysicalCountRound([
+            'round_number' => 2,
+            'type' => 'reopening',
+            'scope' => 'all',
+            'started_at' => now(),
+        ]);
+        $reopening->id = 102;
+        $reopening->physical_count_id = 10;
+
+        $payload = [
+            'rounds' => collect([$original, $reopening]),
+            'allEntries' => collect([
+                $this->roundEntry($original, 8),
+                $this->roundEntry($reopening, 6),
+            ]),
+            'reportRows' => collect([[
+                'physical_count_id' => 10,
+                'branch_product_id' => 100,
+                'branch_name' => 'Ajusco',
+                'audit_name' => 'Auditoría',
+                'folio' => 'AUD-001',
+                'scanned_code' => '750000000001',
+                'product_name' => 'Producto',
+                'category_name' => 'Categoría',
+                'system_stock' => 10,
+                'participants' => ['Usuario 2'],
+                'last_entry_at' => now()->toDateTimeString(),
+            ]]),
+        ];
+
+        $rows = (new PhysicalCountRoundsComparisonSheet($payload))->array();
+
+        $this->assertSame('Ronda 1 - Original', $rows[0][7]);
+        $this->assertSame('Ronda 2 - Reapertura', $rows[0][8]);
+        $this->assertSame(8.0, $rows[1][7]);
+        $this->assertSame(6.0, $rows[1][8]);
+        $this->assertSame(6.0, $rows[1][9]);
+        $this->assertSame('Ronda 2 - Reapertura', $rows[1][11]);
+    }
+
     private function payload(): array
     {
         return [
@@ -135,6 +188,21 @@ class PhysicalCountAuditWorkbookTest extends TestCase
                     'system_stock' => 3,
                 ],
             ]),
+        ];
+    }
+
+    private function roundEntry(PhysicalCountRound $round, float $counted): object
+    {
+        return (object) [
+            'physical_count_id' => 10,
+            'physical_count_round_id' => $round->id,
+            'branch_product_id' => 100,
+            'user_id' => $round->round_number,
+            'counted_quantity' => $counted,
+            'damaged_quantity' => 0,
+            'expired_quantity' => 0,
+            'round' => $round,
+            'created_at' => now(),
         ];
     }
 }

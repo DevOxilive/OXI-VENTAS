@@ -20,6 +20,8 @@ class PhysicalCount extends Model
     'started_at',
     'closed_at',
     'recapture_started_at',
+    'finalized_at',
+    'finalized_by',
     'last_applied_at',
 ];
 
@@ -27,6 +29,7 @@ class PhysicalCount extends Model
         'started_at' => 'datetime',
         'closed_at' => 'datetime',
         'recapture_started_at' => 'datetime',
+        'finalized_at' => 'datetime',
         'last_applied_at' => 'datetime',
     ];
 
@@ -40,9 +43,24 @@ class PhysicalCount extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function finalizer()
+    {
+        return $this->belongsTo(User::class, 'finalized_by');
+    }
+
     public function entries()
     {
         return $this->hasMany(PhysicalCountEntry::class);
+    }
+
+    public function rounds()
+    {
+        return $this->hasMany(PhysicalCountRound::class)->orderBy('round_number');
+    }
+
+    public function currentRound()
+    {
+        return $this->hasOne(PhysicalCountRound::class)->latestOfMany('round_number');
     }
 
     public function snapshot()
