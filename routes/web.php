@@ -84,6 +84,7 @@ Route::middleware([
     $productsAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete';
     $branchInventoryAccess = 'permission:inventory.branches.view,inventory.branches.create,inventory.branches.update,inventory.branches.delete';
     $purchaseReportsAccess = 'permission:inventory.purchase-reports.view,inventory.purchase-reports.create,inventory.purchase-reports.update,inventory.purchase-reports.delete';
+    $generalPurchaseOrdersAccess = 'permission:inventory.purchase-orders.generate.view,inventory.purchase-orders.purchasing.view,inventory.purchase-orders.completed.view';
     $auditsAccess = 'permission:audits.physical-counts.count,audits.physical-counts.view-stock,audits.physical-counts.create,audits.physical-counts.close,audits.physical-counts.reopen,audits.physical-counts.finalize,audits.physical-counts.participants,audits.physical-counts.apply,audits.physical-counts.delete';
     $inventoryReportsAccess = 'permission:inventory.view,inventory.create,inventory.update,inventory.delete,inventory.branches.view,inventory.branches.create,inventory.branches.update,inventory.branches.delete';
     $reportsAccess = 'permission:inventory.view,inventory.create,inventory.update,inventory.delete,inventory.branches.view,inventory.branches.create,inventory.branches.update,inventory.branches.delete,audits.physical-counts.reports,sales.cash-closures.reports,inventory.purchase-orders.generate.view,inventory.purchase-orders.purchasing.view,inventory.purchase-orders.completed.view';
@@ -441,6 +442,7 @@ Route::middleware([
         $branchInventoryAccess,
         $inventoryReportsAccess,
         $purchaseReportsAccess,
+        $generalPurchaseOrdersAccess,
         $cashClosureReportsAccess
     ) {
         Route::get('/dashboard', fn () => Inertia::render('Inventory/Dashboard'))
@@ -595,11 +597,11 @@ Route::middleware([
             ->name('branches.reports.purchases.show');
 
         Route::get('/branches/{branch}/reports/purchase-orders', [GeneralPurchaseOrderController::class, 'index'])
-            ->middleware('permission:inventory.purchase-orders.view,inventory.purchase-orders.create')
+            ->middleware($generalPurchaseOrdersAccess)
             ->name('branches.reports.purchase-orders');
 
         Route::post('/branches/{branch}/reports/purchase-orders/consolidate', [GeneralPurchaseOrderController::class, 'consolidate'])
-            ->middleware('permission:inventory.purchase-orders.create')
+            ->middleware('permission:inventory.purchase-orders.generate.create')
             ->name('branches.reports.purchase-orders.consolidate');
 
         Route::post('/branches/{branch}/reports/purchase-orders/draft', [GeneralPurchaseOrderController::class, 'saveDraft'])
@@ -623,27 +625,27 @@ Route::middleware([
             ->name('branches.reports.purchase-orders.source-orders.update');
 
         Route::get('/branches/{branch}/reports/purchase-orders/tracking', [GeneralPurchaseOrderController::class, 'tracking'])
-            ->middleware('permission:inventory.purchase-orders.update')
+            ->middleware('permission:inventory.purchase-orders.purchasing.view')
             ->name('branches.reports.purchase-orders.tracking');
 
         Route::get('/branches/{branch}/reports/purchase-orders/history', [GeneralPurchaseOrderController::class, 'history'])
-            ->middleware('permission:inventory.purchase-orders.history')
+            ->middleware('permission:inventory.purchase-orders.completed.view')
             ->name('branches.reports.purchase-orders.history');
 
         Route::get('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}/capture', [GeneralPurchaseOrderController::class, 'edit'])
-            ->middleware('permission:inventory.purchase-orders.update')
+            ->middleware('permission:inventory.purchase-orders.costs')
             ->name('branches.reports.purchase-orders.capture');
 
         Route::get('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}', [GeneralPurchaseOrderController::class, 'show'])
-            ->middleware('permission:inventory.purchase-orders.view,inventory.purchase-orders.update,inventory.purchase-orders.history')
+            ->middleware($generalPurchaseOrdersAccess)
             ->name('branches.reports.purchase-orders.show');
 
         Route::put('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}', [GeneralPurchaseOrderController::class, 'update'])
-            ->middleware('permission:inventory.purchase-orders.update')
+            ->middleware('permission:inventory.purchase-orders.costs')
             ->name('branches.reports.purchase-orders.update');
 
         Route::post('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}/complete', [GeneralPurchaseOrderController::class, 'complete'])
-            ->middleware('permission:inventory.purchase-orders.update')
+            ->middleware('permission:inventory.purchase-orders.costs')
             ->name('branches.reports.purchase-orders.complete');
 
         Route::get('/branches/{branch}/reports/audits', function (Branch $branch) {

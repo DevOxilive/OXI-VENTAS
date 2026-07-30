@@ -529,7 +529,7 @@ onBeforeUnmount(() => {
                         {{ profile.accent }}
                     </div>
 
-                    <h1>Bienvenida, {{ userName }}</h1>
+                    <h1>Bienvenid@, {{ userName }}</h1>
                     <p class="hero-subtitle">{{ profile.title }}</p>
                     <p class="hero-description">{{ profile.subtitle }}</p>
 

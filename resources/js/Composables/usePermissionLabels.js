@@ -5,6 +5,7 @@ const permissionSectionOrder = [
     "human-resources",
     "systems",
     "branches",
+    "purchases",
     "sales",
     "printers",
 ];
@@ -25,8 +26,8 @@ const permissionModuleOrder = [
     "files",
     "inventory.products",
     "inventory.branches",
-    "inventory.purchase-reports",
-    "inventory.purchase-orders",
+    "purchases.purchase-lists",
+    "purchases.general-orders",
     "audits",
     "inventory",
     "sales",
@@ -40,6 +41,7 @@ const permissionSectionsMap = {
     "human-resources": "Capital Humano",
     systems: "Sistemas",
     branches: "Sucursales",
+    purchases: "Compras",
     sales: "Ventas",
     printers: "Impresoras",
 };
@@ -97,13 +99,13 @@ const permissionModules = {
         label: "Stock",
         section: "branches",
     },
-    "inventory.purchase-reports": {
-        label: "Listas de compra",
-        section: "branches",
+    "purchases.purchase-lists": {
+        label: "Listas de compra y Órdenes de compra",
+        section: "purchases",
     },
-    "inventory.purchase-orders": {
-        label: "Ordenes generales",
-        section: "branches",
+    "purchases.general-orders": {
+        label: "Órdenes de compra generales",
+        section: "purchases",
     },
     audits: {
         label: "Auditorias",
@@ -217,10 +219,13 @@ const permissionLabels = {
     "inventory.purchase-reports.create": "Crear reportes de compra",
     "inventory.purchase-reports.update": "Editar reportes de compra",
     "inventory.purchase-reports.delete": "Eliminar reportes de compra",
-    "inventory.purchase-orders.view": "Consultar ordenes generales",
-    "inventory.purchase-orders.create": "Generar ordenes generales",
-    "inventory.purchase-orders.update": "Dar seguimiento a compras",
-    "inventory.purchase-orders.history": "Consultar compras completadas",
+    "inventory.purchase-orders.costs": "Consultar y capturar costos de compra",
+    "inventory.purchase-orders.generate.view": "Ver Órdenes de compra",
+    "inventory.purchase-orders.generate.create": "Crear Órdenes de compra generales",
+    "inventory.purchase-orders.generate.update": "Editar Órdenes de compra",
+    "inventory.purchase-orders.generate.transfer": "Transferir Órdenes de compra",
+    "inventory.purchase-orders.purchasing.view": "Ver Órdenes de compra generales",
+    "inventory.purchase-orders.completed.view": "Ver Órdenes de compra generales completadas",
 
     "inventory.view": "Ver modulo de reportes de inventario",
     "inventory.create": "Crear reportes de inventario",
@@ -312,8 +317,12 @@ function getPermissionModule(permissionName = "") {
         return "purchases.general-orders";
     }
 
-    if (permissionName.startsWith("inventory.purchase-orders.")) {
-        return "inventory.purchase-orders";
+    if (
+        permissionName.startsWith("inventory.purchase-orders.purchasing.")
+        || permissionName.startsWith("inventory.purchase-orders.completed.")
+        || permissionName === "inventory.purchase-orders.costs"
+    ) {
+        return "purchases.general-orders";
     }
 
     if (permissionName === "audits.physical-counts.reports") {

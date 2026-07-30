@@ -538,7 +538,7 @@ class UserController extends Controller
         $user->load(['role', 'permissions', 'branches']);
 
         try {
-            broadcast(new UserChanged($user, 'updated'))->toOthers();
+            event(new UserChanged($user, 'updated'));
             event(RealtimeActivityLogged::message('actualizó', 'el usuario', $user->email, 'Sistemas', 'updated'));
         } catch (\Throwable $e) {
             report($e);

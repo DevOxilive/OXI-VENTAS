@@ -434,7 +434,6 @@ function saveUser() {
     form.put(route('systems.users.update', selectedUserId.value), getModalRequestOptions({
       mode: 'update',
       entityName: 'Usuario',
-      close: closeModal,
       successTitle: 'Usuario actualizado correctamente',
       errorTitle: 'Error al actualizar',
       errorMessage: 'No fue posible actualizar la información del usuario.',
