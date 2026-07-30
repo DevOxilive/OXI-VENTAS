@@ -3,7 +3,6 @@ import { computed } from 'vue'
 import { useStockExitModal } from '@/Composables/Inventory/useStockExitModal'
 
 import FormPanel from '@/Components/Cards/FormPanel.vue'
-import SectionHeading from '@/Components/Cards/SectionHeading.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
@@ -22,7 +21,6 @@ const props = defineProps({
 const {
     form,
     frontendErrors,
-    currentStock,
     productName,
     unit,
     reasonOptions,
@@ -44,6 +42,7 @@ const {
 const modalConfig = computed(() => getStockExitModalConfig({
     totalErrors: totalErrors.value,
     processing: form.processing,
+    productName: productName.value,
 }))
 </script>
 
@@ -54,13 +53,6 @@ const modalConfig = computed(() => getStockExitModalConfig({
         @close="closeModal"
     >
         <section class="min-h-0 w-full">
-            <SectionHeading
-                :title="productName"
-                :description="`Stock actual: ${currentStock} ${unit}`"
-                :bordered="true"
-                spacing="md"
-            />
-
             <div class="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_430px]">
                 <FormPanel
                     title="Salida de stock"

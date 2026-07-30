@@ -83,26 +83,24 @@ export function getInventoryReportStatus(statusId) {
 }
 
 export function getInventoryReportToolbarConfig({
-    branch,
     filters,
     categories = [],
-    products = [],
 } = {}) {
     return {
         icon: 'analytics',
         title: 'Reportes de inventario',
-        subtitle: branch?.name
-            ? `Sucursal ${branch.name}`
-            : 'Consulta el estado operativo del inventario.',
+        subtitle: 'Consulta el estado operativo del inventario.',
         backButton: true,
         backLabel: 'Centro de reportes',
-        showSearch: false,
+        search: filters?.search ?? '',
+        searchPlaceholder: 'Buscar producto, codigo, lote o categoria...',
+        showSearch: true,
         showRecordsPerPage: true,
         showCounter: false,
         filters: [
             {
                 key: 'status',
-                label: 'Estado del inventario',
+                label: 'Estado del producto',
                 placeholder: 'Todos los estados',
                 value: filters?.status ?? '',
                 options: INVENTORY_REPORT_STATUS_FILTERS.filter((status) => status.id),
@@ -119,28 +117,20 @@ export function getInventoryReportToolbarConfig({
                 optionValue: 'id',
             },
             {
-                key: 'productId',
-                label: 'Producto',
-                placeholder: 'Todos los productos',
-                value: filters?.productId ?? '',
-                options: products,
-                optionLabel: 'label',
-                optionValue: 'id',
-            },
-            {
                 key: 'dateFrom',
-                label: 'Caducidad inicio',
+                label: 'Desde',
                 type: 'date',
                 value: filters?.dateFrom ?? '',
             },
             {
                 key: 'dateTo',
-                label: 'Caducidad fin',
+                label: 'Hasta',
                 type: 'date',
                 value: filters?.dateTo ?? '',
             },
             {
                 key: 'search',
+                visible: false,
                 label: 'Búsqueda',
                 type: 'text',
                 placeholder: 'Producto, lote o categoría',

@@ -27,6 +27,7 @@ function buildProductSearchText(product) {
         [
             product.name,
             product.code,
+            ...(product.barcodes ?? []),
             product.category_name,
             product.category,
             product.branch,
@@ -194,6 +195,9 @@ export function useBranchInventory(props) {
                     item.product?.barcodes?.[0]?.code ??
                     item.barcode ??
                     `BP-${item.id}`,
+                barcodes: (item.product?.barcodes ?? [])
+                    .map((barcode) => barcode?.code)
+                    .filter(Boolean),
                 category_name: item.product?.category?.name ?? "Sin categoría",
                 category: item.product?.category?.name ?? "Sin categoría",
                 branch:

@@ -35,6 +35,7 @@ class ReportController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         $filters = $this->resolveFilters($request);
+        unset($filters['product_id']);
         $activeReport = $request->input('report', 'dashboard');
         $activeReport = $activeReport === 'movements' ? 'dashboard' : $activeReport;
         $filters['report'] = $activeReport;
@@ -55,7 +56,6 @@ class ReportController extends Controller
             'filters' => $filters,
             'catalogs' => [
                 'categories' => $this->categoryOptions($branch),
-                'products' => $this->branchProductOptions($branch),
             ],
             'summary' => $reportService->summary($branch),
             'reports' => $reports,
@@ -70,13 +70,13 @@ class ReportController extends Controller
         $filters = array_merge($this->resolveFilters($request), [
             'report' => 'movements',
         ]);
+        unset($filters['product_id']);
 
         return Inertia::render('Inventory/Reports/InventoryMovements', [
             'currentBranch' => $branch,
             'filters' => $filters,
             'catalogs' => [
                 'categories' => $this->categoryOptions($branch),
-                'products' => $this->branchProductOptions($branch),
                 'users' => $this->movementUserOptions($branch),
                 'movementTypes' => $this->movementTypes(),
                 'movementReasons' => $this->movementReasons(),
@@ -90,12 +90,13 @@ class ReportController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         $filters = $this->resolveFilters($request);
+        unset($filters['product_id']);
         $rows = $reportService->rows($branch, $filters);
         $title = $this->reportTitle($filters['report'] ?? 'dashboard');
         $fileName = 'reporte-inventario-' . now()->format('Y-m-d-H-i') . '.xlsx';
 
         return Excel::download(
-            new InventoryReportExport($rows, $title),
+            new InventoryReportExport($rows, $title, 'inventory'),
             $fileName
         );
     }
@@ -105,6 +106,7 @@ class ReportController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         $filters = $this->resolveFilters($request);
+        unset($filters['product_id']);
         $rows = $reportService->rows($branch, $filters);
 
         $pdf = Pdf::loadView('pdf.inventory-report', [
@@ -113,6 +115,7 @@ class ReportController extends Controller
             'rows' => $rows,
             'summary' => $reportService->summary($branch),
             'title' => $this->reportTitle($filters['report'] ?? 'dashboard'),
+            'reportType' => 'inventory',
         ])->setPaper('letter', 'landscape');
 
         return $pdf->download('reporte-inventario-' . now()->format('Y-m-d-H-i') . '.pdf');
@@ -125,11 +128,12 @@ class ReportController extends Controller
         $filters = array_merge($this->resolveFilters($request), [
             'report' => 'movements',
         ]);
+        unset($filters['product_id']);
         $rows = $reportService->rows($branch, $filters);
         $fileName = 'reporte-movimientos-inventario-' . now()->format('Y-m-d-H-i') . '.xlsx';
 
         return Excel::download(
-            new InventoryReportExport($rows, 'Movimientos'),
+            new InventoryReportExport($rows, 'Movimientos', 'movements'),
             $fileName
         );
     }
@@ -141,6 +145,7 @@ class ReportController extends Controller
         $filters = array_merge($this->resolveFilters($request), [
             'report' => 'movements',
         ]);
+        unset($filters['product_id']);
         $rows = $reportService->rows($branch, $filters);
 
         $pdf = Pdf::loadView('pdf.inventory-report', [
@@ -149,6 +154,7 @@ class ReportController extends Controller
             'rows' => $rows,
             'summary' => $reportService->summary($branch),
             'title' => 'Movimientos',
+            'reportType' => 'movements',
         ])->setPaper('letter', 'landscape');
 
         return $pdf->download('reporte-movimientos-inventario-' . now()->format('Y-m-d-H-i') . '.pdf');

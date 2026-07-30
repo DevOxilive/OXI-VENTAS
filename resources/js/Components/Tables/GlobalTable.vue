@@ -176,27 +176,26 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
-    <div class="max-h-[560px] overflow-y-auto">
-      <TableDesktop
-        v-if="!isMobileViewport"
-        :items="items"
-        :columns="columns"
-        :actions="actions"
-        :row-key="rowKey"
-        :no-data-message="noDataMessage"
-        :loading="loading"
-        :hover-effect="hoverEffect"
-        :striped="striped"
-        :selectable="selectable"
-        :selected-items="selectedItems"
-        @action="$emit('action', $event)"
-        @row-click="$emit('row-click', $event)"
-        @selection-change="$emit('selection-change', $event)"
-        @update:selectedItems="$emit('update:selectedItems', $event)"
-      />
+    <TableDesktop
+      v-if="!isMobileViewport"
+      :items="items"
+      :columns="columns"
+      :actions="actions"
+      :row-key="rowKey"
+      :no-data-message="noDataMessage"
+      :loading="loading"
+      :hover-effect="hoverEffect"
+      :striped="striped"
+      :selectable="selectable"
+      :selected-items="selectedItems"
+      @action="$emit('action', $event)"
+      @row-click="$emit('row-click', $event)"
+      @selection-change="$emit('selection-change', $event)"
+      @update:selectedItems="$emit('update:selectedItems', $event)"
+    />
 
+    <div v-else class="max-h-[560px] overflow-y-auto">
       <TableMobile
-        v-else
         :items="items"
         :columns="columns"
         :actions="actions"

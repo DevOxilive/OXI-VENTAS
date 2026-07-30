@@ -75,6 +75,7 @@ class InventoryReportService
             ->where('branch_products.branch_id', $branch->id)
             ->select([
                 'product_batches.id',
+                DB::raw($this->productCodeExpression().' as code'),
                 'products.name as product',
                 'categories.name as category',
                 'product_batches.lot_number',
@@ -137,6 +138,7 @@ class InventoryReportService
             ->where('branch_products.branch_id', $branch->id)
             ->select([
                 'stock_movements.id',
+                DB::raw('MAX('.$this->productCodeExpression().') as code'),
                 'products.name as product',
                 'categories.name as category',
                 DB::raw('GROUP_CONCAT(DISTINCT product_batches.lot_number ORDER BY product_batches.lot_number SEPARATOR ", ") as lot_number'),
@@ -260,6 +262,7 @@ class InventoryReportService
             ->where('branch_products.branch_id', $branch->id)
             ->select([
                 'branch_products.id',
+                DB::raw($this->productCodeExpression().' as code'),
                 'products.name as product',
                 'categories.name as category',
                 DB::raw('NULL as lot_number'),
@@ -353,6 +356,7 @@ class InventoryReportService
             })
             ->select([
                 'branch_products.id',
+                DB::raw($this->productCodeExpression().' as code'),
                 'products.name as product',
                 'categories.name as category',
                 DB::raw('NULL as lot_number'),
@@ -452,6 +456,19 @@ class InventoryReportService
                     });
             });
         });
+    }
+
+    private function productCodeExpression(): string
+    {
+        return 'COALESCE(branch_products.barcode, (
+            SELECT barcodes.code
+            FROM barcodes
+            WHERE barcodes.product_id = products.id
+                AND barcodes.active = 1
+                AND barcodes.deleted_at IS NULL
+            ORDER BY CASE WHEN UPPER(barcodes.type) = "PRINCIPAL" THEN 0 ELSE 1 END, barcodes.id
+            LIMIT 1
+        ))';
     }
 
     private function applyPeriod($query, array $filters, string $column = 'created_at'): void

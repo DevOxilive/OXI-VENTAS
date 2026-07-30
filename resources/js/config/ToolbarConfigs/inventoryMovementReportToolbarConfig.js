@@ -1,8 +1,6 @@
 export function getInventoryMovementReportToolbarConfig({
-    branch,
     filters,
     categories = [],
-    products = [],
     users = [],
     movementTypes = [],
     movementReasons = [],
@@ -10,12 +8,12 @@ export function getInventoryMovementReportToolbarConfig({
     return {
         icon: 'swap_horiz',
         title: 'Reportes de movimientos',
-        subtitle: branch?.name
-            ? `Sucursal ${branch.name}`
-            : 'Consulta entradas, salidas, ajustes y trazabilidad por lote.',
+        subtitle: 'Consulta entradas, salidas, ajustes y trazabilidad por lote.',
         backButton: true,
         backLabel: 'Centro de reportes',
-        showSearch: false,
+        search: filters?.search ?? '',
+        searchPlaceholder: 'Buscar producto, codigo, lote, usuario o nota...',
+        showSearch: true,
         showRecordsPerPage: true,
         showCounter: false,
         filters: [
@@ -26,15 +24,6 @@ export function getInventoryMovementReportToolbarConfig({
                 value: filters?.categoryId ?? '',
                 options: categories,
                 optionLabel: 'name',
-                optionValue: 'id',
-            },
-            {
-                key: 'productId',
-                label: 'Producto',
-                placeholder: 'Todos los productos',
-                value: filters?.productId ?? '',
-                options: products,
-                optionLabel: 'label',
                 optionValue: 'id',
             },
             {
@@ -66,18 +55,19 @@ export function getInventoryMovementReportToolbarConfig({
             },
             {
                 key: 'dateFrom',
-                label: 'Movimiento inicio',
+                label: 'Inicio',
                 type: 'date',
                 value: filters?.dateFrom ?? '',
             },
             {
                 key: 'dateTo',
-                label: 'Movimiento fin',
+                label: 'Fin',
                 type: 'date',
                 value: filters?.dateTo ?? '',
             },
             {
                 key: 'search',
+                visible: false,
                 label: 'Búsqueda',
                 type: 'text',
                 field: 'toolbar_search',

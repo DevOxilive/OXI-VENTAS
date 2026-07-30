@@ -30,15 +30,21 @@ export function useProductActions() {
     }
 
     async function deleteProduct(product) {
+        const branchName = product.branch_name ?? product.branch?.name ?? "esta sucursal";
         const result = await confirmModalAction({
+            showDenyButton: true,
+            denyButtonText: "De todas las sucursales",
+            denyButtonColor: "#ef4444",
             mode: "delete",
             entityName: "producto",
             title: "Eliminar producto",
-            message: `¿Deseas eliminar ${product.name}?`,
-            confirmText: "Sí, eliminar",
+            message: `Selecciona cómo deseas retirar ${product.name}.`,
+            confirmText: `Solo de ${branchName}`,
         });
 
-        if (!result.isConfirmed) return;
+        if (!result.isConfirmed && !result.isDenied) return;
+
+        const deleteGlobally = result.isDenied;
 
         router.delete(
             route("inventory.branches.products.destroy", {
@@ -46,9 +52,14 @@ export function useProductActions() {
                 product: product.id,
             }),
             getModalRequestOptions({
+                data: {
+                    delete_globally: deleteGlobally,
+                },
                 mode: "delete",
                 entityName: "Producto",
-                successTitle: "Producto eliminado correctamente",
+                successTitle: deleteGlobally
+                    ? "Producto eliminado de todas las sucursales"
+                    : `Producto retirado de ${branchName}`,
                 errorTitle: "Error al eliminar",
                 errorMessage: "No fue posible eliminar el producto.",
             }),

@@ -1,26 +1,22 @@
 // resources/js/Validation/sanitizers.js
 
 const patterns = {
-    letters: /[^A-Za-zÁÉÍÓÚáéíóúÑñ\s]/g,
+    letters: /[^\p{L}\s]/gu,
     numeric: /[^0-9]/g,
     decimal: /[^0-9.]/g,
-    alphanumeric: /[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\-_\s]/g,
+    alphanumeric: /[^\p{L}\p{N}\-_\s]/gu,
     email: /[\s]/g,
-    address: /[^A-Za-zÁÉÍÓÚáéíóúÑñ0-9\s#.,\-]/g,
-    rfc: /[^A-Za-z0-9Ññ&]/g,
-    text: /[<>]/g,
+    address: /[^\p{L}\p{N}\s#.,\-]/gu,
+    rfc: /[^\p{L}\p{N}&]/gu,
+    text: /[^\p{L}\p{N}\s.,;:?!()#%$+\-_/]/gu,
 };
 
 function toTitleCase(text) {
     return text
         .toLowerCase()
-        .split(" ")
-        .map((word) => {
-            if (!word) return "";
-
-            return word.charAt(0).toUpperCase() + word.slice(1);
-        })
-        .join(" ");
+        .replace(/(^|[\s([{])(\p{L})/gu, (match, separator, letter) => (
+            `${separator}${letter.toUpperCase()}`
+        ));
 }
 
 export function sanitizeField(value, config = {}) {
@@ -54,11 +50,11 @@ export function sanitizeField(value, config = {}) {
             : boundedInteger;
     }
 
-    if (config.uppercase) {
+    if (config.uppercase && !config.preserveCase) {
         clean = clean.toUpperCase();
     }
 
-    if (config.titleCase) {
+    if (config.titleCase && !config.uppercase && !config.preserveCase) {
         clean = toTitleCase(clean);
     }
 

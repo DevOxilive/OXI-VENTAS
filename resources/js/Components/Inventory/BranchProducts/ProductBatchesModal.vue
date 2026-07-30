@@ -101,6 +101,7 @@ const availableQuantity = computed(() => {
 const modalConfig = computed(() => getProductBatchesModalConfig({
     totalErrors: props.totalErrors,
     processing: props.processing,
+    productName: productName.value,
 }))
 
 const batchStatusOptions = [
@@ -174,26 +175,9 @@ function selectBatch(batch) {
             <div class="grid h-full min-h-0 grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)]">
                 <aside class="flex min-h-[250px] max-h-[340px] flex-col border-b border-secondary bg-secondary xl:h-full xl:min-h-0 xl:max-h-full xl:border-b-0 xl:border-r">
                     <div class="border-b border-secondary bg-background px-5 py-4">
-                        <SectionHeading
-                            :description="`${batches.length} lote(s) registrados`"
-                            spacing="sm"
-                        >
-                            <template #title>
-                                <h3 class="truncate font-black text-text">
-                                    {{ productName }}
-                                </h3>
-                            </template>
-
-                            <template #aside>
-                                <span
-                                    v-if="selectedBatch"
-                                    class="shrink-0 rounded-full border px-3 py-1 text-xs font-black"
-                                    :class="statusClass(selectedBatch.status)"
-                                >
-                                    {{ statusLabel(selectedBatch.status) }}
-                                </span>
-                            </template>
-                        </SectionHeading>
+                        <p class="text-sm font-semibold text-text">
+                            {{ batches.length }} lote(s) registrados
+                        </p>
                     </div>
 
                     <div class="min-h-0 flex-1 overflow-y-auto p-3">

@@ -8,6 +8,7 @@ import { GlobalToolbar } from "@/Components/Toolbars";
 import { GlobalModal, getModalRequestOptions } from "@/Components/Modales";
 import MetricCard from "@/Components/Cards/MetricCard.vue";
 import InputField from "@/Components/Forms/InputField.vue";
+import TextareaField from "@/Components/Forms/TextareaField.vue";
 import {
   ErrorAlert,
   ToastAlert,
@@ -533,21 +534,14 @@ onMounted(() => {
             />
           </section>
 
-          <div>
-            <label class="mb-1 block text-sm font-semibold text-text" for="cash_closure_notes">
-              Observaciones
-            </label>
-            <textarea
-              id="cash_closure_notes"
-              v-model="form.notes"
-              rows="4"
-              class="w-full rounded-xl border border-secondary bg-background px-4 py-3 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-              placeholder="Notas del corte, faltantes, sobrantes o aclaraciones."
-            />
-            <p v-if="form.errors.notes" class="mt-1 text-xs text-primary">
-              {{ form.errors.notes }}
-            </p>
-          </div>
+          <TextareaField
+            v-model="form.notes"
+            label="Observaciones"
+            field="notes"
+            :rows="4"
+            placeholder="Notas del corte, faltantes, sobrantes o aclaraciones."
+            :error="form.errors.notes"
+          />
         </div>
 
         <aside class="space-y-4">

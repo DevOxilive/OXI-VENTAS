@@ -136,12 +136,11 @@ function renderCellContentFromValue(value, column) {
 </script>
 
 <template>
-  <div class="hidden md:block">
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm border-collapse">
-        <thead class="border-b border-secondary bg-secondary text-text">
+  <div class="hidden max-h-[560px] overflow-auto md:block">
+      <table class="w-full border-collapse text-sm">
+        <thead class="border-b border-secondary text-text">
           <tr>
-            <th v-if="selectable" class="px-4 py-3 w-10">
+            <th v-if="selectable" class="sticky top-0 z-20 w-10 bg-secondary px-4 py-3">
               <button
                 type="button"
                 role="checkbox"
@@ -158,12 +157,12 @@ function renderCellContentFromValue(value, column) {
             </th>
 
             <th v-for="column in visibleColumns" :key="column.key"
-              class="text-left px-4 py-3 font-semibold whitespace-nowrap"
+              class="sticky top-0 z-20 whitespace-nowrap bg-secondary px-4 py-3 text-left font-semibold"
               :style="column.width ? { width: column.width } : {}">
               {{ column.label }}
             </th>
 
-            <th v-if="canViewActions" class="text-center px-4 py-3 font-semibold whitespace-nowrap">
+            <th v-if="canViewActions" class="sticky top-0 z-20 whitespace-nowrap bg-secondary px-4 py-3 text-center font-semibold">
               Acciones
             </th>
           </tr>
@@ -271,6 +270,5 @@ function renderCellContentFromValue(value, column) {
           </tr>
         </tbody>
       </table>
-    </div>
   </div>
 </template>

@@ -13,7 +13,6 @@ export function useInventoryReport(props) {
         reportType: props.activeReport ?? 'dashboard',
         status: props.filters?.status ?? '',
         categoryId: props.filters?.category_id ?? '',
-        productId: props.filters?.product_id ?? '',
         dateFrom: props.filters?.date_from ?? '',
         dateTo: props.filters?.date_to ?? '',
         search: props.filters?.search ?? '',
@@ -27,7 +26,6 @@ export function useInventoryReport(props) {
     })
 
     const categoryOptions = computed(() => props.catalogs?.categories ?? [])
-    const productOptions = computed(() => props.catalogs?.products ?? [])
 
     const currentReport = computed(() => {
         return getInventoryReportType(filtersState.reportType)
@@ -60,7 +58,6 @@ export function useInventoryReport(props) {
         filtersState.reportType = 'dashboard'
         filtersState.status = ''
         filtersState.categoryId = ''
-        filtersState.productId = ''
         filtersState.dateFrom = ''
         filtersState.dateTo = ''
         filtersState.search = ''
@@ -88,7 +85,6 @@ export function useInventoryReport(props) {
             report: filtersState.reportType || undefined,
             status: filtersState.status || undefined,
             category_id: filtersState.categoryId || undefined,
-            product_id: filtersState.productId || undefined,
             search: filtersState.search || undefined,
             date_from: filtersState.dateFrom || undefined,
             date_to: filtersState.dateTo || undefined,
@@ -159,7 +155,6 @@ export function useInventoryReport(props) {
         filtersState,
         pageTitle,
         categoryOptions,
-        productOptions,
         tableRows,
         tablePagination,
         backToReportsCenter,

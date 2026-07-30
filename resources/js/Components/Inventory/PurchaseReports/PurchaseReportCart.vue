@@ -1,4 +1,6 @@
 <script setup>
+import TextareaField from '@/Components/Forms/TextareaField.vue'
+
 defineProps({
     notes: {
         type: String,
@@ -47,9 +49,16 @@ defineEmits([
             </span>
         </div>
 
-        <textarea :value="notes" rows="3" placeholder="Notas generales del reporte..."
-            class="mt-4 w-full rounded-xl border border-secondary bg-background px-4 py-3 text-sm text-text focus:border-primary focus:ring-primary"
-            @input="$emit('update-notes', $event.target.value)" />
+        <div class="mt-4">
+            <TextareaField
+                :model-value="notes"
+                label="Notas"
+                field="notes"
+                :rows="3"
+                placeholder="Notas generales del reporte..."
+                @update:model-value="$emit('update-notes', $event)"
+            />
+        </div>
 
         <div v-if="!selectedCount" class="mt-6 rounded-xl border border-dashed border-secondary bg-secondary p-6 text-center">
             <p class="text-sm font-medium text-text">

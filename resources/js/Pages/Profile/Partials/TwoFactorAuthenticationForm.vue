@@ -203,6 +203,7 @@ const closePasswordConfirmationModal = () => {
                             v-model="confirmationForm.code"
                             :label="t('profile.twoFactor.code')"
                             field="code"
+                            validation-field="one_time_code"
                             type="text"
                             name="code"
                             class="w-full md:w-1/2"

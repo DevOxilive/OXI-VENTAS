@@ -40,7 +40,6 @@ const {
     filtersState,
     pageTitle,
     categoryOptions,
-    productOptions,
     tableRows,
     tablePagination,
     backToReportsCenter,
@@ -58,10 +57,8 @@ const {
     <PageLayout>
         <template #toolbar>
             <InventoryReportToolbar
-                :branch="currentBranch"
                 :filters="filtersState"
                 :categories="categoryOptions"
-                :products="productOptions"
                 @back="backToReportsCenter"
                 @update:search="updateSearch"
                 @update:filter="updateFilter"

@@ -15,63 +15,53 @@ class InventoryReportExport implements FromArray, WithHeadings, ShouldAutoSize, 
 {
     public function __construct(
         protected Collection $rows,
-        protected string $title = 'Inventario'
+        protected string $title = 'Inventario',
+        protected string $reportType = 'inventory'
     ) {}
 
     public function headings(): array
     {
-        if ($this->title === 'Movimientos') {
+        if ($this->reportType === 'movements') {
             return [
-                'Fecha',
-                'Producto',
-                'Categoria',
+                'Código',
+                'Nombre del producto',
+                'Categoría',
                 'Lote',
-                'Tipo',
+                'Usuario',
+                'Tipo de movimiento',
                 'Motivo',
                 'Cantidad',
-                'Stock anterior',
-                'Stock nuevo',
-                'Stock actual',
-                'Caducidad lote',
-                'Usuario',
+                'Fecha',
                 'Notas',
             ];
         }
 
         return [
-            'Producto',
-            'Categoria',
-            'Lote',
+            'Código',
+            'Nombre del producto',
+            'Categoría',
             'Estado',
-            'Cantidad',
-            'Cantidad inicial',
-            'Caducidad',
-            'Dias',
-            'Ingreso lote',
-            'Ultima entrada',
-            'Stock actual',
-            'Stock minimo',
-            'Impacto estimado',
+            'Lote',
+            'Fecha de ingreso',
+            'Fecha de caducidad',
+            'Impacto de pérdida',
         ];
     }
 
     public function array(): array
     {
-        if ($this->title === 'Movimientos') {
+        if ($this->reportType === 'movements') {
             return $this->rows
                 ->map(fn ($row) => [
-                    $row->movement_date ?? '-',
+                    $row->code ?? '-',
                     $row->product ?? '-',
                     $row->category ?? '-',
                     $row->lot_number ?? '-',
+                    $row->user ?? '-',
                     $row->status_label ?? '-',
                     $row->movement_reason_label ?? $row->movement_reason ?? '-',
                     (float) ($row->quantity ?? 0),
-                    $row->previous_stock ?? '-',
-                    $row->new_stock ?? '-',
-                    $row->current_stock ?? '-',
-                    $row->expiration_date ?? '-',
-                    $row->user ?? '-',
+                    $row->movement_date ?? '-',
                     $row->notes ?? '-',
                 ])
                 ->toArray();
@@ -79,18 +69,13 @@ class InventoryReportExport implements FromArray, WithHeadings, ShouldAutoSize, 
 
         return $this->rows
             ->map(fn ($row) => [
+                $row->code ?? '-',
                 $row->product ?? '-',
                 $row->category ?? '-',
-                $row->lot_number ?? '-',
                 $row->status_label ?? '-',
-                (float) ($row->quantity ?? 0),
-                $row->initial_quantity ?? '-',
-                $row->expiration_date ?? '-',
-                $row->days ?? '-',
+                $row->lot_number ?? '-',
                 $row->received_at ?? '-',
-                $row->last_entry_at ?? '-',
-                $row->current_stock ?? '-',
-                $row->min_stock ?? '-',
+                $row->expiration_date ?? '-',
                 (float) ($row->estimated_loss ?? 0),
             ])
             ->toArray();

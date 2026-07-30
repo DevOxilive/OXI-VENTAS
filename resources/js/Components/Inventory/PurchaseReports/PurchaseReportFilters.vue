@@ -1,4 +1,7 @@
 <script setup>
+import InputField from '@/Components/Forms/InputField.vue'
+import { sanitizeToolbarSearch } from '@/Components/Toolbars/toolbarInputSanitizer'
+
 const props = defineProps({
     filters: {
         type: Object,
@@ -11,6 +14,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['apply'])
+
+function handleSearchInput(value) {
+    props.filters.search = sanitizeToolbarSearch(value)
+}
 
 function clearFilters() {
     props.filters.search = ''
@@ -29,25 +36,30 @@ function clearFilters() {
                 Filtros de inventario
             </h2>
             <p class="text-xs text-text opacity-70">
-                Busca por nombre, código interno o código de barras.
+                Busca por nombre, codigo interno o codigo de barras.
             </p>
         </div>
 
         <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
-            <input
-                v-model="filters.search"
-                type="text"
-                placeholder="Buscar producto, código o barcode..."
-                class="lg:col-span-4 rounded-xl border border-secondary bg-background px-4 py-3 text-sm text-text focus:border-primary focus:ring-primary"
+            <InputField
+                :model-value="filters.search"
+                hide-label
+                field="purchase-report-search"
+                validation-field="toolbar_search"
+                type="search"
+                placeholder="Buscar producto, codigo o barcode..."
+                class="lg:col-span-4"
+                :show-counter="false"
+                @update:model-value="handleSearchInput"
                 @keyup.enter="emit('apply')"
-            >
+            />
 
             <select
                 v-model="filters.category_id"
                 class="lg:col-span-3 rounded-xl border border-secondary bg-background px-4 py-3 text-sm text-text focus:border-primary focus:ring-primary"
                 @change="emit('apply')"
             >
-                <option value="">Categorías</option>
+                <option value="">Categorias</option>
                 <option
                     v-for="category in categories"
                     :key="category.id ?? category"

@@ -3,10 +3,11 @@ import { modalPresets } from './modalPresets'
 export function getStockExitModalConfig({
     totalErrors = 0,
     processing = false,
+    productName = 'Producto',
 } = {}) {
     return {
         mode: 'delete',
-        title: 'Salida',
+        title: `Salida - ${productName}`,
         subtitle: 'Registra producto que sale del inventario.',
         totalErrors,
         processing,

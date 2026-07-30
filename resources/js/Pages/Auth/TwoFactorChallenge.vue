@@ -61,6 +61,7 @@ const submit = () => {
                     v-model="form.code"
                     :label="t('profile.twoFactor.code')"
                     field="code"
+                    validation-field="one_time_code"
                     type="text"
                     inputmode="numeric"
                     :error="form.errors.code"
@@ -75,7 +76,9 @@ const submit = () => {
                     v-model="form.recovery_code"
                     :label="t('auth.recoveryCode')"
                     field="recovery_code"
+                    validation-field="recovery_code"
                     type="text"
+                    preserve-case
                     :error="form.errors.recovery_code"
                     autocomplete="one-time-code"
                 />

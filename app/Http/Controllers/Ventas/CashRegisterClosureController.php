@@ -8,6 +8,7 @@ use App\Models\Branch;
 use App\Models\CashRegisterClosure;
 use App\Models\Sale;
 use App\Models\TicketTemplate;
+use App\Models\User;
 use App\Support\SystemPermission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -48,6 +49,14 @@ class CashRegisterClosureController extends Controller
     public function reports(Request $request, ?Branch $branch = null)
     {
         $branches = $this->accessibleBranches($request);
+        $filters = $request->validate([
+            'folio' => ['nullable', 'string', 'max:80'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'status' => ['nullable', 'in:balanced,difference'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
+            'per_page' => ['nullable', 'integer', 'in:10,20,50,100,200'],
+        ]);
 
         if ($branch) {
             $this->abortIfUserCannotAccessBranch($request, $branch);
@@ -62,6 +71,8 @@ class CashRegisterClosureController extends Controller
                     ->values(),
                 'closures' => $this->emptyClosurePaginator(),
                 'summary' => $this->emptyClosureSummary(),
+                'filters' => $this->mapClosureReportFilters($filters),
+                'users' => [],
             ]);
         }
 
@@ -70,15 +81,24 @@ class CashRegisterClosureController extends Controller
 
         $branchIds = [$branch->id];
 
-        $closures = CashRegisterClosure::query()
+        $closureQuery = CashRegisterClosure::query()
+            ->whereIn('branch_id', $branchIds);
+
+        $this->applyClosureReportFilters($closureQuery, $filters);
+
+        $closures = $closureQuery
             ->with(['branch:id,name,slug', 'user:id,name'])
-            ->whereIn('branch_id', $branchIds)
             ->latest('period_end')
-            ->paginate(15)
+            ->paginate((int) ($filters['per_page'] ?? 20))
+            ->withQueryString()
             ->through(fn (CashRegisterClosure $closure) => $this->mapClosure($closure));
 
-        $summary = CashRegisterClosure::query()
-            ->whereIn('branch_id', $branchIds)
+        $summaryQuery = CashRegisterClosure::query()
+            ->whereIn('branch_id', $branchIds);
+
+        $this->applyClosureReportFilters($summaryQuery, $filters);
+
+        $summary = $summaryQuery
             ->selectRaw('COUNT(*) as cuts_count')
             ->selectRaw('COALESCE(SUM(sales_count), 0) as sales_count')
             ->selectRaw('COALESCE(SUM(sales_total), 0) as sales_total')
@@ -99,6 +119,15 @@ class CashRegisterClosureController extends Controller
                 ->values(),
             'closures' => $closures,
             'summary' => $this->mapClosureSummary($summary),
+            'filters' => $this->mapClosureReportFilters($filters),
+            'users' => User::query()
+                ->whereIn('id', CashRegisterClosure::query()
+                    ->whereIn('branch_id', $branchIds)
+                    ->whereNotNull('user_id')
+                    ->select('user_id'))
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->values(),
         ]);
     }
 
@@ -391,6 +420,51 @@ class CashRegisterClosureController extends Controller
             'card_difference' => (float) $closure->card_difference,
             'status' => abs((float) $closure->cash_difference) < 0.01 && abs((float) $closure->card_difference) < 0.01 ? 'Cuadrado' : 'Diferencia',
             'notes' => $closure->notes,
+        ];
+    }
+
+    private function applyClosureReportFilters($query, array $filters): void
+    {
+        if (!empty($filters['folio'])) {
+            $query->where('folio', 'like', '%' . $filters['folio'] . '%');
+        }
+
+        if (!empty($filters['user_id'])) {
+            $query->where('user_id', $filters['user_id']);
+        }
+
+        if (($filters['status'] ?? null) === 'balanced') {
+            $query
+                ->whereRaw('ABS(cash_difference) < 0.01')
+                ->whereRaw('ABS(card_difference) < 0.01');
+        }
+
+        if (($filters['status'] ?? null) === 'difference') {
+            $query->where(function ($differenceQuery) {
+                $differenceQuery
+                    ->whereRaw('ABS(cash_difference) >= 0.01')
+                    ->orWhereRaw('ABS(card_difference) >= 0.01');
+            });
+        }
+
+        if (!empty($filters['date_from'])) {
+            $query->whereDate('period_end', '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $query->whereDate('period_end', '<=', $filters['date_to']);
+        }
+    }
+
+    private function mapClosureReportFilters(array $filters): array
+    {
+        return [
+            'folio' => $filters['folio'] ?? '',
+            'user_id' => $filters['user_id'] ?? '',
+            'status' => $filters['status'] ?? '',
+            'date_from' => $filters['date_from'] ?? '',
+            'date_to' => $filters['date_to'] ?? '',
+            'per_page' => (int) ($filters['per_page'] ?? 20),
         ];
     }
 

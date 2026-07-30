@@ -248,7 +248,7 @@ class StockMovementService
 
             $productBatch = ProductBatch::create([
                 'branch_product_id' => $branchProduct->id,
-                'lot_number' => $batch['lot_number'] ?? null,
+                'lot_number' => mb_strtoupper((string) ($batch['lot_number'] ?? ''), 'UTF-8'),
                 'expiration_date' => $batch['expiration_date'] ?? null,
                 'initial_quantity' => $batchQuantity,
                 'quantity' => $batchQuantity,

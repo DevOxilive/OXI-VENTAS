@@ -144,6 +144,7 @@ class GeneralPurchaseOrderController extends Controller
         FlexibleSearch::apply($orders, $filters['search'], function ($query, $phrase, $terms) {
             FlexibleSearch::orWhereColumns($query, ['general_purchase_orders.folio'], $phrase, $terms);
             FlexibleSearch::orWhereHasColumns($query, 'items', ['product_name', 'product_code'], $phrase, $terms);
+            FlexibleSearch::orWhereHasColumns($query, 'items.product.barcodes', ['code'], $phrase, $terms);
             FlexibleSearch::orWhereHasColumns($query, 'branchOrders.branch', ['name'], $phrase, $terms);
         });
 

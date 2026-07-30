@@ -1,6 +1,8 @@
 <script setup>
-import { ref, watch, defineProps, defineEmits, onMounted } from 'vue';
+import { computed, ref, watch, defineProps, defineEmits, onMounted } from 'vue';
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue';
+import { fieldRegistry } from '@/Validation/fieldRegistry';
+import { sanitizeField } from '@/Validation/sanitizers';
 
 const props = defineProps({
     modelValue: {
@@ -48,7 +50,9 @@ const props = defineProps({
     withoutLabel: {
         type: Boolean,
         default: false
-    }
+    },
+    validationField: String,
+    preserveCase: Boolean,
 });
 
 const emits = defineEmits(['update:modelValue', 'change']);
@@ -57,6 +61,24 @@ const inputValue = ref(props.modelValue);
 const pattern = ref('');
 const fileInput = ref(null);
 const fileUrl = ref('');
+const fieldConfig = computed(() => fieldRegistry[props.validationField || props.id] ?? {});
+const normalizedFieldConfig = computed(() => {
+    const config = fieldConfig.value;
+    const effectiveType = config.type ?? props.type;
+    const shouldAutoTitleCase =
+        effectiveType === 'text'
+        && !config.uppercase
+        && !config.preserveCase
+        && !props.preserveCase
+        && !props.notUpper;
+
+    return {
+        ...config,
+        type: effectiveType,
+        preserveCase: props.preserveCase || props.notUpper || config.preserveCase,
+        titleCase: config.titleCase ?? shouldAutoTitleCase,
+    };
+});
 
 const onlyLetters = '^[A-Za-zÀ-ÿ]+$';
 const lettersAndSpace = '^[A-Za-zÀ-ÿ\\s]+$';
@@ -65,8 +87,20 @@ const lettersAndNumbers = '^[A-Za-zÀ-ÿ0-9]+$';
 const lettersNumbersAndSpace = '^[A-Za-zÀ-ÿ0-9\\s]+$';
 const email = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$';
 watch(inputValue, (newValue) => {
-    if (props.type === 'text' && typeof newValue === 'string' && !props.notUpper) {
-        emits('update:modelValue', newValue.toUpperCase());
+    if (['date', 'file', 'number', 'password', 'email', 'checkbox'].includes(props.type)) {
+        emits('update:modelValue', newValue);
+        return;
+    }
+
+    if (props.type === 'text' && typeof newValue === 'string') {
+        const sanitized = sanitizeField(newValue, normalizedFieldConfig.value);
+
+        if (sanitized !== newValue) {
+            inputValue.value = sanitized;
+            return;
+        }
+
+        emits('update:modelValue', sanitized);
     } else {
         emits('update:modelValue', newValue);
     }

@@ -19,6 +19,11 @@ const props = defineProps({
         default: 'text'
     },
     readonly: Boolean,
+    preserveCase: Boolean,
+    titleCase: {
+        type: Boolean,
+        default: undefined,
+    },
 
     icon: String,
     prefix: String,
@@ -43,15 +48,16 @@ const normalizedFieldConfig = computed(() => {
     const config = fieldConfig.value ?? {}
     const effectiveType = config.type ?? props.type
     const shouldAutoTitleCase =
-        effectiveType === 'text' &&
+        ['text', 'textarea'].includes(effectiveType) &&
         !config.uppercase &&
         !config.preserveCase &&
-        config.titleCase !== false
+        !props.preserveCase
 
     return {
         ...config,
         type: effectiveType,
-        titleCase: shouldAutoTitleCase || config.titleCase === true,
+        preserveCase: props.preserveCase || config.preserveCase,
+        titleCase: props.titleCase ?? config.titleCase ?? shouldAutoTitleCase,
     }
 })
 

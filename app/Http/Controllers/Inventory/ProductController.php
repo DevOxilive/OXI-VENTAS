@@ -402,12 +402,38 @@ class ProductController extends Controller
         return back()->with('success', 'Producto actualizado correctamente');
     }
 
-    public function destroy(Branch $branch, Product $product)
+    public function destroy(Request $request, Branch $branch, Product $product)
     {
-        $this->abortIfUserCannotAccessBranch(request(), $branch);
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
+        $data = $request->validate([
+            'delete_globally' => ['nullable', 'boolean'],
+        ]);
+
+        $deleteGlobally = (bool) ($data['delete_globally'] ?? false);
+        $branchProduct = BranchProduct::query()
+            ->where('branch_id', $branch->id)
+            ->where('product_id', $product->id)
+            ->firstOrFail();
 
         $productId = $product->id;
         $productName = $product->name;
+
+        if (! $deleteGlobally) {
+            DB::transaction(fn () => $branchProduct->delete());
+
+            broadcast(new ProductChanged('deleted', $productId, [$branch->id]))->toOthers();
+            event(RealtimeActivityLogged::message(
+                'retiro',
+                'el producto de la sucursal',
+                "{$productName} ({$branch->name})",
+                'Inventario',
+                'deleted',
+            ));
+
+            return back()->with('success', "Producto retirado de {$branch->name} correctamente");
+        }
+
         $branchIds = BranchProduct::where('product_id', $product->id)
             ->pluck('branch_id')
             ->map(fn ($id) => (int) $id)
@@ -415,9 +441,7 @@ class ProductController extends Controller
             ->all();
 
         DB::transaction(function () use ($product) {
-            // Deleting a product is a global catalog action. Soft-delete every
-            // active branch assignment so the product and its configuration can
-            // be recovered together from the Global Trash.
+            // La eliminacion global retira el producto maestro y sus asignaciones.
             $product->branchProducts()->delete();
             $product->barcodes()->delete();
             $product->delete();
@@ -426,7 +450,7 @@ class ProductController extends Controller
         broadcast(new ProductChanged('deleted', $productId, $branchIds))->toOthers();
         event(RealtimeActivityLogged::message('eliminó', 'el producto', $productName, 'Inventario', 'deleted'));
 
-        return back()->with('success', 'Producto eliminado correctamente');
+        return back()->with('success', 'Producto eliminado de todas las sucursales correctamente');
     }
 
     private function resolveImageDisk(?string $path): ?string
