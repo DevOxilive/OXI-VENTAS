@@ -136,6 +136,7 @@ class PhysicalCountController extends Controller
             'productBatch:id,branch_product_id,lot_number,expiration_date',
             'branchProduct.product.category:id,name',
             'branchProduct.product.subcategory:id,name,category_id',
+            'branchProduct.product.barcodes:id,product_id,code',
         ])
             ->whereIn('physical_count_id', $auditIds)
             ->when($filters['user_id'], fn ($query, $userId) => $query->where('user_id', $userId))
@@ -152,6 +153,10 @@ class PhysicalCountController extends Controller
 
                     FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct.product', [
                         'name',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct.product.barcodes', [
+                        'code',
                     ], $phrase, $terms);
 
                     FlexibleSearch::orWhereHasColumns($subQuery, 'user', [

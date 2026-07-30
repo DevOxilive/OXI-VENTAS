@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { Head, router, useForm } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
@@ -13,6 +13,7 @@ import MetricCard from "@/Components/Cards/MetricCard.vue";
 import InputField from "@/Components/Forms/InputField.vue";
 import TextareaField from "@/Components/Forms/TextareaField.vue";
 import { usePermissions } from "@/Composables/usePermissions";
+import { getCashRegisterClosureReportsToolbarConfig } from "@/config/ToolbarConfigs/cashRegisterClosureReportsToolbarConfig";
 
 defineOptions({
   layout: AdminLayout,
@@ -25,9 +26,23 @@ const props = defineProps({
   branchesDB: { type: Array, default: () => [] },
   closures: { type: Object, required: true },
   summary: { type: Object, required: true },
+  filters: { type: Object, default: () => ({}) },
+  users: { type: Array, default: () => [] },
 });
 
 const rows = computed(() => props.closures?.data || []);
+let filterReloadTimeout = null;
+let syncingFilters = false;
+
+const reportFilters = reactive({
+  folio: props.filters.folio || "",
+  user_id: props.filters.user_id || "",
+  status: props.filters.status || "",
+  date_from: props.filters.date_from || "",
+  date_to: props.filters.date_to || "",
+  per_page: Number(props.filters.per_page || 20),
+});
+
 const toolbarActions = computed(() => can("sales.cash-closures.create")
   ? [
       {
@@ -38,6 +53,14 @@ const toolbarActions = computed(() => can("sales.cash-closures.create")
       },
     ]
   : []);
+
+const toolbarConfig = computed(() => getCashRegisterClosureReportsToolbarConfig({
+  form: reportFilters,
+  users: props.users,
+  selectorMode: props.selectorMode,
+  actions: toolbarActions.value,
+}));
+
 const selectedClosure = ref(null);
 const modalMode = ref("view");
 const showClosureModal = ref(false);
@@ -214,7 +237,49 @@ function money(value) {
 }
 
 function handlePageChange(url) {
-  router.visit(url, { preserveScroll: true, preserveState: true });
+  router.visit(url, {
+    preserveScroll: true,
+    preserveState: true,
+    replace: true,
+    only: ["closures", "summary", "filters", "users"],
+  });
+}
+
+function reportRoute() {
+  if (props.currentBranch?.id) {
+    return route("inventory.branches.reports.cash-closures", {
+      branch: props.currentBranch.id,
+    });
+  }
+
+  return route("ventas.cash-closures.reports");
+}
+
+function reportQuery(overrides = {}) {
+  return {
+    folio: reportFilters.folio || "",
+    user_id: reportFilters.user_id || "",
+    status: reportFilters.status || "",
+    date_from: reportFilters.date_from || "",
+    date_to: reportFilters.date_to || "",
+    per_page: reportFilters.per_page || 20,
+    ...overrides,
+  };
+}
+
+function applyReportFilters() {
+  if (props.selectorMode) return;
+
+  router.get(reportRoute(), reportQuery({ page: 1 }), {
+    preserveScroll: true,
+    preserveState: true,
+    replace: true,
+    only: ["closures", "summary", "filters", "users"],
+  });
+}
+
+function updateReportFilter({ key, value }) {
+  reportFilters[key] = value;
 }
 
 function goToCut() {
@@ -341,6 +406,39 @@ function backToReportsCenter() {
 
   router.visit(route("dashboard"));
 }
+
+watch(
+  () => props.filters,
+  (filters) => {
+    syncingFilters = true;
+    reportFilters.folio = filters.folio || "";
+    reportFilters.user_id = filters.user_id || "";
+    reportFilters.status = filters.status || "";
+    reportFilters.date_from = filters.date_from || "";
+    reportFilters.date_to = filters.date_to || "";
+    reportFilters.per_page = Number(filters.per_page || 20);
+
+    setTimeout(() => {
+      syncingFilters = false;
+    }, 0);
+  },
+  { deep: true },
+);
+
+watch(
+  () => ({ ...reportFilters }),
+  () => {
+    if (syncingFilters || props.selectorMode) return;
+
+    clearTimeout(filterReloadTimeout);
+    filterReloadTimeout = setTimeout(applyReportFilters, 350);
+  },
+  { deep: true },
+);
+
+onBeforeUnmount(() => {
+  clearTimeout(filterReloadTimeout);
+});
 </script>
 
 <template>
@@ -349,16 +447,13 @@ function backToReportsCenter() {
   <PageLayout>
     <div class="space-y-6">
       <GlobalToolbar
-        icon="assessment"
-        title="Reportes de corte de cajas"
+        v-bind="toolbarConfig"
         :subtitle="selectorMode ? 'Selecciona una sucursal para consultar su historial de cortes.' : currentBranch ? `Historial de cortes de ${currentBranch.name}` : 'Historial de cortes registrados por sucursal y usuario'"
-        back-button
         :back-label="currentBranch && branchesDB.length > 1 ? 'Sucursales' : 'Centro de reportes'"
-        :show-search="false"
-        :show-records-per-page="false"
-        :show-counter="false"
-        :actions="toolbarActions"
         @back="backToReportsCenter"
+        @update:search="reportFilters.folio = $event"
+        @update:filter="updateReportFilter"
+        @update:records-per-page="reportFilters.per_page = $event"
         @action="goToCut"
       />
 

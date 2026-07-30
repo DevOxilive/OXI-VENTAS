@@ -1,12 +1,18 @@
 <script setup>
 import { computed, ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import InputField from '@/Components/Forms/InputField.vue'
 import { GlobalToolbar } from '@/Components/Toolbars'
+import { sanitizeToolbarSearch } from '@/Components/Toolbars/toolbarInputSanitizer'
 
 defineOptions({ layout: AdminLayout })
 
 const search = ref('')
 const statusFilter = ref('')
+
+function handleSearchInput(value) {
+    search.value = sanitizeToolbarSearch(value)
+}
 
 const transfers = ref([
     { id: 1, folio: 'TR-001', product: 'Tanque de oxígeno 680L', quantity: 6, origin: 'Sucursal Centro', destination: 'Sucursal Norte', responsible: 'Carlos Ramirez', status: 'Pendiente', date: '2026-05-18' },
@@ -80,8 +86,16 @@ function statusClass(status) {
 
         <div class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
             <div class="grid grid-cols-1 gap-3 border-b border-secondary p-4 md:grid-cols-2">
-                <input v-model="search" type="text" placeholder="Buscar folio, producto o responsable..."
-                    class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary" />
+                <InputField
+                    :model-value="search"
+                    hide-label
+                    field="inventory-transfer-search"
+                    validation-field="toolbar_search"
+                    type="search"
+                    placeholder="Buscar folio, producto o responsable..."
+                    :show-counter="false"
+                    @update:model-value="handleSearchInput"
+                />
 
                 <select v-model="statusFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
                     <option value="">Estado</option>

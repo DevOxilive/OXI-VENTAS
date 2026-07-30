@@ -2,6 +2,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import InputField from '@/Components/Forms/InputField.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 
 const props = defineProps({
@@ -96,9 +97,9 @@ const columns = [
   },
   {
     key: 'scannedCode',
-    label: 'Código',
+    label: 'Codigo',
     format: 'text',
-    mobileLabel: 'Código',
+    mobileLabel: 'Codigo',
     mobileDisplay: true
   },
   {
@@ -110,9 +111,9 @@ const columns = [
   },
   {
     key: 'damagedQuantity',
-    label: 'Dañado',
+    label: 'Danado',
     format: 'number',
-    mobileLabel: 'Dañado',
+    mobileLabel: 'Danado',
     mobileDisplay: true
   },
   {
@@ -138,9 +139,9 @@ const columns = [
   },
   {
     key: 'userName',
-    label: 'Registró',
+    label: 'Registro',
     format: 'text',
-    mobileLabel: 'Registró',
+    mobileLabel: 'Registro',
     mobileDisplay: true
   },
   {
@@ -199,22 +200,24 @@ function handleTableAction({ action, row }) {
 </script><template>
   <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
     <h2 class="mb-1 text-lg font-semibold text-gray-900">
-      Últimos productos capturados
+      Ultimos productos capturados
     </h2>
 
     <p class="mb-4 text-sm text-gray-500">
-      Registros realizados dentro de esta auditoría, incluyendo el usuario que capturó cada conteo.
+      Registros realizados dentro de esta auditoria, incluyendo el usuario que capturo cada conteo.
     </p>
 
     <div class="mb-4">
-      <input
+      <InputField
         v-model="search"
-        type="search"
-        placeholder="Buscar por producto, código, lote, usuario o fecha..."
-        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        hide-label
+        field="audit_entries_search"
+        validation-field="toolbar_search"
+        placeholder="Buscar por producto, codigo, lote, usuario o fecha..."
+        :show-counter="false"
       />
       <p class="mt-2 text-xs text-gray-500">
-        La búsqueda revisa todos los productos contados de esta auditoría.
+        La busqueda revisa todos los productos contados de esta auditoria.
       </p>
     </div>
 

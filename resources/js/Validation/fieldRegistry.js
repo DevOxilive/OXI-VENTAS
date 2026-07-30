@@ -403,15 +403,85 @@ export const fieldRegistry = {
         message: "Filtro inválido.",
     },
 
+    ticket_header_text: {
+        required: false,
+        type: "text",
+        max: 120,
+        titleCase: true,
+        message: "Encabezado de ticket inválido.",
+    },
+
+    ticket_subheader_text: {
+        required: false,
+        type: "text",
+        max: 160,
+        titleCase: true,
+        message: "Subencabezado de ticket inválido.",
+    },
+
+    ticket_cash_box_text: {
+        required: false,
+        type: "text",
+        max: 80,
+        titleCase: true,
+        message: "Caja de ticket inválida.",
+    },
+
+    ticket_footer_text: {
+        required: false,
+        type: "text",
+        max: 220,
+        titleCase: true,
+        message: "Pie de ticket inválido.",
+    },
+
+    label_product_name: {
+        required: false,
+        type: "text",
+        max: 240,
+        titleCase: true,
+        message: "Nombre de etiqueta inválido.",
+    },
+
+    label_header_text: {
+        required: false,
+        type: "text",
+        max: 120,
+        titleCase: true,
+        message: "Encabezado de etiqueta inválido.",
+    },
+
+    label_footer_text: {
+        required: false,
+        type: "text",
+        max: 120,
+        titleCase: true,
+        message: "Pie de etiqueta inválido.",
+    },
+
+    one_time_code: {
+        required: true,
+        type: "numeric",
+        min: 6,
+        max: 8,
+        message: "Código de autenticación inválido.",
+    },
+
+    recovery_code: {
+        required: true,
+        type: "text",
+        min: 8,
+        max: 80,
+        preserveCase: true,
+        message: "Código de recuperación inválido.",
+    },
+
     lot_number: {
         required: false,
-        type: "alphanumeric",
-        max: 40,
+        type: "text",
+        max: 100,
         uppercase: true,
-        preventSpam: true,
-        spamLevel: "soft",
         message: "Número de lote inválido.",
-        spamMessage: "Número de lote no válido.",
     },
     type: {
         required: true,

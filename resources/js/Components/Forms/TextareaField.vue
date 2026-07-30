@@ -17,6 +17,11 @@ const props = defineProps({
         default: 3,
     },
     readonly: Boolean,
+    preserveCase: Boolean,
+    titleCase: {
+        type: Boolean,
+        default: undefined,
+    },
     autoResize: {
         type: Boolean,
         default: true,
@@ -35,6 +40,16 @@ const textareaId = computed(() =>
 )
 
 const fieldConfig = computed(() => fieldRegistry[props.field])
+const normalizedFieldConfig = computed(() => {
+    const config = fieldConfig.value ?? {}
+
+    return {
+        ...config,
+        type: config.type ?? 'text',
+        preserveCase: props.preserveCase || config.preserveCase,
+        titleCase: props.titleCase ?? config.titleCase ?? (!config.uppercase && !config.preserveCase && !props.preserveCase),
+    }
+})
 
 const textareaMaxHeight = computed(() => {
     return typeof props.maxHeight === 'number'
@@ -61,11 +76,7 @@ function resizeTextarea(textarea) {
 }
 
 function handleInput(e) {
-    const config = fieldConfig.value
-
-    const value = config
-        ? sanitizeField(e.target.value, config)
-        : e.target.value
+    const value = sanitizeField(e.target.value, normalizedFieldConfig.value)
 
     e.target.value = value
 
@@ -114,8 +125,8 @@ function blockExtraInput(e) {
                 {{ error }}
             </p>
 
-            <p v-if="fieldConfig?.max" class="ml-auto text-[11px] text-text opacity-50">
-                {{ (modelValue || '').toString().length }}/{{ fieldConfig.max }}
+            <p v-if="normalizedFieldConfig?.max" class="ml-auto text-[11px] text-text opacity-50">
+                {{ (modelValue || '').toString().length }}/{{ normalizedFieldConfig.max }}
             </p>
         </div>
     </div>

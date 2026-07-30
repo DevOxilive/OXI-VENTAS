@@ -2,7 +2,6 @@
 import { computed, onMounted, watch } from 'vue'
 import { useAdjustStockForm } from '@/Composables/Inventory/useAdjustStockForm'
 import FormPanel from '@/Components/Cards/FormPanel.vue'
-import SectionHeading from '@/Components/Cards/SectionHeading.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { getStockEntryModalConfig } from '@/config/ModalConfigs/stockEntryModalConfig'
 
@@ -30,7 +29,6 @@ const props = defineProps({
 const {
     form,
     frontendErrors,
-    currentStock,
     errorSummary,
     saveAdjustment,
     addBatch,
@@ -58,6 +56,7 @@ const totalErrors = computed(() => errorSummary.value.length)
 const modalConfig = computed(() => getStockEntryModalConfig({
     totalErrors: totalErrors.value,
     processing: form.processing,
+    productName: productName.value,
 }))
 
 const branchOptions = computed(() => {
@@ -88,21 +87,10 @@ const branchDistributionEnabled = computed(() => {
     return selectedBranches.value.length > 1
 })
 
-function formatLotNumber(value) {
-    if (!value) return ''
+function normalizeLotNumber(value = entry.value?.lot_number) {
+    if (value === null || value === undefined) return
 
-    return value
-        .toString()
-        .trim()
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-}
-
-function ensureLotFormat() {
-    if (!entry.value?.lot_number) return
-
-    const cleanLot = formatLotNumber(entry.value.lot_number)
-    entry.value.lot_number = `${cleanLot}-${today.value}`
+    entry.value.lot_number = value.toString().toUpperCase()
 }
 
 function buildAllocation(branchId, quantity = '') {
@@ -204,18 +192,6 @@ function updateBranchAllocation(branchId, value) {
     frontendErrors.branch_allocations = ''
 }
 
-function branchDescription(branchId) {
-    if (isCurrentBranch(branchId)) {
-        return 'Sucursal actual'
-    }
-
-    if (branchSelected(branchId)) {
-        return 'Disponible para esta entrada'
-    }
-
-    return 'Haz clic para agregar'
-}
-
 function allocationPayload() {
     if (!branchDistributionEnabled.value) {
         return []
@@ -285,7 +261,7 @@ function validateEntry() {
         frontendErrors.expiration_date = 'La caducidad debe ser mayor a la fecha de entrada.'
     }
 
-    if (!entry.value?.lot_number) {
+    if (!entry.value?.lot_number?.trim()) {
         frontendErrors.lot_number = 'El numero de lote es obligatorio.'
     }
 
@@ -301,7 +277,7 @@ function validateEntry() {
 
 function saveEntry() {
     syncQuantity()
-    ensureLotFormat()
+    normalizeLotNumber()
 
     if (!validateEntry()) return
 
@@ -345,52 +321,18 @@ onMounted(() => {
             v-if="entry"
             class="min-h-0 w-full"
         >
-            <SectionHeading
-                :description="props.currentBranch?.name || 'Sucursal actual'"
-                :bordered="true"
-                spacing="md"
-            >
-                <template #title>
-                    <h3 class="truncate font-black text-text">
-                        {{ productName }}
-                    </h3>
-                </template>
-
-                <template #aside>
-                    <div class="flex flex-wrap gap-2">
-                        <span class="rounded-full border border-secondary bg-secondary px-3 py-1 text-xs font-semibold text-text opacity-80">
-                            Stock: {{ currentStock }} {{ unit }}
-                        </span>
-
-                        <span class="rounded-full border border-secondary bg-secondary px-3 py-1 text-xs font-semibold text-text opacity-80">
-                            Entrada: {{ today }}
-                        </span>
-                    </div>
-                </template>
-            </SectionHeading>
-
             <div class="space-y-5 p-5">
-                <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.95fr)_minmax(260px,0.9fr)]">
+                <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)_minmax(250px,0.85fr)]">
                     <FormPanel
                         title="Datos del producto"
                         description="Captura la cantidad y los datos principales del lote."
                         panel-class="border-y shadow-none"
                         body-class="space-y-4"
                     >
-                        <div class="mb-4 flex flex-wrap gap-2">
-                            <span class="rounded-full border border-secondary bg-background px-3 py-1 text-xs font-semibold text-text opacity-80">
-                                Stock actual: {{ currentStock }} {{ unit }}
-                            </span>
-
-                            <span class="rounded-full border border-secondary bg-background px-3 py-1 text-xs font-semibold text-text opacity-80">
-                                Entrada: {{ today }}
-                            </span>
-                        </div>
-
                         <div class="grid grid-cols-1 gap-4">
                             <InputField
                                 v-model="entry.quantity"
-                                :label="`Cantidad (${unit})`"
+                                :label="`Cantidad total (${unit})`"
                                 type="number"
                                 field="quantity"
                                 :readonly="form.processing"
@@ -401,9 +343,10 @@ onMounted(() => {
                             <InputField
                                 v-model="entry.lot_number"
                                 label="Numero de lote"
-                                placeholder="Ej. Dulce de leche"
+                                placeholder="Ej. AIHK-342"
                                 field="lot_number"
                                 :readonly="form.processing"
+                                @update:model-value="normalizeLotNumber"
                                 @blur="validateEntry"
                             />
 
@@ -429,40 +372,35 @@ onMounted(() => {
 
                     <FormPanel
                         title="Distribucion por sucursal"
-                        description="Selecciona las sucursales y define cuantas piezas recibe cada una."
+                        description="Selecciona las sucursales y define sus cantidades."
                         panel-class="border-y shadow-none"
                     >
-                        <div class="max-h-[360px] space-y-3 overflow-y-auto pr-1">
+                        <div class="max-h-[320px] space-y-2 overflow-y-auto overscroll-contain pr-2">
                             <div
                                 v-for="branch in branchOptions"
                                 :key="branch.id"
-                                class="flex items-center gap-3"
+                                class="grid grid-cols-[minmax(0,1fr)_88px] items-center gap-2"
                             >
-                                <div class="min-w-0 flex-1">
-                                    <SelectionCheckboxCard
-                                        :checked="branchSelected(branch.id)"
-                                        :disabled="isCurrentBranch(branch.id)"
-                                        :title="branch.name"
-                                        :description="branchDescription(branch.id)"
-                                        :badge="isCurrentBranch(branch.id) ? 'Fija' : ''"
-                                        :highlighted="isCurrentBranch(branch.id)"
-                                        variant="solid"
-                                        :compact="true"
-                                        @toggle="toggleBranch(branch)"
-                                    />
-                                </div>
+                                <SelectionCheckboxCard
+                                    :checked="branchSelected(branch.id)"
+                                    :disabled="isCurrentBranch(branch.id) || form.processing"
+                                    :title="branch.name"
+                                    :description="isCurrentBranch(branch.id) ? 'Sucursal actual' : 'Incluir en la entrada'"
+                                    :badge="isCurrentBranch(branch.id) ? 'Fija' : ''"
+                                    :highlighted="isCurrentBranch(branch.id)"
+                                    variant="solid"
+                                    :compact="true"
+                                    @toggle="toggleBranch(branch)"
+                                />
 
-                                <div class="w-[102px] shrink-0">
-                                    <label class="mb-1 block text-[11px] font-black uppercase tracking-[0.18em] text-text opacity-70">
-                                        Piezas
-                                    </label>
-
+                                <div>
                                     <input
                                         :value="findAllocation(branch.id)?.quantity ?? ''"
                                         type="number"
                                         min="0"
                                         step="0.001"
-                                        class="w-full rounded-2xl border border-secondary bg-background px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-primary disabled:cursor-not-allowed disabled:bg-secondary"
+                                        :aria-label="`Cantidad para ${branch.name}`"
+                                        class="w-full rounded-lg border border-secondary bg-background px-2.5 py-2 text-right text-sm text-text outline-none transition focus:border-primary focus:ring-primary disabled:cursor-not-allowed disabled:bg-secondary"
                                         :disabled="form.processing || !branchSelected(branch.id)"
                                         @input="updateBranchAllocation(branch.id, $event.target.value)"
                                         @blur="validateEntry"
@@ -471,7 +409,7 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <div class="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold">
+                        <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
                             <span class="rounded-full border border-secondary bg-background px-3 py-1 text-text opacity-80">
                                 Asignado: {{ totalAllocated }} / {{ totalQuantity || 0 }} {{ unit }}
                             </span>

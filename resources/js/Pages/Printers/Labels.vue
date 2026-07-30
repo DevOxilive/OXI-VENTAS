@@ -5,6 +5,7 @@ import { useForm } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
 import GlobalToolbar from "@/Components/Toolbars/GlobalToolbar.vue";
+import InputField from "@/Components/Forms/InputField.vue";
 import { ToastAlert, WarningAlert } from "@/Components/Modales/UniversalActionModal";
 import { getPrinterLabelsToolbarConfig } from "@/config/ToolbarConfigs/printerLabelsToolbarConfig";
 import {
@@ -109,6 +110,10 @@ const configurableBlocks = computed(() => (
 const productOptions = computed(() => props.products.map((product) => ({
   label: `${product.name} - $${Number(product.price || 0).toFixed(2)}`,
   value: product.id,
+  searchText: [product.name, product.barcode, ...(product.barcodes || [])]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase(),
 })));
 const filteredProductOptions = computed(() => {
   const query = productSearch.value.trim().toLowerCase();
@@ -118,7 +123,7 @@ const filteredProductOptions = computed(() => {
   }
 
   return productOptions.value.filter((option) => (
-    String(option.label).toLowerCase().includes(query)
+    option.searchText.includes(query)
     || String(option.value) === String(selectedProductId.value)
   ));
 });
@@ -470,12 +475,16 @@ async function printTestLabel() {
                 </p>
               </div>
 
-              <input
+              <InputField
                 v-model="productSearch"
+                hide-label
+                field="label-product-search"
+                validation-field="toolbar_search"
                 type="search"
-                class="mb-2 w-full rounded-lg border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
+                class="mb-2"
                 placeholder="Buscar producto por nombre"
-              >
+                :show-counter="false"
+              />
 
               <select
                 v-model="selectedProductId"
@@ -492,35 +501,32 @@ async function printTestLabel() {
                   {{ option.label }}
                 </option>
               </select>
-              <label class="mt-3 block">
-  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">
-    Nombre que saldrá en la etiqueta
-  </span>
+              <div class="mt-3">
+                <InputField
+                  v-model="editableProductName"
+                  label="Nombre que saldra en la etiqueta"
+                  field="label_product_name"
+                  :show-counter="false"
+                  placeholder="Nombre personalizado para imprimir"
+                />
 
-  <input
-    v-model="editableProductName"
-    type="text"
-    maxlength="240"
-    class="mt-2 w-full rounded-lg border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-    placeholder="Nombre personalizado para imprimir"
-  >
-
-  <p class="mt-1 text-xs text-text opacity-70">
-    Se carga desde el producto seleccionado, pero puedes modificarlo antes de imprimir.
-  </p>
-</label>
+                <p class="mt-1 text-xs text-text opacity-70">
+                  Se carga desde el producto seleccionado, pero puedes modificarlo antes de imprimir.
+                </p>
+              </div>
             </div>
 
             <div class="grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
-              <label class="rounded-2xl border border-secondary bg-secondary p-3">
+              <div class="rounded-2xl border border-secondary bg-secondary p-3">
                 <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Plantilla</span>
-                <input
+                <InputField
                   v-model="form.name"
-                  type="text"
-                  class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
+                  label="Plantilla"
+                  field="name"
+                  :hide-label="true"
                   placeholder="Etiqueta de producto"
-                >
-              </label>
+                />
+              </div>
 
               <label class="rounded-2xl border border-secondary bg-secondary p-3">
                 <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Activa</span>
@@ -533,23 +539,25 @@ async function printTestLabel() {
                 </div>
               </label>
 
-              <label class="rounded-2xl border border-secondary bg-secondary p-3">
+              <div class="rounded-2xl border border-secondary bg-secondary p-3">
                 <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Marca</span>
-                <input
+                <InputField
                   v-model="form.settings.header_text"
-                  type="text"
-                  class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-                >
-              </label>
+                  label="Marca"
+                  field="label_header_text"
+                  :hide-label="true"
+                />
+              </div>
 
-              <label class="rounded-2xl border border-secondary bg-secondary p-3">
+              <div class="rounded-2xl border border-secondary bg-secondary p-3">
                 <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Pie</span>
-                <input
+                <InputField
                   v-model="form.settings.footer_text"
-                  type="text"
-                  class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-                >
-              </label>
+                  label="Pie"
+                  field="label_footer_text"
+                  :hide-label="true"
+                />
+              </div>
             </div>
 
          

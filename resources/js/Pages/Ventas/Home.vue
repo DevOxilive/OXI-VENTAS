@@ -76,6 +76,8 @@ const props = defineProps({
 const page = usePage();
 const { can } = usePermissions();
 const CASH_BOX_STORAGE_KEY = "ventas_cash_box_by_branch";
+const PRODUCT_SEARCH_DEBOUNCE_MS = 300;
+const PRODUCT_SEARCH_CACHE_TTL_MS = 5000;
 
 const search = ref("");
 const searchInput = ref(null);
@@ -97,7 +99,9 @@ const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para imprimir tickets.");
 let searchDebounceTimer = null;
 let searchRequestId = 0;
-let searchAbortController = null;
+let productSearchCacheVersion = 0;
+const productSearchCache = new Map();
+const productSearchRequests = new Map();
 
 const saleForm = useForm({
   branch_id: props.currentBranch?.id ?? "",
@@ -118,6 +122,19 @@ function focusSearch() {
   nextTick(() => {
     searchInput.value?.focus?.();
   });
+}
+
+function clearPendingProductSearch() {
+  if (!searchDebounceTimer) return;
+
+  window.clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = null;
+}
+
+function clearProductSearchCache() {
+  productSearchCacheVersion += 1;
+  productSearchCache.clear();
+  productSearchRequests.clear();
 }
 
 watch(
@@ -148,13 +165,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  if (searchDebounceTimer) {
-    window.clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = null;
-  }
-
-  searchAbortController?.abort();
-  searchAbortController = null;
+  clearPendingProductSearch();
 });
 
 watch(
@@ -227,14 +238,8 @@ watch(
   ([value, branchId]) => {
     const query = String(value || "").trim();
 
-    if (searchDebounceTimer) {
-      window.clearTimeout(searchDebounceTimer);
-      searchDebounceTimer = null;
-    }
-
-    searchAbortController?.abort();
-    searchAbortController = null;
-    searchRequestId += 1;
+    clearPendingProductSearch();
+    const requestId = ++searchRequestId;
 
     if (!query || !branchId || props.selectorMode) {
       remoteSearchProducts.value = [];
@@ -243,10 +248,9 @@ watch(
     }
 
     searchDebounceTimer = window.setTimeout(() => {
-      fetchProductsForSearch(query).catch(() => {
-        // La búsqueda automática puede cancelarse al cambiar de sucursal o limpiar el campo.
-      });
-    }, 180);
+      searchDebounceTimer = null;
+      void fetchProductsForSearch(query, requestId);
+    }, PRODUCT_SEARCH_DEBOUNCE_MS);
   }
 );
 
@@ -696,57 +700,95 @@ function findExactProduct(query) {
   });
 }
 
-async function fetchProductsForSearch(query, { force = false } = {}) {
+async function fetchProductsForSearch(query, requestId = ++searchRequestId, { throwOnError = false } = {}) {
   const term = String(query || "").trim();
+  const branchId = selectedBranchId.value;
 
-  if (!term || !selectedBranchId.value || props.selectorMode) {
+  if (!term || !branchId || props.selectorMode) {
     remoteSearchProducts.value = [];
     return [];
   }
 
-  searchAbortController?.abort();
+  const requestKey = `${branchId}:${term.toLocaleLowerCase("es-MX")}`;
+  const cacheVersion = productSearchCacheVersion;
+  const cached = productSearchCache.get(requestKey);
 
-  const controller = new AbortController();
-  const requestId = ++searchRequestId;
-  searchAbortController = controller;
-  searchLoading.value = true;
+  if (cached && Date.now() - cached.createdAt < PRODUCT_SEARCH_CACHE_TTL_MS) {
+    if (requestId === searchRequestId) {
+      remoteSearchProducts.value = cached.products;
+      searchLoading.value = false;
+    }
+
+    return cached.products;
+  }
+
+  let request = productSearchRequests.get(requestKey);
+
+  if (!request) {
+    request = window.axios
+      .get(route("ventas.products.search"), {
+        params: {
+          branch_id: branchId,
+          search: term,
+        },
+        headers: {
+          Accept: "application/json",
+        },
+        timeout: 8000,
+      })
+      .then(({ data }) => {
+        const products = Array.isArray(data?.products) ? data.products : [];
+
+        if (cacheVersion === productSearchCacheVersion) {
+          productSearchCache.set(requestKey, {
+            createdAt: Date.now(),
+            products,
+          });
+        }
+
+        return products;
+      });
+
+    productSearchRequests.set(requestKey, request);
+    request.then(
+      () => {
+        if (productSearchRequests.get(requestKey) === request) {
+          productSearchRequests.delete(requestKey);
+        }
+      },
+      () => {
+        if (productSearchRequests.get(requestKey) === request) {
+          productSearchRequests.delete(requestKey);
+        }
+      }
+    );
+  }
+
+  if (requestId === searchRequestId) {
+    searchLoading.value = true;
+  }
 
   try {
-    const { data } = await window.axios.get(route("ventas.products.search"), {
-      params: {
-        branch_id: selectedBranchId.value,
-        search: term,
-      },
-      headers: {
-        Accept: "application/json",
-      },
-      signal: controller.signal,
-      timeout: 8000,
-    });
+    const products = await request;
 
-    if (requestId !== searchRequestId && !force) {
+    if (requestId !== searchRequestId) {
       return remoteSearchProducts.value;
     }
 
-    const products = Array.isArray(data?.products) ? data.products : [];
     remoteSearchProducts.value = products;
 
     return products;
   } catch (error) {
-    if (controller.signal.aborted || error?.code === "ERR_CANCELED") {
-      return remoteSearchProducts.value;
-    }
-
     if (requestId === searchRequestId) {
       remoteSearchProducts.value = [];
     }
 
-    throw error;
-  } finally {
-    if (searchAbortController === controller) {
-      searchAbortController = null;
+    if (throwOnError) {
+      throw error;
     }
 
+    return [];
+  } finally {
     if (requestId === searchRequestId) {
       searchLoading.value = false;
     }
@@ -806,8 +848,10 @@ async function handleSearchKeydown(event) {
   if (!query) return;
 
   if (!searchSuggestions.value.length) {
+    clearPendingProductSearch();
+
     try {
-      await fetchProductsForSearch(query, { force: true });
+      await fetchProductsForSearch(query, ++searchRequestId, { throwOnError: true });
     } catch (error) {
       ErrorAlert({
         title: "No se pudo buscar",
@@ -1173,6 +1217,7 @@ function submitSale() {
         }, 1600);
       }
 
+      clearProductSearchCache();
       clearCart();
       saleForm.reset("items", "cash_received");
       saleForm.payment_method_id = props.defaultPaymentMethodId ?? "";

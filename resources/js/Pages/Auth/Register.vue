@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { watch } from 'vue';
+import InputField from '@/Components/Forms/InputField.vue';
 
 const form = useForm({
     name: '',
@@ -77,19 +78,16 @@ const branches = usePage().props.branches;
 
                 <form @submit.prevent="submit" class="space-y-4">
                     <!-- NOMBRE -->
-                    <div>
-                        <input
-                            type="text"
-                            placeholder="Nombre completo"
-                            v-model="form.name"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-                            required
-                        />
-
-                        <p v-if="form.errors.name" class="text-red-500 text-sm">
-                            {{ form.errors.name }}
-                        </p>
-                    </div>
+                    <InputField
+                        v-model="form.name"
+                        label="Nombre completo"
+                        field="name"
+                        placeholder="Nombre completo"
+                        :error="form.errors.name"
+                        :show-counter="false"
+                        hide-label
+                        required
+                    />
 
                     <!-- ROL -->
                     <select

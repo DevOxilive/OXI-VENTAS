@@ -52,6 +52,7 @@ class TicketTemplateController extends Controller
                     'name' => $product->name,
                     'category' => $product->category?->name ?? 'Sin categoria',
                     'barcode' => $barcode,
+                    'barcodes' => $product->barcodes->pluck('code')->values(),
                     'sku' => $barcode,
                     'price' => (float) $product->sale_price,
                     'stock' => (float) ($inventory?->current_stock ?? 0),

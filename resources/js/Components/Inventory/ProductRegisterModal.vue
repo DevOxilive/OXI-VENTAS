@@ -134,7 +134,7 @@ watch(
                     </h3>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
-                        <InputField label="Código interno" field="code" v-model="product.code" :readonly="isReadOnly"
+                        <InputField label="Código interno" field="code" validation-field="codigoProducto" v-model="product.code" :readonly="isReadOnly"
                             :error="frontendErrors.code || product.errors?.code" @validate="validate('code')" />
 
                         <InputField label="Código de barras" field="barcode" v-model="product.barcode" :readonly="isReadOnly"

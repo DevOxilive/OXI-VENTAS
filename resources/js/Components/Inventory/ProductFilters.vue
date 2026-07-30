@@ -1,4 +1,7 @@
 <script setup>
+import InputField from '@/Components/Forms/InputField.vue'
+import { sanitizeToolbarSearch } from '@/Components/Toolbars/toolbarInputSanitizer'
+
 defineProps({
   search: {
     type: String,
@@ -30,13 +33,17 @@ defineProps({
 },
 })
 
-defineEmits([
+const emit = defineEmits([
   'update:search',
   'update:categoryFilter',
   'update:recordsToShow',
   'create',
   'export',
 ])
+
+function handleSearchInput(value) {
+  emit('update:search', sanitizeToolbarSearch(value))
+}
 </script>
 <template>
   <section class="bg-transparent">
@@ -79,10 +86,19 @@ defineEmits([
     <!-- FILTROS -->
     <div class="grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-4">
 
-      <input :value="search" @input="$emit('update:search', $event.target.value)"
-        @keydown.enter.prevent="$emit('update:search', $event.target.value)" type="text" inputmode="search"
-        autocomplete="off" placeholder="Buscar producto"
-        class="w-full rounded-2xl border border-secondary bg-background px-4 py-3 text-sm text-text outline-none focus:border-primary focus:ring-primary" />
+      <InputField
+        :model-value="search"
+        hide-label
+        field="inventory-product-search"
+        validation-field="toolbar_search"
+        type="search"
+        inputmode="search"
+        autocomplete="off"
+        placeholder="Buscar producto"
+        :show-counter="false"
+        @update:model-value="handleSearchInput"
+        @keydown.enter.prevent="handleSearchInput($event.target.value)"
+      />
 
       <select :value="categoryFilter" @change="$emit('update:categoryFilter', $event.target.value)"
         class="w-full rounded-2xl border border-secondary bg-background px-4 py-3 text-sm text-text outline-none focus:border-primary focus:ring-primary">

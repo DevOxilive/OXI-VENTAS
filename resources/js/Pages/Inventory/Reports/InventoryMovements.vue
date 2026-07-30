@@ -32,7 +32,6 @@ const {
     filtersState,
     pageTitle,
     categoryOptions,
-    productOptions,
     userOptions,
     movementTypeOptions,
     movementReasonOptions,
@@ -53,10 +52,8 @@ const {
     <PageLayout>
         <template #toolbar>
             <InventoryMovementReportToolbar
-                :branch="currentBranch"
                 :filters="filtersState"
                 :categories="categoryOptions"
-                :products="productOptions"
                 :users="userOptions"
                 :movement-types="movementTypeOptions"
                 :movement-reasons="movementReasonOptions"

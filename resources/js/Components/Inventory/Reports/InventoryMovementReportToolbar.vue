@@ -5,19 +5,11 @@ import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import { getInventoryMovementReportToolbarConfig } from '@/config/ToolbarConfigs/inventoryMovementReportToolbarConfig'
 
 const props = defineProps({
-    branch: {
-        type: Object,
-        default: null,
-    },
     filters: {
         type: Object,
         required: true,
     },
     categories: {
-        type: Array,
-        default: () => [],
-    },
-    products: {
         type: Array,
         default: () => [],
     },
@@ -45,10 +37,8 @@ defineEmits([
 
 const toolbarConfig = computed(() =>
     getInventoryMovementReportToolbarConfig({
-        branch: props.branch,
         filters: props.filters,
         categories: props.categories,
-        products: props.products,
         users: props.users,
         movementTypes: props.movementTypes,
         movementReasons: props.movementReasons,

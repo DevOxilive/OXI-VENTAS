@@ -3,10 +3,11 @@ import { modalPresets } from './modalPresets'
 export function getStockEntryModalConfig({
     totalErrors = 0,
     processing = false,
+    productName = 'Producto',
 } = {}) {
     return {
         mode: 'create',
-        title: 'Entrada',
+        title: `Entrada - ${productName}`,
         subtitle: 'Registra producto que entra al inventario.',
         totalErrors,
         processing,

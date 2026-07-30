@@ -1,13 +1,19 @@
 <script setup>
 import { computed, ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import InputField from '@/Components/Forms/InputField.vue'
 import { GlobalToolbar } from '@/Components/Toolbars'
+import { sanitizeToolbarSearch } from '@/Components/Toolbars/toolbarInputSanitizer'
 
 defineOptions({ layout: AdminLayout })
 
 const search = ref('')
 const urgencyFilter = ref('')
 const branchFilter = ref('')
+
+function handleSearchInput(value) {
+    search.value = sanitizeToolbarSearch(value)
+}
 
 const expirations = ref([
     { id: 1, product: 'Mascarilla nebulizadora adulto', lot: 'LOT-001', branch: 'Sucursal Centro', stock: 32, expirationDate: '2026-06-10', daysLeft: 23, responsible: 'Andrea Mendoza', status: 'Próximo' },
@@ -92,8 +98,16 @@ function removeLot(item) {
 
         <div class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
             <div class="grid grid-cols-1 gap-3 border-b border-secondary p-4 md:grid-cols-3">
-                <input v-model="search" type="text" placeholder="Buscar producto o lote..."
-                    class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary" />
+                <InputField
+                    :model-value="search"
+                    hide-label
+                    field="inventory-expiration-search"
+                    validation-field="toolbar_search"
+                    type="search"
+                    placeholder="Buscar producto o lote..."
+                    :show-counter="false"
+                    @update:model-value="handleSearchInput"
+                />
 
                 <select v-model="urgencyFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
                     <option value="">Urgencia</option>

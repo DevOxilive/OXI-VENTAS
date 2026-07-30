@@ -154,6 +154,7 @@ class PhysicalCountReportController extends Controller
                 'productBatch:id,branch_product_id,lot_number,expiration_date',
                 'branchProduct.product.category:id,name',
                 'branchProduct.product.subcategory:id,name,category_id',
+                'branchProduct.product.barcodes:id,product_id,code',
             ])
             ->whereIn('physical_count_id', $auditIds)
             ->when($filters['user_ids'] !== [], fn ($query) => $query->whereIn('user_id', $filters['user_ids']))
@@ -170,6 +171,10 @@ class PhysicalCountReportController extends Controller
 
                     FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct.product', [
                         'name',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct.product.barcodes', [
+                        'code',
                     ], $phrase, $terms);
 
                     FlexibleSearch::orWhereHasColumns($subQuery, 'user', [
@@ -193,6 +198,7 @@ class PhysicalCountReportController extends Controller
         $activeBranchProducts = BranchProduct::with([
                 'product.category:id,name',
                 'product.subcategory:id,name,category_id',
+                'product.barcodes:id,product_id,code',
                 'branch:id,name,slug',
             ])
             ->whereIn('branch_id', $branchIds)
@@ -245,6 +251,7 @@ class PhysicalCountReportController extends Controller
                     $row['category_name'] ?? '',
                     $row['subcategory_name'] ?? '',
                     $row['scanned_code'] ?? '',
+                    implode(', ', $row['product_codes'] ?? []),
                     implode(', ', $row['participants'] ?? []),
                     $row['folio'] ?? '',
                     $row['audit_name'] ?? '',
@@ -427,6 +434,7 @@ class PhysicalCountReportController extends Controller
                     'category_name' => $snapshot['category_name'] ?? $first->branchProduct?->product?->category?->name ?? 'Sin categoria',
                     'subcategory_name' => $snapshot['subcategory_name'] ?? $first->branchProduct?->product?->subcategory?->name ?? 'Sin subcategoria',
                     'scanned_code' => $first->scanned_code ?: ($snapshot['scanned_code'] ?? $first->branchProduct?->barcode ?? '-'),
+                    'product_codes' => $first->branchProduct?->product?->barcodes?->pluck('code')->values()->all() ?? [],
                     'system_stock' => $systemStock,
                     'counted_stock' => $countedStock,
                     'damaged_stock' => $damagedStock,
@@ -468,6 +476,7 @@ class PhysicalCountReportController extends Controller
                     'category_name' => $row['category_name'],
                     'subcategory_name' => $row['subcategory_name'],
                     'scanned_code' => $row['scanned_code'],
+                    'product_codes' => $row['product_codes'] ?? [],
                     'system_stock' => (float) $row['system_stock'],
                     'counted_stock' => 0,
                     'damaged_stock' => 0,
@@ -500,6 +509,7 @@ class PhysicalCountReportController extends Controller
                     'category_name' => $branchProduct->product?->category?->name ?? 'Sin categoria',
                     'subcategory_name' => $branchProduct->product?->subcategory?->name ?? 'Sin subcategoria',
                     'scanned_code' => $branchProduct->barcode ?? '-',
+                    'product_codes' => $branchProduct->product?->barcodes?->pluck('code')->values()->all() ?? [],
                     'system_stock' => (float) ($branchProduct->stock ?? 0),
                     'counted_stock' => 0,
                     'damaged_stock' => 0,

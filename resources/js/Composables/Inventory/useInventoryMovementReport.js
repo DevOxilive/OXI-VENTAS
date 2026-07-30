@@ -6,7 +6,6 @@ export function useInventoryMovementReport(props) {
     const { handlePageChange } = useGlobalTablePagination()
     const filtersState = reactive({
         categoryId: props.filters?.category_id ?? '',
-        productId: props.filters?.product_id ?? '',
         userId: props.filters?.user_id ?? '',
         movementType: props.filters?.movement_type ?? '',
         movementReason: props.filters?.movement_reason ?? '',
@@ -23,7 +22,6 @@ export function useInventoryMovementReport(props) {
     })
 
     const categoryOptions = computed(() => props.catalogs?.categories ?? [])
-    const productOptions = computed(() => props.catalogs?.products ?? [])
     const userOptions = computed(() => props.catalogs?.users ?? [])
     const movementTypeOptions = computed(() => props.catalogs?.movementTypes ?? [])
     const movementReasonOptions = computed(() => props.catalogs?.movementReasons ?? [])
@@ -39,7 +37,6 @@ export function useInventoryMovementReport(props) {
 
     function resetFilters() {
         filtersState.categoryId = ''
-        filtersState.productId = ''
         filtersState.userId = ''
         filtersState.movementType = ''
         filtersState.movementReason = ''
@@ -60,7 +57,6 @@ export function useInventoryMovementReport(props) {
     function getRequestFilters() {
         return {
             category_id: filtersState.categoryId || undefined,
-            product_id: filtersState.productId || undefined,
             user_id: filtersState.userId || undefined,
             movement_type: filtersState.movementType || undefined,
             movement_reason: filtersState.movementReason || undefined,
@@ -134,7 +130,6 @@ export function useInventoryMovementReport(props) {
         filtersState,
         pageTitle,
         categoryOptions,
-        productOptions,
         userOptions,
         movementTypeOptions,
         movementReasonOptions,

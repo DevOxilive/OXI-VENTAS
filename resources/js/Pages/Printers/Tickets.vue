@@ -5,6 +5,8 @@ import { useForm } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
 import GlobalToolbar from "@/Components/Toolbars/GlobalToolbar.vue";
+import InputField from "@/Components/Forms/InputField.vue";
+import TextareaField from "@/Components/Forms/TextareaField.vue";
 import { ToastAlert, WarningAlert } from "@/Components/Modales/UniversalActionModal";
 import { getPrinterTicketsToolbarConfig } from "@/config/ToolbarConfigs/printerTicketsToolbarConfig";
 import {
@@ -293,15 +295,14 @@ onBeforeUnmount(() => {
               style="max-height: calc(100vh - 2rem);"
             >
               <div class="grid gap-3 lg:grid-cols-2">
-                <label class="rounded-2xl border border-secondary bg-secondary p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">{{ fieldLabels.name }}</span>
-                  <input
+                <div class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <InputField
                     v-model="form.name"
-                    type="text"
-                    class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
+                    :label="fieldLabels.name"
+                    field="name"
                     placeholder="Ticket principal"
-                  >
-                </label>
+                  />
+                </div>
 
                 <label class="rounded-2xl border border-secondary bg-secondary p-3">
                   <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">Activa</span>
@@ -314,43 +315,40 @@ onBeforeUnmount(() => {
                   </div>
                 </label>
 
-                <label class="rounded-2xl border border-secondary bg-secondary p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">{{ fieldLabels.header }}</span>
-                  <input
+                <div class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <InputField
                     v-model="form.settings.header_text"
-                    type="text"
-                    class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-                  >
-                </label>
+                    :label="fieldLabels.header"
+                    field="ticket_header_text"
+                  />
+                </div>
 
-                <label class="rounded-2xl border border-secondary bg-secondary p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">{{ fieldLabels.subheader }}</span>
-                  <input
+                <div class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <InputField
                     v-model="form.settings.subheader_text"
-                    type="text"
-                    class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-                  >
-                </label>
+                    :label="fieldLabels.subheader"
+                    field="ticket_subheader_text"
+                  />
+                </div>
 
-                <label class="rounded-2xl border border-secondary bg-secondary p-3">
-                  <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">{{ fieldLabels.cashBox }}</span>
-                  <input
+                <div class="rounded-2xl border border-secondary bg-secondary p-3">
+                  <InputField
                     v-model="form.settings.cash_box_text"
-                    type="text"
-                    class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
+                    :label="fieldLabels.cashBox"
+                    field="ticket_cash_box_text"
                     placeholder="Caja #1"
-                  >
-                </label>
+                  />
+                </div>
               </div>
 
-              <label class="block rounded-2xl border border-secondary bg-secondary p-3">
-                <span class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50">{{ fieldLabels.footer }}</span>
-                <textarea
+              <div class="block rounded-2xl border border-secondary bg-secondary p-3">
+                <TextareaField
                   v-model="form.settings.footer_text"
-                  rows="3"
-                  class="mt-2 w-full rounded-2xl border border-secondary bg-background px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
+                  :label="fieldLabels.footer"
+                  field="ticket_footer_text"
+                  :rows="3"
                 />
-              </label>
+              </div>
 
               <div class="grid gap-3 lg:grid-cols-4">
                 <label class="rounded-2xl border border-secondary bg-secondary p-3">
