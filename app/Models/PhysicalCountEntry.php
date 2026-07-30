@@ -11,6 +11,7 @@ class PhysicalCountEntry extends Model
 
    protected $fillable = [
     'physical_count_id',
+    'physical_count_round_id',
     'branch_product_id',
     'product_batch_id',
     'product_id',
@@ -26,6 +27,11 @@ class PhysicalCountEntry extends Model
     public function physicalCount()
     {
         return $this->belongsTo(PhysicalCount::class);
+    }
+
+    public function round()
+    {
+        return $this->belongsTo(PhysicalCountRound::class, 'physical_count_round_id');
     }
 public function productBatch()
 {

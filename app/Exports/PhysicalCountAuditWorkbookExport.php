@@ -52,13 +52,41 @@ class PhysicalCountAuditWorkbookExport implements WithMultipleSheets
             new PhysicalCountDashboardSheet($this->payload, $this->filterLabels, $this->branchName, $this->mainSheetTitle, $this->users, $this->statusFilter),
             new PhysicalCountControlSheet($this->payload, $this->filterLabels, $this->branchName),
             new PhysicalCountConcentratedSheet($this->payload, $this->users, $this->mainSheetTitle, $this->statusFilter),
+        ];
+
+        $rounds = collect($this->payload['rounds'] ?? [])->sortBy([
+            ['physical_count_id', 'asc'],
+            ['round_number', 'asc'],
+        ])->values();
+
+        if ($rounds->isNotEmpty()) {
+            $sheets[] = new PhysicalCountRoundsComparisonSheet($this->payload);
+
+            foreach ($rounds as $round) {
+                $audit = collect($this->payload['audits'] ?? [])->firstWhere('id', $round->physical_count_id);
+                $baseTitle = sprintf(
+                    'R%d %s %s',
+                    $round->round_number,
+                    $round->type === 'original' ? 'Original' : 'Reapertura',
+                    $audit?->folio ? mb_substr($audit->folio, -4) : ''
+                );
+                $sheets[] = new PhysicalCountRoundSheet(
+                    $round,
+                    $this->payload,
+                    $this->safeSheetTitle($baseTitle)
+                );
+            }
+        }
+
+        array_push(
+            $sheets,
             new PhysicalCountConsolidatedCountsSheet($this->payload),
             new PhysicalCountPendingSheet($this->payload),
             new PhysicalCountDifferencesSheet($this->payload),
             new PhysicalCountAuditSummarySheet($this->payload),
             new PhysicalCountBranchSummarySheet($this->payload),
             new PhysicalCountCategorySummarySheet($this->payload),
-        ];
+        );
 
         $usedTitles = collect($sheets)->map(fn ($sheet) => mb_strtolower($sheet->title()))->all();
 

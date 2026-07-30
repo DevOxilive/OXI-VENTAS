@@ -67,6 +67,7 @@ class PhysicalCountReportController extends Controller
             'categorySummary' => $payload['categorySummary']->values(),
             'branchSummary' => $payload['branchSummary']->values(),
             'auditSummary' => $payload['auditSummary']->values(),
+            'roundSummary' => $payload['roundSummary']->values(),
             'topDifferences' => $payload['topDifferences']->values(),
             'filterLabels' => $filterLabels,
         ]);
@@ -129,7 +130,7 @@ class PhysicalCountReportController extends Controller
     {
         $branchIds = $branches->pluck('id')->values()->all();
 
-        $audits = PhysicalCount::with(['branch', 'creator', 'participants:id,name'])
+        $audits = PhysicalCount::with(['branch', 'creator', 'participants:id,name', 'rounds.opener:id,name'])
             ->whereIn('branch_id', $branchIds)
             ->when($filters['physical_count_id'], fn ($query, $id) => $query->where('id', $id))
             ->when(
@@ -151,8 +152,9 @@ class PhysicalCountReportController extends Controller
         $allowedBranchProductIds = $snapshotRows->pluck('branch_product_id')->unique()->values()->all();
         $auditIds = $audits->pluck('id');
 
-        $entries = PhysicalCountEntry::with([
+        $allEntries = PhysicalCountEntry::with([
                 'user:id,name',
+                'round:id,physical_count_id,round_number,type,scope,opened_by,started_at,closed_at,applied_at',
                 'productBatch:id,branch_product_id,lot_number,expiration_date',
                 'branchProduct.product.category:id,name',
                 'branchProduct.product.subcategory:id,name,category_id',
@@ -187,15 +189,7 @@ class PhysicalCountReportController extends Controller
             ->when($allowedBranchProductIds !== [], fn ($query) => $query->whereIn('branch_product_id', $allowedBranchProductIds))
             ->get();
 
-        $auditsById = $audits->keyBy('id');
-        $entries = $entries
-            ->filter(function ($entry) use ($auditsById) {
-                $audit = $auditsById->get($entry->physical_count_id);
-
-                return ! $audit?->recapture_started_at
-                    || $entry->created_at >= $audit->recapture_started_at;
-            })
-            ->values();
+        $entries = $this->consolidateFinalEntries($allEntries);
 
         $activeBranchProducts = BranchProduct::with([
                 'product.category:id,name',
@@ -407,7 +401,36 @@ class PhysicalCountReportController extends Controller
             'auditSummary' => $auditSummary,
             'topDifferences' => $topDifferences,
             'entries' => $entries,
+            'allEntries' => $allEntries->values(),
+            'rounds' => $audits->flatMap(fn ($audit) => $audit->rounds)->values(),
+            'roundSummary' => $audits->flatMap(fn ($audit) => $audit->rounds->map(fn ($round) => [
+                'id' => $round->id,
+                'branch_name' => $audit->branch?->name ?? 'Sin sucursal',
+                'audit_name' => $audit->name,
+                'folio' => $audit->folio,
+                'round_number' => $round->round_number,
+                'type_label' => $round->type === 'original' ? 'Original' : 'Reapertura',
+                'scope_label' => $round->scope === 'zero_stock' ? 'Solo stock cero' : 'Todos los productos',
+                'opened_by' => $round->opener?->name ?? 'Sin usuario',
+                'started_at' => optional($round->started_at)->toDateTimeString(),
+                'closed_at' => optional($round->closed_at)->toDateTimeString(),
+            ]))->values(),
         ];
+    }
+
+    private function consolidateFinalEntries(Collection $entries): Collection
+    {
+        return $entries
+            ->groupBy(fn ($entry) => $entry->physical_count_id . ':' . $entry->branch_product_id)
+            ->flatMap(function (Collection $productEntries) {
+                $latestRoundNumber = $productEntries
+                    ->max(fn ($entry) => (int) ($entry->round?->round_number ?? 1));
+
+                return $productEntries->filter(
+                    fn ($entry) => (int) ($entry->round?->round_number ?? 1) === $latestRoundNumber
+                );
+            })
+            ->values();
     }
 
     private function buildComparisonRows(Collection $audits, Collection $entries, ?Collection $snapshotRows = null): array
@@ -546,6 +569,21 @@ class PhysicalCountReportController extends Controller
     private function buildExportData(array $payload, string $reportType): array
     {
         return match ($reportType) {
+            'rounds' => [
+                'title' => 'Historial de rondas',
+                'headings' => ['Sucursal', 'Auditoría', 'Folio', 'Ronda', 'Tipo', 'Alcance', 'Abierta por', 'Inicio', 'Cierre'],
+                'rows' => $payload['roundSummary']->map(fn ($row) => [
+                    $row['branch_name'],
+                    $row['audit_name'],
+                    $row['folio'],
+                    $row['round_number'],
+                    $row['type_label'],
+                    $row['scope_label'],
+                    $row['opened_by'],
+                    $row['started_at'],
+                    $row['closed_at'] ?? 'Abierta',
+                ])->all(),
+            ],
             'users' => [
                 'title' => 'Resumen por usuario',
                 'headings' => ['Usuario', 'Registros', 'Productos', 'Contado', 'Danado', 'Caducado'],

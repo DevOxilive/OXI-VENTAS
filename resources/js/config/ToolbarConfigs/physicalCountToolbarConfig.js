@@ -14,6 +14,7 @@ export function getPhysicalCountToolbarConfig({ branch, canCreate, status = '' }
                 options: [
                     { label: 'Abierto', value: 'open' },
                     { label: 'Cerrado', value: 'closed' },
+                    { label: 'Finalizado', value: 'finalized' },
                     { label: 'Aplicado', value: 'applied' },
                 ],
             },

@@ -62,6 +62,10 @@ class PhysicalCountPermissionRoutingTest extends TestCase
                 'audits.physical-counts.reopen',
                 'permission:audits.physical-counts.reopen',
             ],
+            'finalizar auditoría' => [
+                'audits.physical-counts.finalize',
+                'permission:audits.physical-counts.finalize',
+            ],
             'aplicar ajustes' => [
                 'audits.physical-counts.apply-adjustments',
                 'permission:audits.physical-counts.apply',

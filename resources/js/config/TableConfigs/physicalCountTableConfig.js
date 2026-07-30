@@ -16,6 +16,14 @@ export const physicalCountTableConfig = {
             fallback: "Sin folio",
         },
         {
+            key: "current_round_number",
+            label: "Ronda",
+            format: "number",
+            mobileLabel: "Ronda",
+            mobileDisplay: true,
+            fallback: "1",
+        },
+        {
             key: "status",
             label: "Estado",
             format: "badge",
@@ -25,16 +33,19 @@ export const physicalCountTableConfig = {
                 labelMap: {
                     open: "Abierto",
                     closed: "Cerrado",
+                    finalized: "Finalizado",
                     applied: "Aplicado",
                 },
                 statusMap: {
                     open: "green",
                     closed: "slate",
+                    finalized: "indigo",
                     applied: "blue",
                 },
                 colorMap: {
                     open: "green",
                     closed: "slate",
+                    finalized: "indigo",
                     applied: "blue",
                 },
             },
@@ -55,7 +66,7 @@ export const physicalCountTableConfig = {
             icon: "lock",
             variant: "amber",
             permission: "audits.physical-counts.close",
-            hidden: (item) => !["open", "applied"].includes(item.status),
+            hidden: (item) => item.status !== "open",
         },
         {
             id: "reopen",
@@ -63,7 +74,15 @@ export const physicalCountTableConfig = {
             icon: "restart_alt",
             variant: "green",
             permission: "audits.physical-counts.reopen",
-            hidden: (item) => !["closed", "applied"].includes(item.status),
+            hidden: (item) => item.status !== "closed",
+        },
+        {
+            id: "finalize",
+            label: "Finalizar auditoría",
+            icon: "verified",
+            variant: "indigo",
+            permission: "audits.physical-counts.finalize",
+            hidden: (item) => item.status !== "closed",
         },
         {
             id: "participants",
@@ -78,7 +97,7 @@ export const physicalCountTableConfig = {
             icon: "check_circle",
             variant: "green",
             permission: "audits.physical-counts.apply",
-            hidden: (item) => !["closed", "applied"].includes(item.status),
+            hidden: (item) => item.status !== "finalized",
         },
         {
             id: "delete",

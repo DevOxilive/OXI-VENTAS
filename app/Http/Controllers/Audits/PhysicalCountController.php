@@ -12,6 +12,7 @@ use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\PhysicalCount;
 use App\Models\PhysicalCountEntry;
+use App\Models\PhysicalCountRound;
 use App\Models\ProductBatch;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
@@ -44,6 +45,7 @@ class PhysicalCountController extends Controller
         $status = $request->input('status');
 
         $physicalCountsQuery = PhysicalCount::with(['branch', 'creator', 'participants:id,name'])
+            ->withMax('rounds as current_round_number', 'round_number')
             ->where('branch_id', $branch->id)
             ->when($status, fn ($query, $value) => $query->where('status', $value))
             ->when($search, function ($query, $value) {
@@ -264,6 +266,13 @@ class PhysicalCountController extends Controller
             ->values();
 
         $physicalCount->participants()->sync($participantIds);
+        $physicalCount->rounds()->create([
+            'round_number' => 1,
+            'type' => 'original',
+            'scope' => 'all',
+            'opened_by' => Auth::id(),
+            'started_at' => $physicalCount->started_at,
+        ]);
         $this->snapshotService->ensureForAudit($physicalCount);
 
         broadcast(new PhysicalCountChanged($physicalCount, 'created'));
@@ -337,7 +346,13 @@ class PhysicalCountController extends Controller
             $physicalCount->load('snapshot.items');
         }
 
-        $physicalCount->load(['branch', 'creator', 'participants:id,name']);
+        $physicalCount->load([
+            'branch',
+            'creator',
+            'participants:id,name',
+            'rounds.opener:id,name',
+            'currentRound.opener:id,name',
+        ]);
 
         return Inertia::render('Audits/PhysicalCounts/Show', [
             'physicalCount' => $physicalCount,
@@ -424,6 +439,7 @@ class PhysicalCountController extends Controller
 
         PhysicalCountEntry::create([
             'physical_count_id' => $physicalCount->id,
+            'physical_count_round_id' => $this->currentRound($physicalCount)->id,
             'branch_product_id' => $data['branch_product_id'],
             'product_batch_id' => $data['product_batch_id'],
             'product_id' => $branchProduct->product_id,
@@ -698,7 +714,7 @@ class PhysicalCountController extends Controller
         $this->abortUnless($request, 'audits.physical-counts.close');
         $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
 
-        if (! in_array($physicalCount->status, ['open', 'applied'], true)) {
+        if ($physicalCount->status !== 'open') {
             return back()->withErrors([
                 'status' => 'Solo auditorías abiertas o aplicadas pueden cerrarse.',
             ]);
@@ -708,6 +724,7 @@ class PhysicalCountController extends Controller
             'status' => 'closed',
             'closed_at' => now(),
         ]);
+        $this->currentRound($physicalCount)->update(['closed_at' => now()]);
 
         broadcast(new PhysicalCountChanged($physicalCount, 'closed'));
         event(RealtimeActivityLogged::message('cerró', 'la auditoría', $physicalCount->folio, 'Auditorías', 'closed'));
@@ -720,7 +737,7 @@ class PhysicalCountController extends Controller
         $this->abortUnless($request, 'audits.physical-counts.reopen');
         $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
 
-        if (! in_array($physicalCount->status, ['closed', 'applied'], true)) {
+        if ($physicalCount->status !== 'closed') {
             return back()->withErrors([
                 'status' => 'Solo auditorías cerradas pueden reabrirse.',
             ]);
@@ -730,18 +747,26 @@ class PhysicalCountController extends Controller
             'recapture_scope' => ['nullable', 'in:all,zero_stock'],
         ]);
         $recaptureScope = $data['recapture_scope'] ?? 'all';
-        $wasApplied = $physicalCount->status === 'applied' || $physicalCount->last_applied_at !== null;
+        DB::transaction(function () use ($physicalCount, $recaptureScope): void {
+            $audit = PhysicalCount::whereKey($physicalCount->id)->lockForUpdate()->firstOrFail();
+            $startedAt = now();
+            $nextRound = ((int) $audit->rounds()->max('round_number')) + 1;
 
-        $physicalCount->update([
-            'status' => 'open',
-            'closed_at' => null,
-            'recapture_scope' => $recaptureScope,
-            'recapture_started_at' => $wasApplied ? now() : $physicalCount->recapture_started_at,
-        ]);
+            $audit->rounds()->create([
+                'round_number' => $nextRound,
+                'type' => 'reopening',
+                'scope' => $recaptureScope,
+                'opened_by' => Auth::id(),
+                'started_at' => $startedAt,
+            ]);
 
-        if ($wasApplied) {
-            $this->snapshotService->refreshForAudit($physicalCount->fresh(), $recaptureScope);
-        }
+            $audit->update([
+                'status' => 'open',
+                'closed_at' => null,
+                'recapture_scope' => $recaptureScope,
+                'recapture_started_at' => $startedAt,
+            ]);
+        });
 
         broadcast(new PhysicalCountChanged($physicalCount, 'reopened'));
         event(RealtimeActivityLogged::message('reabrió', 'la auditoría', $physicalCount->folio, 'Auditorías', 'reopened'));
@@ -749,29 +774,55 @@ class PhysicalCountController extends Controller
         return back()->with('success', 'Auditoría reabierta correctamente.');
     }
 
+    public function finalize(Request $request, PhysicalCount $physicalCount)
+    {
+        $this->abortUnless($request, 'audits.physical-counts.finalize');
+        $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
+
+        if ($physicalCount->status !== 'closed') {
+            return back()->withErrors([
+                'status' => 'Solo una auditoría con su ronda cerrada puede finalizarse.',
+            ]);
+        }
+
+        $physicalCount->update([
+            'status' => 'finalized',
+            'finalized_at' => now(),
+            'finalized_by' => Auth::id(),
+        ]);
+
+        broadcast(new PhysicalCountChanged($physicalCount, 'finalized'));
+        event(RealtimeActivityLogged::message('finalizó', 'la auditoría', $physicalCount->folio, 'Auditorías', 'finalized'));
+
+        return back()->with('success', 'Auditoría finalizada. Ya puede aplicar sus ajustes.');
+    }
+
     public function applyAdjustments(Request $request, PhysicalCount $physicalCount)
     {
         $this->abortUnless($request, 'audits.physical-counts.apply');
         $this->abortIfUserCannotAccessBranch($request, $physicalCount->branch);
 
-        if (! in_array($physicalCount->status, ['closed', 'applied'], true)) {
+        if ($physicalCount->status !== 'finalized') {
             return back()->withErrors([
                 'status' => 'Solo se pueden aplicar ajustes de una auditoría finalizada o aplicada.',
             ]);
         }
 
         DB::transaction(function () use ($physicalCount) {
-            $comparison = $this->currentRoundEntriesQuery($physicalCount)
-                ->select(
-                    'branch_product_id',
-                    'product_batch_id',
-                    DB::raw('SUM(counted_quantity) as counted_stock'),
-                    DB::raw('SUM(damaged_quantity) as damaged_stock'),
-                    DB::raw('SUM(expired_quantity) as expired_stock')
-                )
+            $comparison = $this->finalEntries($physicalCount)
                 ->whereNotNull('product_batch_id')
-                ->groupBy('branch_product_id', 'product_batch_id')
-                ->get();
+                ->groupBy(fn ($entry) => $entry->branch_product_id.':'.$entry->product_batch_id)
+                ->map(function ($entries) {
+                    $first = $entries->first();
+
+                    return (object) [
+                        'branch_product_id' => $first->branch_product_id,
+                        'product_batch_id' => $first->product_batch_id,
+                        'counted_stock' => $entries->sum('counted_quantity'),
+                        'damaged_stock' => $entries->sum('damaged_quantity'),
+                        'expired_stock' => $entries->sum('expired_quantity'),
+                    ];
+                });
 
             foreach ($comparison as $item) {
                 $batch = ProductBatch::whereKey($item->product_batch_id)
@@ -842,6 +893,7 @@ class PhysicalCountController extends Controller
                 'status' => 'applied',
                 'last_applied_at' => now(),
             ]);
+            $this->currentRound($physicalCount)->update(['applied_at' => now()]);
         });
         broadcast(new PhysicalCountChanged($physicalCount, 'applied'));
         event(RealtimeActivityLogged::message('aplicó ajustes de', 'la auditoría', $physicalCount->folio, 'Auditorías', 'applied'));
@@ -1159,7 +1211,8 @@ class PhysicalCountController extends Controller
     {
         return (bool) ($user?->hasPermission('audits.physical-counts.create')
             || $user?->hasPermission('audits.physical-counts.close')
-            || $user?->hasPermission('audits.physical-counts.reopen')
+              || $user?->hasPermission('audits.physical-counts.reopen')
+              || $user?->hasPermission('audits.physical-counts.finalize')
             || $user?->hasPermission('audits.physical-counts.participants')
             || $user?->hasPermission('audits.physical-counts.apply')
             || $user?->hasPermission('audits.physical-counts.delete'));
@@ -1177,7 +1230,7 @@ class PhysicalCountController extends Controller
 
     private function canCaptureInStatus(PhysicalCount $physicalCount): bool
     {
-        return in_array($physicalCount->status, ['open', 'applied'], true);
+        return $physicalCount->status === 'open';
     }
 
     private function canRecaptureBranchProduct(PhysicalCount $physicalCount, BranchProduct $branchProduct): bool
@@ -1189,9 +1242,30 @@ class PhysicalCountController extends Controller
     private function currentRoundEntriesQuery(PhysicalCount $physicalCount)
     {
         return $physicalCount->entries()
-            ->when($physicalCount->recapture_started_at, function ($query) use ($physicalCount) {
-                $query->where('created_at', '>=', $physicalCount->recapture_started_at);
-            });
+            ->where('physical_count_round_id', $this->currentRound($physicalCount)->id);
+    }
+
+    private function finalEntries(PhysicalCount $physicalCount)
+    {
+        return $physicalCount->entries()
+            ->with('round:id,round_number')
+            ->get()
+            ->groupBy('branch_product_id')
+            ->flatMap(function ($entries) {
+                $latestRound = $entries->max(fn ($entry) => (int) ($entry->round?->round_number ?? 1));
+
+                return $entries->filter(
+                    fn ($entry) => (int) ($entry->round?->round_number ?? 1) === $latestRound
+                );
+            })
+            ->values();
+    }
+
+    private function currentRound(PhysicalCount $physicalCount): PhysicalCountRound
+    {
+        return $physicalCount->rounds()
+            ->latest('round_number')
+            ->firstOrFail();
     }
 
     private function isAssignedParticipant(?User $user, PhysicalCount $physicalCount): bool
