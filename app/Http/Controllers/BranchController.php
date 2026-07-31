@@ -50,6 +50,13 @@ class BranchController extends Controller
 }
     public function index()
     {
+        $currentUser = Auth::user();
+        $canViewBranches = $currentUser?->hasPermission('branches.view') ?? false;
+        $canCreateBranches = $currentUser?->hasPermission('branches.create') ?? false;
+        $canUpdateBranches = $currentUser?->hasPermission('branches.update') ?? false;
+        $canDeleteBranches = $currentUser?->hasPermission('branches.delete') ?? false;
+        $canManageExistingBranches = $canViewBranches || $canUpdateBranches || $canDeleteBranches;
+
         $this->checkAnyPermission([
             'branches.view',
             'branches.create',
@@ -58,7 +65,16 @@ class BranchController extends Controller
         ]);
 
         return Inertia::render('Systems/Branches', [
-            'branches' => Branch::orderBy('name')->get(),
+            'branches' => Branch::query()
+                ->when(!$canManageExistingBranches, fn ($query) => $query->whereRaw('1 = 0'))
+                ->orderBy('name')
+                ->get(),
+            'capabilities' => [
+                'viewBranches' => $canViewBranches,
+                'createBranches' => $canCreateBranches,
+                'updateBranches' => $canUpdateBranches,
+                'deleteBranches' => $canDeleteBranches,
+            ],
         ]);
     }
 
@@ -71,7 +87,7 @@ class BranchController extends Controller
             'color' => ['nullable', 'string', 'max:20'],
             'attendance_latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'attendance_longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'attendance_geofence_radius_meters' => ['nullable', 'integer', 'min:10', 'max:10000'],
+            'attendance_geofence_radius_meters' => ['nullable', 'integer', 'min:10', 'max:1000'],
         ]);
 
         $branch = DB::transaction(function () use ($data) {
@@ -81,7 +97,7 @@ class BranchController extends Controller
                 'color' => $data['color'] ?? null,
                 'attendance_latitude' => $data['attendance_latitude'] ?? null,
                 'attendance_longitude' => $data['attendance_longitude'] ?? null,
-                'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? null,
+                'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? 100,
                 'active' => true,
             ]);
 
@@ -125,7 +141,7 @@ class BranchController extends Controller
             'active' => ['boolean'],
             'attendance_latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'attendance_longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'attendance_geofence_radius_meters' => ['nullable', 'integer', 'min:10', 'max:10000'],
+            'attendance_geofence_radius_meters' => ['nullable', 'integer', 'min:10', 'max:1000'],
         ]);
 
         $branch->update([
@@ -134,7 +150,7 @@ class BranchController extends Controller
             'color' => $data['color'] ?? null,
             'attendance_latitude' => $data['attendance_latitude'] ?? null,
             'attendance_longitude' => $data['attendance_longitude'] ?? null,
-            'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? null,
+            'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? 100,
             'active' => $data['active'] ?? true,
         ]);
 

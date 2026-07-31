@@ -1,11 +1,12 @@
 import { computed, onBeforeUnmount, onMounted, reactive, watch } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
 import { getPhysicalCountReportsToolbarConfig } from '@/config/ToolbarConfigs/physicalCountReportsToolbarConfig'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 
 export function usePhysicalCountReports(props) {
+    const page = usePage()
     let unsubscribePhysicalCountChanged = null
     let filterReloadTimeout = null
     let syncingFromServer = false
@@ -214,8 +215,7 @@ export function usePhysicalCountReports(props) {
     }
 
     function reloadReports() {
-        router.reload({
-            only: [
+        refreshRealtimeProps(page, [
                 'summary',
                 'reportRows',
                 'reportPagination',
@@ -227,10 +227,7 @@ export function usePhysicalCountReports(props) {
                 'auditSummary',
                 'roundSummary',
                 'topDifferences',
-            ],
-            preserveScroll: true,
-            preserveState: true,
-        })
+        ])
     }
 
     watch(

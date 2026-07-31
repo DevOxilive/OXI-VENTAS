@@ -14,7 +14,7 @@ import {
   ToastAlert,
 } from '@/Components/Modales/UniversalActionModal'
 import { confirmModalAction } from '@/Components/Modales/useModalConfig'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 defineOptions({
   layout: AdminLayout,
 });
@@ -57,7 +57,7 @@ onMounted(() => {
     REALTIME_EVENTS.systemTrashChanged,
     (event) => {
       if (event?.resource === 'products') {
-        router.reload({ only: ['productsDB', 'categoriesDB'] })
+        refreshRealtimeProps(page, ['productsDB', 'categoriesDB'])
       }
     },
   )

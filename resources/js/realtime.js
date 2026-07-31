@@ -67,6 +67,7 @@ export const REALTIME_CONFIG = Object.freeze({
 
 let realtimeClient = null
 const channelSubscriptionCounts = new Map()
+const pendingPropRefreshes = new Map()
 
 function connectionOptions() {
     const options = {
@@ -123,6 +124,56 @@ export function subscribeRealtime(channelName, eventName, handler) {
  */
 export function subscribePrivateRealtime(channelName, eventName, handler) {
     return subscribeToRealtimeChannel(channelName, eventName, handler, true)
+}
+
+/**
+ * Obtiene propiedades Inertia sin iniciar una visita ni reemplazar el componente.
+ * Así los eventos colaborativos actualizan datos sin cerrar modales o perder formularios.
+ */
+export async function refreshRealtimeProps(page, propNames, options = {}) {
+    if (typeof window === 'undefined' || !page?.component) return null
+
+    const names = Array.isArray(propNames)
+        ? [...new Set(propNames.filter(Boolean))]
+        : null
+    if (Array.isArray(names) && names.length === 0) return null
+
+    const requestKey = `${page.component}:${names ? names.sort().join(',') : '*'}`
+    const pendingRequest = pendingPropRefreshes.get(requestKey)
+    if (pendingRequest) return pendingRequest
+
+    const request = window.axios.get(window.location.href, {
+        headers: {
+            Accept: 'text/html, application/xhtml+xml',
+            'X-Inertia': 'true',
+            ...(names ? {
+                'X-Inertia-Partial-Component': page.component,
+                'X-Inertia-Partial-Data': names.join(','),
+            } : {}),
+            ...(page.version ? { 'X-Inertia-Version': page.version } : {}),
+        },
+    }).then(({ data }) => {
+        const nextProps = data?.props ?? {}
+
+        const namesToApply = names ?? Object.keys(nextProps)
+        namesToApply.forEach((name) => {
+            if (Object.prototype.hasOwnProperty.call(nextProps, name)) {
+                page.props[name] = nextProps[name]
+            }
+        })
+
+        options.onSuccess?.(nextProps)
+        return nextProps
+    }).catch((error) => {
+        options.onError?.(error)
+        console.error('No se pudieron sincronizar los datos en tiempo real', error)
+        return null
+    }).finally(() => {
+        pendingPropRefreshes.delete(requestKey)
+    })
+
+    pendingPropRefreshes.set(requestKey, request)
+    return request
 }
 
 function subscribeToRealtimeChannel(channelName, eventName, handler, isPrivate = false) {

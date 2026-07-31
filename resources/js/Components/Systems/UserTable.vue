@@ -15,6 +15,10 @@ const props = defineProps({
         type: Function,
         required: true,
     },
+    canViewUsers: {
+        type: Boolean,
+        default: false,
+    },
     actionHandlers: {
         type: Object,
         default: () => ({}),
@@ -31,6 +35,7 @@ defineEmits([
 <template>
     <GlobalTable :items="items" v-bind="getUsersTableConfig({
         can: props.can,
+        canViewUsers: props.canViewUsers,
         onViewUser: props.actionHandlers.view,
         onCreateUser: props.actionHandlers.createUser,
         onEditUser: props.actionHandlers.edit,

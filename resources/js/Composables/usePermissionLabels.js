@@ -6,16 +6,14 @@ const permissionSectionOrder = [
     "systems",
     "branches",
     "sales",
+    "reports",
     "printers",
 ];
 
 const permissionModuleOrder = [
     "dashboard",
     "employees",
-    "departments",
-    "positions",
-    "departments",
-    "positions",
+    "organization-structure",
     "attendance",
     "attendance.schedules",
     "attendance.schedule-assignments",
@@ -25,11 +23,16 @@ const permissionModuleOrder = [
     "files",
     "inventory.products",
     "inventory.branches",
-    "inventory.purchase-reports",
     "inventory.purchase-orders",
+    "inventory.general-purchase-orders",
     "audits",
-    "inventory",
     "sales",
+    "sales.purchase-lists",
+    "sales.purchase-orders",
+    "reports.audits",
+    "reports.cash-closures",
+    "reports.inventory",
+    "reports.movements",
     "systems.tickets",
     "systems.cash-closure-tickets",
     "systems.labels",
@@ -41,6 +44,7 @@ const permissionSectionsMap = {
     systems: "Sistemas",
     branches: "Sucursales",
     sales: "Ventas",
+    reports: "Reportes",
     printers: "Impresoras",
 };
 
@@ -53,12 +57,8 @@ const permissionModules = {
         label: "Registro de empleados",
         section: "human-resources",
     },
-    departments: {
-        label: "Registro de departamentos",
-        section: "human-resources",
-    },
-    positions: {
-        label: "Registro de puestos",
+    "organization-structure": {
+        label: "Registro de Puestos y Departamentos",
         section: "human-resources",
     },
     attendance: {
@@ -97,25 +97,45 @@ const permissionModules = {
         label: "Stock",
         section: "branches",
     },
-    "inventory.purchase-reports": {
-        label: "Listas de compra",
+    "inventory.purchase-orders": {
+        label: "Órdenes de compra",
         section: "branches",
     },
-    "inventory.purchase-orders": {
-        label: "Ordenes generales",
+    "inventory.general-purchase-orders": {
+        label: "Órdenes de compra generales",
         section: "branches",
     },
     audits: {
         label: "Auditorias",
         section: "branches",
     },
-    inventory: {
-        label: "Reportes",
-        section: "branches",
-    },
     sales: {
         label: "Ventas",
         section: "sales",
+    },
+    "sales.purchase-lists": {
+        label: "Listas de compra",
+        section: "sales",
+    },
+    "sales.purchase-orders": {
+        label: "Seguimiento de Órdenes de compra",
+        section: "sales",
+    },
+    "reports.audits": {
+        label: "Reportes de auditoría",
+        section: "reports",
+    },
+    "reports.cash-closures": {
+        label: "Reportes de cortes",
+        section: "reports",
+    },
+    "reports.inventory": {
+        label: "Reportes de inventario",
+        section: "reports",
+    },
+    "reports.movements": {
+        label: "Reportes de movimientos",
+        section: "reports",
     },
     "systems.tickets": {
         label: "Tickets",
@@ -170,16 +190,15 @@ const permissionLabels = {
     "positions.update": "Editar puestos",
     "positions.delete": "Eliminar puestos",
 
-    "users.view": "Ver modulo de usuarios",
+    "users.view": "Ver usuarios",
     "users.create": "Crear usuarios",
     "users.update": "Editar usuarios",
     "users.delete": "Eliminar usuarios",
 
-    "branches.view": "Ver modulo de sucursales",
+    "branches.view": "Ver sucursales",
     "branches.create": "Crear sucursales",
     "branches.update": "Editar sucursales",
     "branches.delete": "Eliminar sucursales",
-    "branches.access-all": "Acceder a todas las sucursales",
 
     "sales.view": "Ver modulo de ventas",
     "sales.create": "Crear ventas",
@@ -190,7 +209,10 @@ const permissionLabels = {
     "sales.cash-closures.create": "Crear cortes de caja",
     "sales.cash-closures.update": "Editar cortes de caja",
     "sales.cash-closures.delete": "Eliminar cortes de caja",
-    "sales.cash-closures.reports": "Consultar reportes de cortes de caja",
+    "reports.audits.view": "Ver reportes de auditoría",
+    "reports.cash-closures.view": "Ver reportes de cortes",
+    "reports.inventory.view": "Ver reportes de inventario",
+    "reports.movements.view": "Ver reportes de movimientos",
 
     "inventory.products.view": "Ver modulo de productos",
     "inventory.products.create": "Crear productos",
@@ -203,7 +225,6 @@ const permissionLabels = {
     "inventory.branches.delete": "Editar lotes y configuracion de stock",
 
     "audits.physical-counts.count": "Capturar conteos de auditoría",
-    "audits.physical-counts.reports": "Ver reportes de auditoría",
     "audits.physical-counts.view-stock": "Ver stock en auditorías",
     "audits.physical-counts.create": "Crear auditorías",
     "audits.physical-counts.close": "Cerrar auditoría",
@@ -213,19 +234,20 @@ const permissionLabels = {
     "audits.physical-counts.apply": "Aplicar auditoría",
     "audits.physical-counts.delete": "Eliminar auditorías",
 
-    "inventory.purchase-reports.view": "Ver modulo de listas/reportes de compra",
-    "inventory.purchase-reports.create": "Crear reportes de compra",
-    "inventory.purchase-reports.update": "Editar reportes de compra",
-    "inventory.purchase-reports.delete": "Eliminar reportes de compra",
-    "inventory.purchase-orders.view": "Consultar ordenes generales",
-    "inventory.purchase-orders.create": "Generar ordenes generales",
-    "inventory.purchase-orders.update": "Dar seguimiento a compras",
-    "inventory.purchase-orders.history": "Consultar compras completadas",
-
-    "inventory.view": "Ver modulo de reportes de inventario",
-    "inventory.create": "Crear reportes de inventario",
-    "inventory.update": "Editar reportes de inventario",
-    "inventory.delete": "Eliminar reportes de inventario",
+    "sales.purchase-lists.view": "Ver listas de compra",
+    "sales.purchase-lists.create": "Crear listas de compra",
+    "sales.purchase-lists.update": "Editar listas de compra",
+    "sales.purchase-lists.delete": "Eliminar listas de compra",
+    "sales.purchase-orders.view": "Ver seguimiento de sus Órdenes de compra",
+    "sales.purchase-orders.receive": "Confirmar recepción de sus Órdenes de compra",
+    "inventory.purchase-orders.source.view": "Ver Órdenes de compra",
+    "inventory.purchase-orders.source.update": "Editar Órdenes de compra",
+    "inventory.purchase-orders.source.review": "Revisar Órdenes de compra",
+    "inventory.purchase-orders.source.transfer": "Transferir Órdenes de compra",
+    "inventory.purchase-orders.general.view": "Ver Órdenes de compra generales",
+    "inventory.purchase-orders.general.create": "Crear Órdenes de compra generales",
+    "inventory.purchase-orders.general.update": "Editar Órdenes de compra generales",
+    "inventory.purchase-orders.general.complete": "Aplicar Órdenes de compra generales",
 
     "files.export": "Exportar archivos",
     "systems.tickets.view": "Ver modulo de tickets",
@@ -256,13 +278,6 @@ const permissionLabels = {
     "system.records.view-all": "Consultar todos los registros del sistema",
 };
 
-const branchScopedPermissionNames = [
-    "inventory.view",
-    "inventory.create",
-    "inventory.update",
-    "inventory.delete",
-];
-
 function getPermissionModule(permissionName = "") {
     if (permissionName.startsWith("dashboard.")) {
         return "dashboard";
@@ -288,8 +303,8 @@ function getPermissionModule(permissionName = "") {
         return "inventory.branches";
     }
 
-    if (permissionName.startsWith("inventory.purchase-reports.")) {
-        return "purchases.purchase-lists";
+    if (permissionName.startsWith("sales.purchase-lists.")) {
+        return "sales.purchase-lists";
     }
 
     if (permissionName === "attendance.view" || permissionName === "attendance.register" || permissionName === "attendance.manage" || permissionName.startsWith("attendance.export.") || permissionName.startsWith("attendance.corrections.")) {
@@ -308,16 +323,26 @@ function getPermissionModule(permissionName = "") {
         return "attendance.incidents";
     }
 
-    if (permissionName.startsWith("inventory.purchase-orders.generate.")) {
-        return "purchases.general-orders";
+    if (permissionName.startsWith("departments.") || permissionName.startsWith("positions.")) {
+        return "organization-structure";
     }
 
-    if (permissionName.startsWith("inventory.purchase-orders.")) {
+    if (permissionName.startsWith("sales.purchase-orders.")) {
+        return "sales.purchase-orders";
+    }
+
+    if (permissionName.startsWith("inventory.purchase-orders.source.")) {
         return "inventory.purchase-orders";
     }
 
-    if (permissionName === "audits.physical-counts.reports") {
-        return "inventory";
+    if (permissionName.startsWith("inventory.purchase-orders.general.")) {
+        return "inventory.general-purchase-orders";
+    }
+
+    if (permissionName.startsWith("reports.")) {
+        const [, reportType] = permissionName.split(".");
+
+        return `reports.${reportType}`;
     }
 
     if (permissionName.startsWith("audits.")) {
@@ -365,10 +390,11 @@ export function requiresBranchAssignments(roleName = "", permissionNames = []) {
             permissionName.startsWith("sales.") ||
             permissionName.startsWith("inventory.products.") ||
             permissionName.startsWith("inventory.branches.") ||
-            permissionName.startsWith("inventory.purchase-reports.") ||
+            permissionName.startsWith("sales.purchase-lists.") ||
+            permissionName.startsWith("sales.purchase-orders.") ||
             permissionName.startsWith("inventory.purchase-orders.") ||
             permissionName.startsWith("audits.physical-counts.") ||
-            branchScopedPermissionNames.includes(permissionName)
+            permissionName.startsWith("reports.")
         );
     });
 }

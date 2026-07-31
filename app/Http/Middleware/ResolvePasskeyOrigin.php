@@ -20,16 +20,25 @@ class ResolvePasskeyOrigin
         $host = strtolower($request->getHost());
         $origin = $request->getSchemeAndHttpHost();
 
-        if ($host === 'trycloudflare.com' || str_ends_with($host, '.trycloudflare.com')) {
-            config()->set('passkeys.relying_party_id', $host);
-        }
-
-        if ($host === 'onrender.com' || str_ends_with($host, '.onrender.com')) {
+        if ($this->shouldUseRequestHost($request, $host)) {
             config()->set('passkeys.relying_party_id', $host);
         }
 
         config()->set('passkeys.allowed_origins', [$origin]);
 
         return $next($request);
+    }
+
+    private function shouldUseRequestHost(Request $request, string $host): bool
+    {
+        if ($host === 'localhost' || filter_var($host, FILTER_VALIDATE_IP)) {
+            return false;
+        }
+
+        return $request->isSecure()
+            || $host === 'trycloudflare.com'
+            || str_ends_with($host, '.trycloudflare.com')
+            || $host === 'onrender.com'
+            || str_ends_with($host, '.onrender.com');
     }
 }

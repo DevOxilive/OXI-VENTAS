@@ -13,7 +13,7 @@ import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { GlobalToolbar } from '@/Components/Toolbars'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales'
 import { usePermissions } from '@/Composables/usePermissions'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
 import { getAttendanceIncidentsToolbarConfig } from '@/config/ToolbarConfigs/attendanceIncidentsToolbarConfig'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
@@ -284,7 +284,7 @@ onMounted(() => {
     REALTIME_EVENTS.attendanceChanged,
     ({ action }) => {
       if (action?.startsWith('incident_')) {
-        router.reload({ only: ['incidents', 'employees', 'filters', 'notificationSummary'], preserveScroll: true, preserveState: true })
+        refreshRealtimeProps(page, ['incidents', 'employees', 'filters', 'notificationSummary'])
       }
     },
   )

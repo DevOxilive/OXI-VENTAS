@@ -93,15 +93,13 @@ class UserController extends Controller
                 $query
                     ->where('name', 'like', 'inventory.products.%')
                     ->orWhere('name', 'like', 'inventory.branches.%')
-                    ->orWhere('name', 'like', 'inventory.purchase-reports.%')
+                    ->orWhere('name', 'like', 'inventory.purchase-orders.%')
+                    ->orWhere('name', 'like', 'sales.purchase-lists.%')
+                    ->orWhere('name', 'like', 'sales.purchase-orders.%')
                     ->orWhere('name', 'like', 'audits.physical-counts.%')
+                    ->orWhere('name', 'like', 'reports.%')
                     ->orWhere('name', 'like', 'sales.%')
-                    ->orWhereIn('name', [
-                        'inventory.view',
-                        'inventory.create',
-                        'inventory.update',
-                        'inventory.delete',
-                    ]);
+                    ;
             })
             ->exists();
     }
@@ -140,7 +138,8 @@ class UserController extends Controller
     private function visiblePermissionsQuery()
     {
         return Permission::query()
-            ->where('name', 'not like', 'roles.%');
+            ->where('name', 'not like', 'roles.%')
+            ->where('name', '!=', SystemPermission::BRANCHES_ACCESS_ALL);
     }
 
     private function syncUserPermissionOverrides(User $user, Role $role, array $finalPermissionIds = []): void
@@ -215,6 +214,13 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
+        $currentUser = Auth::user();
+        $canViewUsers = $currentUser?->hasPermission('users.view') ?? false;
+        $canCreateUsers = $currentUser?->hasPermission('users.create') ?? false;
+        $canUpdateUsers = $currentUser?->hasPermission('users.update') ?? false;
+        $canDeleteUsers = $currentUser?->hasPermission('users.delete') ?? false;
+        $canManageExistingUsers = $canViewUsers || $canUpdateUsers || $canDeleteUsers;
+
         $this->checkAnyPermission([
             'users.view',
             'users.create',
@@ -243,6 +249,9 @@ class UserController extends Controller
                 'users.role_id',
                 'users.is_active',
             ])
+            ->when(!$canManageExistingUsers, function ($query) {
+                $query->whereRaw('1 = 0');
+            })
             ->when($search, function ($query) use ($search) {
                 FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
                     FlexibleSearch::orWhereColumns($subQuery, [
@@ -421,6 +430,13 @@ class UserController extends Controller
                 'status' => $statusFilter,
                 'role' => $roleFilter,
             ],
+
+            'capabilities' => [
+                'viewUsers' => $canViewUsers,
+                'createUsers' => $canCreateUsers,
+                'updateUsers' => $canUpdateUsers,
+                'deleteUsers' => $canDeleteUsers,
+            ],
         ]);
     }
     public function store(Request $request)
@@ -538,7 +554,7 @@ class UserController extends Controller
         $user->load(['role', 'permissions', 'branches']);
 
         try {
-            broadcast(new UserChanged($user, 'updated'))->toOthers();
+            event(new UserChanged($user, 'updated'));
             event(RealtimeActivityLogged::message('actualizó', 'el usuario', $user->email, 'Sistemas', 'updated'));
         } catch (\Throwable $e) {
             report($e);

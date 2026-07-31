@@ -26,7 +26,7 @@ const orders = usePurchaseOrders(props, routeName)
 const { handlePageChange } = useGlobalTablePagination()
 const tableConfig = getPurchaseOrdersTableConfig({
     mode: 'tracking',
-    viewPermission: 'inventory.purchase-orders.purchasing.view',
+    viewPermission: 'inventory.purchase-orders.general.view',
 })
 const selectedOrder = ref(null)
 const toolbarConfig = computed(() => getPurchaseOrdersToolbarConfig({
