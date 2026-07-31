@@ -243,13 +243,6 @@ onMounted(() => {
     if (!shouldReloadForProductEvent(event)) return
 
     if (
-      showModal.value &&
-      ['created', 'updated'].includes(event.action)
-    ) {
-      closeModal()
-    }
-
-    if (
       event.action === 'deleted' &&
       selectedProduct.value?.id === event.productId
     ) {

@@ -265,11 +265,11 @@ const permissionLabels = {
     "inventory.products.update": "Editar productos",
     "inventory.products.delete": "Eliminar productos",
 
-    "inventory.branches.view": "Ver existencias y movimientos de stock",
-    "inventory.branches.stock-in": "Registrar entradas de stock",
-    "inventory.branches.stock-out": "Registrar salidas de stock",
+    "inventory.branches.view": "Ver historial de movimientos",
+    "inventory.branches.stock-in": "Ingresar lotes",
+    "inventory.branches.stock-out": "Sacar lotes",
     "inventory.branches.stock-adjust": "Registrar ajustes de stock",
-    "inventory.branches.batches.update": "Editar lotes de productos",
+    "inventory.branches.batches.update": "Editar lotes",
     "inventory.branches.config.update": "Editar configuración de stock",
 
     "audits.physical-counts.count": "Capturar conteos de auditoría",

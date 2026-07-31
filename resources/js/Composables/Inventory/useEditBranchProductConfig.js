@@ -1,9 +1,10 @@
-import { computed, reactive, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useForm } from "@inertiajs/vue3";
 import { getModalRequestOptions } from "@/Components/Modales";
 
 export function useEditBranchProductConfig(product) {
     const frontendErrors = reactive({});
+    const initializedProductId = ref(null);
 
     const form = useForm({
         min_stock: 0,
@@ -71,10 +72,19 @@ export function useEditBranchProductConfig(product) {
         (currentProduct) => {
             if (!currentProduct) return;
 
+            const productChanged =
+                Number(initializedProductId.value) !== Number(currentProduct.id);
+
+            if (!productChanged && form.isDirty) {
+                return;
+            }
+
             form.min_stock = currentProduct.minStock ?? 0;
             form.status = currentProduct.administrativeStatus ?? "active";
             form.season_start_date = currentProduct.seasonStartDate ?? "";
             form.season_end_date = currentProduct.seasonEndDate ?? "";
+            initializedProductId.value = currentProduct.id;
+            form.defaults(form.data());
         },
         { immediate: true },
     );

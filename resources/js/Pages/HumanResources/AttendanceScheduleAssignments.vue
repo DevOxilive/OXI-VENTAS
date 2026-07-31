@@ -57,15 +57,37 @@ function updatePerPage(value) {
 }
 function toggleWorkingDay(day) { form.working_days = form.working_days.includes(day) ? form.working_days.filter((value) => value !== day) : [...form.working_days, day] }
 
+function refreshAssignments(event) {
+  if (!event?.action?.startsWith('schedule_')) return
+
+  if (
+    event.action === 'schedule_assignment_deleted' &&
+    Number(event.recordId) === Number(selected.value?.id)
+  ) {
+    close()
+    selected.value = null
+  }
+
+  refreshRealtimeProps(page, ['assignments', 'employees', 'schedules'], {
+    onSuccess: () => {
+      if (!showModal.value || mode.value !== 'view' || !selected.value?.id) return
+
+      const updatedAssignment = (props.assignments?.data || []).find((assignment) =>
+        Number(assignment.id) === Number(selected.value.id)
+      )
+
+      if (!updatedAssignment) return
+
+      load(updatedAssignment, 'view')
+    },
+  })
+}
+
 onMounted(() => {
   unsubscribeAssignments = subscribePrivateRealtime(
     REALTIME_CHANNELS.user(page.props.auth.user.id),
     REALTIME_EVENTS.attendanceChanged,
-    ({ action: realtimeAction }) => {
-      if (realtimeAction?.startsWith('schedule_')) {
-        refreshRealtimeProps(page, ['assignments', 'employees', 'schedules'])
-      }
-    },
+    refreshAssignments,
   )
 })
 

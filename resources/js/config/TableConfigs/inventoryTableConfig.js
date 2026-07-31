@@ -52,21 +52,21 @@ export const inventoryTableConfig = {
     actions: [
         {
             id: "entry",
-            label: "Entrada",
+            label: "Ingresar lotes",
             icon: "add",
             variant: "green",
             permission: "inventory.branches.stock-in",
         },
         {
             id: "exit",
-            label: "Salida",
+            label: "Sacar lotes",
             icon: "remove",
             variant: "red",
             permission: "inventory.branches.stock-out",
         },
         {
             id: "batches",
-            label: "Lotes",
+            label: "Editar lotes",
             icon: "inventory_2",
             variant: "blue",
             permission: "inventory.branches.batches.update",
@@ -75,7 +75,7 @@ export const inventoryTableConfig = {
         },
         {
             id: "movements",
-            label: "Historial",
+            label: "Ver historial",
             icon: "history",
             variant: "slate",
             permission: "inventory.branches.view",

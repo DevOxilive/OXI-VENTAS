@@ -1,11 +1,12 @@
 <script setup>
-import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import InputField from '@/Components/Forms/InputField.vue'
+import { REALTIME_BROWSER_EVENTS, refreshRealtimeProps } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
 
@@ -23,6 +24,7 @@ const props = defineProps({
     categories: { type: Array, default: () => [] },
 })
 
+const page = usePage()
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 })
 const number = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 3 })
 const metricColors = ['#e0000f', '#171717', '#a06b00', '#dc2626']
@@ -33,6 +35,21 @@ const productOptions = ref([])
 const isSearchingProducts = ref(false)
 const categorySearch = ref('')
 let productSearchTimer
+let dashboardRefreshTimer
+
+function refreshDashboardRealtime() {
+    clearTimeout(dashboardRefreshTimer)
+    dashboardRefreshTimer = setTimeout(() => {
+        refreshRealtimeProps(page, [
+            'branches',
+            'chartWidget',
+            'rankingWidget',
+            'radarWidget',
+            'categoryWidget',
+            'categories',
+        ])
+    }, 250)
+}
 
 const chartBranch = computed(() => props.chartWidget.series?.[0] ?? null)
 const chartFilters = computed(() => props.chartWidget.filters ?? {})
@@ -104,7 +121,15 @@ watch(productSearch, (term) => {
         } finally { isSearchingProducts.value = false }
     }, 250)
 })
-onBeforeUnmount(() => clearTimeout(productSearchTimer))
+onMounted(() => {
+    window.addEventListener(REALTIME_BROWSER_EVENTS.dataChanged, refreshDashboardRealtime)
+})
+
+onBeforeUnmount(() => {
+    clearTimeout(productSearchTimer)
+    clearTimeout(dashboardRefreshTimer)
+    window.removeEventListener(REALTIME_BROWSER_EVENTS.dataChanged, refreshDashboardRealtime)
+})
 
 function currentParams() {
     return {

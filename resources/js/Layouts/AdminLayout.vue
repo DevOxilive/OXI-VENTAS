@@ -14,7 +14,6 @@ import {
     REALTIME_BROWSER_EVENTS,
     REALTIME_CHANNELS,
     REALTIME_EVENTS,
-    refreshRealtimeProps,
     subscribePrivateRealtime,
     subscribeRealtime,
 } from '@/realtime'
@@ -51,70 +50,8 @@ const currentTheme = ref('light')
 let unsubscribeUserChanged = null
 let unsubscribeRealtimeActivity = null
 let unsubscribeGlobalDataChanged = null
-let globalRefreshTimer = null
 let desktopMediaQueryList = null
 let handleDesktopViewportChange = null
-
-const routesWithDedicatedRealtime = [
-    'audits.physical-counts.*',
-    'branches.index',
-    'human-resources.attendance-incidents.index',
-    'human-resources.attendance-schedule-assignments.index',
-    'human-resources.attendance-schedules.index',
-    'human-resources.attendance.index',
-    'human-resources.departments.index',
-    'human-resources.employees.index',
-    'inventory.branches.inventory',
-    'inventory.branches.products.index',
-    'system-administration.audits.index',
-    'system-administration.index',
-    'system-administration.trash.index',
-    'systems.attendance.index',
-    'systems.users.index',
-    'ventas.attendance.index',
-    // El punto de venta conserva su captura local; una señal global no debe recargarlo.
-    'ventas.home',
-]
-
-const relatedRealtimeScopes = Object.freeze({
-    inventory: ['ventas'],
-    ventas: ['inventory'],
-})
-
-function matchesRoutePattern(routeName, pattern) {
-    if (!routeName) return false
-    if (!pattern.endsWith('.*')) return routeName === pattern
-
-    return routeName.startsWith(pattern.slice(0, -1))
-}
-
-function currentRouteName() {
-    if (typeof route !== 'function') return null
-
-    return route().current()
-}
-
-function shouldRefreshCurrentInterface(event) {
-    if (event?.result && event.result !== 'success') return false
-    if (!['create', 'update', 'delete', 'restore', 'force_delete'].includes(event?.action)) {
-        return false
-    }
-
-    const activeRoute = currentRouteName()
-    if (!activeRoute) return false
-
-    if (routesWithDedicatedRealtime.some((pattern) => matchesRoutePattern(activeRoute, pattern))) {
-        return false
-    }
-
-    if (activeRoute === 'dashboard') return true
-
-    const activeScope = activeRoute.split('.')[0]
-    const changedScope = event?.routeName?.split('.')[0] ?? event?.module
-
-    return activeScope === changedScope
-        || (relatedRealtimeScopes[activeScope] ?? []).includes(changedScope)
-}
 
 function distributeGlobalDataChange(event) {
     if (typeof window === 'undefined') return
@@ -123,12 +60,6 @@ function distributeGlobalDataChange(event) {
         detail: event,
     }))
 
-    if (!shouldRefreshCurrentInterface(event)) return
-
-    window.clearTimeout(globalRefreshTimer)
-    globalRefreshTimer = window.setTimeout(() => {
-        refreshRealtimeProps(page)
-    }, 180)
 }
 
 function emitCollapseAllItems() {
@@ -286,9 +217,6 @@ onBeforeUnmount(() => {
     unsubscribeRealtimeActivity?.()
     unsubscribeGlobalDataChanged?.()
 
-    if (typeof window !== 'undefined') {
-        window.clearTimeout(globalRefreshTimer)
-    }
 })
 
 watch(desktopSidebarCollapsed, (value) => {

@@ -144,6 +144,7 @@ export function useOrganizationStructure(props) {
         refreshRealtimeProps(page, ["departments", "positions"], {
             onSuccess: () => {
                 if (!showModal.value || !selectedRecord.value?.id) return;
+                if (modalMode.value !== "view") return;
 
                 const records = entity.value === "department"
                     ? props.departments

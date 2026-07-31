@@ -24,7 +24,7 @@ class AttendanceScheduleController extends Controller
         $data['code'] = $this->makeCode($data['name']);
         $schedule = AttendanceSchedule::create($data);
         $this->audit->record('attendance_schedule', 'create', 'success', $request, ['record_type' => AttendanceSchedule::class, 'record_id' => $schedule->id, 'record_label' => $schedule->name]);
-        broadcast(new AttendanceChanged(0, 'schedule_created', $request->user()->id));
+        broadcast(new AttendanceChanged($schedule->id, 'schedule_created', $request->user()->id));
         return back()->with('success', 'Horario creado correctamente.');
     }
 
@@ -33,7 +33,7 @@ class AttendanceScheduleController extends Controller
         $before = $attendanceSchedule->getOriginal();
         $attendanceSchedule->update($this->validated($request));
         $this->audit->record('attendance_schedule', 'update', 'success', $request, ['record_type' => AttendanceSchedule::class, 'record_id' => $attendanceSchedule->id, 'record_label' => $attendanceSchedule->name, 'old_values' => $before, 'new_values' => $attendanceSchedule->getChanges()]);
-        broadcast(new AttendanceChanged(0, 'schedule_updated', $request->user()->id));
+        broadcast(new AttendanceChanged($attendanceSchedule->id, 'schedule_updated', $request->user()->id));
         return back()->with('success', 'Horario actualizado correctamente.');
     }
 
@@ -52,7 +52,7 @@ class AttendanceScheduleController extends Controller
             'record_id' => $id,
             'record_label' => $label,
         ]);
-        broadcast(new AttendanceChanged(0, 'schedule_deleted', $request->user()->id));
+        broadcast(new AttendanceChanged($id, 'schedule_deleted', $request->user()->id));
 
         return back()->with('success', 'Horario eliminado correctamente.');
     }

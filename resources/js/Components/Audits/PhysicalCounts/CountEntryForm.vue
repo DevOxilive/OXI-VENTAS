@@ -53,6 +53,9 @@ watch(
     (product) => {
         if (!product) return
 
+        const productChanged =
+            Number(form.branch_product_id) !== Number(product.branch_product_id)
+
         form.branch_product_id = product.branch_product_id
         form.product_id = product.product_id
         form.scanned_code = product.scanned_code
@@ -61,7 +64,12 @@ watch(
             ? product.batches?.find((batch) => batch.lot_number === pendingLotNumber.value)
             : null
 
-        form.product_batch_id = pendingBatch?.id ?? ''
+        if (pendingBatch) {
+            form.product_batch_id = pendingBatch.id
+            pendingLotNumber.value = ''
+        } else if (productChanged) {
+            form.product_batch_id = ''
+        }
     },
     { immediate: true },
 )

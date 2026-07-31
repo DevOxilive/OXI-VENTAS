@@ -1,5 +1,5 @@
 <script setup>
-import { router, useForm } from "@inertiajs/vue3";
+import { useForm } from "@inertiajs/vue3";
 import { watch, computed, ref, onBeforeUnmount } from "vue";
 import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import InputField from "@/Components/Forms/InputField.vue";
@@ -373,9 +373,6 @@ onBeforeUnmount(() => {
 
 function submit() {
   const branchSlug = props.branch?.slug;
-  const shouldRefreshCategories =
-    categoryInputMode.value === "text" &&
-    Boolean(String(form.category_name ?? "").trim());
 
   if (!branchSlug) {
     console.error("No llegó branch.slug al modal:", props.branch);
@@ -405,25 +402,11 @@ function submit() {
         forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
-          const finalizeSuccess = () => {
-            ToastAlert({
-              title: "Producto creado correctamente",
-            });
-
-            emit("close");
-          };
-
-          if (!shouldRefreshCategories) {
-            finalizeSuccess();
-            return;
-          }
-
-          router.reload({
-            only: ["categoriesDB", "productsDB", "filters"],
-            preserveScroll: true,
-            preserveState: true,
-            onFinish: finalizeSuccess,
+          ToastAlert({
+            title: "Producto creado correctamente",
           });
+
+          emit("close");
         },
         onError: () => {
           const barcodeError = form.errors["barcodes.0"];
@@ -463,25 +446,11 @@ function submit() {
           forceFormData: true,
           preserveScroll: true,
           onSuccess: () => {
-            const finalizeSuccess = () => {
-              ToastAlert({
-                title: "Producto actualizado correctamente",
-              });
-
-              emit("close");
-            };
-
-            if (!shouldRefreshCategories) {
-              finalizeSuccess();
-              return;
-            }
-
-            router.reload({
-              only: ["categoriesDB", "productsDB", "filters"],
-              preserveScroll: true,
-              preserveState: true,
-              onFinish: finalizeSuccess,
+            ToastAlert({
+              title: "Producto actualizado correctamente",
             });
+
+            emit("close");
           },
           onError: (errors) => {
             const barcodeError =

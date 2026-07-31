@@ -278,15 +278,46 @@ function handleAction({ action, row }) {
   }
 }
 
+function refreshIncidents(event) {
+  if (!event?.action?.startsWith('incident_')) return
+
+  const affectsSelectedIncident =
+    Number(event.recordId) === Number(selectedIncident.value?.id)
+
+  if (
+    affectsSelectedIncident &&
+    (
+      event.action === 'incident_deleted' ||
+      (
+        modalMode.value === 'edit' &&
+        ['incident_approved', 'incident_rejected'].includes(event.action)
+      )
+    )
+  ) {
+    closeModal()
+  }
+
+  refreshRealtimeProps(page, ['incidents', 'employees', 'notificationSummary'], {
+    onSuccess: () => {
+      if (!modalOpen.value || modalMode.value !== 'view' || !selectedIncident.value?.id) return
+
+      const updatedIncident = (props.incidents?.data || []).find((incident) =>
+        Number(incident.id) === Number(selectedIncident.value.id)
+      )
+
+      if (!updatedIncident) return
+
+      selectedIncident.value = updatedIncident
+      fillForm(updatedIncident)
+    },
+  })
+}
+
 onMounted(() => {
   unsubscribeIncidents = subscribePrivateRealtime(
     REALTIME_CHANNELS.user(page.props.auth.user.id),
     REALTIME_EVENTS.attendanceChanged,
-    ({ action }) => {
-      if (action?.startsWith('incident_')) {
-        refreshRealtimeProps(page, ['incidents', 'employees', 'filters', 'notificationSummary'])
-      }
-    },
+    refreshIncidents,
   )
 })
 

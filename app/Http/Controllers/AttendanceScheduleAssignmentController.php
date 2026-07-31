@@ -58,7 +58,7 @@ class AttendanceScheduleAssignmentController extends Controller
             $assignment = AttendanceScheduleAssignment::create(['attendance_schedule_id' => $data['attendance_schedule_id'], 'assignable_type' => Employee::class, 'assignable_id' => $data['employee_id'], 'effective_from' => $data['effective_from'], 'effective_to' => $data['effective_to'] ?? null, 'observations' => $data['observations'] ?? null, 'working_days' => $data['working_days'], 'active' => $data['active'], 'assigned_by' => $request->user()->id]);
         });
         $this->audit->record('attendance_schedule_assignment', 'create', 'success', $request, ['record_type' => AttendanceScheduleAssignment::class, 'record_id' => $assignment->id, 'record_label' => 'Asignación de horario']);
-        broadcast(new AttendanceChanged(0, 'schedule_assignment_created', $request->user()->id));
+        broadcast(new AttendanceChanged($assignment->id, 'schedule_assignment_created', $request->user()->id));
         return back()->with('success', 'Horario asignado y vigencia anterior actualizada.');
     }
 
@@ -69,7 +69,7 @@ class AttendanceScheduleAssignmentController extends Controller
         $before = $attendanceScheduleAssignment->getOriginal();
         $attendanceScheduleAssignment->update(['attendance_schedule_id' => $data['attendance_schedule_id'], 'assignable_id' => $data['employee_id'], 'effective_from' => $data['effective_from'], 'effective_to' => $data['effective_to'] ?? null, 'observations' => $data['observations'] ?? null, 'working_days' => $data['working_days'], 'active' => $data['active']]);
         $this->audit->record('attendance_schedule_assignment', 'update', 'success', $request, ['record_type' => AttendanceScheduleAssignment::class, 'record_id' => $attendanceScheduleAssignment->id, 'old_values' => $before, 'new_values' => $attendanceScheduleAssignment->getChanges()]);
-        broadcast(new AttendanceChanged(0, 'schedule_assignment_updated', $request->user()->id));
+        broadcast(new AttendanceChanged($attendanceScheduleAssignment->id, 'schedule_assignment_updated', $request->user()->id));
         return back()->with('success', 'Asignación actualizada correctamente.');
     }
 
@@ -79,7 +79,7 @@ class AttendanceScheduleAssignmentController extends Controller
         $assignmentId = $attendanceScheduleAssignment->id;
         $attendanceScheduleAssignment->delete();
         $this->audit->record('attendance_schedule_assignment', 'delete', 'success', $request, ['record_type' => AttendanceScheduleAssignment::class, 'record_id' => $assignmentId, 'record_label' => 'Asignación de horario']);
-        broadcast(new AttendanceChanged(0, 'schedule_assignment_deleted', $request->user()->id));
+        broadcast(new AttendanceChanged($assignmentId, 'schedule_assignment_deleted', $request->user()->id));
         return back()->with('success', 'Asignación eliminada correctamente. El empleado y el horario se conservan.');
     }
 

@@ -166,9 +166,9 @@ const permissionLabelMap = {
     'inventory.products.create': 'Crear productos',
     'inventory.products.update': 'Editar productos',
     'inventory.products.delete': 'Eliminar productos',
-    'inventory.branches.view': 'Ver stock',
-    'inventory.branches.stock-in': 'Registrar entradas',
-    'inventory.branches.stock-out': 'Registrar salidas',
+    'inventory.branches.view': 'Ver historial de movimientos',
+    'inventory.branches.stock-in': 'Ingresar lotes',
+    'inventory.branches.stock-out': 'Sacar lotes',
     'inventory.branches.stock-adjust': 'Registrar ajustes',
     'inventory.branches.batches.update': 'Editar lotes',
     'inventory.branches.config.update': 'Editar configuración de stock',
@@ -561,7 +561,7 @@ onMounted(() => {
     }
 
     const handleUserChanged = () => {
-        refreshRealtimeProps(page)
+        refreshRealtimeProps(page, ['dashboardUser', 'assignedBranches'])
     }
 
     unsubscribeUserChanged = subscribePrivateRealtime(

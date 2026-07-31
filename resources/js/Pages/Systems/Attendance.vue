@@ -272,7 +272,7 @@ onMounted(() => {
             if (Number(event?.userId) !== Number(page.props.auth.user.id)) return
 
             refreshRealtimeProps(page, [
-                    'records', 'dashboard', 'filters', 'options', 'canViewAttendance',
+                    'records', 'dashboard', 'options', 'canViewAttendance',
                     'canManage', 'canViewEvidence', 'canRegister', 'canRequestCorrection',
                     'canReviewCorrections', 'passkeyEnabled', 'registeredTypesToday',
             ])

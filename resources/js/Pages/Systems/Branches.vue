@@ -303,6 +303,7 @@ function reloadBranches(event = null) {
   refreshRealtimeProps(page, ["branches", "capabilities"], {
     onSuccess: () => {
       if (!selectedBranch.value?.id || modalMode.value === "create") return
+      if (modalMode.value !== "view") return
 
       const updatedBranch = normalizedBranches.value.find((branch) => {
         return branch.id === selectedBranch.value.id

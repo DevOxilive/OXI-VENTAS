@@ -1,4 +1,4 @@
-import { useForm, router } from "@inertiajs/vue3";
+import { useForm } from "@inertiajs/vue3";
 import { reactive, computed, watch } from "vue";
 import {
     WarningAlert,
@@ -324,11 +324,6 @@ export function useEmployeeForm(props, emit) {
             onSuccess: () => {
                 employee.reset();
                 clearFrontendErrors();
-
-                router.reload({
-                    only: ["employeesDB", "filterOptions", "organizationOptions"],
-                    preserveScroll: true,
-                });
             },
         });
 
