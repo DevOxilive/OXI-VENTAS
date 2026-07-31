@@ -131,7 +131,7 @@ export const fieldRegistry = {
     mapsUrl: {
         type: "text",
         required: false,
-        max: 255,
+        max: 1000,
         preserveCase: true,
         message: "URL inválida.",
     },

@@ -85,6 +85,7 @@ class BranchController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'color' => ['nullable', 'string', 'max:20'],
+            'maps_url' => ['nullable', 'string', 'max:1000'],
             'attendance_latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'attendance_longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'attendance_geofence_radius_meters' => ['nullable', 'integer', 'min:10', 'max:1000'],
@@ -95,6 +96,7 @@ class BranchController extends Controller
                 'name' => $data['name'],
                 'slug' => Str::slug($data['name']),
                 'color' => $data['color'] ?? null,
+                'maps_url' => $data['maps_url'] ?? null,
                 'attendance_latitude' => $data['attendance_latitude'] ?? null,
                 'attendance_longitude' => $data['attendance_longitude'] ?? null,
                 'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? 100,
@@ -138,6 +140,7 @@ class BranchController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'color' => ['nullable', 'string', 'max:20'],
+            'maps_url' => ['nullable', 'string', 'max:1000'],
             'active' => ['boolean'],
             'attendance_latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'attendance_longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -148,6 +151,7 @@ class BranchController extends Controller
             'name' => $data['name'],
             'slug' => Str::slug($data['name']),
             'color' => $data['color'] ?? null,
+            'maps_url' => $data['maps_url'] ?? null,
             'attendance_latitude' => $data['attendance_latitude'] ?? null,
             'attendance_longitude' => $data['attendance_longitude'] ?? null,
             'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? 100,

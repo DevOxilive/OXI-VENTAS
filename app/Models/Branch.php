@@ -14,6 +14,7 @@ class Branch extends Model
     protected $fillable = [
         'name',
         'address',
+        'maps_url',
         'slug',
         'color',
         'active',
