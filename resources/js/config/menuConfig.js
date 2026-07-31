@@ -17,9 +17,11 @@ export function generateMenu(role, permissions = [], branches = []) {
         ],
         branchInventory: [
             "inventory.branches.view",
-            "inventory.branches.create",
-            "inventory.branches.update",
-            "inventory.branches.delete",
+            "inventory.branches.stock-in",
+            "inventory.branches.stock-out",
+            "inventory.branches.stock-adjust",
+            "inventory.branches.batches.update",
+            "inventory.branches.config.update",
         ],
         purchaseReports: [
             "sales.purchase-lists.view",
@@ -66,7 +68,7 @@ export function generateMenu(role, permissions = [], branches = []) {
             "systems.cash-closure-tickets.view",
             "systems.cash-closure-tickets.update",
         ],
-        labels: ["systems.labels.view", "systems.labels.update"],
+        labels: ["systems.labels.view", "systems.labels.update", "systems.labels.print"],
         attendance: [
             "attendance.view",
             "attendance.register",
@@ -236,9 +238,11 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("inventory.products.update") ||
         can("inventory.products.delete") ||
         can("inventory.branches.view") ||
-        can("inventory.branches.create") ||
-        can("inventory.branches.update") ||
-        can("inventory.branches.delete") ||
+        can("inventory.branches.stock-in") ||
+        can("inventory.branches.stock-out") ||
+        can("inventory.branches.stock-adjust") ||
+        can("inventory.branches.batches.update") ||
+        can("inventory.branches.config.update") ||
         canUse("purchaseOrders") ||
         can("audits.physical-counts.count") ||
         can("audits.physical-counts.view-stock") ||

@@ -5,6 +5,7 @@
     "scripts": {
         "build": "npm run check:encoding && vite build",
         "check:encoding": "node scripts/check-encoding.mjs",
+        "check:permissions": "node scripts/check-permission-catalog.mjs",
         "dev": "vite",
         "dev:prepare": "node scripts/prepare-dev.mjs",
         "dev:serve": "php artisan serve --host=127.0.0.1 --port=8000",
