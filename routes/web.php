@@ -76,7 +76,7 @@ Route::middleware([
     $employeesAccess = 'permission:employees.view,employees.create,employees.update,employees.delete';
     $organizationAccess = 'permission:departments.view,departments.create,departments.update,departments.delete,positions.view,positions.create,positions.update,positions.delete';
     $salesAccess = 'permission:sales.view,sales.create,sales.update,sales.delete,sales.reports';
-    $cashClosuresAccess = 'permission:sales.cash-closures.view,sales.cash-closures.create,sales.cash-closures.update,sales.cash-closures.delete';
+    $cashClosuresAccess = 'permission:sales.cash-closures.view,sales.cash-closures.create,sales.cash-closures.update,sales.cash-closures.delete,reports.cash-closures.create';
     $cashClosureReportsAccess = 'permission:reports.cash-closures.view';
     $ticketsAccess = 'permission:systems.tickets.view,systems.tickets.update';
     $cashClosureTicketsAccess = 'permission:systems.cash-closure-tickets.view,systems.cash-closure-tickets.update';
@@ -363,15 +363,15 @@ Route::middleware([
                 ->name('cash-closures.index');
 
             Route::post('/cortes', [CashRegisterClosureController::class, 'store'])
-                ->middleware('permission:sales.cash-closures.create')
+                ->middleware('permission:sales.cash-closures.create,reports.cash-closures.create')
                 ->name('cash-closures.store');
 
             Route::put('/cortes/{closure}', [CashRegisterClosureController::class, 'update'])
-                ->middleware('permission:sales.cash-closures.update')
+                ->middleware('permission:sales.cash-closures.update,reports.cash-closures.update')
                 ->name('cash-closures.update');
 
             Route::delete('/cortes/{closure}', [CashRegisterClosureController::class, 'destroy'])
-                ->middleware('permission:sales.cash-closures.delete')
+                ->middleware('permission:sales.cash-closures.delete,reports.cash-closures.delete')
                 ->name('cash-closures.destroy');
 
             Route::get('/cortes/reportes', [CashRegisterClosureController::class, 'reports'])
@@ -675,11 +675,11 @@ Route::middleware([
             ->name('branches.reports.inventory');
 
         Route::get('/branches/{branch}/reports/inventory/excel', [ReportController::class, 'exportExcel'])
-            ->middleware($inventoryReportsAccess)
+            ->middleware('permission:reports.inventory.export.excel')
             ->name('branches.reports.inventory.excel');
 
         Route::get('/branches/{branch}/reports/inventory/pdf', [ReportController::class, 'exportPdf'])
-            ->middleware($inventoryReportsAccess)
+            ->middleware('permission:reports.inventory.export.pdf')
             ->name('branches.reports.inventory.pdf');
 
         Route::get('/branches/{branch}/reports/movements', [ReportController::class, 'movements'])
@@ -687,11 +687,11 @@ Route::middleware([
             ->name('branches.reports.movements');
 
         Route::get('/branches/{branch}/reports/movements/excel', [ReportController::class, 'exportMovementsExcel'])
-            ->middleware($movementReportsAccess)
+            ->middleware('permission:reports.movements.export.excel')
             ->name('branches.reports.movements.excel');
 
         Route::get('/branches/{branch}/reports/movements/pdf', [ReportController::class, 'exportMovementsPdf'])
-            ->middleware($movementReportsAccess)
+            ->middleware('permission:reports.movements.export.pdf')
             ->name('branches.reports.movements.pdf');
     });
 
@@ -724,11 +724,11 @@ Route::middleware([
             ->name('physical-counts.reports');
 
         Route::get('/physical-counts/reports/export-excel', [PhysicalCountReportController::class, 'exportExcel'])
-            ->middleware(['permission:reports.audits.view', 'permission:files.export'])
+            ->middleware('permission:reports.audits.export.excel')
             ->name('physical-counts.reports.export-excel');
 
         Route::get('/physical-counts/reports/export-pdf', [PhysicalCountReportController::class, 'exportPdf'])
-            ->middleware(['permission:reports.audits.view', 'permission:files.export'])
+            ->middleware('permission:reports.audits.export.pdf')
             ->name('physical-counts.reports.export-pdf');
 
         Route::get('/physical-count-entries/{entry}', [PhysicalCountController::class, 'showEntry'])
@@ -792,11 +792,11 @@ Route::middleware([
             ->name('physical-counts.apply-adjustments');
 
         Route::get('/physical-counts/{physicalCount}/export-excel', [PhysicalCountController::class, 'exportExcel'])
-            ->middleware(['permission:reports.audits.view', 'permission:files.export'])
+            ->middleware('permission:reports.audits.export.excel')
             ->name('physical-counts.export-excel');
 
         Route::get('/physical-counts/{physicalCount}/export-pdf', [PhysicalCountController::class, 'exportPdf'])
-            ->middleware(['permission:reports.audits.view', 'permission:files.export'])
+            ->middleware('permission:reports.audits.export.pdf')
             ->name('physical-counts.export-pdf');
     });
 });

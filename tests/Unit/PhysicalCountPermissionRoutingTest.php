@@ -80,19 +80,19 @@ class PhysicalCountPermissionRoutingTest extends TestCase
             ],
             'exportar reporte general a Excel' => [
                 'audits.physical-counts.reports.export-excel',
-                'permission:files.export',
+                'permission:reports.audits.export.excel',
             ],
             'exportar reporte general a PDF' => [
                 'audits.physical-counts.reports.export-pdf',
-                'permission:files.export',
+                'permission:reports.audits.export.pdf',
             ],
             'exportar auditoría a Excel' => [
                 'audits.physical-counts.export-excel',
-                'permission:files.export',
+                'permission:reports.audits.export.excel',
             ],
             'exportar auditoría a PDF' => [
                 'audits.physical-counts.export-pdf',
-                'permission:files.export',
+                'permission:reports.audits.export.pdf',
             ],
         ];
     }

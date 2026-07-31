@@ -46,17 +46,14 @@ class ReportController extends Controller
 
     public function landing(Request $request)
     {
-        $branches = $this->reportBranches($request);
+        $report = collect(self::REPORT_TYPES)
+            ->keys()
+            ->first(fn (string $report) => $request->user()?->hasPermission(self::REPORT_TYPES[$report]['permission']));
 
-        if ($branches->count() === 1) {
-            return redirect()->route('inventory.branches.reports', [
-                'branch' => $branches->first()->id,
-            ]);
-        }
+        abort_unless($report, 403, 'No tienes permiso para consultar reportes.');
 
-        return Inertia::render('Inventory/Reports/Branches', [
-            'branches' => $branches,
-            'selectedReport' => null,
+        return redirect()->route('inventory.reports.select', [
+            'report' => $report,
         ]);
     }
 
@@ -93,8 +90,14 @@ class ReportController extends Controller
     {
         $this->abortIfUserCannotAccessBranch(request(), $branch);
 
-        return Inertia::render('Inventory/Reports/Index', [
-            'currentBranch' => $branch,
+        $report = collect(self::REPORT_TYPES)
+            ->keys()
+            ->first(fn (string $report) => request()->user()?->hasPermission(self::REPORT_TYPES[$report]['permission']));
+
+        abort_unless($report, 403, 'No tienes permiso para consultar reportes.');
+
+        return redirect()->route(self::REPORT_TYPES[$report]['route'], [
+            'branch' => $branch->id,
         ]);
     }
 

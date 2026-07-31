@@ -30,8 +30,8 @@ export function useInventoryMovementReport(props) {
     const tablePagination = computed(() => props.movements?.data ? props.movements : null)
 
     function backToReportsCenter() {
-        router.get(route('inventory.branches.reports', {
-            branch: props.currentBranch.id,
+        router.get(route('inventory.reports.select', {
+            report: 'movements',
         }))
     }
 

@@ -43,13 +43,14 @@ const reportFilters = reactive({
   per_page: Number(props.filters.per_page || 20),
 });
 
-const toolbarActions = computed(() => can("sales.cash-closures.create")
+const toolbarActions = computed(() => can("reports.cash-closures.create")
   ? [
       {
         id: "new-cut",
         label: "Nuevo corte",
         icon: "payments",
         variant: "primary",
+        permission: "reports.cash-closures.create",
       },
     ]
   : []);
@@ -215,14 +216,14 @@ const closureActions = computed(() => [
     label: "Editar",
     icon: "edit",
     variant: "amber",
-    permission: "sales.cash-closures.update",
+    permission: "reports.cash-closures.update",
   },
   {
     id: "delete",
     label: "Eliminar",
     icon: "delete",
     variant: "red",
-    permission: "sales.cash-closures.delete",
+    permission: "reports.cash-closures.delete",
   },
 ].map((action) => ({
   ...action,
@@ -312,11 +313,11 @@ function handleTableAction({ action, row }) {
     openClosure(row, "view");
   }
 
-  if (action === "edit" && can("sales.cash-closures.update")) {
+  if (action === "edit" && can("reports.cash-closures.update")) {
     openClosure(row, "edit");
   }
 
-  if (action === "delete" && can("sales.cash-closures.delete")) {
+  if (action === "delete" && can("reports.cash-closures.delete")) {
     deleteClosure(row);
   }
 }
@@ -432,7 +433,7 @@ onBeforeUnmount(() => {
       <GlobalToolbar
         v-bind="toolbarConfig"
         :subtitle="selectorMode ? 'Selecciona una sucursal para consultar su historial de cortes.' : currentBranch ? `Historial de cortes de ${currentBranch.name}` : 'Historial de cortes registrados por sucursal y usuario'"
-        :back-label="currentBranch && branchesDB.length > 1 ? 'Sucursales' : 'Centro de reportes'"
+        back-label="Sucursales"
         @back="backToReportsCenter"
         @update:search="reportFilters.folio = $event"
         @update:filter="updateReportFilter"

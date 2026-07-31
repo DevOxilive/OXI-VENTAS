@@ -1,6 +1,9 @@
 import { computed } from "vue";
+import { usePermissions } from "@/Composables/usePermissions";
 
 export function useToolbarConfig(props) {
+    const { can } = usePermissions();
+
     const visibleFilters = computed(() => {
         if (!props.filters) return [];
 
@@ -17,6 +20,16 @@ export function useToolbarConfig(props) {
         if (!props.actions) return [];
 
         return props.actions.filter((action) => {
+            if (action.permission) {
+                const permissions = Array.isArray(action.permission)
+                    ? action.permission
+                    : [action.permission];
+
+                if (!permissions.some((permission) => can(permission))) {
+                    return false;
+                }
+            }
+
             if (typeof action.hidden === "function") {
                 return !action.hidden();
             }

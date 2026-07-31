@@ -8,7 +8,7 @@ export function getCashRegisterClosureReportsToolbarConfig({
         icon: 'assessment',
         title: 'Reportes de corte de cajas',
         backButton: true,
-        backLabel: 'Centro de reportes',
+        backLabel: 'Sucursales',
         search: form.folio,
         searchPlaceholder: 'Buscar por folio...',
         showSearch: !selectorMode,
