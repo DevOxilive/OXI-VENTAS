@@ -1,6 +1,8 @@
 export function getPrinterLabelsToolbarConfig({
   processing = false,
   printing = false,
+  canSave = true,
+  canPrint = true,
 } = {}) {
   return {
     icon: "barcode",
@@ -12,24 +14,28 @@ export function getPrinterLabelsToolbarConfig({
     filters: [],
     tabs: [],
     actions: [
-      {
-        id: "reset",
-        label: "Restablecer",
-        icon: "restart_alt",
-        variant: "slate",
-      },
-      {
-        id: "print",
-        label: printing ? "Imprimiendo..." : "Probar impresion",
-        icon: "print",
-        variant: "green",
-      },
-      {
-        id: "save",
-        label: processing ? "Guardando..." : "Guardar",
-        icon: "save",
-        variant: "primary",
-      },
+      ...(canSave ? [
+        {
+          id: "reset",
+          label: "Restablecer",
+          icon: "restart_alt",
+          variant: "slate",
+        },
+        {
+          id: "save",
+          label: processing ? "Guardando..." : "Guardar",
+          icon: "save",
+          variant: "primary",
+        },
+      ] : []),
+      ...(canPrint ? [
+        {
+          id: "print",
+          label: printing ? "Imprimiendo..." : "Probar impresion",
+          icon: "print",
+          variant: "green",
+        },
+      ] : []),
     ],
   }
 }

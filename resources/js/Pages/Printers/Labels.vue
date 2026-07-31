@@ -25,6 +25,7 @@ import {
   printImageLabel,
   saveStoredPrinterName,
 } from "@/Composables/useQzTray";
+import { usePermissions } from "@/Composables/usePermissions";
 
 defineOptions({
   layout: AdminLayout,
@@ -58,6 +59,9 @@ const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para imprimir etiquetas.");
 const printing = ref(false);
 const printCopies = ref(1);
+const { can } = usePermissions();
+const canUpdateTemplate = computed(() => can("systems.labels.update"));
+const canPrintLabels = computed(() => can("systems.labels.print"));
 
 
 function withoutCustomTextBlock(settings) {
@@ -100,6 +104,8 @@ const toolbarConfig = computed(() =>
   getPrinterLabelsToolbarConfig({
     processing: form.processing,
     printing: printing.value,
+    canSave: canUpdateTemplate.value,
+    canPrint: canPrintLabels.value,
   })
 );
 const configurableBlocks = computed(() => (
@@ -150,6 +156,8 @@ onBeforeUnmount(() => {
 });
 
 function updateBlock(index, field, value) {
+  if (!canUpdateTemplate.value) return;
+
   form.settings.blocks = form.settings.blocks.map((block, blockIndex) =>
     blockIndex === index ? { ...block, [field]: value } : { ...block }
   );
@@ -166,6 +174,8 @@ function updateBlockByKey(key, field, value) {
 
 
 function resetTemplate() {
+  if (!canUpdateTemplate.value) return;
+
   const nextSettings = withoutCustomTextBlock(createDefaultLabelTemplate());
 
   nextSettings.blocks = nextSettings.blocks.map((block) => {
@@ -194,6 +204,14 @@ function resetTemplate() {
 }
 
 function saveTemplate() {
+  if (!canUpdateTemplate.value) {
+    WarningAlert({
+      title: "Sin permiso para guardar",
+      message: "Puedes consultar la plantilla, pero no tienes permiso para editarla.",
+    });
+    return;
+  }
+
   form.settings = withoutCustomTextBlock({
     ...form.settings,
   });
@@ -231,6 +249,7 @@ function handleToolbarAction(actionId) {
   }
 
   if (actionId === "print" && !printing.value) {
+    if (!canPrintLabels.value) return;
     printTestLabel();
     return;
   }

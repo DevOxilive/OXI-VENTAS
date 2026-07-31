@@ -33,13 +33,6 @@ class PermissionSeeder extends Seeder
             'users.create',
             'users.update',
             'users.delete',
-            'systems.tickets.view',
-            'systems.tickets.update',
-            'systems.cash-closure-tickets.view',
-            'systems.cash-closure-tickets.update',
-            'systems.labels.view',
-            'systems.labels.update',
-
             // Asistencias
             'attendance.view',
             'attendance.register',
@@ -67,15 +60,6 @@ class PermissionSeeder extends Seeder
             SystemPermission::BRANCHES_ACCESS_ALL,
             ...SystemPermission::exclusive(),
 
-            'sales.view',
-            'sales.create',
-            'sales.update',
-            'sales.delete',
-            'sales.reports',
-            'sales.cash-closures.view',
-            'sales.cash-closures.create',
-            'sales.cash-closures.update',
-            'sales.cash-closures.delete',
             'branches.view',
             'branches.create',
             'branches.update',
@@ -88,9 +72,11 @@ class PermissionSeeder extends Seeder
             'inventory.products.update',
             'inventory.products.delete',
             'inventory.branches.view',
-            'inventory.branches.create',
-            'inventory.branches.update',
-            'inventory.branches.delete',
+            'inventory.branches.stock-in',
+            'inventory.branches.stock-out',
+            'inventory.branches.stock-adjust',
+            'inventory.branches.batches.update',
+            'inventory.branches.config.update',
             'inventory.purchase-orders.source.view',
             'inventory.purchase-orders.source.update',
             'inventory.purchase-orders.source.review',
@@ -139,6 +125,7 @@ class PermissionSeeder extends Seeder
             'systems.cash-closure-tickets.update',
             'systems.labels.view',
             'systems.labels.update',
+            'systems.labels.print',
         ];
 
         foreach (array_unique($permissions) as $permission) {

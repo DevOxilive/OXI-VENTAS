@@ -80,9 +80,9 @@ Route::middleware([
     $cashClosureReportsAccess = 'permission:reports.cash-closures.view';
     $ticketsAccess = 'permission:systems.tickets.view,systems.tickets.update';
     $cashClosureTicketsAccess = 'permission:systems.cash-closure-tickets.view,systems.cash-closure-tickets.update';
-    $labelsAccess = 'permission:systems.labels.view,systems.labels.update';
+    $labelsAccess = 'permission:systems.labels.view,systems.labels.update,systems.labels.print';
     $productsAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete';
-    $branchInventoryAccess = 'permission:inventory.branches.view,inventory.branches.create,inventory.branches.update,inventory.branches.delete';
+    $branchInventoryAccess = 'permission:inventory.branches.view,inventory.branches.stock-in,inventory.branches.stock-out,inventory.branches.stock-adjust,inventory.branches.batches.update,inventory.branches.config.update';
     $purchaseReportsAccess = 'permission:sales.purchase-lists.view,sales.purchase-lists.create,sales.purchase-lists.update,sales.purchase-lists.delete,sales.purchase-orders.view,sales.purchase-orders.receive';
     $generalPurchaseOrdersAccess = 'permission:inventory.purchase-orders.general.view,inventory.purchase-orders.general.create,inventory.purchase-orders.general.update,inventory.purchase-orders.general.complete';
     $auditsAccess = 'permission:audits.physical-counts.count,audits.physical-counts.view-stock,audits.physical-counts.create,audits.physical-counts.close,audits.physical-counts.reopen,audits.physical-counts.finalize,audits.physical-counts.participants,audits.physical-counts.apply,audits.physical-counts.delete';
@@ -494,11 +494,11 @@ Route::middleware([
             ->name('branches.inventory.realtime-snapshot');
 
         Route::post('/branch-inventory', [BranchInventoryController::class, 'store'])
-            ->middleware('permission:inventory.branches.create')
+            ->middleware('permission:inventory.branches.config.update')
             ->name('branch-inventory.store');
 
         Route::patch('/branch-inventory/{branchProduct}/config', [BranchInventoryController::class, 'updateConfig'])
-            ->middleware('permission:inventory.branches.update')
+            ->middleware('permission:inventory.branches.config.update')
             ->name('branch-inventory.update-config');
 
         Route::get('/branch-inventory/{branchProduct}/details', [BranchInventoryController::class, 'details'])
@@ -506,7 +506,7 @@ Route::middleware([
             ->name('branch-inventory.details');
 
         Route::put('/product-batches/{productBatch}', [ProductBatchController::class, 'update'])
-            ->middleware('permission:inventory.branches.update')
+            ->middleware('permission:inventory.branches.batches.update')
             ->name('product-batches.update');
 
         Route::get('/stock-movements', [StockMovementController::class, 'index'])
@@ -518,7 +518,7 @@ Route::middleware([
             ->name('stock-movements.products.search');
 
         Route::post('/stock-movements', [StockMovementController::class, 'store'])
-            ->middleware('permission:inventory.branches.create,inventory.branches.update')
+            ->middleware('permission:inventory.branches.stock-in,inventory.branches.stock-out,inventory.branches.stock-adjust')
             ->name('stock-movements.store');
 
         Route::get('/movements', [StockMovementController::class, 'index'])
@@ -530,11 +530,11 @@ Route::middleware([
             ->name('expirations');
 
         Route::get('/transfers', fn () => Inertia::render('Inventory/Transfers'))
-            ->middleware('permission:inventory.branches.update')
+            ->middleware('permission:inventory.branches.stock-out')
             ->name('transfers');
 
         Route::get('/adjustments', fn () => Inertia::render('Inventory/Adjustments'))
-            ->middleware('permission:inventory.branches.update')
+            ->middleware('permission:inventory.branches.stock-adjust')
             ->name('adjustments');
 
         /*
