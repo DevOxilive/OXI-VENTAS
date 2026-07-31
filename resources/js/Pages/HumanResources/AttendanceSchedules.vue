@@ -12,7 +12,7 @@ import SelectField from '@/Components/Forms/SelectField.vue'
 import TimeField from '@/Components/Forms/TimeField.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import { usePermissions } from '@/Composables/usePermissions'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
 import { getAttendanceSchedulesToolbarConfig } from '@/config/ToolbarConfigs/attendanceSchedulesToolbarConfig'
 
 defineOptions({ layout: AdminLayout })
@@ -178,7 +178,7 @@ onMounted(() => {
     REALTIME_EVENTS.attendanceChanged,
     ({ action }) => {
       if (['schedule_created', 'schedule_updated', 'schedule_deleted'].includes(action)) {
-        router.reload({ only: ['schedules'], preserveScroll: true, preserveState: true })
+        refreshRealtimeProps(page, ['schedules'])
       }
     },
   )

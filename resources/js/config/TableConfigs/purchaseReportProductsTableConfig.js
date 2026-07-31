@@ -41,8 +41,8 @@ export function getPurchaseReportProductsTableConfig({ canManage = false } = {})
                 icon: "add_shopping_cart",
                 variant: "green",
                 permission: [
-                    "inventory.purchase-reports.create",
-                    "inventory.purchase-reports.update",
+                    "sales.purchase-lists.create",
+                    "sales.purchase-lists.update",
                 ],
                 hidden: (row) => !canManage || Boolean(row.in_purchase_list),
                 mobile: "button",
@@ -53,8 +53,8 @@ export function getPurchaseReportProductsTableConfig({ canManage = false } = {})
                 icon: "remove_shopping_cart",
                 variant: "red",
                 permission: [
-                    "inventory.purchase-reports.create",
-                    "inventory.purchase-reports.update",
+                    "sales.purchase-lists.create",
+                    "sales.purchase-lists.update",
                 ],
                 hidden: (row) => !canManage || !row.in_purchase_list,
                 mobile: "button",

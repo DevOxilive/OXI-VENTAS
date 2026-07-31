@@ -15,7 +15,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import UserRegisterModal from '@/Components/Systems/UserRegisterModal.vue'
 import UserDetailModal from '@/Components/Systems/UserDetailModal.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 defineOptions({ layout: AdminLayout })
 
 const page = usePage()
@@ -30,6 +30,7 @@ const roles = computed(() => page.props.roles || [])
 const branches = computed(() => page.props.branches || [])
 const permissions = computed(() => page.props.permissions || [])
 const filters = computed(() => page.props.filters || {})
+const userCapabilities = computed(() => page.props.capabilities || {})
 
 const search = ref(filters.value.search || '')
 const recordsPerPage = ref(filters.value.perPage || 50)
@@ -44,6 +45,10 @@ const {
   moduleLabel,
   sectionLabel,
 } = usePermissionLabels(permissions)
+
+const canViewUsers = computed(() => {
+  return Boolean(userCapabilities.value.viewUsers) && can('users.view')
+})
 
 const showModal = ref(false)
 const isEditing = ref(false)
@@ -288,7 +293,7 @@ function handleToolbarFilter({ key, value }) {
 
 const userTableActionHandlers = {
   view: (row) => {
-    if (!can('users.view')) return
+    if (!canViewUsers.value) return
     openUserDetail(row)
   },
   createUser: (row) => {
@@ -306,7 +311,7 @@ const userTableActionHandlers = {
 }
 
 function openUserDetail(user) {
-  if (!isUserRecord(user)) return
+  if (!canViewUsers.value || !isUserRecord(user)) return
 
   selectedUser.value = user
   showUserDetail.value = true
@@ -412,6 +417,12 @@ watch(() => form.role_id, () => {
   assignPermissionsByRole()
 })
 
+watch(canViewUsers, (canView) => {
+  if (!canView) {
+    closeUserDetail()
+  }
+})
+
 function closeModal() {
   showModal.value = false
   isEditing.value = false
@@ -434,7 +445,6 @@ function saveUser() {
     form.put(route('systems.users.update', selectedUserId.value), getModalRequestOptions({
       mode: 'update',
       entityName: 'Usuario',
-      close: closeModal,
       successTitle: 'Usuario actualizado correctamente',
       errorTitle: 'Error al actualizar',
       errorMessage: 'No fue posible actualizar la información del usuario.',
@@ -489,17 +499,14 @@ function deleteUser(id) {
   })
 }
 function reloadSystem() {
-  router.reload({
-    only: [
+  refreshRealtimeProps(page, [
       'recordsDB',
       'roles',
       'permissions',
       'branches',
       'filters',
-    ],
-    preserveScroll: true,
-    preserveState: true,
-  })
+      'capabilities',
+  ])
 }
 
 onMounted(() => {
@@ -556,10 +563,10 @@ onBeforeUnmount(() => {
         @update:search="search = $event" @update:filter="handleToolbarFilter" @update:records-per-page="recordsPerPage = $event" />
     </template>
 
-    <UserTable :items="normalizedList" :pagination="activePaginator" :can="can"
+    <UserTable :items="normalizedList" :pagination="activePaginator" :can="can" :can-view-users="canViewUsers"
       :action-handlers="userTableActionHandlers" @page-change="handlePageChange" />
 
-    <UserDetailModal v-if="showUserDetail && can('users.view')" :user="selectedUser" :permissions="permissions"
+    <UserDetailModal v-if="showUserDetail && canViewUsers" :user="selectedUser" :permissions="permissions"
       @close="closeUserDetail" />
 
     <UserRegisterModal v-if="showModal" :form="form" :errors="errors" :roles="roles" :branches="branches"

@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import { computed, onBeforeUnmount, onMounted, reactive } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
@@ -8,9 +8,10 @@ import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 
 const props = defineProps({ audits: Object, filters: Object, modules: Array })
+const page = usePage()
 const form = reactive({
     search: props.filters.search ?? '',
     module: props.filters.module ?? '',
@@ -67,7 +68,7 @@ let refreshTimer = null
 function refreshAudits() {
     clearTimeout(refreshTimer)
     refreshTimer = setTimeout(() => {
-        router.reload({ only: ['audits', 'modules'], preserveScroll: true })
+        refreshRealtimeProps(page, ['audits', 'modules'])
     }, 120)
 }
 

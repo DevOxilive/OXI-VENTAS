@@ -66,7 +66,7 @@ function reportDetails(report) {
 
                 <div class="flex shrink-0 items-center gap-2">
                     <ActionIconButton
-                        v-if="can('inventory.purchase-reports.update')"
+                        v-if="can('sales.purchase-lists.update')"
                         class="h-9 w-9"
                         icon="edit"
                         title="Editar borrador"
@@ -75,7 +75,7 @@ function reportDetails(report) {
                     />
 
                     <ActionIconButton
-                        v-if="can('inventory.purchase-reports.delete')"
+                        v-if="can('sales.purchase-lists.delete')"
                         class="h-9 w-9"
                         icon="delete"
                         title="Eliminar borrador"

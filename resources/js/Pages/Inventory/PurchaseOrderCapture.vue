@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -44,6 +44,7 @@ const form = reactive({
         image_failed: false,
     })),
 })
+const completing = ref(false)
 const totalPurchased = computed(() => form.items.reduce(
     (total, item) => total + purchasedQuantity(item),
     0,
@@ -211,6 +212,8 @@ function saveOrder() {
 }
 
 async function completeOrder() {
+    if (completing.value) return
+
     const result = await confirmModalAction({
         mode: 'update',
         entityName: 'orden general',
@@ -221,6 +224,7 @@ async function completeOrder() {
 
     if (!result.isConfirmed) return
 
+    completing.value = true
     router.post(
         route('inventory.branches.reports.purchase-orders.complete', routeParams()),
         payload(),
@@ -230,6 +234,9 @@ async function completeOrder() {
             successTitle: 'Compra general completada correctamente',
             errorTitle: 'No se pudo completar la compra general',
             errorMessage: 'Revisa que cada producto tenga cantidad y precio de compra.',
+            onFinish: () => {
+                completing.value = false
+            },
         }),
     )
 }
@@ -415,7 +422,9 @@ async function completeOrder() {
 
                 <div class="grid gap-2">
                     <AppButton block variant="secondary" @click="saveOrder">Guardar avance</AppButton>
-                    <AppButton block @click="completeOrder">Completar compra</AppButton>
+                    <AppButton block :disabled="completing" @click="completeOrder">
+                        {{ completing ? 'Completando...' : 'Completar compra' }}
+                    </AppButton>
                 </div>
             </aside>
         </div>

@@ -2,6 +2,7 @@
 
 export function getUsersTableConfig({
     can,
+    canViewUsers = false,
     onViewUser,
     onCreateUser,
     onEditUser,
@@ -56,7 +57,7 @@ export function getUsersTableConfig({
                 variant: "slate",
                 permission: "users.view",
                 handler: onViewUser,
-                hidden: (row) => !row?.has_user || !can("users.view"),
+                hidden: (row) => !row?.has_user || !canViewUsers,
                 mobile: "button",
             },
             {

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted } from "vue";
-import { Head, router } from "@inertiajs/vue3";
+import { Head, router, usePage } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
@@ -22,8 +22,9 @@ import { getPurchaseReportProductsTableConfig } from "@/config/TableConfigs/purc
 import { getPurchaseReportToolbarConfig } from "@/config/ToolbarConfigs/purchaseReportToolbarConfig";
 
 import PurchaseReportDrafts from "@/Components/Inventory/PurchaseReports/PurchaseReportDrafts.vue";
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 
+const page = usePage()
 const props = defineProps({
     selectorMode: {
         type: Boolean,
@@ -68,8 +69,8 @@ const perPageOptions = [
 
 const branchLabel = computed(() => props.currentBranch?.name || "Sin sucursal");
 const cycleSubmitted = computed(() => Boolean(props.purchaseCycle?.submitted));
-const canCreatePurchaseReport = computed(() => can("inventory.purchase-reports.create"));
-const canUpdatePurchaseReport = computed(() => can("inventory.purchase-reports.update"));
+const canCreatePurchaseReport = computed(() => can("sales.purchase-lists.create"));
+const canUpdatePurchaseReport = computed(() => can("sales.purchase-lists.update"));
 const canSavePurchaseReport = computed(() => report.isEditing.value
     ? canUpdatePurchaseReport.value
     : canCreatePurchaseReport.value);
@@ -115,7 +116,7 @@ onMounted(() => {
         REALTIME_EVENTS.systemTrashChanged,
         (event) => {
             if (event?.resource === 'purchase-reports') {
-                router.reload({ only: ['reportsDB', 'purchaseCycle'] })
+                refreshRealtimeProps(page, ['reportsDB', 'purchaseCycle'])
             }
         },
     )
@@ -209,7 +210,7 @@ async function generateOrder() {
 }
 
 async function deleteDraft(draft) {
-    if (!can("inventory.purchase-reports.delete")) return;
+    if (!can("sales.purchase-lists.delete")) return;
 
     const result = await confirmModalAction({
         mode: "delete",

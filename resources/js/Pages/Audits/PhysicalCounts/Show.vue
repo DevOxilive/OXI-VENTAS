@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -11,7 +12,7 @@ import ProductFoundCard from '@/Components/Audits/PhysicalCounts/ProductFoundCar
 import CountEntryForm from '@/Components/Audits/PhysicalCounts/CountEntryForm.vue'
 import { getPhysicalCountDetailToolbarConfig } from '@/config/ToolbarConfigs/physicalCountDetailToolbarConfig'
 import { usePermissions } from '@/Composables/usePermissions'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
 
@@ -67,6 +68,10 @@ function handleToolbarAction(action) {
             branch: props.physicalCount.branch.slug,
         }))
     }
+}
+
+function reloadAuditDetail() {
+    refreshRealtimeProps(page, ['physicalCount', 'scannedProduct', 'canViewReports'])
 }
 
 onMounted(() => {

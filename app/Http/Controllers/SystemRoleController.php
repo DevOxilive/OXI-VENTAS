@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\RealtimeActivityLogged;
+use App\Events\UserChanged;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Support\SystemPermission;
@@ -34,6 +36,25 @@ class SystemRoleController extends SystemAdministrationController
         }
 
         $role->permissions()->sync($data['permission_ids']);
+        $role->unsetRelation('permissions');
+
+        try {
+            $role->users()
+                ->with(['role.permissions', 'permissions'])
+                ->eachById(function ($user): void {
+                    event(new UserChanged($user, 'permissions_updated'));
+                });
+
+            event(RealtimeActivityLogged::message(
+                'actualizó los permisos de',
+                'el rol',
+                $role->name,
+                'Sistemas',
+                'permissions_updated',
+            ));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
 
         return back()->with('success', 'Permisos del rol actualizados correctamente.');
     }

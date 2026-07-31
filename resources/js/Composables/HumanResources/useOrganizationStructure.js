@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { router, useForm } from "@inertiajs/vue3";
+import { router, useForm, usePage } from "@inertiajs/vue3";
 import {
     confirmModalAction,
     getModalRequestOptions,
@@ -8,10 +8,12 @@ import { getOrganizationStructureModalConfig } from "@/config/ModalConfigs/organ
 import {
     REALTIME_CHANNELS,
     REALTIME_EVENTS,
+    refreshRealtimeProps,
     subscribeRealtime,
 } from "@/realtime";
 
 export function useOrganizationStructure(props) {
+    const page = usePage();
     const showModal = ref(false);
     const modalMode = ref("create");
     const entity = ref("department");
@@ -139,10 +141,7 @@ export function useOrganizationStructure(props) {
             selectedRecord.value = null;
         }
 
-        router.reload({
-            only: ["departments", "positions"],
-            preserveScroll: true,
-            preserveState: true,
+        refreshRealtimeProps(page, ["departments", "positions"], {
             onSuccess: () => {
                 if (!showModal.value || !selectedRecord.value?.id) return;
 

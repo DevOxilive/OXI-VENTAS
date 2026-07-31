@@ -58,7 +58,7 @@ export function getPurchaseOrdersTableConfig({ mode = 'view', viewPermission = n
                 label: 'Editar compra',
                 icon: 'edit',
                 variant: 'yellow',
-                permission: 'inventory.purchase-orders.costs',
+                permission: 'inventory.purchase-orders.general.update',
                 hidden: (row) => !purchasing || !row.can_edit,
             },
         ],

@@ -22,16 +22,22 @@ export function generateMenu(role, permissions = [], branches = []) {
             "inventory.branches.delete",
         ],
         purchaseReports: [
-            "inventory.purchase-reports.view",
-            "inventory.purchase-reports.create",
-            "inventory.purchase-reports.update",
-            "inventory.purchase-reports.delete",
+            "sales.purchase-lists.view",
+            "sales.purchase-lists.create",
+            "sales.purchase-lists.update",
+            "sales.purchase-lists.delete",
+            "sales.purchase-orders.view",
+            "sales.purchase-orders.receive",
         ],
         purchaseOrders: [
-            "inventory.purchase-orders.view",
-            "inventory.purchase-orders.create",
-            "inventory.purchase-orders.update",
-            "inventory.purchase-orders.history",
+            "inventory.purchase-orders.source.view",
+            "inventory.purchase-orders.source.update",
+            "inventory.purchase-orders.source.review",
+            "inventory.purchase-orders.source.transfer",
+            "inventory.purchase-orders.general.view",
+            "inventory.purchase-orders.general.create",
+            "inventory.purchase-orders.general.update",
+            "inventory.purchase-orders.general.complete",
         ],
         audits: [
             "audits.physical-counts.count",
@@ -51,7 +57,10 @@ export function generateMenu(role, permissions = [], branches = []) {
             "sales.cash-closures.update",
             "sales.cash-closures.delete",
         ],
-        cashClosureReports: ["sales.cash-closures.reports"],
+        auditReports: ["reports.audits.view"],
+        cashClosureReports: ["reports.cash-closures.view"],
+        inventoryReports: ["reports.inventory.view"],
+        movementReports: ["reports.movements.view"],
         tickets: ["systems.tickets.view", "systems.tickets.update"],
         cashClosureTickets: [
             "systems.cash-closure-tickets.view",
@@ -67,7 +76,6 @@ export function generateMenu(role, permissions = [], branches = []) {
         attendanceSchedules: ["attendance.schedules.view", "attendance.schedules.create", "attendance.schedules.update", "attendance.schedules.delete"],
         attendanceScheduleAssignments: ["attendance.schedule-assignments.view", "attendance.schedule-assignments.create", "attendance.schedule-assignments.update", "attendance.schedule-assignments.delete"],
         attendanceIncidents: ["attendance.incidents.view", "attendance.incidents.create", "attendance.incidents.update", "attendance.incidents.delete", "attendance.incidents.approve", "attendance.incidents.reject"],
-        inventoryReports: ["inventory.view", "inventory.create", "inventory.update", "inventory.delete"],
         systemAdministration: ["system.center.access"],
     };
 
@@ -194,13 +202,13 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        ...(canUse("purchaseReports")
+        ...(canUse("purchaseOrders")
             ? [
                   {
-                      text: "Listas de compra",
-                      key: `inventory.${branch.slug}.purchase-report`,
-                      icon: "shopping_cart",
-                      url: route("inventory.branches.purchase-reports.index", {
+                      text: "Órdenes de compra generales",
+                      key: `inventory.${branch.slug}.general-purchase-orders`,
+                      icon: "receipt_long",
+                      url: route("inventory.branches.reports.purchase-orders", {
                           branch: branch.id,
                       }),
                   },
@@ -220,28 +228,9 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        ...(canUse("audits") ||
-        can("audits.physical-counts.reports") ||
-        canUse("cashClosureReports") ||
-        canUse("inventoryReports") ||
-        canUse("branchInventory") ||
-        canUse("purchaseReports") ||
-        canUse("purchaseOrders")
-            ? [
-                  {
-                      text: "Reportes",
-                      key: `inventory.${branch.slug}.reports`,
-                      icon: "bar_chart",
-                      url: route("inventory.branches.reports", {
-                          branch: branch.id,
-                      }),
-                  },
-              ]
-            : []),
     ];
 
     const canSeeBranchesSection =
-        can("branches.access-all") ||
         can("inventory.products.view") ||
         can("inventory.products.create") ||
         can("inventory.products.update") ||
@@ -250,14 +239,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("inventory.branches.create") ||
         can("inventory.branches.update") ||
         can("inventory.branches.delete") ||
-        can("inventory.purchase-reports.view") ||
-        can("inventory.purchase-reports.create") ||
-        can("inventory.purchase-reports.update") ||
-        can("inventory.purchase-reports.delete") ||
-        can("inventory.purchase-orders.view") ||
-        can("inventory.purchase-orders.create") ||
-        can("inventory.purchase-orders.update") ||
-        can("inventory.purchase-orders.history") ||
+        canUse("purchaseOrders") ||
         can("audits.physical-counts.count") ||
         can("audits.physical-counts.view-stock") ||
         can("audits.physical-counts.create") ||
@@ -267,16 +249,11 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("audits.physical-counts.participants") ||
         can("audits.physical-counts.apply") ||
         can("audits.physical-counts.delete") ||
-        can("sales.cash-closures.reports") ||
-        can("inventory.view") ||
         can("inventory.branches.view") ||
         canUse("products") ||
         canUse("branchInventory") ||
-        canUse("purchaseReports") ||
         canUse("purchaseOrders") ||
-        canUse("audits") ||
-        canUse("cashClosureReports") ||
-        canUse("inventoryReports");
+        canUse("audits");
 
     if (canSeeBranchesSection) {
         menu.push({
@@ -301,9 +278,34 @@ export function generateMenu(role, permissions = [], branches = []) {
         });
     }
 
+    const purchaseListsMenuItem = {
+        text: "Lista de compra",
+        key: "sales.purchase-lists",
+        icon: "shopping_cart",
+        url: route("ventas.purchase-reports.index"),
+    };
+    const branchPurchaseOrdersMenuItem = {
+        text: "Órdenes de compra",
+        key: "sales.purchase-orders",
+        icon: "shopping_bag",
+        url: route("ventas.purchase-orders.index"),
+    };
+    const canUsePurchaseLists = canAny([
+        "sales.purchase-lists.view",
+        "sales.purchase-lists.create",
+        "sales.purchase-lists.update",
+        "sales.purchase-lists.delete",
+    ]);
+    const canUsePurchaseOrderTracking = canAny([
+        "sales.purchase-orders.view",
+        "sales.purchase-orders.receive",
+    ]);
+
     if (
         canUse("sales") ||
         canUse("cashClosures") ||
+        canUsePurchaseLists ||
+        canUsePurchaseOrderTracking ||
         canRegisterSalesAttendance
     ) {
         menu.push({
@@ -312,12 +314,14 @@ export function generateMenu(role, permissions = [], branches = []) {
             icon: "point_of_sale",
             isOpen: false,
             children: [
-                {
-                    text: "Punto de venta",
-                    key: "sales.pos",
-                    icon: "point_of_sale",
-                    url: route("ventas.home"),
-                },
+                ...(canUse("sales")
+                    ? [{
+                        text: "Punto de venta",
+                        key: "sales.pos",
+                        icon: "point_of_sale",
+                        url: route("ventas.home"),
+                    }]
+                    : []),
                 ...(canUse("cashClosures")
                     ? [
                           {
@@ -328,6 +332,12 @@ export function generateMenu(role, permissions = [], branches = []) {
                           },
                       ]
                     : []),
+                ...(canUsePurchaseLists
+                    ? [purchaseListsMenuItem]
+                    : []),
+                ...(canUsePurchaseOrderTracking
+                    ? [branchPurchaseOrdersMenuItem]
+                    : []),
                 ...(canRegisterSalesAttendance
                     ? [{
                         text: "Asistencia",
@@ -337,6 +347,51 @@ export function generateMenu(role, permissions = [], branches = []) {
                     }]
                     : []),
             ],
+        });
+    }
+
+    const reportMenuItems = [
+        ...(canUse("auditReports")
+            ? [{
+                text: "Reportes de auditoría",
+                key: "reports.audits",
+                icon: "fact_check",
+                url: route("inventory.reports.select", { report: "audits" }),
+            }]
+            : []),
+        ...(canUse("cashClosureReports")
+            ? [{
+                text: "Reportes de cortes",
+                key: "reports.cash-closures",
+                icon: "summarize",
+                url: route("inventory.reports.select", { report: "cash-closures" }),
+            }]
+            : []),
+        ...(canUse("inventoryReports")
+            ? [{
+                text: "Reportes de inventario",
+                key: "reports.inventory",
+                icon: "inventory_2",
+                url: route("inventory.reports.select", { report: "inventory" }),
+            }]
+            : []),
+        ...(canUse("movementReports")
+            ? [{
+                text: "Reportes de movimientos",
+                key: "reports.movements",
+                icon: "sync_alt",
+                url: route("inventory.reports.select", { report: "movements" }),
+            }]
+            : []),
+    ];
+
+    if (reportMenuItems.length) {
+        menu.push({
+            text: "Reportes",
+            key: "reports",
+            icon: "bar_chart",
+            isOpen: false,
+            children: reportMenuItems,
         });
     }
 

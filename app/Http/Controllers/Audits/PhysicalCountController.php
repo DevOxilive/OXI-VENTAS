@@ -1298,7 +1298,7 @@ class PhysicalCountController extends Controller
 
     private function canViewReports(Request $request): bool
     {
-        return (bool) $request->user()?->hasPermission('audits.physical-counts.reports');
+        return (bool) $request->user()?->hasPermission('reports.audits.view');
     }
 
     private function canViewAuditStock(Request $request): bool

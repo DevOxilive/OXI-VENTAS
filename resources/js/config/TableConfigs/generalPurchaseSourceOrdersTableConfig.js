@@ -55,14 +55,14 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
                 label: 'Ver',
                 icon: 'visibility',
                 variant: 'blue',
-                permission: 'inventory.purchase-orders.generate.view',
+                permission: 'inventory.purchase-orders.source.view',
             },
             {
                 id: 'approve',
                 label: 'Aprobar',
                 icon: 'check_circle',
                 variant: 'green',
-                permission: 'inventory.purchase-orders.generate.update',
+                permission: 'inventory.purchase-orders.source.review',
                 hidden: (row) => row.review_status === 'APPROVED' || row.selected || row.in_draft,
             },
             {
@@ -70,7 +70,7 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
                 label: 'Rechazar',
                 icon: 'cancel',
                 variant: 'red',
-                permission: 'inventory.purchase-orders.generate.update',
+                permission: 'inventory.purchase-orders.source.review',
                 hidden: (row) => row.review_status === 'REJECTED' || row.selected || row.in_draft,
             },
             {
@@ -78,7 +78,7 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
                 label: 'Transferir',
                 icon: 'swap_horiz',
                 variant: 'secondary',
-                permission: 'inventory.purchase-orders.generate.transfer',
+                permission: 'inventory.purchase-orders.source.transfer',
                 hidden: (row) => row.review_status !== 'APPROVED' || row.selected || row.in_draft,
             },
             {
@@ -86,7 +86,7 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
                 label: 'Editar',
                 icon: 'edit',
                 variant: 'yellow',
-                permission: 'inventory.purchase-orders.generate.update',
+                permission: 'inventory.purchase-orders.source.update',
                 hidden: (row) => row.selected || row.in_draft,
             },
             {
@@ -94,7 +94,7 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
                 label: 'Historial de transferencias',
                 icon: 'history',
                 variant: 'blue',
-                permission: 'inventory.purchase-orders.generate.view',
+                permission: 'inventory.purchase-orders.source.view',
                 hidden: (row) => Number(row.transfer_history_count || 0) === 0,
             },
             {
@@ -102,7 +102,7 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
                 label: 'Agregar a Orden de compra general',
                 icon: 'add_circle',
                 variant: 'green',
-                permission: 'inventory.purchase-orders.generate.create',
+                permission: 'inventory.purchase-orders.general.create',
                 hidden: (row) => row.review_status !== 'APPROVED' || row.selected,
             },
             {
@@ -110,7 +110,7 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
                 label: 'Quitar de Orden de compra general',
                 icon: 'remove_circle',
                 variant: 'red',
-                permission: 'inventory.purchase-orders.generate.create',
+                permission: 'inventory.purchase-orders.general.create',
                 hidden: (row) => !row.selected,
             },
         ],

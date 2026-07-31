@@ -3,7 +3,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 
 import { useEmployeeActions } from '@/Composables/HumanResources/useEmployeeActions'
 import { useEmployeeExport } from '@/Composables/HumanResources/useEmployeeExport'
@@ -13,7 +13,7 @@ import { usePermissions } from '@/Composables/usePermissions'
 import EmployeeToolbar from '@/Components/HumanResourses/EmployeeToolbar.vue'
 import EmployeeTable from '@/Components/HumanResourses/EmployeeTable.vue'
 import EmployeeRegisterModal from '@/Components/HumanResourses/EmployeeRegisterModal.vue'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
 
@@ -21,6 +21,7 @@ let unsubscribeEmployeeChanged = null
 let unsubscribeOrganizationStructureChanged = null
 
 const { can } = usePermissions()
+const page = usePage()
 
 const props = defineProps({
     employeesDB: {
@@ -108,11 +109,7 @@ function reloadEmployees() {
 }
 
 function refreshEmployeesRealtime() {
-    router.reload({
-        only: ['employeesDB', 'filterOptions', 'organizationOptions'],
-        preserveScroll: true,
-        preserveState: true,
-    })
+    refreshRealtimeProps(page, ['employeesDB', 'filterOptions', 'organizationOptions'])
 }
 
 watch(search, reloadEmployees)

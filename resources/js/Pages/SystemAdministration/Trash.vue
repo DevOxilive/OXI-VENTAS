@@ -1,5 +1,5 @@
 <script setup>
-import { Head, router } from '@inertiajs/vue3'
+import { Head, router, usePage } from '@inertiajs/vue3'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
@@ -9,10 +9,11 @@ import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import { ToastAlert, UniversalActionModal } from '@/Components/Modales/UniversalActionModal'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 import { usePermissions } from '@/Composables/usePermissions'
 
 const props = defineProps({ resources: Array, resource: String, records: Object, filters: Object })
+const page = usePage()
 const { can } = usePermissions()
 const form = reactive({
     resource: props.resource,
@@ -52,11 +53,7 @@ function clearSelection() {
 function refreshTrash() {
     clearTimeout(refreshTimer)
     refreshTimer = setTimeout(() => {
-        router.reload({
-            only: ['records'],
-            preserveScroll: true,
-            onSuccess: clearSelection,
-        })
+        refreshRealtimeProps(page, ['records'])
     }, 120)
 }
 
