@@ -77,7 +77,7 @@ Route::middleware([
     $organizationAccess = 'permission:departments.view,departments.create,departments.update,departments.delete,positions.view,positions.create,positions.update,positions.delete';
     $salesAccess = 'permission:sales.view,sales.create,sales.update,sales.delete,sales.reports';
     $cashClosuresAccess = 'permission:sales.cash-closures.view,sales.cash-closures.create,sales.cash-closures.update,sales.cash-closures.delete';
-    $cashClosureReportsAccess = 'permission:sales.cash-closures.reports';
+    $cashClosureReportsAccess = 'permission:reports.cash-closures.view';
     $ticketsAccess = 'permission:systems.tickets.view,systems.tickets.update';
     $cashClosureTicketsAccess = 'permission:systems.cash-closure-tickets.view,systems.cash-closure-tickets.update';
     $labelsAccess = 'permission:systems.labels.view,systems.labels.update';
@@ -86,8 +86,9 @@ Route::middleware([
     $purchaseReportsAccess = 'permission:inventory.purchase-reports.view,inventory.purchase-reports.create,inventory.purchase-reports.update,inventory.purchase-reports.delete';
     $generalPurchaseOrdersAccess = 'permission:inventory.purchase-orders.generate.view,inventory.purchase-orders.purchasing.view,inventory.purchase-orders.completed.view';
     $auditsAccess = 'permission:audits.physical-counts.count,audits.physical-counts.view-stock,audits.physical-counts.create,audits.physical-counts.close,audits.physical-counts.reopen,audits.physical-counts.finalize,audits.physical-counts.participants,audits.physical-counts.apply,audits.physical-counts.delete';
-    $inventoryReportsAccess = 'permission:inventory.view,inventory.create,inventory.update,inventory.delete,inventory.branches.view,inventory.branches.create,inventory.branches.update,inventory.branches.delete';
-    $reportsAccess = 'permission:inventory.view,inventory.create,inventory.update,inventory.delete,inventory.branches.view,inventory.branches.create,inventory.branches.update,inventory.branches.delete,audits.physical-counts.reports,sales.cash-closures.reports,inventory.purchase-orders.generate.view,inventory.purchase-orders.purchasing.view,inventory.purchase-orders.completed.view';
+    $inventoryReportsAccess = 'permission:reports.inventory.view';
+    $movementReportsAccess = 'permission:reports.movements.view';
+    $reportsAccess = 'permission:reports.audits.view,reports.cash-closures.view,reports.inventory.view,reports.movements.view';
 
     /*
     |--------------------------------------------------------------------------
@@ -441,6 +442,7 @@ Route::middleware([
         $productsAccess,
         $branchInventoryAccess,
         $inventoryReportsAccess,
+        $movementReportsAccess,
         $purchaseReportsAccess,
         $generalPurchaseOrdersAccess,
         $cashClosureReportsAccess
@@ -528,11 +530,11 @@ Route::middleware([
             ->name('expirations');
 
         Route::get('/transfers', fn () => Inertia::render('Inventory/Transfers'))
-            ->middleware('permission:inventory.update,inventory.branches.update')
+            ->middleware('permission:inventory.branches.update')
             ->name('transfers');
 
         Route::get('/adjustments', fn () => Inertia::render('Inventory/Adjustments'))
-            ->middleware('permission:inventory.update,inventory.branches.update')
+            ->middleware('permission:inventory.branches.update')
             ->name('adjustments');
 
         /*
@@ -583,8 +585,16 @@ Route::middleware([
         |--------------------------------------------------------------------------
         */
 
+        Route::get('/reports', [ReportController::class, 'landing'])
+            ->middleware($reportsAccess)
+            ->name('reports');
+
+        Route::get('/reports/{report}', [ReportController::class, 'select'])
+            ->middleware($reportsAccess)
+            ->whereIn('report', ['audits', 'cash-closures', 'inventory', 'movements'])
+            ->name('reports.select');
+
         Route::get('/branches/{branch}/reports', [ReportController::class, 'index'])
-            ->middleware('permission:inventory.view,inventory.branches.view,sales.cash-closures.reports,inventory.purchase-orders.generate.view,inventory.purchase-orders.purchasing.view,inventory.purchase-orders.completed.view')
             ->middleware($reportsAccess)
             ->name('branches.reports');
 
@@ -653,16 +663,12 @@ Route::middleware([
                 'branch' => $branch->slug,
             ]);
         })
-            ->middleware('permission:audits.physical-counts.reports')
+            ->middleware('permission:reports.audits.view')
             ->name('branches.reports.audits');
 
         Route::get('/branches/{branch}/reports/cash-closures', [CashRegisterClosureController::class, 'reports'])
             ->middleware($cashClosureReportsAccess)
             ->name('branches.reports.cash-closures');
-
-        Route::get('/reports', fn () => Inertia::render('Inventory/Reports/Index'))
-            ->middleware($reportsAccess)
-            ->name('reports');
 
         Route::get('/branches/{branch}/reports/inventory', [ReportController::class, 'inventory'])
             ->middleware($inventoryReportsAccess)
@@ -677,15 +683,15 @@ Route::middleware([
             ->name('branches.reports.inventory.pdf');
 
         Route::get('/branches/{branch}/reports/movements', [ReportController::class, 'movements'])
-            ->middleware($inventoryReportsAccess)
+            ->middleware($movementReportsAccess)
             ->name('branches.reports.movements');
 
         Route::get('/branches/{branch}/reports/movements/excel', [ReportController::class, 'exportMovementsExcel'])
-            ->middleware($inventoryReportsAccess)
+            ->middleware($movementReportsAccess)
             ->name('branches.reports.movements.excel');
 
         Route::get('/branches/{branch}/reports/movements/pdf', [ReportController::class, 'exportMovementsPdf'])
-            ->middleware($inventoryReportsAccess)
+            ->middleware($movementReportsAccess)
             ->name('branches.reports.movements.pdf');
     });
 
@@ -714,15 +720,15 @@ Route::middleware([
             ->name('physical-counts.index');
 
         Route::get('/physical-counts/reports', [PhysicalCountReportController::class, 'index'])
-            ->middleware('permission:audits.physical-counts.reports')
+            ->middleware('permission:reports.audits.view')
             ->name('physical-counts.reports');
 
         Route::get('/physical-counts/reports/export-excel', [PhysicalCountReportController::class, 'exportExcel'])
-            ->middleware(['permission:audits.physical-counts.reports', 'permission:files.export'])
+            ->middleware(['permission:reports.audits.view', 'permission:files.export'])
             ->name('physical-counts.reports.export-excel');
 
         Route::get('/physical-counts/reports/export-pdf', [PhysicalCountReportController::class, 'exportPdf'])
-            ->middleware(['permission:audits.physical-counts.reports', 'permission:files.export'])
+            ->middleware(['permission:reports.audits.view', 'permission:files.export'])
             ->name('physical-counts.reports.export-pdf');
 
         Route::get('/physical-count-entries/{entry}', [PhysicalCountController::class, 'showEntry'])
@@ -786,11 +792,11 @@ Route::middleware([
             ->name('physical-counts.apply-adjustments');
 
         Route::get('/physical-counts/{physicalCount}/export-excel', [PhysicalCountController::class, 'exportExcel'])
-            ->middleware(['permission:audits.physical-counts.reports', 'permission:files.export'])
+            ->middleware(['permission:reports.audits.view', 'permission:files.export'])
             ->name('physical-counts.export-excel');
 
         Route::get('/physical-counts/{physicalCount}/export-pdf', [PhysicalCountController::class, 'exportPdf'])
-            ->middleware(['permission:audits.physical-counts.reports', 'permission:files.export'])
+            ->middleware(['permission:reports.audits.view', 'permission:files.export'])
             ->name('physical-counts.export-pdf');
     });
 });

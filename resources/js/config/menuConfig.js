@@ -54,7 +54,10 @@ export function generateMenu(role, permissions = [], branches = []) {
             "sales.cash-closures.update",
             "sales.cash-closures.delete",
         ],
-        cashClosureReports: ["sales.cash-closures.reports"],
+        auditReports: ["reports.audits.view"],
+        cashClosureReports: ["reports.cash-closures.view"],
+        inventoryReports: ["reports.inventory.view"],
+        movementReports: ["reports.movements.view"],
         tickets: ["systems.tickets.view", "systems.tickets.update"],
         cashClosureTickets: [
             "systems.cash-closure-tickets.view",
@@ -70,7 +73,6 @@ export function generateMenu(role, permissions = [], branches = []) {
         attendanceSchedules: ["attendance.schedules.view", "attendance.schedules.create", "attendance.schedules.update", "attendance.schedules.delete"],
         attendanceScheduleAssignments: ["attendance.schedule-assignments.view", "attendance.schedule-assignments.create", "attendance.schedule-assignments.update", "attendance.schedule-assignments.delete"],
         attendanceIncidents: ["attendance.incidents.view", "attendance.incidents.create", "attendance.incidents.update", "attendance.incidents.delete", "attendance.incidents.approve", "attendance.incidents.reject"],
-        inventoryReports: ["inventory.view", "inventory.create", "inventory.update", "inventory.delete"],
         systemAdministration: ["system.center.access"],
     };
 
@@ -223,22 +225,6 @@ export function generateMenu(role, permissions = [], branches = []) {
               ]
             : []),
 
-        ...(canUse("audits") ||
-        can("audits.physical-counts.reports") ||
-        canUse("cashClosureReports") ||
-        canUse("inventoryReports") ||
-        canUse("branchInventory")
-            ? [
-                  {
-                      text: "Reportes",
-                      key: `inventory.${branch.slug}.reports`,
-                      icon: "bar_chart",
-                      url: route("inventory.branches.reports", {
-                          branch: branch.id,
-                      }),
-                  },
-              ]
-            : []),
     ];
 
     const canSeeBranchesSection =
@@ -266,15 +252,11 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("audits.physical-counts.participants") ||
         can("audits.physical-counts.apply") ||
         can("audits.physical-counts.delete") ||
-        can("sales.cash-closures.reports") ||
-        can("inventory.view") ||
         can("inventory.branches.view") ||
         canUse("products") ||
         canUse("branchInventory") ||
         canUse("purchaseOrders") ||
-        canUse("audits") ||
-        canUse("cashClosureReports") ||
-        canUse("inventoryReports");
+        canUse("audits");
 
     if (canSeeBranchesSection) {
         menu.push({
@@ -358,6 +340,51 @@ export function generateMenu(role, permissions = [], branches = []) {
                     }]
                     : []),
             ],
+        });
+    }
+
+    const reportMenuItems = [
+        ...(canUse("auditReports")
+            ? [{
+                text: "Reportes de auditoría",
+                key: "reports.audits",
+                icon: "fact_check",
+                url: route("inventory.reports.select", { report: "audits" }),
+            }]
+            : []),
+        ...(canUse("cashClosureReports")
+            ? [{
+                text: "Reportes de cortes",
+                key: "reports.cash-closures",
+                icon: "summarize",
+                url: route("inventory.reports.select", { report: "cash-closures" }),
+            }]
+            : []),
+        ...(canUse("inventoryReports")
+            ? [{
+                text: "Reportes de inventario",
+                key: "reports.inventory",
+                icon: "inventory_2",
+                url: route("inventory.reports.select", { report: "inventory" }),
+            }]
+            : []),
+        ...(canUse("movementReports")
+            ? [{
+                text: "Reportes de movimientos",
+                key: "reports.movements",
+                icon: "sync_alt",
+                url: route("inventory.reports.select", { report: "movements" }),
+            }]
+            : []),
+    ];
+
+    if (reportMenuItems.length) {
+        menu.push({
+            text: "Reportes",
+            key: "reports",
+            icon: "bar_chart",
+            isOpen: false,
+            children: reportMenuItems,
         });
     }
 

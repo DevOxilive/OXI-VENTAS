@@ -21,6 +21,74 @@ class ReportController extends Controller
 {
     use AuthorizesBranchAccess;
 
+    private const REPORT_TYPES = [
+        'audits' => [
+            'permission' => 'reports.audits.view',
+            'route' => 'inventory.branches.reports.audits',
+            'label' => 'Reportes de auditoría',
+        ],
+        'cash-closures' => [
+            'permission' => 'reports.cash-closures.view',
+            'route' => 'inventory.branches.reports.cash-closures',
+            'label' => 'Reportes de cortes',
+        ],
+        'inventory' => [
+            'permission' => 'reports.inventory.view',
+            'route' => 'inventory.branches.reports.inventory',
+            'label' => 'Reportes de inventario',
+        ],
+        'movements' => [
+            'permission' => 'reports.movements.view',
+            'route' => 'inventory.branches.reports.movements',
+            'label' => 'Reportes de movimientos',
+        ],
+    ];
+
+    public function landing(Request $request)
+    {
+        $branches = $this->reportBranches($request);
+
+        if ($branches->count() === 1) {
+            return redirect()->route('inventory.branches.reports', [
+                'branch' => $branches->first()->id,
+            ]);
+        }
+
+        return Inertia::render('Inventory/Reports/Branches', [
+            'branches' => $branches,
+            'selectedReport' => null,
+        ]);
+    }
+
+    public function select(Request $request, string $report)
+    {
+        $reportConfig = self::REPORT_TYPES[$report] ?? null;
+
+        abort_unless($reportConfig, 404);
+        abort_unless(
+            $request->user()?->hasPermission($reportConfig['permission']),
+            403,
+            'No tienes permiso para consultar este reporte.'
+        );
+
+        $branches = $this->reportBranches($request);
+
+        if ($branches->count() === 1) {
+            return redirect()->route($reportConfig['route'], [
+                'branch' => $branches->first()->id,
+            ]);
+        }
+
+        return Inertia::render('Inventory/Reports/Branches', [
+            'branches' => $branches,
+            'selectedReport' => [
+                'key' => $report,
+                'label' => $reportConfig['label'],
+                'routeName' => $reportConfig['route'],
+            ],
+        ]);
+    }
+
     public function index(Branch $branch)
     {
         $this->abortIfUserCannotAccessBranch(request(), $branch);
@@ -267,5 +335,21 @@ class ReportController extends Controller
             ['id' => 'OTHER', 'label' => 'Otros'],
             ['id' => 'INVENTORY_DIFFERENCE', 'label' => 'Ajuste manual'],
         ];
+    }
+
+    private function reportBranches(Request $request)
+    {
+        $user = $request->user()?->loadMissing(['role', 'branches']);
+
+        abort_unless($user, 401, 'Debes iniciar sesión.');
+
+        $branches = $user->accessibleBranchesQuery()
+            ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
+            ->orderBy('branches.name')
+            ->get();
+
+        abort_if($branches->isEmpty(), 403, 'No tienes sucursales habilitadas para consultar reportes.');
+
+        return $branches;
     }
 }

@@ -208,7 +208,7 @@ const closureActions = computed(() => [
     label: "Ver",
     icon: "visibility",
     variant: "blue",
-    permission: "sales.cash-closures.reports",
+    permission: "reports.cash-closures.view",
   },
   {
     id: "edit",
@@ -308,7 +308,7 @@ function closeClosureModal() {
 }
 
 function handleTableAction({ action, row }) {
-  if (action === "view" && can("sales.cash-closures.reports")) {
+  if (action === "view" && can("reports.cash-closures.view")) {
     openClosure(row, "view");
   }
 
@@ -387,24 +387,7 @@ async function deleteClosure(row) {
 }
 
 function backToReportsCenter() {
-  if (props.currentBranch?.id && props.branchesDB.length > 1) {
-    router.visit(route("ventas.cash-closures.reports"));
-    return;
-  }
-
-  if (props.currentBranch?.id) {
-    router.visit(route("inventory.branches.reports", { branch: props.currentBranch.id }));
-    return;
-  }
-
-  const firstBranch = props.branchesDB[0];
-
-  if (firstBranch?.id) {
-    router.visit(route("inventory.branches.reports", { branch: firstBranch.id }));
-    return;
-  }
-
-  router.visit(route("dashboard"));
+  router.visit(route("inventory.reports.select", { report: "cash-closures" }));
 }
 
 watch(

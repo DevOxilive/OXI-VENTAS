@@ -95,13 +95,9 @@ class UserController extends Controller
                     ->orWhere('name', 'like', 'inventory.branches.%')
                     ->orWhere('name', 'like', 'inventory.purchase-reports.%')
                     ->orWhere('name', 'like', 'audits.physical-counts.%')
+                    ->orWhere('name', 'like', 'reports.%')
                     ->orWhere('name', 'like', 'sales.%')
-                    ->orWhereIn('name', [
-                        'inventory.view',
-                        'inventory.create',
-                        'inventory.update',
-                        'inventory.delete',
-                    ]);
+                    ;
             })
             ->exists();
     }

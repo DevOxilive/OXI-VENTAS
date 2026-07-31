@@ -76,7 +76,7 @@ class PhysicalCountPermissionRoutingTest extends TestCase
             ],
             'ver reportes' => [
                 'audits.physical-counts.reports',
-                'permission:audits.physical-counts.reports',
+                'permission:reports.audits.view',
             ],
             'exportar reporte general a Excel' => [
                 'audits.physical-counts.reports.export-excel',

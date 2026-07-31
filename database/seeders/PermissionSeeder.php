@@ -76,12 +76,6 @@ class PermissionSeeder extends Seeder
             'sales.cash-closures.create',
             'sales.cash-closures.update',
             'sales.cash-closures.delete',
-            'sales.cash-closures.reports',
-
-            'inventory.view',
-            'inventory.create',
-            'inventory.update',
-            'inventory.delete',
             'branches.view',
             'branches.create',
             'branches.update',
@@ -105,7 +99,6 @@ class PermissionSeeder extends Seeder
             'inventory.purchase-orders.purchasing.view',
             'inventory.purchase-orders.completed.view',
             'audits.physical-counts.count',
-            'audits.physical-counts.reports',
             'audits.physical-counts.view-stock',
             'audits.physical-counts.create',
             'audits.physical-counts.close',
@@ -114,10 +107,6 @@ class PermissionSeeder extends Seeder
             'audits.physical-counts.participants',
             'audits.physical-counts.apply',
             'audits.physical-counts.delete',
-            'inventory.view',
-            'inventory.create',
-            'inventory.update',
-            'inventory.delete',
 
             // Ventas
             'sales.view',
@@ -129,11 +118,16 @@ class PermissionSeeder extends Seeder
             'sales.cash-closures.create',
             'sales.cash-closures.update',
             'sales.cash-closures.delete',
-            'sales.cash-closures.reports',
             'inventory.purchase-reports.view',
             'inventory.purchase-reports.create',
             'inventory.purchase-reports.update',
             'inventory.purchase-reports.delete',
+
+            // Reportes
+            'reports.audits.view',
+            'reports.cash-closures.view',
+            'reports.inventory.view',
+            'reports.movements.view',
 
             // Impresoras
             'systems.tickets.view',

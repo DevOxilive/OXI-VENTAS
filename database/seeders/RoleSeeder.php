@@ -169,7 +169,6 @@ class RoleSeeder extends Seeder
             if (
                 (
                     str_starts_with($permission->name, 'sales.')
-                    && $permission->name !== 'sales.cash-closures.reports'
                 )
                 || str_starts_with($permission->name, 'inventory.purchase-reports.')
             ) {
@@ -195,6 +194,11 @@ class RoleSeeder extends Seeder
                 && $permission->name !== 'inventory.purchase-orders.purchasing.view'
                 && $permission->name !== 'inventory.purchase-orders.completed.view')
                 || str_starts_with($permission->name, 'audits.physical-counts.')
+                || in_array($permission->name, [
+                    'reports.audits.view',
+                    'reports.inventory.view',
+                    'reports.movements.view',
+                ], true)
                 || $permission->name === 'files.export'
             ) {
                 DB::table('role_permission')->updateOrInsert([

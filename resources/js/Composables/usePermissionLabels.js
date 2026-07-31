@@ -7,6 +7,7 @@ const permissionSectionOrder = [
     "branches",
     "purchases",
     "sales",
+    "reports",
     "printers",
 ];
 
@@ -26,8 +27,11 @@ const permissionModuleOrder = [
     "purchases.purchase-lists",
     "purchases.general-orders",
     "audits",
-    "inventory",
     "sales",
+    "reports.audits",
+    "reports.cash-closures",
+    "reports.inventory",
+    "reports.movements",
     "systems.tickets",
     "systems.cash-closure-tickets",
     "systems.labels",
@@ -40,6 +44,7 @@ const permissionSectionsMap = {
     branches: "Sucursales",
     purchases: "Compras",
     sales: "Ventas",
+    reports: "Reportes",
     printers: "Impresoras",
 };
 
@@ -104,13 +109,25 @@ const permissionModules = {
         label: "Auditorias",
         section: "branches",
     },
-    inventory: {
-        label: "Reportes",
-        section: "branches",
-    },
     sales: {
         label: "Ventas",
         section: "sales",
+    },
+    "reports.audits": {
+        label: "Reportes de auditoría",
+        section: "reports",
+    },
+    "reports.cash-closures": {
+        label: "Reportes de cortes",
+        section: "reports",
+    },
+    "reports.inventory": {
+        label: "Reportes de inventario",
+        section: "reports",
+    },
+    "reports.movements": {
+        label: "Reportes de movimientos",
+        section: "reports",
     },
     "systems.tickets": {
         label: "Tickets",
@@ -184,7 +201,10 @@ const permissionLabels = {
     "sales.cash-closures.create": "Crear cortes de caja",
     "sales.cash-closures.update": "Editar cortes de caja",
     "sales.cash-closures.delete": "Eliminar cortes de caja",
-    "sales.cash-closures.reports": "Consultar reportes de cortes de caja",
+    "reports.audits.view": "Ver reportes de auditoría",
+    "reports.cash-closures.view": "Ver reportes de cortes",
+    "reports.inventory.view": "Ver reportes de inventario",
+    "reports.movements.view": "Ver reportes de movimientos",
 
     "inventory.products.view": "Ver modulo de productos",
     "inventory.products.create": "Crear productos",
@@ -197,7 +217,6 @@ const permissionLabels = {
     "inventory.branches.delete": "Editar lotes y configuracion de stock",
 
     "audits.physical-counts.count": "Capturar conteos de auditoría",
-    "audits.physical-counts.reports": "Ver reportes de auditoría",
     "audits.physical-counts.view-stock": "Ver stock en auditorías",
     "audits.physical-counts.create": "Crear auditorías",
     "audits.physical-counts.close": "Cerrar auditoría",
@@ -218,11 +237,6 @@ const permissionLabels = {
     "inventory.purchase-orders.generate.transfer": "Transferir Órdenes de compra",
     "inventory.purchase-orders.purchasing.view": "Ver Órdenes de compra generales",
     "inventory.purchase-orders.completed.view": "Ver Órdenes de compra generales completadas",
-
-    "inventory.view": "Ver modulo de reportes de inventario",
-    "inventory.create": "Crear reportes de inventario",
-    "inventory.update": "Editar reportes de inventario",
-    "inventory.delete": "Eliminar reportes de inventario",
 
     "files.export": "Exportar archivos",
     "systems.tickets.view": "Ver modulo de tickets",
@@ -252,13 +266,6 @@ const permissionLabels = {
     "system.maintenance.manage": "Administrar mantenimiento",
     "system.records.view-all": "Consultar todos los registros del sistema",
 };
-
-const branchScopedPermissionNames = [
-    "inventory.view",
-    "inventory.create",
-    "inventory.update",
-    "inventory.delete",
-];
 
 function getPermissionModule(permissionName = "") {
     if (permissionName.startsWith("dashboard.")) {
@@ -321,8 +328,10 @@ function getPermissionModule(permissionName = "") {
         return "purchases.general-orders";
     }
 
-    if (permissionName === "audits.physical-counts.reports") {
-        return "inventory";
+    if (permissionName.startsWith("reports.")) {
+        const [, reportType] = permissionName.split(".");
+
+        return `reports.${reportType}`;
     }
 
     if (permissionName.startsWith("audits.")) {
@@ -373,7 +382,7 @@ export function requiresBranchAssignments(roleName = "", permissionNames = []) {
             permissionName.startsWith("inventory.purchase-reports.") ||
             permissionName.startsWith("inventory.purchase-orders.") ||
             permissionName.startsWith("audits.physical-counts.") ||
-            branchScopedPermissionNames.includes(permissionName)
+            permissionName.startsWith("reports.")
         );
     });
 }
