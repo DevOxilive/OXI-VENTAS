@@ -242,7 +242,6 @@ export function generateMenu(role, permissions = [], branches = []) {
     ];
 
     const canSeeBranchesSection =
-        can("branches.access-all") ||
         can("inventory.products.view") ||
         can("inventory.products.create") ||
         can("inventory.products.update") ||

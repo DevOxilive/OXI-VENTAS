@@ -19,8 +19,8 @@ export function getBranchModalConfig({
             ? 'Actualizar sucursal'
             : 'Guardar sucursal',
         closeButtonText: mode === 'view' ? 'Cerrar' : 'Cancelar',
-        ...modalPresets.compact,
-        size: 'sm',
+        ...modalPresets.standard,
+        size: 'lg',
         showSave: mode !== 'view',
         alerts: {
             entityName: 'Sucursal',

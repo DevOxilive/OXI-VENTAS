@@ -4,37 +4,39 @@ import { dirname, resolve } from 'node:path';
 
 const localBinary = resolve('tools', 'cloudflared.exe');
 const command = existsSync(localBinary) ? localBinary : 'cloudflared';
+const appConfigPath = resolve('storage', 'framework', 'app-tunnel.json');
 const realtimeConfigPath = resolve('storage', 'framework', 'realtime-tunnel.json');
 const children = [];
 let shuttingDown = false;
 
-function removeOwnedRealtimeConfig(force = false) {
-    if (!existsSync(realtimeConfigPath)) return;
+function removeOwnedConfig(path, force = false) {
+    if (!existsSync(path)) return;
 
     try {
-        const config = JSON.parse(readFileSync(realtimeConfigPath, 'utf8'));
+        const config = JSON.parse(readFileSync(path, 'utf8'));
 
         if (force || Number(config.ownerPid) === process.pid) {
-            rmSync(realtimeConfigPath);
+            rmSync(path);
         }
     } catch {
-        // Un archivo incompleto no debe bloquear el siguiente arranque.
-        rmSync(realtimeConfigPath);
+        // An incomplete config file should not block the next startup.
+        rmSync(path);
     }
 }
 
-function saveRealtimeUrl(publicUrl) {
+function saveTunnelConfig(path, label, publicUrl) {
     const url = new URL(publicUrl);
 
-    mkdirSync(dirname(realtimeConfigPath), { recursive: true });
-    writeFileSync(realtimeConfigPath, JSON.stringify({
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify({
+        url: publicUrl,
         host: url.hostname,
         port: 443,
         scheme: 'https',
         ownerPid: process.pid,
     }, null, 2));
 
-    console.log(`[reverb-tunnel] Realtime público: ${publicUrl}`);
+    console.log(`[${label}] URL publica: ${publicUrl}`);
 }
 
 function startTunnel(label, localUrl, onPublicUrl = null) {
@@ -89,13 +91,15 @@ function shutdown(exitCode = 0) {
         }
     }
 
-    removeOwnedRealtimeConfig();
+    removeOwnedConfig(appConfigPath);
+    removeOwnedConfig(realtimeConfigPath);
     process.exit(exitCode);
 }
 
-removeOwnedRealtimeConfig(true);
-startTunnel('reverb-tunnel', 'http://127.0.0.1:8080', saveRealtimeUrl);
-startTunnel('app-tunnel', 'http://127.0.0.1:8000');
+removeOwnedConfig(appConfigPath, true);
+removeOwnedConfig(realtimeConfigPath, true);
+startTunnel('reverb-tunnel', 'http://127.0.0.1:8080', (publicUrl) => saveTunnelConfig(realtimeConfigPath, 'reverb-tunnel', publicUrl));
+startTunnel('app-tunnel', 'http://127.0.0.1:8000', (publicUrl) => saveTunnelConfig(appConfigPath, 'app-tunnel', publicUrl));
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => {

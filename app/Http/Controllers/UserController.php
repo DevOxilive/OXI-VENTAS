@@ -140,7 +140,8 @@ class UserController extends Controller
     private function visiblePermissionsQuery()
     {
         return Permission::query()
-            ->where('name', 'not like', 'roles.%');
+            ->where('name', 'not like', 'roles.%')
+            ->where('name', '!=', SystemPermission::BRANCHES_ACCESS_ALL);
     }
 
     private function syncUserPermissionOverrides(User $user, Role $role, array $finalPermissionIds = []): void
@@ -215,6 +216,13 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
+        $currentUser = Auth::user();
+        $canViewUsers = $currentUser?->hasPermission('users.view') ?? false;
+        $canCreateUsers = $currentUser?->hasPermission('users.create') ?? false;
+        $canUpdateUsers = $currentUser?->hasPermission('users.update') ?? false;
+        $canDeleteUsers = $currentUser?->hasPermission('users.delete') ?? false;
+        $canManageExistingUsers = $canViewUsers || $canUpdateUsers || $canDeleteUsers;
+
         $this->checkAnyPermission([
             'users.view',
             'users.create',
@@ -243,6 +251,9 @@ class UserController extends Controller
                 'users.role_id',
                 'users.is_active',
             ])
+            ->when(!$canManageExistingUsers, function ($query) {
+                $query->whereRaw('1 = 0');
+            })
             ->when($search, function ($query) use ($search) {
                 FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
                     FlexibleSearch::orWhereColumns($subQuery, [
@@ -420,6 +431,13 @@ class UserController extends Controller
                 'userStatus' => $userStatus,
                 'status' => $statusFilter,
                 'role' => $roleFilter,
+            ],
+
+            'capabilities' => [
+                'viewUsers' => $canViewUsers,
+                'createUsers' => $canCreateUsers,
+                'updateUsers' => $canUpdateUsers,
+                'deleteUsers' => $canDeleteUsers,
             ],
         ]);
     }

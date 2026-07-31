@@ -13,10 +13,7 @@ const permissionSectionOrder = [
 const permissionModuleOrder = [
     "dashboard",
     "employees",
-    "departments",
-    "positions",
-    "departments",
-    "positions",
+    "organization-structure",
     "attendance",
     "attendance.schedules",
     "attendance.schedule-assignments",
@@ -55,12 +52,8 @@ const permissionModules = {
         label: "Registro de empleados",
         section: "human-resources",
     },
-    departments: {
-        label: "Registro de departamentos",
-        section: "human-resources",
-    },
-    positions: {
-        label: "Registro de puestos",
+    "organization-structure": {
+        label: "Registro de Puestos y Departamentos",
         section: "human-resources",
     },
     attendance: {
@@ -172,16 +165,15 @@ const permissionLabels = {
     "positions.update": "Editar puestos",
     "positions.delete": "Eliminar puestos",
 
-    "users.view": "Ver modulo de usuarios",
+    "users.view": "Ver usuarios",
     "users.create": "Crear usuarios",
     "users.update": "Editar usuarios",
     "users.delete": "Eliminar usuarios",
 
-    "branches.view": "Ver modulo de sucursales",
+    "branches.view": "Ver sucursales",
     "branches.create": "Crear sucursales",
     "branches.update": "Editar sucursales",
     "branches.delete": "Eliminar sucursales",
-    "branches.access-all": "Acceder a todas las sucursales",
 
     "sales.view": "Ver modulo de ventas",
     "sales.create": "Crear ventas",
@@ -311,6 +303,10 @@ function getPermissionModule(permissionName = "") {
 
     if (permissionName.startsWith("attendance.incidents.")) {
         return "attendance.incidents";
+    }
+
+    if (permissionName.startsWith("departments.") || permissionName.startsWith("positions.")) {
+        return "organization-structure";
     }
 
     if (permissionName.startsWith("inventory.purchase-orders.generate.")) {
