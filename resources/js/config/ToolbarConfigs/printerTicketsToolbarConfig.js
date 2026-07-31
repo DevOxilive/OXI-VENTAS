@@ -14,14 +14,14 @@ export function getPrinterTicketsToolbarConfig({
     filters: [],
     tabs: [],
     actions: [
-      {
-        id: "reset",
-        label: "Restablecer",
-        icon: "restart_alt",
-        variant: "slate",
-      },
       ...(canSave
         ? [
+            {
+              id: "reset",
+              label: "Restablecer",
+              icon: "restart_alt",
+              variant: "slate",
+            },
             {
               id: "save",
               label: processing ? "Guardando..." : "Guardar",

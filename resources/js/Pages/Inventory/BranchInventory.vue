@@ -170,15 +170,15 @@ function handleInventoryToolbarFilter({ key, value }) {
 }
 
 function handleInventoryAction({ action, row }) {
-    if (action === 'entry' && can('inventory.branches.create')) {
+    if (action === 'entry' && can('inventory.branches.stock-in')) {
         openEntryModal(row)
     }
 
-    if (action === 'exit' && can('inventory.branches.update')) {
+    if (action === 'exit' && can('inventory.branches.stock-out')) {
         openExitModal(row)
     }
 
-    if (action === 'batches' && can('inventory.branches.update')) {
+    if (action === 'batches' && can('inventory.branches.batches.update')) {
         openProductBatchesModal(row)
     }
 
@@ -203,18 +203,19 @@ function handleInventoryAction({ action, row }) {
         <GlobalTable :items="filteredProducts" v-bind="inventoryTableConfig" :pagination="branchProductsDB"
             @page-change="goToPage" @action="handleInventoryAction" />
 
-        <StockEntryModal v-if="showEntryModal && liveSelectedMovementProduct && can('inventory.branches.create')"
+        <StockEntryModal v-if="showEntryModal && liveSelectedMovementProduct && can('inventory.branches.stock-in')"
             :product="liveSelectedMovementProduct" :branches="branchesDB" :current-branch="currentBranch"
             @close="closeEntryModal" />
 
-        <StockExitModal v-if="showExitModal && liveSelectedMovementProduct && can('inventory.branches.update')"
+        <StockExitModal v-if="showExitModal && liveSelectedMovementProduct && can('inventory.branches.stock-out')"
             :product="liveSelectedMovementProduct" @close="closeExitModal" />
 
         <ProductMovementsModal
             v-if="showMovementsModal && liveSelectedMovementsProduct && can('inventory.branches.view')"
             :product="liveSelectedMovementsProduct" @close="closeMovementsModal" />
 
-        <ProductBatchesModal v-if="showProductBatchesModal && liveSelectedBatchesProduct"
+        <ProductBatchesModal
+            v-if="showProductBatchesModal && liveSelectedBatchesProduct && can('inventory.branches.batches.update')"
             :product="liveSelectedBatchesProduct" :selected-batch="liveSelectedBatch" :form="batchAdjustmentForm"
             :frontend-errors="batchAdjustmentErrors" :total-errors="batchAdjustmentTotalErrors"
             :processing="batchAdjustmentProcessing"
@@ -228,7 +229,7 @@ function handleInventoryAction({ action, row }) {
             :batches="selectedAlertBatches" @close="closeAlertModal" />
 
         <EditBranchProductConfigModal
-            v-if="showConfigModal && liveSelectedConfigProduct && can('inventory.branches.update')"
+            v-if="showConfigModal && liveSelectedConfigProduct && can('inventory.branches.config.update')"
             :product="liveSelectedConfigProduct" @close="closeConfigModal" />
     </PageLayout>
 </template>

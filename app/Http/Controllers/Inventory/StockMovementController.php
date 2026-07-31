@@ -345,9 +345,9 @@ class StockMovementController extends Controller
         $user = $request->user();
 
         $requiredPermission = match ($type) {
-            StockMovement::TYPE_IN => 'inventory.branches.create',
-            StockMovement::TYPE_OUT,
-            StockMovement::TYPE_ADJUSTMENT => 'inventory.branches.update',
+            StockMovement::TYPE_IN => 'inventory.branches.stock-in',
+            StockMovement::TYPE_OUT => 'inventory.branches.stock-out',
+            StockMovement::TYPE_ADJUSTMENT => 'inventory.branches.stock-adjust',
             default => null,
         };
 

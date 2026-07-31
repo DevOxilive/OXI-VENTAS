@@ -164,9 +164,11 @@ const permissionLabelMap = {
     'inventory.products.update': 'Editar productos',
     'inventory.products.delete': 'Eliminar productos',
     'inventory.branches.view': 'Ver stock',
-    'inventory.branches.create': 'Entradas',
-    'inventory.branches.update': 'Salidas y ajustes',
-    'inventory.branches.delete': 'Eliminar stock',
+    'inventory.branches.stock-in': 'Registrar entradas',
+    'inventory.branches.stock-out': 'Registrar salidas',
+    'inventory.branches.stock-adjust': 'Registrar ajustes',
+    'inventory.branches.batches.update': 'Editar lotes',
+    'inventory.branches.config.update': 'Editar configuración de stock',
     'sales.purchase-lists.view': 'Ver listas de compra',
     'sales.purchase-lists.create': 'Crear listas de compra',
     'sales.purchase-lists.update': 'Editar listas de compra',
@@ -199,6 +201,7 @@ const permissionLabelMap = {
     'systems.cash-closure-tickets.update': 'Editar tickets de corte',
     'systems.labels.view': 'Ver etiquetas',
     'systems.labels.update': 'Editar etiquetas',
+    'systems.labels.print': 'Imprimir etiquetas',
     'files.export': 'Exportar archivos',
 }
 
@@ -225,7 +228,7 @@ const permissionCatalog = [
         key: 'printers',
         title: 'Impresoras',
         icon: 'print',
-        permissions: ['systems.tickets.view', 'systems.tickets.update', 'systems.cash-closure-tickets.view', 'systems.cash-closure-tickets.update', 'systems.labels.view', 'systems.labels.update'],
+        permissions: ['systems.tickets.view', 'systems.tickets.update', 'systems.cash-closure-tickets.view', 'systems.cash-closure-tickets.update', 'systems.labels.view', 'systems.labels.update', 'systems.labels.print'],
     },
     {
         key: 'users',
@@ -243,7 +246,7 @@ const permissionCatalog = [
         key: 'inventory',
         title: 'Inventario',
         icon: 'inventory_2',
-        permissions: ['inventory.products.view', 'inventory.products.create', 'inventory.products.update', 'inventory.products.delete', 'inventory.branches.view', 'inventory.branches.create', 'inventory.branches.update', 'inventory.branches.delete'],
+        permissions: ['inventory.products.view', 'inventory.products.create', 'inventory.products.update', 'inventory.products.delete', 'inventory.branches.view', 'inventory.branches.stock-in', 'inventory.branches.stock-out', 'inventory.branches.stock-adjust', 'inventory.branches.batches.update', 'inventory.branches.config.update'],
     },
     {
         key: 'purchase-orders',
@@ -322,9 +325,11 @@ const permissionAction = (permission) => {
         'inventory.products.update': { icon: 'edit_square', href: branchHref((branch) => route('inventory.branches.products.index', { branch: branch.slug })) },
         'inventory.products.delete': { icon: 'delete', href: branchHref((branch) => route('inventory.branches.products.index', { branch: branch.slug })) },
         'inventory.branches.view': { icon: 'visibility', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
-        'inventory.branches.create': { icon: 'input', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
-        'inventory.branches.update': { icon: 'sync_alt', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
-        'inventory.branches.delete': { icon: 'delete', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
+        'inventory.branches.stock-in': { icon: 'input', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
+        'inventory.branches.stock-out': { icon: 'output', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
+        'inventory.branches.stock-adjust': { icon: 'tune', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
+        'inventory.branches.batches.update': { icon: 'inventory_2', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
+        'inventory.branches.config.update': { icon: 'settings', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
         'sales.purchase-lists.view': { icon: 'visibility', href: route('ventas.purchase-reports.index') },
         'sales.purchase-lists.create': { icon: 'add_shopping_cart', href: route('ventas.purchase-reports.index') },
         'sales.purchase-lists.update': { icon: 'edit', href: route('ventas.purchase-reports.index') },
@@ -357,6 +362,7 @@ const permissionAction = (permission) => {
         'systems.cash-closure-tickets.update': { icon: 'edit', href: route('printers.cash-closure-tickets.index') },
         'systems.labels.view': { icon: 'visibility', href: route('printers.labels.index') },
         'systems.labels.update': { icon: 'edit', href: route('printers.labels.index') },
+        'systems.labels.print': { icon: 'print', href: route('printers.labels.index') },
         'files.export': { icon: 'download', href: branchHref((branch) => route('inventory.branches.reports', { branch: branch.id })) },
     }
 
@@ -436,9 +442,11 @@ const allQuickActions = computed(() => [
             : null,
         visible: Boolean(firstBranch.value) && canAny([
             'inventory.branches.view',
-            'inventory.branches.create',
-            'inventory.branches.update',
-            'inventory.branches.delete',
+            'inventory.branches.stock-in',
+            'inventory.branches.stock-out',
+            'inventory.branches.stock-adjust',
+            'inventory.branches.batches.update',
+            'inventory.branches.config.update',
         ]),
     },
     {

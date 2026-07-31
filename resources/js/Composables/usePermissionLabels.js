@@ -8,6 +8,7 @@ const permissionSectionOrder = [
     "sales",
     "reports",
     "printers",
+    "administration",
 ];
 
 const permissionModuleOrder = [
@@ -36,6 +37,13 @@ const permissionModuleOrder = [
     "systems.tickets",
     "systems.cash-closure-tickets",
     "systems.labels",
+    "system.center",
+    "system.audit",
+    "system.trash",
+    "system.access-control",
+    "system.configuration",
+    "system.monitoring",
+    "system.records",
 ];
 
 const permissionSectionsMap = {
@@ -46,6 +54,7 @@ const permissionSectionsMap = {
     sales: "Ventas",
     reports: "Reportes",
     printers: "Impresoras",
+    administration: "Administración",
 };
 
 const permissionModules = {
@@ -149,12 +158,40 @@ const permissionModules = {
         label: "Etiquetas",
         section: "printers",
     },
+    "system.center": {
+        label: "Centro de Administración",
+        section: "administration",
+    },
+    "system.audit": {
+        label: "Auditoría y registros",
+        section: "administration",
+    },
+    "system.trash": {
+        label: "Papelera global",
+        section: "administration",
+    },
+    "system.access-control": {
+        label: "Roles y control de acceso",
+        section: "administration",
+    },
+    "system.configuration": {
+        label: "Configuración y herramientas",
+        section: "administration",
+    },
+    "system.monitoring": {
+        label: "Monitoreo y estadísticas",
+        section: "administration",
+    },
+    "system.records": {
+        label: "Acceso global a registros",
+        section: "administration",
+    },
 };
 
 const permissionLabels = {
     "dashboard.executive.view": "Ver dashboard ejecutivo",
 
-    "employees.view": "Ver modulo de empleados",
+    "employees.view": "Ver registros de empleados",
     "employees.create": "Crear empleados",
     "employees.update": "Editar empleados",
     "employees.delete": "Eliminar empleados",
@@ -200,12 +237,12 @@ const permissionLabels = {
     "branches.update": "Editar sucursales",
     "branches.delete": "Eliminar sucursales",
 
-    "sales.view": "Ver modulo de ventas",
+    "sales.view": "Ver ventas registradas",
     "sales.create": "Crear ventas",
     "sales.update": "Editar ventas",
     "sales.delete": "Eliminar ventas",
     "sales.reports": "Ver reportes de ventas",
-    "sales.cash-closures.view": "Ver modulo de cortes de caja",
+    "sales.cash-closures.view": "Ver cortes de caja registrados",
     "sales.cash-closures.create": "Crear cortes de caja",
     "sales.cash-closures.update": "Editar cortes de caja",
     "sales.cash-closures.delete": "Eliminar cortes de caja",
@@ -214,15 +251,17 @@ const permissionLabels = {
     "reports.inventory.view": "Ver reportes de inventario",
     "reports.movements.view": "Ver reportes de movimientos",
 
-    "inventory.products.view": "Ver modulo de productos",
+    "inventory.products.view": "Ver productos registrados",
     "inventory.products.create": "Crear productos",
     "inventory.products.update": "Editar productos",
     "inventory.products.delete": "Eliminar productos",
 
-    "inventory.branches.view": "Ver modulo de stock y movimientos",
-    "inventory.branches.create": "Registrar entradas de stock",
-    "inventory.branches.update": "Registrar salidas y ajustes de stock",
-    "inventory.branches.delete": "Editar lotes y configuracion de stock",
+    "inventory.branches.view": "Ver existencias y movimientos de stock",
+    "inventory.branches.stock-in": "Registrar entradas de stock",
+    "inventory.branches.stock-out": "Registrar salidas de stock",
+    "inventory.branches.stock-adjust": "Registrar ajustes de stock",
+    "inventory.branches.batches.update": "Editar lotes de productos",
+    "inventory.branches.config.update": "Editar configuración de stock",
 
     "audits.physical-counts.count": "Capturar conteos de auditoría",
     "audits.physical-counts.view-stock": "Ver stock en auditorías",
@@ -250,12 +289,13 @@ const permissionLabels = {
     "inventory.purchase-orders.general.complete": "Aplicar Órdenes de compra generales",
 
     "files.export": "Exportar archivos",
-    "systems.tickets.view": "Ver modulo de tickets",
+    "systems.tickets.view": "Ver configuración actual de tickets",
     "systems.tickets.update": "Editar configuracion de tickets",
-    "systems.cash-closure-tickets.view": "Ver modulo de tickets de corte",
+    "systems.cash-closure-tickets.view": "Ver configuración actual de tickets de corte",
     "systems.cash-closure-tickets.update": "Editar configuracion de tickets de corte",
-    "systems.labels.view": "Ver modulo de etiquetas",
+    "systems.labels.view": "Ver configuración actual de etiquetas",
     "systems.labels.update": "Editar configuracion de etiquetas",
+    "systems.labels.print": "Imprimir etiquetas de productos",
 
     "system.center.access": "Acceder al Centro de Administración",
     "system.audit.view": "Consultar Auditoría del Sistema",
@@ -276,9 +316,10 @@ const permissionLabels = {
     "system.logs.view": "Consultar registros del sistema",
     "system.maintenance.manage": "Administrar mantenimiento",
     "system.records.view-all": "Consultar todos los registros del sistema",
+    "branches.access-all": "Acceder a todas las sucursales",
 };
 
-function getPermissionModule(permissionName = "") {
+export function getPermissionModule(permissionName = "") {
     if (permissionName.startsWith("dashboard.")) {
         return "dashboard";
     }
@@ -293,6 +334,43 @@ function getPermissionModule(permissionName = "") {
 
     if (permissionName.startsWith("systems.labels.")) {
         return "systems.labels";
+    }
+
+    if (permissionName === "system.center.access") {
+        return "system.center";
+    }
+
+    if (permissionName.startsWith("system.audit.") || permissionName === "system.logs.view") {
+        return "system.audit";
+    }
+
+    if (permissionName.startsWith("system.trash.")) {
+        return "system.trash";
+    }
+
+    if (
+        permissionName === "system.roles.manage"
+        || permissionName === "system.permissions.manage"
+        || permissionName === "system.super-administrators.manage"
+    ) {
+        return "system.access-control";
+    }
+
+    if (
+        permissionName === "system.settings.manage"
+        || permissionName === "system.integrations.manage"
+        || permissionName === "system.tools.access"
+        || permissionName === "system.maintenance.manage"
+    ) {
+        return "system.configuration";
+    }
+
+    if (permissionName === "system.monitoring.view" || permissionName === "system.statistics.view") {
+        return "system.monitoring";
+    }
+
+    if (permissionName === "system.records.view-all") {
+        return "system.records";
     }
 
     if (permissionName.startsWith("inventory.products.")) {
@@ -350,6 +428,24 @@ function getPermissionModule(permissionName = "") {
     }
 
     return permissionName.split(".")[0]?.toLowerCase();
+}
+
+export function auditPermissionCatalog(permissionNames = []) {
+    const counts = permissionNames.reduce((result, permissionName) => {
+        result[permissionName] = (result[permissionName] || 0) + 1;
+        return result;
+    }, {});
+
+    return {
+        duplicates: Object.entries(counts)
+            .filter(([, count]) => count > 1)
+            .map(([permissionName]) => permissionName),
+        missingLabels: permissionNames.filter((permissionName) => !permissionLabels[permissionName]),
+        missingModules: permissionNames.filter((permissionName) => {
+            const module = getPermissionModule(permissionName);
+            return !permissionModules[module] || !permissionModuleOrder.includes(module);
+        }),
+    };
 }
 
 function createOrderedModules() {

@@ -102,6 +102,8 @@ const paperClass = computed(() => {
 });
 
 function updateBlock(index, field, value) {
+  if (!canUpdateTemplate.value) return;
+
   form.settings.blocks = form.settings.blocks.map((block, blockIndex) =>
     blockIndex === index ? { ...block, [field]: value } : { ...block }
   );
@@ -116,6 +118,8 @@ function updateBlockByKey(key, field, value) {
 }
 
 function resetTemplate() {
+  if (!canUpdateTemplate.value) return;
+
   const nextSettings = normalizeTicketTemplate(createDefaultTicketTemplate());
   const contextSettings = {
     ...nextSettings,
