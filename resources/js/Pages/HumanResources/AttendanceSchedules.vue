@@ -46,6 +46,7 @@ const form = useForm({
   minimum_work_minutes: 420,
   tolerances: { on_time_minutes: 10 },
   daily_schedule: daily(),
+  record_version: '',
 })
 
 const columns = [
@@ -75,6 +76,7 @@ function resetForm() {
   form.meal_end_at = '15:00'
   form.tolerances = { on_time_minutes: 10 }
   form.daily_schedule = daily()
+  form.record_version = ''
 }
 
 function openCreateModal() {
@@ -101,6 +103,7 @@ function loadSchedule(schedule, mode) {
   form.minimum_work_minutes = schedule.minimum_work_minutes ?? 420
   form.tolerances = { on_time_minutes: schedule.tolerances?.on_time_minutes ?? 10 }
   form.daily_schedule = schedule.daily_schedule || daily()
+  form.record_version = schedule.updated_at || ''
   showDayOverrides.value = Object.keys(form.daily_schedule).length > 0
   showModal.value = true
 }
@@ -156,6 +159,7 @@ async function deleteSchedule(schedule) {
 
   if (!result.isConfirmed) return
 
+  form.record_version = schedule.updated_at || ''
   form.delete(route('human-resources.attendance-schedules.destroy', schedule.id), getModalRequestOptions({
     mode: 'delete',
     entityName: 'Horario',

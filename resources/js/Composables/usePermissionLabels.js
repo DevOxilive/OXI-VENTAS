@@ -305,6 +305,7 @@ const permissionLabels = {
     "systems.labels.view": "Ver configuración actual de etiquetas",
     "systems.labels.update": "Editar configuracion de etiquetas",
     "systems.labels.print": "Imprimir etiquetas de productos",
+    "systems.qz.sign": "Firmar trabajos de impresion local",
 
     "system.center.access": "Acceder al Centro de Administración",
     "system.audit.view": "Consultar Auditoría del Sistema",
@@ -341,7 +342,7 @@ export function getPermissionModule(permissionName = "") {
         return "systems.cash-closure-tickets";
     }
 
-    if (permissionName.startsWith("systems.labels.")) {
+    if (permissionName.startsWith("systems.labels.") || permissionName === "systems.qz.sign") {
         return "systems.labels";
     }
 

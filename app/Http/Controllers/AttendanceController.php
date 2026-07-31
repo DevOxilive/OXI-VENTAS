@@ -15,9 +15,12 @@ use App\Support\TablePagination;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use Throwable;
 
 class AttendanceController extends Controller
 {
@@ -132,18 +135,31 @@ class AttendanceController extends Controller
 
         $now = now();
         $selfiePath = $request->file('selfie')->store("attendance/selfies/{$user->id}", 'local');
-        $record = AttendanceRecord::create([
-            'user_id' => $user->id, 'employee_id' => $user->employee_id, 'branch_id' => $branch->exists ? $branch->id : null,
-            'attendance_date' => $now->toDateString(), 'recorded_at' => $now, 'type' => $data['type'],
-            'status' => $this->rules->evaluate($user->employee, $data['type'], $now),
-            'latitude' => $data['latitude'], 'longitude' => $data['longitude'], 'location_accuracy' => $data['accuracy'] ?? null,
-            'approximate_address' => $data['approximateAddress'] ?? null, 'within_geofence' => true,
-            'geofence_snapshot' => ['branch_id' => $branch->exists ? $branch->id : null, 'label' => $branch->name, 'radius_meters' => (int) $branch->attendance_geofence_radius_meters, 'distance_meters' => round($distance, 1)],
-            'authentication_method' => $data['authenticationMethod'], 'authentication_result' => 'verified', 'selfie_path' => $selfiePath,
-            'operating_system' => data_get($data, 'device.operatingSystem'), 'browser' => data_get($data, 'device.browser'),
-            'device_type' => data_get($data, 'device.type'), 'user_agent' => $request->userAgent(), 'ip_address' => $request->ip(),
-            'metadata' => ['photo_captured' => true],
-        ]);
+        try {
+            $record = DB::transaction(fn () => AttendanceRecord::create([
+                'user_id' => $user->id, 'employee_id' => $user->employee_id, 'branch_id' => $branch->exists ? $branch->id : null,
+                'attendance_date' => $now->toDateString(), 'recorded_at' => $now, 'type' => $data['type'],
+                'operation_key' => "attendance:{$user->id}:{$now->toDateString()}:{$data['type']}",
+                'status' => $this->rules->evaluate($user->employee, $data['type'], $now),
+                'latitude' => $data['latitude'], 'longitude' => $data['longitude'], 'location_accuracy' => $data['accuracy'] ?? null,
+                'approximate_address' => $data['approximateAddress'] ?? null, 'within_geofence' => true,
+                'geofence_snapshot' => ['branch_id' => $branch->exists ? $branch->id : null, 'label' => $branch->name, 'radius_meters' => (int) $branch->attendance_geofence_radius_meters, 'distance_meters' => round($distance, 1)],
+                'authentication_method' => $data['authenticationMethod'], 'authentication_result' => 'verified', 'selfie_path' => $selfiePath,
+                'operating_system' => data_get($data, 'device.operatingSystem'), 'browser' => data_get($data, 'device.browser'),
+                'device_type' => data_get($data, 'device.type'), 'user_agent' => $request->userAgent(), 'ip_address' => $request->ip(),
+                'metadata' => ['photo_captured' => true],
+            ]));
+        } catch (Throwable $exception) {
+            Storage::disk('local')->delete($selfiePath);
+
+            if (str_contains($exception->getMessage(), 'attendance_records_user_date_type_unique')) {
+                throw ValidationException::withMessages([
+                    'type' => sprintf('Ya registraste %s el dia de hoy.', mb_strtolower($this->typeLabel($data['type']))),
+                ]);
+            }
+
+            throw $exception;
+        }
 
         $this->audit->record('attendance', 'create', 'success', $request, ['record_type' => AttendanceRecord::class, 'record_id' => $record->id, 'record_label' => $this->typeLabel($record->type)]);
         broadcast(new AttendanceChanged($record->id, 'created', $user->id));
@@ -171,7 +187,17 @@ class AttendanceController extends Controller
     {
         abort_unless($attendanceRecord->user_id === $request->user()->id || $request->user()->hasPermission('attendance.corrections.review'), 403);
         $data = $request->validate(['reason' => ['required', 'string', 'max:1000'], 'requestedChanges' => ['nullable', 'array']]);
-        $correction = AttendanceCorrectionRequest::create(['attendance_record_id' => $attendanceRecord->id, 'requested_by' => $request->user()->id, 'reason' => $data['reason'], 'requested_changes' => $data['requestedChanges'] ?? []]);
+        $correction = DB::transaction(function () use ($attendanceRecord, $request, $data) {
+            $attendanceRecord = AttendanceRecord::query()->lockForUpdate()->findOrFail($attendanceRecord->id);
+
+            if ($attendanceRecord->correctionRequests()->where('status', 'pending')->exists()) {
+                throw ValidationException::withMessages([
+                    'reason' => 'Este registro ya tiene una solicitud de correccion pendiente.',
+                ]);
+            }
+
+            return AttendanceCorrectionRequest::create(['attendance_record_id' => $attendanceRecord->id, 'requested_by' => $request->user()->id, 'reason' => $data['reason'], 'requested_changes' => $data['requestedChanges'] ?? [], 'pending_key' => "attendance-correction:{$attendanceRecord->id}:pending"]);
+        });
         $this->audit->record('attendance', 'request_correction', 'success', $request, ['record_type' => AttendanceCorrectionRequest::class, 'record_id' => $correction->id, 'record_label' => 'Solicitud de corrección']);
         broadcast(new AttendanceChanged($attendanceRecord->id, 'correction_requested', $request->user()->id));
         return back()->with('success', 'Solicitud de corrección enviada.');
@@ -180,11 +206,26 @@ class AttendanceController extends Controller
     public function reviewCorrection(Request $request, AttendanceCorrectionRequest $attendanceCorrectionRequest)
     {
         $data = $request->validate(['status' => ['required', 'in:approved,rejected'], 'reviewNotes' => ['nullable', 'string', 'max:1000']]);
-        $attendanceCorrectionRequest->update(['status' => $data['status'], 'review_notes' => $data['reviewNotes'] ?? null, 'reviewed_by' => $request->user()->id, 'reviewed_at' => now()]);
-        if ($data['status'] === 'approved') {
-            $changes = collect($attendanceCorrectionRequest->requested_changes ?? [])->only(['recorded_at', 'status', 'approximate_address'])->all();
-            if ($changes) $attendanceCorrectionRequest->attendanceRecord->update(array_merge($changes, ['status' => 'corrected']));
-        }
+        DB::transaction(function () use ($attendanceCorrectionRequest, $data, $request) {
+            $correction = AttendanceCorrectionRequest::query()
+                ->lockForUpdate()
+                ->findOrFail($attendanceCorrectionRequest->id);
+
+            if ($correction->status !== 'pending') {
+                throw ValidationException::withMessages([
+                    'status' => 'Esta solicitud ya fue revisada por otra persona.',
+                ]);
+            }
+
+            $correction->update(['status' => $data['status'], 'review_notes' => $data['reviewNotes'] ?? null, 'reviewed_by' => $request->user()->id, 'reviewed_at' => now(), 'pending_key' => null]);
+            if ($data['status'] === 'approved') {
+                $changes = collect($correction->requested_changes ?? [])->only(['recorded_at', 'status', 'approximate_address'])->all();
+                if ($changes) {
+                    AttendanceRecord::query()->lockForUpdate()->findOrFail($correction->attendance_record_id)
+                        ->update(array_merge($changes, ['status' => 'corrected']));
+                }
+            }
+        });
         $this->audit->record('attendance', 'review_correction', 'success', $request, ['record_type' => AttendanceCorrectionRequest::class, 'record_id' => $attendanceCorrectionRequest->id, 'record_label' => 'Solicitud de corrección']);
         broadcast(new AttendanceChanged($attendanceCorrectionRequest->attendance_record_id, 'correction_reviewed', $request->user()->id));
         return back()->with('success', 'Solicitud de corrección actualizada.');

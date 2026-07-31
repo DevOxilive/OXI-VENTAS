@@ -95,6 +95,7 @@ function toggleDiscount(item) {
 function payload() {
     return {
         notes: form.notes,
+        record_version: props.report?.record_version || props.report?.updated_at || null,
         items: form.items.map((item) => ({
             branch_product_id: item.branch_product_id,
             requested_quantity: item.requested_quantity,
@@ -191,14 +192,17 @@ async function deleteDraft() {
 
     router.delete(
         route('inventory.branches.purchase-reports.destroy', routeParams()),
-        getModalRequestOptions({
+        {
+            ...getModalRequestOptions({
             mode: 'delete',
             entityName: 'Borrador',
             successTitle: 'Borrador eliminado correctamente',
             errorTitle: 'No se pudo eliminar el borrador',
             errorMessage: 'Actualiza la página y vuelve a intentarlo.',
             onSuccess: () => emit('close'),
-        }),
+            }),
+            data: { record_version: props.report?.record_version || props.report?.updated_at || null },
+        },
     )
 }
 </script>

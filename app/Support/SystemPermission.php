@@ -31,7 +31,6 @@ final class SystemPermission
             self::ACCESS_CENTER,
             self::AUDIT_VIEW,
             self::AUDIT_EXPORT,
-            self::AUDIT_FILTER_ADVANCED,
             self::TRASH_VIEW,
             self::TRASH_RESTORE,
             self::TRASH_FORCE_DELETE,
@@ -39,14 +38,6 @@ final class SystemPermission
             self::ROLES_MANAGE,
             self::PERMISSIONS_MANAGE,
             self::SUPER_ADMINISTRATORS_MANAGE,
-            self::SETTINGS_MANAGE,
-            self::INTEGRATIONS_MANAGE,
-            self::TOOLS_ACCESS,
-            self::MONITORING_VIEW,
-            self::STATISTICS_VIEW,
-            self::LOGS_VIEW,
-            self::MAINTENANCE_MANAGE,
-            self::RECORDS_VIEW_ALL,
         ];
     }
 }

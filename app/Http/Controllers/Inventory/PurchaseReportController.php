@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Inventory;
 
 use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
+use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
@@ -21,7 +22,7 @@ use Inertia\Inertia;
 
 class PurchaseReportController extends Controller
 {
-    use AuthorizesBranchAccess;
+    use AuthorizesBranchAccess, ValidatesRecordVersion;
 
     public function salesPurchaseLists(Request $request)
     {
@@ -209,10 +210,6 @@ class PurchaseReportController extends Controller
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
 
-        abort_unless($purchaseReport->status === PurchaseOrder::STATUS_DRAFT, 422, 'Solo se pueden modificar listas en borrador.');
-        abort_if($purchaseReport->general_purchase_order_id, 422, 'La solicitud ya forma parte de una orden general.');
-        $this->abortIfDraftDoesNotBelongToUser($request, $purchaseReport);
-
         $validated = $this->validateOrderPayload($request);
         $assignedUser = $this->assignedInventoryUser(
             $branch,
@@ -220,12 +217,15 @@ class PurchaseReportController extends Controller
             false,
         );
 
-        $purchaseReport->update([
-            'assigned_to_user_id' => $assignedUser?->id,
-        ]);
-
-        $this->syncItems($purchaseReport, $branch, $validated['items']);
-        $this->refreshTotals($purchaseReport);
+        DB::transaction(function () use ($purchaseReport, $request, $assignedUser, $branch, $validated) {
+            $lockedOrder = $this->lockCurrentVersion($request, $purchaseReport);
+            abort_unless($lockedOrder->status === PurchaseOrder::STATUS_DRAFT, 422, 'Solo se pueden modificar listas en borrador.');
+            abort_if($lockedOrder->general_purchase_order_id, 422, 'La solicitud ya forma parte de una orden general.');
+            $this->abortIfDraftDoesNotBelongToUser($request, $lockedOrder);
+            $lockedOrder->update(['assigned_to_user_id' => $assignedUser?->id]);
+            $this->syncItems($lockedOrder, $branch, $validated['items']);
+            $this->refreshTotals($lockedOrder);
+        }, 3);
 
         return redirect()->back()->with('success', 'Orden actualizada correctamente.');
     }
@@ -238,9 +238,6 @@ class PurchaseReportController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
-        abort_unless($purchaseReport->status === PurchaseOrder::STATUS_DRAFT, 422);
-        $this->abortIfDraftDoesNotBelongToUser($request, $purchaseReport);
-
         $validated = $this->validateOrderPayload($request, true);
         $assignedUser = $this->assignedInventoryUser(
             $branch,
@@ -249,20 +246,24 @@ class PurchaseReportController extends Controller
         );
 
         DB::transaction(function () use ($assignedUser, $branch, $purchaseReport, $request, $validated) {
-            $purchaseReport->update([
+            $lockedOrder = $this->lockCurrentVersion($request, $purchaseReport);
+            abort_unless($lockedOrder->status === PurchaseOrder::STATUS_DRAFT, 422);
+            abort_if($lockedOrder->general_purchase_order_id, 422, 'La solicitud ya forma parte de una orden general.');
+            $this->abortIfDraftDoesNotBelongToUser($request, $lockedOrder);
+            $lockedOrder->update([
                 'assigned_to_user_id' => $assignedUser->id,
             ]);
 
-            $this->syncItems($purchaseReport, $branch, $validated['items']);
-            $this->refreshTotals($purchaseReport);
+            $this->syncItems($lockedOrder, $branch, $validated['items']);
+            $this->refreshTotals($lockedOrder);
 
-            $purchaseReport->update([
+            $lockedOrder->update([
                 'status' => PurchaseOrder::STATUS_GENERATED,
                 'generated_at' => now(),
             ]);
 
-            app(PurchaseCycleService::class)->registerOrder($purchaseReport, $request->user());
-        });
+            app(PurchaseCycleService::class)->registerOrder($lockedOrder, $request->user());
+        }, 3);
 
         $this->notifyInventoryAssignment($purchaseReport, $assignedUser, $branch);
 
@@ -283,12 +284,6 @@ class PurchaseReportController extends Controller
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
         abort_unless((int) $purchaseReport->user_id === (int) $request->user()?->id, 403);
-        abort_unless(
-            $purchaseReport->status === PurchaseOrder::STATUS_REVIEW,
-            422,
-            'La orden debe estar por revisar antes de confirmar la recepcion.'
-        );
-
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'integer'],
@@ -296,17 +291,20 @@ class PurchaseReportController extends Controller
             'items.*.receipt_notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $purchaseReport->load('items');
         $receivedItems = collect($validated['items'])->keyBy(fn ($item) => (int) $item['id']);
 
-        if ($receivedItems->keys()->sort()->values()->all() !== $purchaseReport->items->pluck('id')->sort()->values()->all()) {
-            throw ValidationException::withMessages([
-                'items' => 'Debes confirmar la recepcion de todos los productos de la orden.',
-            ]);
-        }
-
         DB::transaction(function () use ($purchaseReport, $receivedItems, $request) {
-            foreach ($purchaseReport->items as $item) {
+            $lockedOrder = $this->lockCurrentVersion($request, $purchaseReport);
+            abort_unless($lockedOrder->status === PurchaseOrder::STATUS_REVIEW, 422, 'La orden debe estar por revisar antes de confirmar la recepcion.');
+            $items = $lockedOrder->items()->lockForUpdate()->get();
+
+            if ($receivedItems->keys()->sort()->values()->all() !== $items->pluck('id')->sort()->values()->all()) {
+                throw ValidationException::withMessages([
+                    'items' => 'Debes confirmar la recepcion de todos los productos de la orden.',
+                ]);
+            }
+
+            foreach ($items as $item) {
                 $received = $receivedItems->get((int) $item->id);
                 $receivedQuantity = (float) $received['received_quantity'];
                 $requestedQuantity = (float) $item->requested_quantity;
@@ -323,14 +321,14 @@ class PurchaseReportController extends Controller
                 ]);
             }
 
-            $this->refreshTotals($purchaseReport);
+            $this->refreshTotals($lockedOrder);
 
-            $purchaseReport->update([
+            $lockedOrder->update([
                 'status' => PurchaseOrder::STATUS_COMPLETED,
                 'completed_by' => $request->user()?->id,
                 'completed_at' => now(),
             ]);
-        });
+        }, 3);
 
         return redirect()->back()->with('success', 'Orden completada correctamente.');
     }
@@ -343,10 +341,12 @@ class PurchaseReportController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
-        abort_unless($purchaseReport->status === PurchaseOrder::STATUS_DRAFT, 422);
-        $this->abortIfDraftDoesNotBelongToUser($request, $purchaseReport);
-
-        $purchaseReport->delete();
+        DB::transaction(function () use ($purchaseReport, $request) {
+            $lockedOrder = $this->lockCurrentVersion($request, $purchaseReport);
+            abort_unless($lockedOrder->status === PurchaseOrder::STATUS_DRAFT, 422);
+            $this->abortIfDraftDoesNotBelongToUser($request, $lockedOrder);
+            $lockedOrder->delete();
+        });
 
         return redirect()->back()->with('success', 'Borrador eliminado correctamente.');
     }
@@ -420,6 +420,7 @@ class PurchaseReportController extends Controller
                 'assigned_to_user_id' => $order->assigned_to_user_id,
                 'items_count' => $order->items_count,
                 'created_at' => $order->created_at,
+                'record_version' => $order->updated_at?->toJSON(),
                 'display_date' => $order->completed_at ?? $order->generated_at ?? $order->created_at,
                 'items' => $order->items->map(function (PurchaseOrderItem $item) {
                     $branchProduct = $item->branchProduct;
@@ -513,6 +514,7 @@ class PurchaseReportController extends Controller
             'folio' => $purchaseReport->folio,
             'status' => $purchaseReport->status,
             'status_label' => $this->statusLabel($purchaseReport->status, $purchaseReport->review_status),
+            'record_version' => $purchaseReport->updated_at?->toJSON(),
             'requested_at' => $purchaseReport->generated_at ?? $purchaseReport->created_at,
             'items_count' => $purchaseReport->items->count(),
             'branch' => $purchaseReport->branch ? ['id' => $purchaseReport->branch->id, 'name' => $purchaseReport->branch->name] : null,

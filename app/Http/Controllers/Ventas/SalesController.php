@@ -163,6 +163,11 @@ class SalesController extends Controller
             ]);
         }
 
+        $data['items'] = collect($data['items'])
+            ->sortBy(fn (array $item) => (int) $item['branch_product_id'])
+            ->values()
+            ->all();
+
         $sale = DB::transaction(function () use ($data, $user, $branch, $paymentMethod, $stockService) {
             $sale = Sale::create([
                 'date' => now(),
@@ -307,7 +312,7 @@ class SalesController extends Controller
             ]);
 
             return $sale;
-        });
+        }, 3);
 
         $expirationAlerts = $this->buildRemainingNearExpirationAlertsAfterSale($sale);
 

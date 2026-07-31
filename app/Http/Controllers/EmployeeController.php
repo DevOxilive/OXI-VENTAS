@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use App\Events\EmployeeChanged;
 use App\Events\RealtimeActivityLogged;
+use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Exports\EmployeeExport;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
@@ -21,6 +22,8 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
 {
+    use ValidatesRecordVersion;
+
     private function syncLinkedUserStatus(Employee $employee): void
     {
         $user = $employee->user;
@@ -148,6 +151,7 @@ class EmployeeController extends Controller
                     'seniority' => $employee->seniority,
                     'nss' => $employee->nss,
                     'rfc' => $employee->rfc,
+                    'recordVersion' => $employee->updated_at?->toJSON(),
                 ];
             });
 
@@ -238,7 +242,9 @@ class EmployeeController extends Controller
 
         $this->validateEmployee($request, $employee);
 
-        $employee->update([
+        $employee = DB::transaction(function () use ($request, $employee) {
+            $employee = $this->lockCurrentVersion($request, $employee);
+            $employee->update([
             'first_name' => $request->firstName,
             'last_name' => $request->lastName,
             'email' => $request->email,
@@ -262,7 +268,10 @@ class EmployeeController extends Controller
             'seniority' => $request->seniority,
             'nss' => $request->nss,
             'rfc' => $request->rfc,
-        ]);
+            ]);
+
+            return $employee;
+        });
 
         $employee->load('user');
         $this->syncLinkedUserStatus($employee);
@@ -273,14 +282,17 @@ class EmployeeController extends Controller
         return redirect()->back();
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $employee = Employee::with('user')->findOrFail($id);
         $employeeId = $employee->id;
         $employeeName = trim("{$employee->first_name} {$employee->last_name}");
 
-        $this->deleteLinkedUser($employee);
-        $employee->delete();
+        DB::transaction(function () use ($request, $employee) {
+            $employee = $this->lockCurrentVersion($request, $employee);
+            $this->deleteLinkedUser($employee);
+            $employee->delete();
+        });
 
         broadcast(new EmployeeChanged('deleted', $employeeId))->toOthers();
         event(RealtimeActivityLogged::message('eliminó', 'el empleado', $employeeName, 'Recursos humanos', 'deleted'));

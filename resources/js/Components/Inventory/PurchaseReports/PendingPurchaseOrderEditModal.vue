@@ -16,6 +16,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'updated'])
 const form = useForm({
+    record_version: props.order.record_version || props.order.updated_at || null,
     items: (props.order.items ?? []).map((item) => ({
         branch_product_id: item.branch_product_id,
         requested_quantity: Number(item.requested_quantity ?? 1),

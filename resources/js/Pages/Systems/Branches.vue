@@ -43,10 +43,18 @@ let unsubscribeBranchChanged = null
 const form = useForm({
   name: "",
   color: "#facc15",
+  street: "",
+  external_number: "",
+  internal_number: "",
+  postal_code: "",
+  neighborhood: "",
+  municipality: "",
+  address_state: "",
   maps_url: "",
   attendance_latitude: "",
   attendance_longitude: "",
   attendance_geofence_radius_meters: 100,
+  record_version: "",
 })
 
 const canViewBranches = computed(() => {
@@ -72,8 +80,24 @@ const selectedMapCoordinates = computed(() => {
   return { latitude, longitude }
 })
 
+const fullAddress = computed(() => {
+  return [
+    form.street,
+    form.external_number,
+    form.internal_number,
+    form.neighborhood,
+    form.municipality,
+    form.address_state,
+    form.postal_code,
+  ].filter(Boolean).join(", ")
+})
+
 const googleMapsPreviewUrl = computed(() => {
   const coordinates = selectedMapCoordinates.value
+
+  if (fullAddress.value) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(fullAddress.value)}&output=embed`
+  }
 
   if (coordinates) {
     return `https://maps.google.com/maps?q=${coordinates.latitude},${coordinates.longitude}&z=17&output=embed`
@@ -93,7 +117,7 @@ const googleMapsOpenUrl = computed(() => {
     return `https://www.google.com/maps/search/?api=1&query=${coordinates.latitude},${coordinates.longitude}`
   }
 
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(form.name || "sucursal")}`
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress.value || form.name || "sucursal")}`
 })
 
 const toolbarConfig = computed(() =>
@@ -160,19 +184,35 @@ function resetForm() {
   form.reset()
   form.clearErrors()
   form.color = "#facc15"
+  form.street = ""
+  form.external_number = ""
+  form.internal_number = ""
+  form.postal_code = ""
+  form.neighborhood = ""
+  form.municipality = ""
+  form.address_state = ""
   form.maps_url = ""
   form.attendance_latitude = ""
   form.attendance_longitude = ""
   form.attendance_geofence_radius_meters = 100
+  form.record_version = ""
 }
 
 function fillBranchForm(branch) {
   form.name = branch.name
   form.color = branch.color || "#facc15"
+  form.street = branch.street || ""
+  form.external_number = branch.external_number || ""
+  form.internal_number = branch.internal_number || ""
+  form.postal_code = branch.postal_code || ""
+  form.neighborhood = branch.neighborhood || ""
+  form.municipality = branch.municipality || ""
+  form.address_state = branch.address_state || ""
   form.maps_url = branch.maps_url || ""
   form.attendance_latitude = branch.attendance_latitude || ""
   form.attendance_longitude = branch.attendance_longitude || ""
   form.attendance_geofence_radius_meters = branch.attendance_geofence_radius_meters || 100
+  form.record_version = branch.updated_at || ""
 }
 
 function openCreateModal() {
@@ -290,6 +330,7 @@ async function deleteBranch(branch) {
 
   if (!result.isConfirmed) return
 
+  form.record_version = branch.updated_at || ""
   form.delete(route("branches.destroy", branch.id), getModalRequestOptions({
     mode: "delete",
     entityName: "Sucursal",
@@ -359,6 +400,13 @@ function submit() {
     onSuccess: () => {
       form.reset("name")
       form.color = "#facc15"
+      form.street = ""
+      form.external_number = ""
+      form.internal_number = ""
+      form.postal_code = ""
+      form.neighborhood = ""
+      form.municipality = ""
+      form.address_state = ""
       form.maps_url = ""
       form.attendance_latitude = ""
       form.attendance_longitude = ""
@@ -478,6 +526,68 @@ onBeforeUnmount(() => {
             :disabled="isBranchFormReadonly"
             :error="form.errors.color"
           />
+
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <InputField
+              v-model="form.street"
+              label="Calle"
+              field="street"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.street"
+            />
+
+            <InputField
+              v-model="form.external_number"
+              label="Numero exterior"
+              field="external_number"
+              validation-field="externalNumber"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.external_number"
+            />
+
+            <InputField
+              v-model="form.internal_number"
+              label="Numero interior"
+              field="internal_number"
+              validation-field="internalNumber"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.internal_number"
+            />
+
+            <InputField
+              v-model="form.postal_code"
+              label="Codigo postal"
+              field="postal_code"
+              validation-field="postalCode"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.postal_code"
+            />
+
+            <InputField
+              v-model="form.neighborhood"
+              label="Colonia"
+              field="neighborhood"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.neighborhood"
+            />
+
+            <InputField
+              v-model="form.municipality"
+              label="Municipio"
+              field="municipality"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.municipality"
+            />
+
+            <InputField
+              v-model="form.address_state"
+              label="Estado"
+              field="address_state"
+              validation-field="addressState"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.address_state"
+            />
+          </div>
 
           <div class="space-y-4 rounded-2xl border border-secondary bg-secondary p-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

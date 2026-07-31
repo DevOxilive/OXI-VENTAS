@@ -188,6 +188,7 @@ export function usePurchaseReport(props) {
     function buildPayload() {
         return {
             assigned_to_user_id: assignedToUserId.value || null,
+            record_version: editingOrder.value?.record_version || null,
             items: selectedProducts.value.map((item) => ({
                 branch_product_id: item.branch_product_id,
                 requested_quantity: Number(item.requested_quantity || 0),

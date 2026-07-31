@@ -259,16 +259,38 @@
 .disabled\:opacity-60:disabled { opacity: 0.55; }
 
 /* SweetAlert comparte la misma superficie que los modales de Vue. */
+.swal2-container {
+    z-index: 2147483647 !important;
+}
+
 .swal2-popup,
 .swal2-modal,
 .swal2-toast {
     border: var(--border-width) solid var(--border);
-    background: var(--surface-raised);
+    background: var(--surface-raised) !important;
     color: var(--text);
     box-shadow: var(--shadow-lg);
 }
+
+.swal2-popup {
+    border-radius: 1rem;
+}
+
+.swal2-toast {
+    background: var(--surface-raised) !important;
+}
+
 .swal2-title,
-.swal2-html-container { color: var(--text); }
+.swal2-html-container,
+.swal2-content,
+.swal2-footer {
+    color: var(--text);
+}
+
+.swal2-html-container {
+    opacity: 0.84;
+}
+
 .swal2-input,
 .swal2-select,
 .swal2-textarea {
@@ -276,15 +298,48 @@
     background: var(--surface);
     color: var(--text);
 }
-.swal2-confirm {
+
+.swal2-actions {
+    gap: 0.5rem;
+}
+
+.swal2-confirm,
+.oxi-swal-confirm {
     border: var(--border-width) solid var(--border-primary);
     background: var(--primary) !important;
-    color: var(--text-on-primary);
+    color: var(--text-on-primary) !important;
 }
-.swal2-cancel {
+
+.swal2-cancel,
+.oxi-swal-cancel {
     border: var(--border-width) solid var(--border);
     background: var(--surface-sunken) !important;
-    color: var(--text);
+    color: var(--text) !important;
+}
+
+.swal2-timer-progress-bar {
+    background: var(--primary) !important;
+}
+
+.swal2-icon.swal2-success {
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.swal2-icon.swal2-error {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.swal2-icon.swal2-warning {
+    border-color: var(--warning);
+    color: var(--warning);
+}
+
+.swal2-icon.swal2-info,
+.swal2-icon.swal2-question {
+    border-color: var(--info);
+    color: var(--info);
 }
 
 [x-cloak] {

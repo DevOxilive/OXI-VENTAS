@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Models\Branch;
 use App\Models\Product;
 use App\Models\TicketTemplate;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class TicketTemplateController extends Controller
 {
+    use ValidatesRecordVersion;
+
     public function index()
     {
         $template = TicketTemplate::salesTemplate();
@@ -21,6 +25,7 @@ class TicketTemplateController extends Controller
                 'slug' => $template->slug,
                 'is_active' => $template->is_active,
                 'settings' => $this->resolvedSettings($template),
+                'updated_at' => $template->updated_at?->toJSON(),
             ],
             'samplePrintJob' => $this->samplePrintJob(),
         ]);
@@ -69,6 +74,7 @@ class TicketTemplateController extends Controller
                 'slug' => $template->slug,
                 'is_active' => $template->is_active,
                 'settings' => TicketTemplate::sanitizeLabelSettings($template->settings ?? []),
+                'updated_at' => $template->updated_at?->toJSON(),
             ],
             'products' => $products,
             'sampleProduct' => $products->first() ?? $this->sampleProduct(),
@@ -86,6 +92,7 @@ class TicketTemplateController extends Controller
                 'slug' => $template->slug,
                 'is_active' => $template->is_active,
                 'settings' => $this->resolvedSettings($template),
+                'updated_at' => $template->updated_at?->toJSON(),
             ],
             'samplePrintJob' => $this->sampleCashClosurePrintJob(),
             'templateContext' => [
@@ -157,11 +164,14 @@ class TicketTemplateController extends Controller
             ? TicketTemplate::cashClosureDefaultSettings()
             : TicketTemplate::defaultSettings();
 
-        $ticketTemplate->update([
-            'name' => $data['name'],
-            'is_active' => $data['is_active'],
-            'settings' => TicketTemplate::sanitizeSettings($data['settings'], $defaults),
-        ]);
+        DB::transaction(function () use ($request, $ticketTemplate, $data, $defaults) {
+            $ticketTemplate = $this->lockCurrentVersion($request, $ticketTemplate);
+            $ticketTemplate->update([
+                'name' => $data['name'],
+                'is_active' => $data['is_active'],
+                'settings' => TicketTemplate::sanitizeSettings($data['settings'], $defaults),
+            ]);
+        });
 
         return back()->with('success', 'Plantilla de ticket actualizada correctamente.');
     }
@@ -190,11 +200,14 @@ class TicketTemplateController extends Controller
             'settings.blocks.*.size_percent' => ['required', 'integer', 'min:50', 'max:2000'],
         ]);
 
-        $ticketTemplate->update([
-            'name' => $data['name'],
-            'is_active' => $data['is_active'],
-            'settings' => TicketTemplate::sanitizeLabelSettings($data['settings']),
-        ]);
+        DB::transaction(function () use ($request, $ticketTemplate, $data) {
+            $ticketTemplate = $this->lockCurrentVersion($request, $ticketTemplate);
+            $ticketTemplate->update([
+                'name' => $data['name'],
+                'is_active' => $data['is_active'],
+                'settings' => TicketTemplate::sanitizeLabelSettings($data['settings']),
+            ]);
+        });
 
         return back()->with('success', 'Plantilla de etiqueta actualizada correctamente.');
     }

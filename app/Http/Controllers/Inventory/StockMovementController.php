@@ -121,6 +121,17 @@ class StockMovementController extends Controller
             throw new AuthorizationException('No tienes acceso al inventario de esta sucursal.');
         }
 
+        $destinationBranchIds = collect($validated['branch_allocations'] ?? [])
+            ->pluck('branch_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+
+        if ($destinationBranchIds->contains(
+            fn (int $branchId) => ! $request->user()->hasBranchAccess($branchId)
+        )) {
+            throw new AuthorizationException('No tienes acceso a una de las sucursales destino.');
+        }
+
         try {
             $hasBranchAllocations = $validated['type'] === StockMovement::TYPE_IN
                 && collect($validated['branch_allocations'] ?? [])->isNotEmpty();

@@ -169,6 +169,7 @@ function togglePromotion(item) {
 function payload() {
     return {
         purchased_at: form.purchased_at,
+        record_version: props.orderDB.record_version || props.orderDB.updated_at || null,
         items: form.items.map((item) => ({
             id: item.id,
             purchase_presentation: presentationName(item),

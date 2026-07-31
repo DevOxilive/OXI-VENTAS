@@ -353,8 +353,11 @@ class BranchInventoryController extends Controller
             ->get();
     }
 
-    public function details(BranchProduct $branchProduct): JsonResponse
+    public function details(Request $request, BranchProduct $branchProduct): JsonResponse
     {
+        $branchProduct->loadMissing('branch');
+        $this->abortIfUserCannotAccessBranch($request, $branchProduct->branch);
+
         return response()->json($this->serializeBranchProductDetails($branchProduct));
     }
 
@@ -401,6 +404,9 @@ class BranchInventoryController extends Controller
             'status' => ['nullable', 'in:active,inactive,seasonal'],
         ]);
 
+        $branch = Branch::query()->findOrFail($validated['branch_id']);
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $branchProduct = BranchProduct::create([
             'branch_id' => $validated['branch_id'],
             'product_id' => $validated['product_id'],
@@ -425,6 +431,9 @@ class BranchInventoryController extends Controller
 
     public function updateConfig(Request $request, BranchProduct $branchProduct)
     {
+        $branchProduct->loadMissing('branch');
+        $this->abortIfUserCannotAccessBranch($request, $branchProduct->branch);
+
         $validated = $request->validate([
             'min_stock' => ['required', 'numeric', 'min:0'],
             'status' => ['required', 'in:active,inactive,seasonal'],

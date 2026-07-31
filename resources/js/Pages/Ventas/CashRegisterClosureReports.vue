@@ -71,6 +71,7 @@ const form = useForm({
   cash_left: 0,
   counted_card: 0,
   notes: "",
+  record_version: "",
 });
 
 const isSelectedBalanced = computed(() => {
@@ -298,6 +299,7 @@ function openClosure(row, mode = "view") {
   form.cash_left = Number(row.cash_left || 0);
   form.counted_card = Number(row.counted_card || 0);
   form.notes = row.notes || "";
+  form.record_version = row.record_version || "";
   form.clearErrors();
   showClosureModal.value = true;
 }
@@ -372,6 +374,7 @@ async function deleteClosure(row) {
 
   if (!result.isConfirmed) return;
 
+  form.record_version = row.record_version || "";
   form.delete(route("ventas.cash-closures.destroy", row.id), {
     preserveScroll: true,
     onSuccess: () => {

@@ -173,6 +173,7 @@ class RoleSeeder extends Seeder
                 || str_starts_with($permission->name, 'sales.purchase-lists.')
                 || str_starts_with($permission->name, 'sales.purchase-orders.')
                 || str_starts_with($permission->name, 'reports.cash-closures.')
+                || $permission->name === 'systems.qz.sign'
             ) {
                 DB::table('role_permission')->updateOrInsert([
                     'role_id' => $salesRole->id,

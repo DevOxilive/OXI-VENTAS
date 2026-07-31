@@ -10,6 +10,7 @@ class AttendanceCorrectionRequest extends Model
     protected $fillable = [
         'attendance_record_id', 'requested_by', 'reviewed_by', 'reason', 'requested_changes',
         'status', 'review_notes', 'reviewed_at',
+        'pending_key',
     ];
 
     protected function casts(): array

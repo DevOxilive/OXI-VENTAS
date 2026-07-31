@@ -7,13 +7,17 @@ use App\Events\EmployeeChanged;
 use App\Events\ProductChanged;
 use App\Events\UserChanged;
 use App\Models\Branch;
+use App\Models\Barcode;
+use App\Models\Category;
 use App\Models\Employee;
 use App\Models\Product;
+use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Support\TrashRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class SystemRecoveryService
@@ -23,7 +27,7 @@ class SystemRecoveryService
     public function restoreCompletely(string $resource, int $id, Request $request): Model
     {
         $model = TrashRegistry::find($resource, $id);
-        $this->restoreModel($model);
+        DB::transaction(fn () => $this->restoreModel($model));
 
         $this->log($request, $resource, $model, $id);
         $this->broadcastRestoredModel($model);
@@ -115,6 +119,7 @@ class SystemRecoveryService
      */
     private function restoreModel(Model $model): void
     {
+        $this->assertRestoreIsAvailable($model);
         $model->restore();
 
         if ($model instanceof Product) {
@@ -128,6 +133,61 @@ class SystemRecoveryService
             if ($linkedUser?->trashed()) {
                 $linkedUser->restore();
             }
+        }
+    }
+
+    private function assertRestoreIsAvailable(Model $model): void
+    {
+        if ($model instanceof User) {
+            $this->assertUniqueValue(User::class, 'email', $model->email, $model->id, 'Ya existe otro usuario con el mismo correo.');
+        }
+
+        if ($model instanceof Employee) {
+            $this->assertUniqueValue(Employee::class, 'email', $model->email, $model->id, 'Ya existe otro empleado con el mismo correo.');
+            $linkedUser = $model->user()->withTrashed()->first();
+
+            if ($linkedUser?->trashed()) {
+                $this->assertUniqueValue(User::class, 'email', $linkedUser->email, $linkedUser->id, 'El usuario vinculado usa un correo que ya fue ocupado.');
+            }
+        }
+
+        if ($model instanceof Branch) {
+            $this->assertUniqueValue(Branch::class, 'slug', $model->slug, $model->id, 'Ya existe otra sucursal con la misma clave.');
+        }
+
+        if ($model instanceof Category) {
+            $this->assertUniqueValue(Category::class, 'name', $model->name, $model->id, 'Ya existe otra categoria con el mismo nombre.');
+        }
+
+        if ($model instanceof TicketTemplate) {
+            $this->assertUniqueValue(TicketTemplate::class, 'slug', $model->slug, $model->id, 'Ya existe otra plantilla con la misma clave.');
+        }
+
+        if ($model instanceof Product) {
+            $codes = $model->barcodes()->onlyTrashed()->pluck('code');
+            $duplicatedCode = Barcode::query()->whereIn('code', $codes)->first();
+
+            if ($duplicatedCode) {
+                throw ValidationException::withMessages([
+                    'restore' => "El codigo {$duplicatedCode->code} ya pertenece a otro producto activo.",
+                ]);
+            }
+        }
+    }
+
+    private function assertUniqueValue(
+        string $modelClass,
+        string $column,
+        mixed $value,
+        int $ignoredId,
+        string $message
+    ): void {
+        if (blank($value)) {
+            return;
+        }
+
+        if ($modelClass::query()->where($column, $value)->whereKeyNot($ignoredId)->exists()) {
+            throw ValidationException::withMessages(['restore' => $message]);
         }
     }
 

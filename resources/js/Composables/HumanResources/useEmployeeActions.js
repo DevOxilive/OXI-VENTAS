@@ -51,13 +51,16 @@ export function useEmployeeActions() {
 
             router.delete(
                 route("human-resources.employees.destroy", employee.id),
-                getModalRequestOptions({
+                {
+                    ...getModalRequestOptions({
                     mode: "delete",
                     entityName: "Empleado",
                     successTitle: "Empleado eliminado correctamente",
                     errorTitle: "Error al eliminar",
                     errorMessage: "No fue posible eliminar el empleado",
-                }),
+                    }),
+                    data: { record_version: employee.recordVersion },
+                },
             );
         });
     }

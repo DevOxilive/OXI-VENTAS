@@ -54,6 +54,7 @@ const form = useForm({
   name: props.template?.name || "Ticket principal",
   is_active: props.template?.is_active ?? true,
   settings: normalizeTicketTemplate(props.template?.settings || createDefaultTicketTemplate()),
+  record_version: props.template?.updated_at || "",
 });
 
 const previewTemplate = computed(() => normalizeTicketTemplate({ ...form.settings }));
@@ -131,6 +132,7 @@ function resetTemplate() {
     name: props.templateContext?.defaultName || "Ticket principal",
     is_active: true,
     settings: contextSettings,
+    record_version: props.template?.updated_at || "",
   });
 
   form.reset();

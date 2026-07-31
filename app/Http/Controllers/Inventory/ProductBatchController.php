@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Events\InventoryStockUpdated;
 use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Models\BranchProduct;
 use App\Models\ProductBatch;
 use App\Models\StockMovement;
@@ -15,8 +16,13 @@ use Illuminate\Validation\Rule;
 
 class ProductBatchController extends Controller
 {
+    use AuthorizesBranchAccess;
+
     public function update(Request $request, ProductBatch $productBatch)
     {
+        $productBatch->loadMissing('branchProduct.branch');
+        $this->abortIfUserCannotAccessBranch($request, $productBatch->branchProduct->branch);
+
         $validated = $request->validate([
             'lot_number' => ['nullable', 'string', 'max:255'],
             'expiration_date' => ['nullable', 'date'],
@@ -121,19 +127,6 @@ class ProductBatchController extends Controller
                 'new_stock' => $newStock,
                 'notes' => $movementNotes,
             ]);
-
-            $isQuantityAdjustment = abs($difference) > 0;
-
-            if ($isQuantityAdjustment) {
-                StockMovementBatch::create([
-                    'stock_movement_id' => $movement->id,
-                    'product_batch_id' => $productBatch->id,
-                    'quantity' => abs($difference),
-                    'previous_batch_quantity' => $previousQuantity,
-                    'new_batch_quantity' => $newQuantity,
-                    'allocation_method' => StockMovementBatch::ALLOCATION_MANUAL,
-                ]);
-            }
 
             if (abs($difference) > 0) {
                 StockMovementBatch::create([

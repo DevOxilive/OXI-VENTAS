@@ -12,6 +12,7 @@ const props = defineProps({ order: { type: Object, required: true }, mode: { typ
 const emit = defineEmits(['close', 'completed'])
 const isEditing = computed(() => props.mode === 'edit')
 const form = useForm({
+    record_version: props.order.record_version || props.order.updated_at || null,
     items: (props.order.items ?? []).map((item) => ({ id: item.id, received_quantity: item.received_quantity ?? 0, receipt_notes: item.receipt_notes ?? '' })),
 })
 const itemLookup = computed(() => new Map((props.order.items ?? []).map((item) => [Number(item.id), item])))

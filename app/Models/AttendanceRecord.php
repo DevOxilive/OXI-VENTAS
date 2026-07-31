@@ -24,6 +24,7 @@ class AttendanceRecord extends Model
         'latitude', 'longitude', 'location_accuracy', 'approximate_address', 'within_geofence',
         'geofence_snapshot', 'authentication_method', 'authentication_result', 'operating_system',
         'browser', 'device_type', 'user_agent', 'ip_address', 'selfie_path', 'metadata',
+        'operation_key',
     ];
 
     protected function casts(): array
