@@ -483,15 +483,8 @@ class PurchaseReportController extends Controller
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
         abort_unless((int) $purchaseReport->user_id === (int) $request->user()?->id, 403);
 
-        $purchaseReport->load([
-            'user',
-            'items.branchProduct.product.barcodes',
-            'items.branchProduct.product.category',
-        ]);
-
-        return Inertia::render('Inventory/PurchaseReportShow', [
-            'currentBranch' => $branch,
-            'reportDB' => $purchaseReport,
+        return redirect()->route('inventory.branches.purchase-reports.index', [
+            'branch' => $branch->id,
         ]);
     }
 

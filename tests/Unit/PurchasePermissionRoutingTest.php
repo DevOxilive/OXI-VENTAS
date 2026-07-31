@@ -68,4 +68,16 @@ class PurchasePermissionRoutingTest extends TestCase
             ],
         ];
     }
+
+    public function test_administrators_receive_sales_purchase_order_tracking_permissions(): void
+    {
+        $migration = file_get_contents(database_path(
+            'migrations/2026_07_31_092000_grant_sales_purchase_order_tracking_to_administrators.php'
+        ));
+
+        $this->assertStringContainsString("'Administrador'", $migration);
+        $this->assertStringContainsString("'Super Administrador'", $migration);
+        $this->assertStringContainsString("'sales.purchase-orders.view'", $migration);
+        $this->assertStringContainsString("'sales.purchase-orders.receive'", $migration);
+    }
 }

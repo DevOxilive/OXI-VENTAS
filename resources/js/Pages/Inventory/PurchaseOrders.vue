@@ -356,7 +356,7 @@ async function generateGeneralOrder() {
         <template #toolbar>
             <GlobalToolbar
                 v-bind="toolbarConfig"
-                @back="orders.backToReportsCenter"
+                @back="orders.backToBranchInventory"
                 @update:search="orders.localFilters.value.search = $event"
                 @update:filter="orders.updateFilter"
                 @update:records-per-page="orders.localFilters.value.per_page = $event"

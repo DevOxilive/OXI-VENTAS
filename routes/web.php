@@ -449,7 +449,7 @@ Route::middleware([
         $generalPurchaseOrdersAccess,
         $cashClosureReportsAccess
     ) {
-        Route::get('/dashboard', fn () => Inertia::render('Inventory/Dashboard'))
+        Route::get('/dashboard', fn () => redirect()->route('dashboard'))
             ->middleware($reportsAccess)
             ->name('dashboard');
 
@@ -527,15 +527,17 @@ Route::middleware([
             ->middleware($branchInventoryAccess)
             ->name('movements');
 
-        Route::get('/expirations', fn () => Inertia::render('Inventory/Expirations'))
+        Route::get('/expirations', fn () => redirect()->route('inventory.reports.select', [
+            'report' => 'inventory',
+        ]))
             ->middleware($inventoryReportsAccess)
             ->name('expirations');
 
-        Route::get('/transfers', fn () => Inertia::render('Inventory/Transfers'))
+        Route::get('/transfers', [BranchInventoryController::class, 'landing'])
             ->middleware('permission:inventory.branches.stock-out')
             ->name('transfers');
 
-        Route::get('/adjustments', fn () => Inertia::render('Inventory/Adjustments'))
+        Route::get('/adjustments', [BranchInventoryController::class, 'landing'])
             ->middleware('permission:inventory.branches.stock-adjust')
             ->name('adjustments');
 

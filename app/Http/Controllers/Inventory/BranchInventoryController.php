@@ -21,6 +21,21 @@ class BranchInventoryController extends Controller
 {
     use AuthorizesBranchAccess;
 
+    public function landing(Request $request)
+    {
+        $branch = $request->user()
+            ?->accessibleBranchesQuery()
+            ->select(['branches.id', 'branches.name'])
+            ->orderBy('branches.name')
+            ->first();
+
+        abort_unless($branch, 403, 'No tienes sucursales habilitadas para consultar inventario.');
+
+        return redirect()->route('inventory.branches.inventory', [
+            'branch' => $branch->id,
+        ]);
+    }
+
     public function index(Request $request)
     {
         return $this->renderInventory($request, null);
