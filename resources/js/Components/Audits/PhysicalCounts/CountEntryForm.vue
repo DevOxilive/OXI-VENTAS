@@ -6,9 +6,10 @@ import AuditBatchModal from '@/Components/Audits/PhysicalCounts/AuditBatchModal.
 import FormPanel from '@/Components/Cards/FormPanel.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import InputField from '@/Components/Forms/InputField.vue'
-import SelectField from '@/Components/Forms/SelectField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
+import AuditBatchSelect from '@/Components/Audits/PhysicalCounts/AuditBatchSelect.vue'
 import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
+import { confirmModalAction } from '@/Components/Modales/useModalConfig'
 
 const props = defineProps({
     physicalCountId: {
@@ -40,12 +41,6 @@ const form = useForm({
 const showCreateBatch = ref(false)
 const pendingLotNumber = ref('')
 
-const batchOptions = computed(() =>
-    (props.product?.batches || []).map((batch) => ({
-        value: batch.id,
-        label: batchOptionLabel(batch),
-    })),
-)
 const countedQuantity = computed(() => Number(form.counted_quantity || 0))
 const damagedQuantity = computed(() => Number(form.damaged_quantity || 0))
 const expiredQuantity = computed(() => Number(form.expired_quantity || 0))
@@ -71,21 +66,38 @@ watch(
     { immediate: true },
 )
 
-function batchOptionLabel(batch) {
-    const parts = [
-        `Lote: ${batch.lot_number ?? 'Sin lote'}`,
-        `Caducidad: ${batch.expiration_date ?? 'Sin fecha'}`,
-    ]
-
-    if (props.canViewStock) {
-        parts.push(`Existencia: ${batch.quantity ?? 0}`)
-    }
-
-    return parts.join(' | ')
-}
-
 function handleBatchCreated(lotNumber) {
     pendingLotNumber.value = lotNumber
+}
+
+async function handleBatchSelection(batchId) {
+    const batch = (props.product?.batches || [])
+        .find((item) => String(item.id) === String(batchId))
+
+    if (!batch?.is_counted) {
+        form.product_batch_id = batchId
+        return
+    }
+
+    const countedBy = (batch.counted_by || [])
+        .map((user) => user.name)
+        .filter(Boolean)
+        .join(', ')
+
+    const result = await confirmModalAction({
+        mode: 'update',
+        title: 'Lote ya contado',
+        message: `El lote ${batch.lot_number || 'seleccionado'} ya fue contado${
+            countedBy ? ` por ${countedBy}` : ''
+        }. ¿Deseas agregar más producto sobre este mismo lote?`,
+        confirmText: 'Sí, agregar más',
+        cancelText: 'Elegir otro lote',
+        confirmButtonColor: '#16a34a',
+    })
+
+    if (result.isConfirmed) {
+        form.product_batch_id = batchId
+    }
 }
 
 function submit() {
@@ -122,13 +134,12 @@ function submit() {
         </template>
 
         <form class="space-y-4" @submit.prevent="submit">
-            <SelectField
-                v-model="form.product_batch_id"
-                label="Lote y caducidad"
-                field="product_batch_id"
-                :options="batchOptions"
-                placeholder="Selecciona un lote"
+            <AuditBatchSelect
+                :model-value="form.product_batch_id"
+                :batches="product?.batches || []"
+                :can-view-stock="canViewStock"
                 :error="form.errors.product_batch_id"
+                @update:model-value="handleBatchSelection"
             />
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">

@@ -223,6 +223,12 @@ function getActionButtonClasses(action) {
               {{ cell.column.mobileLabel || cell.column.label }}
             </p>
 
+            <slot
+              :name="`cell-${cell.column.key}`"
+              :row="tableRow.row"
+              :value="cell.value"
+              :column="cell.column"
+            >
             <span v-if="cell.column.format === 'badge'" :class="[
               'inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold mt-1',
               cell.content.classes,
@@ -253,6 +259,7 @@ function getActionButtonClasses(action) {
             >
               {{ cell.subValue }}
             </span>
+            </slot>
           </div>
         </template>
       </div>

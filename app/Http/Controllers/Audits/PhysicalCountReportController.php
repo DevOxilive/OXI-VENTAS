@@ -13,7 +13,6 @@ use App\Models\PhysicalCount;
 use App\Models\PhysicalCountEntry;
 use App\Models\User;
 use App\Services\PhysicalCountSnapshotService;
-use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -40,26 +39,46 @@ class PhysicalCountReportController extends Controller
         $filters = $this->normalizeFilters($request, $branch);
         $payload = $this->buildReportPayload($branches, $filters, true);
         $filterLabels = $this->buildFilterLabels($filters, $payload['audits']);
+        $auditOptions = PhysicalCount::with(['participants:id,name'])
+            ->whereIn('branch_id', $branches->pluck('id'))
+            ->when($filters['search'], fn ($query, $search) => $query->where(function ($nested) use ($search) {
+                $nested->where('name', 'like', "%{$search}%")
+                    ->orWhere('folio', 'like', "%{$search}%");
+            }))
+            ->latest()
+            ->paginate($filters['per_page'])
+            ->withQueryString();
+        $auditOptions->setCollection($auditOptions->getCollection()->map(fn ($audit) => [
+            'id' => $audit->id,
+            'name' => $audit->name,
+            'folio' => $audit->folio,
+            'status' => $audit->status,
+            'started_at' => optional($audit->started_at)->toDateTimeString(),
+            'participants' => $audit->participants
+                ->map(fn ($participant) => [
+                    'id' => $participant->id,
+                    'name' => $participant->name,
+                ])
+                ->values(),
+        ]));
 
         return Inertia::render('Inventory/Reports/PhysicalCountsReports', [
             'branch' => $branch,
             'branches' => $this->accessibleBranches($request),
             'filters' => $filters,
             'summary' => $payload['summary'],
-            'audits' => $payload['audits']->map(fn ($audit) => [
-                'id' => $audit->id,
-                'name' => $audit->name,
-                'folio' => $audit->folio,
-                'status' => $audit->status,
-                'started_at' => optional($audit->started_at)->toDateTimeString(),
-                'participants' => $audit->participants
-                    ->map(fn ($participant) => [
-                        'id' => $participant->id,
-                        'name' => $participant->name,
-                    ])
-                    ->values(),
-            ])->values(),
-            'users' => $this->availableAuditUsers(),
+            'audits' => $auditOptions->getCollection()->values(),
+            'auditPagination' => [
+                'current_page' => $auditOptions->currentPage(),
+                'last_page' => $auditOptions->lastPage(),
+                'per_page' => $auditOptions->perPage(),
+                'total' => $auditOptions->total(),
+                'path' => $auditOptions->path(),
+                'first_page_url' => $auditOptions->url(1),
+                'prev_page_url' => $auditOptions->previousPageUrl(),
+                'next_page_url' => $auditOptions->nextPageUrl(),
+                'links' => $auditOptions->linkCollection(),
+            ],
             'categories' => Category::orderBy('name')->get(['id', 'name']),
             'reportRows' => $payload['reportRows']->values(),
             'reportPagination' => $payload['reportPagination'],
@@ -106,7 +125,7 @@ class PhysicalCountReportController extends Controller
         $branch = $branches->count() === 1 ? $branches->first() : null;
         $filters = $this->normalizeFilters($request, $branch);
         $payload = $this->buildReportPayload($branches, $filters, false);
-        $exportData = $this->buildExportData($payload, $filters['report_type']);
+        $exportData = $this->buildExportData($payload, 'detail');
         $filterLabels = $this->buildFilterLabels($filters, $payload['audits']);
         $branchLabel = $branch?->name ?? 'Todas las sucursales';
         $fileBranch = $branch?->slug ?? 'todas-las-sucursales';
@@ -119,6 +138,7 @@ class PhysicalCountReportController extends Controller
             'sectionTitle' => $exportData['title'],
             'headings' => $exportData['headings'],
             'rows' => $exportData['rows'],
+            'detailRows' => $payload['reportRows']->values(),
         ])->setPaper('letter', 'landscape');
 
         return $pdf->download(
@@ -132,22 +152,22 @@ class PhysicalCountReportController extends Controller
 
         $audits = PhysicalCount::with(['branch', 'creator', 'participants:id,name', 'rounds.opener:id,name'])
             ->whereIn('branch_id', $branchIds)
-            ->when($filters['physical_count_id'], fn ($query, $id) => $query->where('id', $id))
-            ->when(
-                $filters['report_date'],
-                fn ($query, $date) => $query->whereDate('started_at', $date)
-            )
+            ->when($filters['audit_ids'] !== [], fn ($query) => $query->whereIn('id', $filters['audit_ids']))
+            ->when($filters['search'], fn ($query, $search) => $query->where(function ($nested) use ($search) {
+                $nested->where('name', 'like', "%{$search}%")
+                    ->orWhere('folio', 'like', "%{$search}%");
+            }))
             ->latest()
             ->get();
 
         $this->hydrateAuditSnapshots($audits);
 
         $snapshotRows = $this->snapshotService->buildProductRows($audits);
-        if ($filters['category_id']) {
-            $snapshotRows = $snapshotRows
-                ->where('category_id', (int) $filters['category_id'])
-                ->values();
-        }
+        $snapshotRows = $snapshotRows->filter(function ($row) use ($filters) {
+            $selected = collect($filters['audit_filters'][$row['physical_count_id']]['category_ids'] ?? [])
+                ->map(fn ($id) => (int) $id);
+            return $selected->isEmpty() || $selected->contains((int) $row['category_id']);
+        })->values();
 
         $allowedBranchProductIds = $snapshotRows->pluck('branch_product_id')->unique()->values()->all();
         $auditIds = $audits->pluck('id');
@@ -161,33 +181,18 @@ class PhysicalCountReportController extends Controller
                 'branchProduct.product.barcodes:id,product_id,code',
             ])
             ->whereIn('physical_count_id', $auditIds)
-            ->when($filters['user_ids'] !== [], fn ($query) => $query->whereIn('user_id', $filters['user_ids']))
-            ->when($filters['search'], function ($query, $search) {
-                FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
-                    FlexibleSearch::orWhereColumns($subQuery, [
-                        'scanned_code',
-                        'notes',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct', [
-                        'barcode',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct.product', [
-                        'name',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct.product.barcodes', [
-                        'code',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($subQuery, 'user', [
-                        'name',
-                    ], $phrase, $terms);
-                });
-            })
             ->when($allowedBranchProductIds !== [], fn ($query) => $query->whereIn('branch_product_id', $allowedBranchProductIds))
             ->get();
+
+        $allEntries = $allEntries->filter(function ($entry) use ($filters) {
+            $configuration = $filters['audit_filters'][$entry->physical_count_id] ?? [];
+            $userIds = collect($configuration['user_ids'] ?? [])->map(fn ($id) => (int) $id);
+            $categoryIds = collect($configuration['category_ids'] ?? [])->map(fn ($id) => (int) $id);
+
+            return ($userIds->isEmpty() || $userIds->contains((int) $entry->user_id))
+                && ($categoryIds->isEmpty()
+                    || $categoryIds->contains((int) $entry->branchProduct?->product?->category_id));
+        })->values();
 
         $entries = $this->consolidateFinalEntries($allEntries);
 
@@ -198,11 +203,23 @@ class PhysicalCountReportController extends Controller
                 'branch:id,name,slug',
             ])
             ->whereIn('branch_id', $branchIds)
-            ->where('status', BranchProduct::STATUS_ACTIVE)
-            ->when($filters['category_id'], function ($query, $categoryId) {
-                $query->whereHas('product', fn ($productQuery) => $productQuery->where('category_id', $categoryId));
-            })
+            ->whereIn('status', [
+                BranchProduct::STATUS_ACTIVE,
+                BranchProduct::STATUS_SEASONAL,
+            ])
             ->get();
+
+        $productCodesByBranchProduct = $activeBranchProducts->mapWithKeys(function ($branchProduct) {
+            $codes = collect([$branchProduct->barcode])
+                ->merge($branchProduct->product?->barcodes?->pluck('code') ?? [])
+                ->map(fn ($code) => trim((string) $code))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            return [$branchProduct->id => $codes];
+        });
 
         $comparisonRows = collect($this->buildComparisonRows($audits, $entries, $snapshotRows))
             ->map(function ($row) {
@@ -225,35 +242,28 @@ class PhysicalCountReportController extends Controller
                 return $row;
             });
 
-        $reportRows = collect([...$comparisonRows->all(), ...$pendingRows->all()]);
+        $reportRows = collect([...$comparisonRows->all(), ...$pendingRows->all()])
+            ->map(function (array $row) use ($productCodesByBranchProduct) {
+                $codes = $productCodesByBranchProduct->get(
+                    $row['branch_product_id'] ?? null,
+                    $row['product_codes'] ?? []
+                );
+                $row['product_codes'] = collect([
+                    $row['scanned_code'] ?? null,
+                    ...$codes,
+                ])->filter()->unique()->values()->all();
 
-        if ($filters['status'] !== '') {
-            $reportRows = $reportRows->filter(function ($row) use ($filters) {
-                return match ($filters['status']) {
-                    'not_found' => $row['row_type'] === 'pending',
-                    'missing' => $row['status'] === 'missing',
-                    'surplus' => $row['status'] === 'surplus',
-                    'matched' => $row['status'] === 'matched',
-                    default => true,
-                };
-            })->values();
-        }
+                return $row;
+            });
+        $reportRows = $reportRows->filter(function ($row) use ($filters) {
+            $results = collect($filters['audit_filters'][$row['physical_count_id']]['results'] ?? []);
+            if ($results->isEmpty()) return true;
 
-        if ($filters['search'] !== '') {
-            $search = mb_strtolower($filters['search']);
-            $reportRows = $reportRows->filter(function ($row) use ($search) {
-                return collect([
-                    $row['product_name'] ?? '',
-                    $row['category_name'] ?? '',
-                    $row['subcategory_name'] ?? '',
-                    $row['scanned_code'] ?? '',
-                    implode(', ', $row['product_codes'] ?? []),
-                    implode(', ', $row['participants'] ?? []),
-                    $row['folio'] ?? '',
-                    $row['audit_name'] ?? '',
-                ])->contains(fn ($value) => str_contains(mb_strtolower((string) $value), $search));
-            })->values();
-        }
+            $result = ($row['row_type'] ?? null) === 'pending'
+                ? 'not_found'
+                : ($row['status'] ?? null);
+            return $results->contains($result);
+        })->values();
 
         $userSummary = $entries
             ->groupBy('user_id')
@@ -720,59 +730,78 @@ class PhysicalCountReportController extends Controller
 
         return [
             'branch' => $branchFilter,
-            'physical_count_id' => $request->input('physical_count_id'),
-            'user_id' => $request->input('user_id'),
-            'user_ids' => $this->normalizeUserIds($request),
-            'user_scope' => $request->input('user_scope', 'participants'),
-            'category_id' => $request->input('category_id'),
-            'report_date' => $request->input('report_date'),
-            'status' => $request->input('status', ''),
+            'report_date' => null,
             'search' => trim((string) $request->input('search', '')),
-            'report_type' => $request->input('report_type', 'summary'),
+            'audit_ids' => collect($request->input('audit_ids', []))
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all(),
+            'audit_filters' => $this->normalizeAuditFilters($request),
+            'selected_results' => collect($this->normalizeAuditFilters($request))
+                ->flatMap(fn ($configuration) => $configuration['results'] ?? [])
+                ->unique()
+                ->values()
+                ->all(),
+            'report_type' => 'summary',
             'page' => max(1, (int) $request->input('page', 1)),
             'per_page' => TablePagination::resolvePerPage($request, 25),
         ];
     }
 
-    private function availableAuditUsers(): Collection
+    private function normalizeAuditFilters(Request $request): array
     {
-        return User::with('role:id,name')
-            ->orderBy('name')
-            ->get(['id', 'name', 'email', 'role_id'])
-            ->map(fn ($user) => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role?->name ?? 'Sin rol',
-            ])
-            ->values();
+        $filters = $request->input('audit_filters', []);
+        if (is_string($filters)) {
+            $filters = json_decode($filters, true) ?: [];
+        }
+        if (! is_array($filters)) return [];
+
+        return collect($filters)->mapWithKeys(function ($configuration, $auditId) {
+            $normalizeIds = fn ($values) => collect(is_array($values) ? $values : [])
+                ->map(fn ($value) => (int) $value)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+            $results = collect(is_array($configuration['results'] ?? null) ? $configuration['results'] : [])
+                ->filter(fn ($value) => in_array($value, ['matched', 'missing', 'surplus', 'not_found'], true))
+                ->unique()
+                ->values()
+                ->all();
+
+            return [(int) $auditId => [
+                'user_ids' => $normalizeIds($configuration['user_ids'] ?? []),
+                'category_ids' => $normalizeIds($configuration['category_ids'] ?? []),
+                'results' => $results,
+                'include_lots' => filter_var(
+                    $configuration['include_lots'] ?? false,
+                    FILTER_VALIDATE_BOOLEAN
+                ),
+            ]];
+        })->all();
     }
 
     private function buildFilterLabels(array $filters, Collection $audits): array
     {
-        $selectedAudit = $audits->firstWhere('id', (int) $filters['physical_count_id']);
-        $selectedUsers = $filters['user_ids'] !== []
-            ? User::query()->whereIn('id', $filters['user_ids'])->orderBy('name')->get(['id', 'name'])
-            : collect();
-        $selectedCategory = $filters['category_id']
-            ? Category::query()->find($filters['category_id'], ['id', 'name'])
-            : null;
-
         return [
-            'audit' => $selectedAudit
-                ? trim(($selectedAudit->name ?: 'Auditoria') . ' - ' . ($selectedAudit->folio ?: 'Sin folio'))
-                : 'Todas',
-            'user' => $selectedUsers->isNotEmpty() ? $selectedUsers->pluck('name')->join(', ') : 'Todos',
-            'category' => $selectedCategory?->name ?: 'Todas',
-            'status' => match ($filters['status']) {
-                'matched' => 'Coincidente',
-                'missing' => 'Faltantes',
-                'surplus' => 'Sobrantes',
-                'not_found' => 'No encontrado',
-                default => 'Todos',
-            },
-            'report_date' => $filters['report_date'] ?: 'Sin fecha',
-            'search' => $filters['search'] ?: 'Sin filtro',
+            'audit' => $audits->count() === 1
+                ? trim(($audits->first()->name ?: 'Auditoría').' - '.($audits->first()->folio ?: 'Sin folio'))
+                : 'Todas las auditorías filtradas',
+            'user' => 'Configuración individual por auditoría',
+            'category' => 'Configuración individual por auditoría',
+            'status' => empty($filters['selected_results'])
+                ? 'Reporte general'
+                : collect($filters['selected_results'])->map(fn ($result) => match ($result) {
+                    'matched' => 'Coincidentes',
+                    'missing' => 'Faltantes',
+                    'surplus' => 'Sobrantes',
+                    'not_found' => 'No encontrados',
+                    default => $result,
+                })->join(', '),
+            'report_date' => $filters['report_date'] ?: 'Todas las fechas',
+            'search' => $filters['search'] ?: 'Sin búsqueda',
         ];
     }
 
@@ -802,31 +831,6 @@ class PhysicalCountReportController extends Controller
             ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
             ->orderBy('branches.name')
             ->get();
-    }
-
-    private function normalizeUserIds(Request $request): array
-    {
-        $userIds = $request->input('user_ids', []);
-
-        if (is_string($userIds)) {
-            $userIds = preg_split('/,/', $userIds) ?: [];
-        }
-
-        if (! is_array($userIds)) {
-            $userIds = [];
-        }
-
-        if ($request->filled('user_id')) {
-            $userIds[] = $request->input('user_id');
-        }
-
-        return collect($userIds)
-            ->filter(fn ($id) => $id !== null && $id !== '')
-            ->map(fn ($id) => (int) $id)
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
     }
 
     private function canViewReports(Request $request): bool

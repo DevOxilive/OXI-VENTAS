@@ -37,10 +37,6 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
 
     public function array(): array
     {
-        $formulaLastRow = max(2, $this->filteredRows()->count() + 1);
-        $consolidatedLastRow = max(2, collect($this->payload['entries'] ?? [])->count() + 1);
-        $sheet = $this->quotedSheetTitle();
-        $users = $this->users();
         $filteredRows = $this->filteredRows();
         $countedRows = $filteredRows->where('row_type', 'counted');
         $matched = $countedRows->where('status', 'matched')->count();
@@ -66,36 +62,10 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
             ['Usuario(s)', $this->filterLabels['user'] ?? 'Todos'],
             ['Categoria', $this->filterLabels['category'] ?? 'Todas'],
             ['Resultado', $this->filterLabels['status'] ?? 'Todos'],
-            ['Fecha de auditoría', $this->filterLabels['report_date'] ?? 'Sin fecha'],
-            ['Busqueda', $this->filterLabels['search'] ?? 'Sin filtro'],
+            ['Fecha de auditoría', $this->filterLabels['report_date'] ?? 'Todas las fechas'],
+            ['Busqueda', $this->filterLabels['search'] ?? 'Sin búsqueda'],
             ['Generado', now()->format('d/m/Y H:i')],
-            [null, null],
-            ['Resumen por usuario'],
-            ['Usuario', 'Conteo Fisico', 'Danado', 'Caducado', 'Productos contados'],
         ];
-
-        $users->each(function (object|array $user, int $index) use (&$rows, $sheet, $formulaLastRow) {
-            $userId = is_array($user) ? ($user['id'] ?? null) : ($user->id ?? null);
-            $userEntries = collect($this->payload['entries'] ?? [])->where('user_id', $userId);
-
-            $rows[] = [
-                $this->userName($user),
-                (float) $userEntries->sum('counted_quantity'),
-                (float) $userEntries->sum('damaged_quantity'),
-                (float) $userEntries->sum('expired_quantity'),
-                $userEntries->pluck('branch_product_id')->unique()->count(),
-            ];
-        });
-
-        if ($users->isEmpty()) {
-            $rows[] = ['Sin usuarios con conteos', 0, 0, 0, 0];
-        }
-
-        $rows[] = [null, null];
-        $rows[] = ['Indicadores de supervisión'];
-        $rows[] = ['Auditoría lista para cierre', $pending === 0 ? 'Revisar diferencias' : 'Pendiente de conteo'];
-        $rows[] = ['Productos con mayor diferencia', $missing + $surplus];
-        $rows[] = ['Observaciones registradas', collect($this->payload['entries'] ?? [])->pluck('notes')->filter()->count()];
 
         return $rows;
     }
@@ -135,6 +105,12 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
         $labelsConfig->setShowLegendKey(false);
         $labelsConfig->setShowVal(false);
         $values[0]->setLabelLayout($labelsConfig);
+        $values[0]->setFillColor([
+            '16A34A', // Coincidente
+            'FACC15', // Sobrante
+            'DC2626', // Faltante
+            'DBEAFE', // No encontrado
+        ]);
 
         $chart->setTopLeftPosition('C1');
         $chart->setBottomRightPosition('P10');
@@ -149,7 +125,6 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
             'B1:B7' => ['font' => ['size' => 20]],
             9 => ['font' => ['bold' => true]],
             10 => ['font' => ['bold' => true]],
-            21 => ['font' => ['bold' => true, 'size' => 14]],
         ];
     }
 
@@ -161,29 +136,27 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
                 $highestRow = $sheet->getHighestRow();
 
                 $sheet->mergeCells('C1:P10');
-                $sheet->mergeCells('A21:E21');
                 $sheet->getStyle("A1:F{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
                 $sheet->getStyle('A1:B10')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
                 $sheet->getStyle('A1:B10')->getBorders()->getAllBorders()->getColor()->setRGB('D1D5DB');
                 $sheet->getStyle("A12:B19")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-                $sheet->getStyle("A21:E{$highestRow}")->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
-                $sheet->getStyle("A22:E{$highestRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-                $sheet->getStyle('A22:E22')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('5B3F86');
-                $sheet->getStyle('A22:E22')->getFont()->getColor()->setRGB('FFFFFF');
                 // Tarjetas ejecutivas: lectura inmediata del estado de la auditoría.
                 foreach ([
                     'A1:B2' => '1D4ED8',
                     'A4:B4' => '16A34A',
-                    'A5:B5' => '2563EB',
+                    'A5:B5' => 'FACC15',
                     'A6:B6' => 'DC2626',
-                    'A7:B7' => '6B7280',
+                    'A7:B7' => 'DBEAFE',
                     'A9:B10' => 'F3F4F6',
                 ] as $range => $color) {
                     $sheet->getStyle($range)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($color);
                     $sheet->getStyle($range)->getFont()->setBold(true);
                 }
                 $sheet->getStyle('A1:B2')->getFont()->getColor()->setRGB('FFFFFF');
-                $sheet->getStyle('A4:B7')->getFont()->getColor()->setRGB('FFFFFF');
+                $sheet->getStyle('A4:B4')->getFont()->getColor()->setRGB('FFFFFF');
+                $sheet->getStyle('A5:B5')->getFont()->getColor()->setRGB('111827');
+                $sheet->getStyle('A6:B6')->getFont()->getColor()->setRGB('FFFFFF');
+                $sheet->getStyle('A7:B7')->getFont()->getColor()->setRGB('111827');
                 $sheet->getStyle('A1:A10')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
                 $sheet->getStyle('B1:B10')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 $sheet->getRowDimension(1)->setRowHeight(30);
@@ -192,12 +165,8 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
                     $sheet->getRowDimension($row)->setRowHeight(24);
                 }
                 $sheet->getStyle('A12:A19')->getFont()->setBold(true)->getColor()->setRGB('374151');
-                $sheet->getStyle('A21:E21')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('111827');
-                $sheet->getStyle('A21:E21')->getFont()->getColor()->setRGB('FFFFFF');
-                $sheet->getStyle("A{$highestRow}:E{$highestRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
                 $sheet->getStyle('B1:B10')->getNumberFormat()->setFormatCode('#,##0');
                 $sheet->getStyle('B2')->getNumberFormat()->setFormatCode('0.00%');
-                $sheet->getStyle("B23:E{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
                 $sheet->getStyle('B1:B10')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 $sheet->getColumnDimension('A')->setWidth(35.38);
                 $sheet->getColumnDimension('B')->setWidth(17.63);
@@ -212,7 +181,7 @@ class PhysicalCountDashboardSheet implements FromArray, ShouldAutoSize, WithChar
                     $drawing->setName('Super Kay');
                     $drawing->setDescription('Logotipo Super Kay');
                     $drawing->setPath($logoPath);
-                    $drawing->setHeight(86);
+                    $drawing->setHeight(125);
                     // Bloque visual independiente debajo de la gráfica y junto
                     // a los filtros, sin tapar indicadores ni tablas.
                     $drawing->setCoordinates('C12');

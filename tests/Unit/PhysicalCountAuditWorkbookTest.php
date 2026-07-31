@@ -5,7 +5,9 @@ namespace Tests\Unit;
 use App\Exports\PhysicalCountConcentratedSheet;
 use App\Exports\PhysicalCountDashboardSheet;
 use App\Exports\PhysicalCountAuditWorkbookExport;
+use App\Exports\PhysicalCountLotsSheet;
 use App\Exports\PhysicalCountRoundsComparisonSheet;
+use App\Exports\PhysicalCountUserSheet;
 use App\Models\PhysicalCountRound;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Facades\Excel;
@@ -24,8 +26,8 @@ class PhysicalCountAuditWorkbookTest extends TestCase
         $rows = $sheet->array();
 
         $this->assertCount(3, $rows);
-        $this->assertSame('Producto contado', $rows[1][5]);
-        $this->assertSame('Producto no encontrado', $rows[2][5]);
+        $this->assertSame('Producto contado', $rows[1][2]);
+        $this->assertSame('Producto no encontrado', $rows[2][2]);
     }
 
     public function test_not_found_filter_exports_pending_products_instead_of_an_empty_sheet(): void
@@ -40,10 +42,119 @@ class PhysicalCountAuditWorkbookTest extends TestCase
         $rows = $sheet->array();
 
         $this->assertCount(2, $rows);
-        $this->assertSame('Producto no encontrado', $rows[1][5]);
+        $this->assertSame('Producto no encontrado', $rows[1][2]);
     }
 
-    public function test_dashboard_prints_all_filter_labels(): void
+    public function test_concentrated_sheet_uses_the_requested_product_and_participant_columns(): void
+    {
+        $user = (object) ['id' => 7, 'name' => 'Ana'];
+        $payload = $this->payload();
+        $payload['reportRows'] = collect([$payload['reportRows']->first()]);
+        $payload['entries'] = collect([(object) [
+            'physical_count_id' => 10,
+            'branch_product_id' => 100,
+            'user_id' => 7,
+            'counted_quantity' => 12,
+            'expired_quantity' => 2,
+            'damaged_quantity' => 1,
+        ]]);
+
+        $rows = (new PhysicalCountConcentratedSheet($payload, collect([$user])))->array();
+
+        $this->assertSame([
+            'Código(s) de barras',
+            'Categoría',
+            'Nombre del producto',
+            'Stock actual',
+            'Stock nuevo',
+            'Conteo físico Ana',
+            'Caducado Ana',
+            'Dañado Ana',
+        ], $rows[0]);
+        $this->assertSame(9.0, $rows[1][4]);
+        $this->assertSame([12.0, 2.0, 1.0], array_slice($rows[1], 5, 3));
+    }
+
+    public function test_concentrated_sheet_distinguishes_a_zero_count_from_a_product_without_capture(): void
+    {
+        $user = (object) ['id' => 7, 'name' => 'Ana'];
+        $payload = $this->payload();
+        $payload['reportRows'] = collect([$payload['reportRows']->first()]);
+        $payload['entries'] = collect([(object) [
+            'physical_count_id' => 10,
+            'branch_product_id' => 100,
+            'user_id' => 7,
+            'counted_quantity' => 0,
+            'expired_quantity' => 0,
+            'damaged_quantity' => 0,
+        ]]);
+
+        $rows = (new PhysicalCountConcentratedSheet($payload, collect([$user])))->array();
+
+        $this->assertEquals(0.0, $rows[1][4]);
+        $this->assertEquals(0.0, $rows[1][5]);
+    }
+
+    public function test_concentrated_sheet_keeps_alternate_barcodes_on_one_product_row(): void
+    {
+        $payload = $this->payload();
+        $first = $payload['reportRows']->first();
+        $first['product_codes'] = ['750000000001', '750000000099', '750000000123'];
+        $payload['reportRows'] = collect([$first]);
+
+        $rows = (new PhysicalCountConcentratedSheet($payload, collect()))->array();
+
+        $this->assertSame(
+            '750000000001, 750000000099, 750000000123',
+            $rows[1][0]
+        );
+        $this->assertCount(2, $rows);
+    }
+
+    public function test_user_sheet_only_contains_products_counted_by_that_user_without_checkboxes(): void
+    {
+        $user = (object) ['id' => 7, 'name' => 'Ana'];
+        $payload = $this->payload();
+        $payload['entries'] = collect([
+            (object) [
+                'physical_count_id' => 10,
+                'branch_product_id' => 100,
+                'user_id' => 7,
+                'counted_quantity' => 8,
+                'expired_quantity' => 1,
+                'damaged_quantity' => 2,
+                'notes' => 'Producto en exhibidor principal.',
+            ],
+            (object) [
+                'physical_count_id' => 10,
+                'branch_product_id' => 101,
+                'user_id' => 8,
+                'counted_quantity' => 3,
+                'expired_quantity' => 0,
+                'damaged_quantity' => 0,
+                'notes' => null,
+            ],
+        ]);
+
+        $rows = (new PhysicalCountUserSheet($payload, $user, 'Ana'))->array();
+
+        $this->assertSame([
+            'Código(s) de barras',
+            'Categoría',
+            'Nombre del producto',
+            'Stock actual',
+            'Conteo físico',
+            'Caducado',
+            'Dañado',
+            'Exhibido',
+            'Observaciones',
+        ], $rows[0]);
+        $this->assertCount(2, $rows);
+        $this->assertSame([8.0, 1.0, 2.0, 'Sí'], array_slice($rows[1], 4, 4));
+        $this->assertSame('Producto en exhibidor principal.', $rows[1][8]);
+    }
+
+    public function test_dashboard_prints_active_filter_labels(): void
     {
         $sheet = new PhysicalCountDashboardSheet(
             $this->payload(),
@@ -63,8 +174,11 @@ class PhysicalCountAuditWorkbookTest extends TestCase
         $rows = collect($sheet->array())->keyBy(fn (array $row) => $row[0] ?? null);
 
         $this->assertSame('Bebidas', $rows->get('Categoria')[1]);
+        $this->assertSame('Auditor', $rows->get('Usuario(s)')[1]);
         $this->assertSame('2026-07-29', $rows->get('Fecha de auditoría')[1]);
         $this->assertSame('refresco', $rows->get('Busqueda')[1]);
+        $this->assertNull($rows->get('Resumen por usuario'));
+        $this->assertNull($rows->get('Indicadores de supervisión'));
     }
 
     public function test_complete_workbook_can_be_generated_with_all_core_sheets(): void
@@ -72,7 +186,7 @@ class PhysicalCountAuditWorkbookTest extends TestCase
         $binary = Excel::raw(
             new PhysicalCountAuditWorkbookExport(
                 $this->payload(),
-                ['user_ids' => [], 'status' => ''],
+                ['audit_filters' => [], 'selected_results' => []],
                 [
                     'audit' => 'Todas',
                     'user' => 'Todos',
@@ -95,22 +209,60 @@ class PhysicalCountAuditWorkbookTest extends TestCase
 
             $this->assertSame([
                 'Dashboard',
-                'Control y filtros',
                 'Concentrado',
-                'Conteos consolidados',
-                'No encontrados',
-                'Diferencias',
-                'Resumen auditorias',
-                'Resumen sucursales',
-                'Resumen categorias',
             ], $workbook->getSheetNames());
-            $this->assertSame('Producto no encontrado', $workbook->getSheetByName('No encontrados')->getCell('F2')->getValue());
-            $this->assertSame('Usuario que contó', $workbook->getSheetByName('Conteos consolidados')->getCell('E1')->getValue());
             $this->assertFalse(in_array('Subcategoría', $workbook->getSheetByName('Concentrado')->toArray()[0], true));
-            $this->assertSame('Categoría', $workbook->getSheetByName('Control y filtros')->getCell('A9')->getValue());
         } finally {
             @unlink($path);
         }
+    }
+
+    public function test_lot_sheet_consolidates_each_product_and_lot_into_one_row(): void
+    {
+        $audit = (object) ['id' => 10, 'name' => 'Auditoría', 'folio' => 'AUD-001'];
+        $batch = (object) ['lot_number' => 'LOT-001', 'expiration_date' => now()->addMonth()];
+        $round = (object) ['round_number' => 1, 'type' => 'original'];
+        $payload = $this->payload();
+        $payload['audits'] = collect([$audit]);
+        $payload['reportRows'] = collect([$payload['reportRows']->first()]);
+        $payload['entries'] = collect([
+            (object) [
+                'physical_count_id' => 10,
+                'branch_product_id' => 100,
+                'product_batch_id' => 501,
+                'user_id' => 7,
+                'user' => (object) ['name' => 'Ana'],
+                'productBatch' => $batch,
+                'round' => $round,
+                'counted_quantity' => 8,
+                'expired_quantity' => 1,
+                'damaged_quantity' => 0,
+                'notes' => 'Primera captura',
+            ],
+            (object) [
+                'physical_count_id' => 10,
+                'branch_product_id' => 100,
+                'product_batch_id' => 501,
+                'user_id' => 8,
+                'user' => (object) ['name' => 'Blanca'],
+                'productBatch' => $batch,
+                'round' => $round,
+                'counted_quantity' => 4,
+                'expired_quantity' => 0,
+                'damaged_quantity' => 1,
+                'notes' => null,
+            ],
+        ]);
+
+        $rows = (new PhysicalCountLotsSheet($payload, collect([10])))->array();
+
+        $this->assertCount(2, $rows);
+        $this->assertSame('Código(s) de barras', $rows[0][0]);
+        $this->assertNotContains('Auditoría', $rows[0]);
+        $this->assertSame('LOT-001', $rows[1][3]);
+        $this->assertSame(12.0, $rows[1][6]);
+        $this->assertSame(10.0, $rows[1][9]);
+        $this->assertSame('Ana (8.00), Blanca (4.00)', $rows[1][11]);
     }
 
     public function test_round_comparison_keeps_original_values_and_uses_latest_recapture_as_final(): void
@@ -176,6 +328,7 @@ class PhysicalCountAuditWorkbookTest extends TestCase
                     'status' => 'matched',
                     'scanned_code' => '750000000001',
                     'product_name' => 'Producto contado',
+                    'category_name' => 'Categoría',
                     'system_stock' => 5,
                 ],
                 [
@@ -185,6 +338,7 @@ class PhysicalCountAuditWorkbookTest extends TestCase
                     'status' => 'pending',
                     'scanned_code' => '750000000002',
                     'product_name' => 'Producto no encontrado',
+                    'category_name' => 'Categoría',
                     'system_stock' => 3,
                 ],
             ]),

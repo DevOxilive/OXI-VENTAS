@@ -2,12 +2,9 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
-import GlobalTable from '@/Components/Tables/GlobalTable.vue'
+import AuditReportConfigurationTable from '@/Components/Audits/PhysicalCounts/AuditReportConfigurationTable.vue'
 import { usePhysicalCountReports } from '@/Composables/Audits/usePhysicalCountReports'
-import { physicalCountReportSummaryTableConfig } from '@/config/TableConfigs/physicalCountReportSummaryTableConfig'
-import { physicalCountReportDetailTableConfig } from '@/config/TableConfigs/physicalCountReportDetailTableConfig'
-import { physicalCountReportDifferencesTableConfig } from '@/config/TableConfigs/physicalCountReportDifferencesTableConfig'
-import { physicalCountReportRoundsTableConfig } from '@/config/TableConfigs/physicalCountReportRoundsTableConfig'
+import { computed, ref } from 'vue'
 
 defineOptions({ layout: AdminLayout })
 
@@ -17,7 +14,7 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     summary: { type: Object, default: () => ({}) },
     audits: { type: Array, default: () => [] },
-    users: { type: Array, default: () => [] },
+    auditPagination: { type: Object, default: null },
     categories: { type: Array, default: () => [] },
     reportRows: { type: Array, default: () => [] },
     reportPagination: { type: Object, default: null },
@@ -32,16 +29,25 @@ const props = defineProps({
 const {
     form,
     toolbarConfig,
-    summaryTableItems,
-    reportTableItems,
-    differencesTableItems,
-    roundSummaryItems,
+    auditConfigurations,
     backToReportsCenter,
     updateSearch,
-    updateFilter,
-    handleToolbarAction,
-    handlePageChange,
+    updateRecordsPerPage,
+    changePage,
+    exportReport,
 } = usePhysicalCountReports(props)
+
+const removedAuditIds = ref([])
+const visibleAudits = computed(() =>
+    props.audits.filter((audit) => !removedAuditIds.value.includes(Number(audit.id))),
+)
+
+function removeAuditFromTable(auditId) {
+    const normalizedId = Number(auditId)
+    if (!removedAuditIds.value.includes(normalizedId)) {
+        removedAuditIds.value = [...removedAuditIds.value, normalizedId]
+    }
+}
 </script>
 
 <template>
@@ -49,54 +55,22 @@ const {
         <template #toolbar>
             <GlobalToolbar
                 v-bind="toolbarConfig"
-                :active-tab="form.report_type"
-                :records-per-page="form.per_page"
                 @back="backToReportsCenter"
                 @update:search="updateSearch"
-                @update:filter="updateFilter"
-                @update:records-per-page="form.per_page = $event"
-                @update:active-tab="form.report_type = $event"
-                @action="handleToolbarAction"
+                @update:records-per-page="updateRecordsPerPage"
             />
         </template>
 
         <section class="space-y-5">
-            <template v-if="form.report_type === 'summary'">
-                <GlobalTable
-                    :items="summaryTableItems"
-                    v-bind="physicalCountReportSummaryTableConfig"
-                    row-key="id"
-                    :show-pagination="false"
-                />
-            </template>
-
-            <template v-else-if="form.report_type === 'detail'">
-                <GlobalTable
-                    :items="reportTableItems"
-                    v-bind="physicalCountReportDetailTableConfig"
-                    :pagination="reportPagination"
-                    row-key="id"
-                    @page-change="handlePageChange"
-                />
-            </template>
-
-            <template v-else-if="form.report_type === 'rounds'">
-                <GlobalTable
-                    :items="roundSummaryItems"
-                    v-bind="physicalCountReportRoundsTableConfig"
-                    row-key="id"
-                    :show-pagination="false"
-                />
-            </template>
-
-            <template v-else-if="form.report_type === 'differences'">
-                <GlobalTable
-                    :items="differencesTableItems"
-                    v-bind="physicalCountReportDifferencesTableConfig"
-                    row-key="id"
-                    :show-pagination="false"
-                />
-            </template>
+            <AuditReportConfigurationTable
+                v-model="auditConfigurations"
+                :audits="visibleAudits"
+                :categories="categories"
+                :pagination="auditPagination"
+                @export="({ type, auditId }) => exportReport(type, auditId)"
+                @remove="removeAuditFromTable"
+                @page-change="changePage"
+            />
         </section>
     </PageLayout>
 </template>
