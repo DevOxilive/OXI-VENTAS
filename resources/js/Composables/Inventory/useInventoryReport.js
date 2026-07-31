@@ -44,8 +44,8 @@ export function useInventoryReport(props) {
     })
 
     function backToReportsCenter() {
-        router.get(route('inventory.branches.reports', {
-            branch: props.currentBranch.id,
+        router.get(route('inventory.reports.select', {
+            report: 'inventory',
         }))
     }
 

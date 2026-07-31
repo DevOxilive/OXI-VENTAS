@@ -20,7 +20,7 @@ const props = defineProps({
     },
 })
 
-const pageTitle = computed(() => props.selectedReport?.label ?? 'Centro de reportes')
+const pageTitle = computed(() => props.selectedReport?.label ?? 'Reportes')
 
 const toolbarConfig = computed(() => ({
     title: pageTitle.value,
@@ -34,9 +34,9 @@ const toolbarConfig = computed(() => ({
 }))
 
 function openBranch(branch) {
-    const routeName = props.selectedReport?.routeName ?? 'inventory.branches.reports'
+    if (!props.selectedReport?.routeName) return
 
-    router.get(route(routeName, {
+    router.get(route(props.selectedReport.routeName, {
         branch: branch.id,
     }))
 }

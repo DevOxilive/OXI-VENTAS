@@ -10,7 +10,7 @@ export function getPhysicalCountReportsToolbarConfig({
             ? `Sucursal ${branch.name}`
             : 'Todas las sucursales accesibles',
         backButton: true,
-        backLabel: 'Centro de reportes',
+        backLabel: 'Sucursales',
         showSearch: true,
         searchPlaceholder: 'Buscar auditoría por nombre o folio...',
         recordsPerPage: Number(form?.per_page || 25),

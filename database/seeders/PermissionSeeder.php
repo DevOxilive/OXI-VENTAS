@@ -114,9 +114,18 @@ class PermissionSeeder extends Seeder
 
             // Reportes
             'reports.audits.view',
+            'reports.audits.export.excel',
+            'reports.audits.export.pdf',
             'reports.cash-closures.view',
+            'reports.cash-closures.create',
+            'reports.cash-closures.update',
+            'reports.cash-closures.delete',
             'reports.inventory.view',
+            'reports.inventory.export.excel',
+            'reports.inventory.export.pdf',
             'reports.movements.view',
+            'reports.movements.export.excel',
+            'reports.movements.export.pdf',
 
             // Impresoras
             'systems.tickets.view',

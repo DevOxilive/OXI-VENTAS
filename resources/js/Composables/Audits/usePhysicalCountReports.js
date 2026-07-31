@@ -26,8 +26,8 @@ export function usePhysicalCountReports(props) {
     )
 
     function backToReportsCenter() {
-        router.get(route('inventory.branches.reports', {
-            branch: props.branch?.id,
+        router.get(route('inventory.reports.select', {
+            report: 'audits',
         }))
     }
 
