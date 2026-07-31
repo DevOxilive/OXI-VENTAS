@@ -158,7 +158,10 @@ function renderCellContentFromValue(value, column) {
 
             <th v-for="column in visibleColumns" :key="column.key"
               class="sticky top-0 z-20 whitespace-nowrap bg-secondary px-4 py-3 text-left font-semibold"
-              :style="column.width ? { width: column.width } : {}">
+              :style="{
+                ...(column.width ? { width: column.width } : {}),
+                ...(column.minWidth ? { minWidth: column.minWidth } : {}),
+              }">
               {{ column.label }}
             </th>
 
@@ -193,6 +196,12 @@ function renderCellContentFromValue(value, column) {
 
             <td v-for="cell in tableRow.cells" :key="cell.key" class="px-4 py-3 align-middle"
               :class="cell.column.cellClass || ''">
+              <slot
+                :name="`cell-${cell.column.key}`"
+                :row="tableRow.row"
+                :value="cell.value"
+                :column="cell.column"
+              >
               <template v-if="cell.column.format === 'badge'">
                 <span :class="[
                   'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap',
@@ -245,6 +254,7 @@ function renderCellContentFromValue(value, column) {
                   {{ cell.content.content }}
                 </span>
               </template>
+              </slot>
             </td>
 
             <td v-if="canViewActions" class="px-4 py-3">

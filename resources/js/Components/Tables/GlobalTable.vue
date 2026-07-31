@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useSlots } from 'vue'
 import TableDesktop from './TableDesktop.vue'
 import TableMobile from './TableMobile.vue'
 
@@ -53,6 +53,7 @@ const emit = defineEmits([
   'update:selectedItems',
   'page-change',
 ])
+const slots = useSlots()
 
 const isMobileViewport = ref(false)
 let mobileMediaQuery = null
@@ -192,7 +193,11 @@ onBeforeUnmount(() => {
       @row-click="$emit('row-click', $event)"
       @selection-change="$emit('selection-change', $event)"
       @update:selectedItems="$emit('update:selectedItems', $event)"
-    />
+    >
+      <template v-for="(_, name) in slots" #[name]="slotProps">
+        <slot :name="name" v-bind="slotProps" />
+      </template>
+    </TableDesktop>
 
     <div v-else class="max-h-[560px] overflow-y-auto">
       <TableMobile
@@ -209,7 +214,11 @@ onBeforeUnmount(() => {
         @row-click="$emit('row-click', $event)"
         @selection-change="$emit('selection-change', $event)"
         @update:selectedItems="$emit('update:selectedItems', $event)"
-      />
+      >
+        <template v-for="(_, name) in slots" #[name]="slotProps">
+          <slot :name="name" v-bind="slotProps" />
+        </template>
+      </TableMobile>
     </div>
 
     <footer

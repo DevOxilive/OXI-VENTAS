@@ -275,7 +275,7 @@ class PhysicalCountController extends Controller
         ]);
         $this->snapshotService->ensureForAudit($physicalCount);
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'created'));
+        broadcast(new PhysicalCountChanged($physicalCount, 'created'))->toOthers();
         event(RealtimeActivityLogged::message('creó', 'la auditoría', $physicalCount->folio, 'Auditorías', 'created'));
 
         return redirect()
@@ -299,14 +299,16 @@ class PhysicalCountController extends Controller
         ]);
 
         $participantIds = collect($data['participant_ids'])
-            ->push($physicalCount->created_by)
             ->filter()
             ->unique()
             ->values();
 
-        $physicalCount->participants()->sync($participantIds);
+        $participantChanges = $physicalCount->participants()->sync($participantIds);
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'updated'));
+        broadcast(new PhysicalCountChanged($physicalCount->fresh(), 'participants_updated', [
+            'attached_user_ids' => array_values($participantChanges['attached'] ?? []),
+            'detached_user_ids' => array_values($participantChanges['detached'] ?? []),
+        ]))->toOthers();
         event(RealtimeActivityLogged::message('actualizó', 'la auditoría', $physicalCount->folio, 'Auditorías', 'updated'));
 
         return back()->with('success', 'Auditoría actualizada correctamente.');
@@ -437,7 +439,7 @@ class PhysicalCountController extends Controller
             ]);
         }
 
-        PhysicalCountEntry::create([
+        $entry = PhysicalCountEntry::create([
             'physical_count_id' => $physicalCount->id,
             'physical_count_round_id' => $this->currentRound($physicalCount)->id,
             'branch_product_id' => $data['branch_product_id'],
@@ -452,7 +454,15 @@ class PhysicalCountController extends Controller
             'notes' => $data['notes'] ?? null,
         ]);
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'entry_created'));
+        $entry->load('user:id,name');
+        broadcast(new PhysicalCountChanged($physicalCount, 'entry_created', [
+            'entry' => [
+                'id' => $entry->id,
+                'branch_product_id' => $entry->branch_product_id,
+                'product_batch_id' => $entry->product_batch_id,
+                'user' => $entry->user ? ['id' => $entry->user->id, 'name' => $entry->user->name] : null,
+            ],
+        ]))->toOthers();
         event(RealtimeActivityLogged::message('registró', 'una captura en la auditoría', $physicalCount->folio, 'Auditorías', 'entry_created'));
 
         return redirect()
@@ -491,7 +501,13 @@ class PhysicalCountController extends Controller
         }
 
         $entry->update($data);
-        broadcast(new PhysicalCountChanged($entry->physicalCount, 'entry_updated'));
+        broadcast(new PhysicalCountChanged($entry->physicalCount, 'entry_updated', [
+            'entry' => [
+                'id' => $entry->id,
+                'branch_product_id' => $entry->branch_product_id,
+                'product_batch_id' => $entry->product_batch_id,
+            ],
+        ]))->toOthers();
         event(RealtimeActivityLogged::message('actualizó', 'una captura en la auditoría', $entry->physicalCount->folio, 'Auditorías', 'entry_updated'));
 
         return back()->with('success', 'Registro actualizado correctamente.');
@@ -510,9 +526,30 @@ class PhysicalCountController extends Controller
         }
 
         $physicalCount = $entry->physicalCount;
+        $deletedEntry = [
+            'id' => $entry->id,
+            'branch_product_id' => $entry->branch_product_id,
+            'product_batch_id' => $entry->product_batch_id,
+        ];
         $entry->delete();
 
-        broadcast(new PhysicalCountChanged($physicalCount, 'entry_deleted'));
+        $remainingEntries = $this->currentRoundEntriesQuery($physicalCount)
+            ->where('product_batch_id', $deletedEntry['product_batch_id'])
+            ->with('user:id,name')
+            ->get();
+        broadcast(new PhysicalCountChanged($physicalCount, 'entry_deleted', [
+            'entry' => $deletedEntry,
+            'batch_status' => [
+                'is_counted' => $remainingEntries->isNotEmpty(),
+                'count_records' => $remainingEntries->count(),
+                'counted_by' => $remainingEntries->pluck('user')
+                    ->filter()
+                    ->unique('id')
+                    ->map(fn ($user) => ['id' => $user->id, 'name' => $user->name])
+                    ->values()
+                    ->all(),
+            ],
+        ]))->toOthers();
         event(RealtimeActivityLogged::message('eliminó', 'una captura en la auditoría', $physicalCount->folio, 'Auditorías', 'entry_deleted'));
 
         return back()->with('success', 'Registro eliminado correctamente.');
@@ -1135,6 +1172,12 @@ class PhysicalCountController extends Controller
                 $payload['stock'] = (float) $snapshotRow['system_stock'];
             }
 
+            $payload['batches'] = $this->withBatchCountingStatus(
+                $physicalCount,
+                $branchProduct,
+                collect($payload['batches'])
+            );
+
             return $payload;
         }
 
@@ -1174,7 +1217,43 @@ class PhysicalCountController extends Controller
             $payload['stock'] = $currentStock ?? $branchProduct->stock;
         }
 
+        $payload['batches'] = $this->withBatchCountingStatus(
+            $physicalCount,
+            $branchProduct,
+            collect($payload['batches'])
+        );
+
         return $payload;
+    }
+
+    private function withBatchCountingStatus(
+        PhysicalCount $physicalCount,
+        BranchProduct $branchProduct,
+        Collection $batches
+    ): Collection {
+        $countedByBatch = $this->currentRoundEntriesQuery($physicalCount)
+            ->where('branch_product_id', $branchProduct->id)
+            ->with('user:id,name')
+            ->get()
+            ->groupBy('product_batch_id');
+
+        return $batches->map(function ($batch) use ($countedByBatch) {
+            $batch = is_array($batch) ? $batch : $batch->toArray();
+            $entries = $countedByBatch->get($batch['id'], collect());
+            $users = $entries
+                ->pluck('user')
+                ->filter()
+                ->unique('id')
+                ->map(fn ($user) => ['id' => $user->id, 'name' => $user->name])
+                ->values();
+
+            return [
+                ...$batch,
+                'is_counted' => $entries->isNotEmpty(),
+                'counted_by' => $users,
+                'count_records' => $entries->count(),
+            ];
+        })->values();
     }
 
     private function hydrateAuditSnapshots(Collection $audits): void
@@ -1213,9 +1292,8 @@ class PhysicalCountController extends Controller
             || $user?->hasPermission('audits.physical-counts.close')
               || $user?->hasPermission('audits.physical-counts.reopen')
               || $user?->hasPermission('audits.physical-counts.finalize')
-            || $user?->hasPermission('audits.physical-counts.participants')
-            || $user?->hasPermission('audits.physical-counts.apply')
-            || $user?->hasPermission('audits.physical-counts.delete'));
+              || $user?->hasPermission('audits.physical-counts.participants')
+              || $user?->hasPermission('audits.physical-counts.apply'));
     }
 
     private function canViewReports(Request $request): bool

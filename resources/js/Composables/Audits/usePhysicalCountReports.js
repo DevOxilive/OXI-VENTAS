@@ -1,3 +1,5 @@
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { router } from '@inertiajs/vue3'
 import { computed, onBeforeUnmount, onMounted, reactive, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
@@ -11,87 +13,20 @@ export function usePhysicalCountReports(props) {
     let filterReloadTimeout = null
     let syncingFromServer = false
 
-    const { handlePageChange } = useGlobalTablePagination({
-        only: [
-            'summary',
-            'reportRows',
-            'reportPagination',
-            'audits',
-            'filters',
-            'userSummary',
-            'categorySummary',
-            'branchSummary',
-            'auditSummary',
-            'roundSummary',
-            'topDifferences',
-        ],
-    })
     const form = reactive({
         branch: props.filters.branch || '',
-        physical_count_id: props.filters.physical_count_id || '',
-        user_id: props.filters.user_id || '',
-        user_ids: props.filters.user_ids || [],
-        user_scope: props.filters.user_scope || 'participants',
-        category_id: props.filters.category_id || '',
-        report_date: props.filters.report_date || '',
-        status: props.filters.status || '',
         search: props.filters.search || '',
-        report_type: props.filters.report_type || 'summary',
         per_page: Number(props.filters.per_page || 25),
     })
+    const auditConfigurations = ref(props.filters.audit_filters || {})
 
     const toolbarConfig = computed(() =>
         getPhysicalCountReportsToolbarConfig({
             branch: props.branch,
             form,
-            branches: props.branches,
-            audits: props.audits,
-            users: props.users,
-            categories: props.categories,
+            pagination: props.auditPagination,
         })
     )
-
-    const summaryTableItems = computed(() => [
-        { id: 'audits', indicator: 'Auditorías', value: props.summary.audits ?? 0 },
-        { id: 'records', indicator: 'Registros', value: props.summary.records ?? 0 },
-        { id: 'participants', indicator: 'Usuarios', value: props.summary.participants ?? 0 },
-        { id: 'counted_products', indicator: 'Contados', value: props.summary.counted_products ?? 0 },
-        { id: 'pending_products', indicator: 'No encontrados', value: props.summary.pending_products ?? 0 },
-        { id: 'missing_products', indicator: 'Faltantes', value: props.summary.missing_products ?? 0 },
-        { id: 'surplus_products', indicator: 'Sobrantes', value: props.summary.surplus_products ?? 0 },
-        { id: 'matched_products', indicator: 'Coincidentes', value: props.summary.matched_products ?? 0 },
-    ])
-
-    const reportTableItems = computed(() =>
-        props.reportRows.map((row) => ({
-            ...row,
-            participantsLabel: Array.isArray(row.participants) ? row.participants.join(', ') : 'Sin registros',
-            differenceLabel: row.difference ?? '-',
-        }))
-    )
-
-    const differencesTableItems = computed(() =>
-        props.topDifferences.map((row) => ({
-            ...row,
-            differenceLabel: row.difference ?? '-',
-        }))
-    )
-
-    const branchSummaryItems = computed(() =>
-        (props.branchSummary || []).map((row) => ({
-            ...row,
-            advanceLabel: `${Math.round((Number(row.advance) || 0) * 100)}%`,
-        }))
-    )
-
-    const auditSummaryItems = computed(() =>
-        (props.auditSummary || []).map((row) => ({
-            ...row,
-            advanceLabel: `${Math.round((Number(row.advance) || 0) * 100)}%`,
-        }))
-    )
-
-    const roundSummaryItems = computed(() => props.roundSummary || [])
 
     function backToReportsCenter() {
         router.get(route('inventory.branches.reports', {
@@ -102,38 +37,19 @@ export function usePhysicalCountReports(props) {
     function buildQuery(overrides = {}) {
         return {
             branch: form.branch || '',
-            physical_count_id: form.physical_count_id || '',
-            user_id: form.user_id || '',
-            user_ids: form.user_ids || [],
-            user_scope: form.user_scope || 'participants',
-            category_id: form.category_id || '',
-            report_date: form.report_date || '',
-            status: form.status || '',
             search: form.search || '',
-            report_type: form.report_type || 'summary',
-            per_page: form.per_page || 25,
+            per_page: form.per_page,
+            audit_filters: JSON.stringify(auditConfigurations.value),
             ...overrides,
         }
     }
 
     function applyFilters(overrides = {}) {
-        router.get(route('audits.physical-counts.reports'), buildQuery({ page: 1, ...overrides }), {
+        router.get(route('audits.physical-counts.reports'), buildQuery(overrides), {
             preserveScroll: true,
             preserveState: true,
             replace: true,
-            only: [
-                'summary',
-                'reportRows',
-                'reportPagination',
-                'audits',
-                'filters',
-                'userSummary',
-                'categorySummary',
-                'branchSummary',
-                'auditSummary',
-                'roundSummary',
-                'topDifferences',
-            ],
+            only: ['audits', 'auditPagination', 'filters', 'summary'],
         })
     }
 
@@ -141,80 +57,43 @@ export function usePhysicalCountReports(props) {
         form.search = value
     }
 
-    function updateFilter({ key, value }) {
-        if (key === 'branch' && value !== form.branch && form.physical_count_id) {
-            form.physical_count_id = ''
-        }
-
-        if (['branch', 'physical_count_id', 'user_scope'].includes(key)) {
-            form.user_ids = []
-            form.user_id = ''
-        }
-
-        if (key === 'search') {
-            form.search = value
-            return
-        }
-
-        form[key] = value
+    function updateRecordsPerPage(value) {
+        form.per_page = Number(value)
     }
 
-    function clearFilters() {
-        form.branch = ''
-        form.physical_count_id = ''
-        form.user_id = ''
-        form.user_ids = []
-        form.user_scope = 'participants'
-        form.category_id = ''
-        form.report_date = ''
-        form.status = ''
-        form.search = ''
-        form.report_type = 'summary'
-        form.per_page = 25
-        router.get(route('audits.physical-counts.reports'), { branch: form.branch }, {
-            preserveScroll: true,
-            preserveState: true,
-            replace: true,
-            only: [
-                'summary',
-                'reportRows',
-                'reportPagination',
-                'audits',
-                'filters',
-                'userSummary',
-                'categorySummary',
-                'branchSummary',
-                'auditSummary',
-                'roundSummary',
-                'topDifferences',
-            ],
-        })
+    function changePage(url) {
+        if (!url) return
+        const page = Number(new URL(url, window.location.origin).searchParams.get('page') || 1)
+        applyFilters({ page })
     }
 
-    function handleToolbarAction(action) {
-        const actionId = typeof action === 'string' ? action : action?.id
+    function exportReport(type, auditId = null) {
+        const routeName = type === 'pdf'
+            ? 'audits.physical-counts.reports.export-pdf'
+            : 'audits.physical-counts.reports.export-excel'
+        const configuration = auditId === null
+            ? auditConfigurations.value
+            : {
+                [String(auditId)]: auditConfigurations.value[String(auditId)] || {
+                    user_ids: [],
+                    category_ids: [],
+                    results: [],
+                    include_lots: false,
+                },
+            }
 
-        if (actionId === 'filter') {
-            applyFilters()
-            return
-        }
-
-        if (actionId === 'clear') {
-            clearFilters()
-            return
-        }
-
-        if (actionId === 'excel') {
-            window.location.href = route('audits.physical-counts.reports.export-excel', buildQuery())
-            return
-        }
-
-        if (actionId === 'pdf') {
-            window.location.href = route('audits.physical-counts.reports.export-pdf', buildQuery())
-        }
+        window.location.href = route(routeName, buildQuery({
+            audit_ids: auditId === null ? [] : [auditId],
+            audit_filters: JSON.stringify(configuration),
+        }))
     }
 
     function reloadReports() {
+        router.reload({
+            only: ['audits', 'auditPagination', 'filters', 'summary'],
+            preserveScroll: true,
+            preserveState: true,
+        })
         refreshRealtimeProps(page, [
                 'summary',
                 'reportRows',
@@ -235,76 +114,46 @@ export function usePhysicalCountReports(props) {
         (filters) => {
             syncingFromServer = true
             form.branch = filters.branch || ''
-            form.physical_count_id = filters.physical_count_id || ''
-            form.user_id = filters.user_id || ''
-            form.user_ids = filters.user_ids || []
-            form.user_scope = filters.user_scope || 'participants'
-            form.category_id = filters.category_id || ''
-            form.report_date = filters.report_date || ''
-            form.status = filters.status || ''
             form.search = filters.search || ''
-            form.report_type = filters.report_type || 'summary'
             form.per_page = Number(filters.per_page || 25)
             setTimeout(() => {
                 syncingFromServer = false
             }, 0)
         },
-        { deep: true }
+        { deep: true },
     )
 
     watch(
-        () => ({
-            branch: form.branch,
-            physical_count_id: form.physical_count_id,
-            user_ids: [...form.user_ids],
-            user_scope: form.user_scope,
-            category_id: form.category_id,
-            report_date: form.report_date,
-            status: form.status,
-            search: form.search,
-            report_type: form.report_type,
-            per_page: form.per_page,
-        }),
+        () => ({ search: form.search, per_page: form.per_page }),
         () => {
             if (syncingFromServer) return
-
             clearTimeout(filterReloadTimeout)
-            filterReloadTimeout = setTimeout(() => {
-                applyFilters()
-            }, 450)
+            filterReloadTimeout = setTimeout(applyFilters, 450)
         },
-        { deep: true }
+        { deep: true },
     )
 
     onMounted(() => {
         unsubscribePhysicalCountChanged = subscribeRealtime(
             REALTIME_CHANNELS.audits,
             REALTIME_EVENTS.physicalCountChanged,
-            () => {
-                reloadReports()
-            },
+            reloadReports,
         )
     })
 
     onBeforeUnmount(() => {
         clearTimeout(filterReloadTimeout)
-
         unsubscribePhysicalCountChanged?.()
     })
 
     return {
         form,
         toolbarConfig,
-        summaryTableItems,
-        reportTableItems,
-        differencesTableItems,
-        branchSummaryItems,
-        auditSummaryItems,
-        roundSummaryItems,
+        auditConfigurations,
         backToReportsCenter,
         updateSearch,
-        updateFilter,
-        handleToolbarAction,
-        handlePageChange,
+        updateRecordsPerPage,
+        changePage,
+        exportReport,
     }
 }

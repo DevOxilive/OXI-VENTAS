@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
@@ -50,6 +50,7 @@ const props = defineProps({
 })
 
 const { can } = usePermissions()
+const page = usePage()
 const { handlePageChange } = useGlobalTablePagination({
     only: ['physicalCounts', 'filters'],
 })
@@ -64,7 +65,19 @@ const selectedPhysicalCount = ref(null)
 const reopeningPhysicalCount = ref(false)
 let filterTimeout = null
 
-const physicalCounts = computed(() => props.physicalCounts?.data || [])
+const physicalCounts = ref([...(props.physicalCounts?.data || [])])
+watch(() => props.physicalCounts?.data, (rows) => {
+    physicalCounts.value = [...(rows || [])]
+})
+
+const canManageAnyAudit = computed(() => [
+    'audits.physical-counts.create',
+    'audits.physical-counts.close',
+    'audits.physical-counts.reopen',
+    'audits.physical-counts.finalize',
+    'audits.physical-counts.participants',
+    'audits.physical-counts.apply',
+].some(can))
 
 const physicalCountToolbarConfig = computed(() =>
     getPhysicalCountToolbarConfig({
@@ -254,8 +267,44 @@ onMounted(() => {
     unsubscribePhysicalCountChanged = subscribeRealtime(
         REALTIME_CHANNELS.audits,
         REALTIME_EVENTS.physicalCountChanged,
-        () => {
-            reloadPhysicalCounts()
+        (event) => {
+            const incoming = event.physicalCount
+            if (!incoming || Number(incoming.branch_id) !== Number(props.branch?.id)) return
+
+            const currentUserId = Number(page.props.auth?.user?.id)
+            const wasDetached = (event.details?.detached_user_ids || [])
+                .map(Number)
+                .includes(currentUserId)
+            const isParticipant = (incoming.participant_ids || [])
+                .map(Number)
+                .includes(currentUserId)
+            const maySeeAudit = canManageAnyAudit.value || isParticipant
+            const index = physicalCounts.value.findIndex((row) => Number(row.id) === Number(incoming.id))
+
+            if (event.action === 'deleted' || wasDetached || !maySeeAudit) {
+                if (index >= 0) physicalCounts.value.splice(index, 1)
+                return
+            }
+
+            if (index >= 0) {
+                physicalCounts.value[index] = {
+                    ...physicalCounts.value[index],
+                    ...incoming,
+                }
+                return
+            }
+
+            const matchesStatus = !statusFilter.value || incoming.status === statusFilter.value
+            const term = search.value.trim().toLowerCase()
+            const matchesSearch = !term || [
+                incoming.name,
+                incoming.folio,
+                ...(incoming.participants || []).map((participant) => participant.name),
+            ].some((value) => String(value || '').toLowerCase().includes(term))
+
+            if (matchesStatus && matchesSearch) {
+                physicalCounts.value.unshift(incoming)
+            }
         },
     )
 })
@@ -317,7 +366,6 @@ watch(search, () => {
             :physical-count="selectedPhysicalCount"
             :users="props.users"
             @close="showParticipantsModal = false"
-            @updated="reloadPhysicalCounts"
         />
 
         <ReopenPhysicalCountModal

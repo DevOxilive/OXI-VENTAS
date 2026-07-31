@@ -18,13 +18,8 @@ class PhysicalCountAuditWorkbookExport implements WithMultipleSheets
         protected string $branchName
     ) {
         $entries = collect($this->payload['entries'] ?? []);
-        $selectedUserIds = collect($this->filters['user_ids'] ?? [])
-            ->map(fn ($id) => (int) $id)
-            ->filter()
-            ->unique()
-            ->values();
-        $this->statusFilter = ($this->filters['status'] ?? '') ?: null;
-        $this->mainSheetTitle = $this->statusSheetTitle($this->statusFilter) ?? 'Concentrado';
+        $this->statusFilter = null;
+        $this->mainSheetTitle = 'Concentrado';
 
         $visibleEntryKeys = collect($this->payload['reportRows'] ?? [])
             ->where('row_type', 'counted')
@@ -36,57 +31,66 @@ class PhysicalCountAuditWorkbookExport implements WithMultipleSheets
         $visibleEntries = $visibleEntryKeys->isEmpty()
             ? collect()
             : $entries->filter(fn ($entry) => $visibleEntryKeys->contains($entry->physical_count_id . ':' . $entry->branch_product_id));
+        $this->payload['entries'] = $visibleEntries->values();
 
-        $this->users = $visibleEntries
+        $entryUsers = $visibleEntries
             ->pluck('user')
             ->filter()
-            ->when($selectedUserIds->isNotEmpty(), fn ($users) => $users
-                ->filter(fn ($user) => $selectedUserIds->contains((int) $user->id)))
             ->unique('id')
             ->values();
+        $auditParticipants = collect($this->payload['audits'] ?? [])
+            ->flatMap(fn ($audit) => $audit->participants ?? [])
+            ->filter()
+            ->unique('id')
+            ->values();
+        $selectedUserIds = collect($this->filters['audit_filters'] ?? [])
+            ->flatMap(fn ($configuration) => $configuration['user_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $availableUsers = $auditParticipants
+            ->merge($entryUsers)
+            ->unique('id')
+            ->values();
+
+        $this->users = $selectedUserIds->isEmpty()
+            ? $availableUsers
+            : $availableUsers->filter(fn ($user) => $selectedUserIds->contains((int) $user->id))->values();
     }
 
     public function sheets(): array
     {
         $sheets = [
             new PhysicalCountDashboardSheet($this->payload, $this->filterLabels, $this->branchName, $this->mainSheetTitle, $this->users, $this->statusFilter),
-            new PhysicalCountControlSheet($this->payload, $this->filterLabels, $this->branchName),
             new PhysicalCountConcentratedSheet($this->payload, $this->users, $this->mainSheetTitle, $this->statusFilter),
         ];
 
-        $rounds = collect($this->payload['rounds'] ?? [])->sortBy([
-            ['physical_count_id', 'asc'],
-            ['round_number', 'asc'],
-        ])->values();
-
-        if ($rounds->isNotEmpty()) {
-            $sheets[] = new PhysicalCountRoundsComparisonSheet($this->payload);
-
-            foreach ($rounds as $round) {
-                $audit = collect($this->payload['audits'] ?? [])->firstWhere('id', $round->physical_count_id);
-                $baseTitle = sprintf(
-                    'R%d %s %s',
-                    $round->round_number,
-                    $round->type === 'original' ? 'Original' : 'Reapertura',
-                    $audit?->folio ? mb_substr($audit->folio, -4) : ''
-                );
-                $sheets[] = new PhysicalCountRoundSheet(
-                    $round,
+        $selectedResults = collect($this->filters['selected_results'] ?? []);
+        foreach (['matched', 'missing', 'surplus'] as $result) {
+            if ($selectedResults->contains($result)) {
+                $sheets[] = new PhysicalCountConcentratedSheet(
                     $this->payload,
-                    $this->safeSheetTitle($baseTitle)
+                    $this->users,
+                    $this->statusSheetTitle($result),
+                    $result
                 );
             }
         }
+        if ($selectedResults->contains('not_found')) {
+            $sheets[] = new PhysicalCountPendingSheet($this->payload);
+        }
 
-        array_push(
-            $sheets,
-            new PhysicalCountConsolidatedCountsSheet($this->payload),
-            new PhysicalCountPendingSheet($this->payload),
-            new PhysicalCountDifferencesSheet($this->payload),
-            new PhysicalCountAuditSummarySheet($this->payload),
-            new PhysicalCountBranchSummarySheet($this->payload),
-            new PhysicalCountCategorySummarySheet($this->payload),
-        );
+        $lotAuditIds = collect($this->filters['audit_filters'] ?? [])
+            ->filter(fn ($configuration) => (bool) ($configuration['include_lots'] ?? false))
+            ->keys()
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values();
+        if ($lotAuditIds->isNotEmpty()) {
+            $sheets[] = new PhysicalCountLotsSheet($this->payload, $lotAuditIds);
+        }
 
         $usedTitles = collect($sheets)->map(fn ($sheet) => mb_strtolower($sheet->title()))->all();
 

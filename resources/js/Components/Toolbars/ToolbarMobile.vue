@@ -345,7 +345,11 @@ function multiFilterLabel(filter) {
                             key: filter.key,
                             value: $event.target.value
                         })">
-                        <option :value="filter.emptyValue ?? ''">
+                        <option
+                            :value="filter.emptyValue ?? ''"
+                            :disabled="filter.hidePlaceholderOption"
+                            :hidden="filter.hidePlaceholderOption"
+                        >
                             {{ filter.placeholder || filter.label }}
                         </option>
 

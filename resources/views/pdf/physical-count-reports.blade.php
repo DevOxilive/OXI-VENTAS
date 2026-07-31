@@ -4,26 +4,54 @@
     <meta charset="UTF-8">
     <title>Reporte de auditoría</title>
     <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10px; color: #111827; }
-        h1 { font-size: 18px; margin-bottom: 4px; }
-        h2 { font-size: 13px; margin-top: 18px; margin-bottom: 8px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #d1d5db; padding: 5px; text-align: left; vertical-align: top; }
-        th { background: #f3f4f6; }
+        @page { margin: 26px 24px 34px; }
+        body { margin: 0; font-family: DejaVu Sans, sans-serif; font-size: 8px; color: #111827; }
+        h1 { margin: 0 0 3px; font-size: 17px; color: #4c3575; }
+        h2 { margin: 12px 0 6px; font-size: 11px; color: #111827; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #d1d5db; padding: 4px; text-align: left; vertical-align: middle; }
+        th { background: #5b3f86; color: #fff; font-size: 7px; }
         .muted { color: #6b7280; }
+        .meta { margin: 0 0 8px; line-height: 1.45; }
+        .summary-table td { width: 12%; }
+        .summary-table th { width: 13%; background: #f3f4f6; color: #374151; }
+        .filters-table th { width: 14%; background: #f3f4f6; color: #374151; }
+        .filters-table td { width: 36%; }
+        .detail-table { table-layout: fixed; }
+        .detail-table thead { display: table-header-group; }
+        .detail-table td { overflow-wrap: anywhere; word-wrap: break-word; }
+        .detail-table .participants { display: block; margin-top: 3px; color: #64748b; font-size: 6.5px; }
+        .text-center { text-align: center; }
+        .result { font-weight: bold; text-align: center; }
+        .result-matched { color: #15803d; }
+        .result-missing { color: #c2410c; }
+        .result-surplus { color: #a16207; }
+        .result-pending { color: #1d4ed8; }
+        .footer {
+            position: fixed;
+            right: 0;
+            bottom: -22px;
+            left: 0;
+            color: #6b7280;
+            text-align: center;
+            font-size: 7px;
+        }
+        .footer .page-number:after { content: counter(page); }
     </style>
 </head>
 <body>
+    <div class="footer">Super Kay · Reporte de auditoría · Página <span class="page-number"></span></div>
+
     <h1>Reporte de auditoría</h1>
 
-    <p class="muted">
+    <p class="muted meta">
         Sucursal: {{ $branch->name ?? 'Sin sucursal' }}<br>
         Generado: {{ now()->format('d/m/Y H:i') }}<br>
         Tipo de reporte: {{ $sectionTitle }}
     </p>
 
     <h2>Resumen general</h2>
-    <table>
+    <table class="summary-table">
         <tr>
             <th>Auditorías</th>
             <td>{{ $summary['audits'] ?? 0 }}</td>
@@ -51,7 +79,7 @@
     </table>
 
     <h2>Filtros aplicados</h2>
-    <table>
+    <table class="filters-table">
         <tr>
             <th>Auditoría</th>
             <td>{{ $filterLabels['audit'] ?? 'Todas' }}</td>
@@ -72,25 +100,61 @@
         </tr>
     </table>
 
-    <h2>{{ $sectionTitle }}</h2>
-    <table>
+    <h2>Detalle de productos</h2>
+    <table class="detail-table">
+        <colgroup>
+            <col style="width: 12%">
+            <col style="width: 24%">
+            <col style="width: 12%">
+            <col style="width: 8%">
+            <col style="width: 8%">
+            <col style="width: 8%">
+            <col style="width: 8%">
+            <col style="width: 8%">
+            <col style="width: 12%">
+        </colgroup>
         <thead>
             <tr>
-                @foreach ($headings as $heading)
-                    <th>{{ $heading }}</th>
-                @endforeach
+                <th>Código</th>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th class="text-center">Stock sistema</th>
+                <th class="text-center">Conteo físico</th>
+                <th class="text-center">Dañado</th>
+                <th class="text-center">Caducado</th>
+                <th class="text-center">Diferencia</th>
+                <th class="text-center">Resultado</th>
             </tr>
         </thead>
         <tbody>
-            @forelse ($rows as $row)
+            @forelse ($detailRows as $row)
+                @php
+                    $result = ($row['row_type'] ?? null) === 'pending'
+                        ? 'pending'
+                        : ($row['status'] ?? 'pending');
+                    $participants = implode(', ', $row['participants'] ?? []);
+                @endphp
                 <tr>
-                    @foreach ($row as $value)
-                        <td>{{ $value }}</td>
-                    @endforeach
+                    <td>{{ $row['scanned_code'] ?? '-' }}</td>
+                    <td>
+                        {{ $row['product_name'] ?? 'Sin producto' }}
+                        <span class="participants">
+                            <strong>Participantes:</strong> {{ $participants ?: 'Sin captura registrada' }}
+                        </span>
+                    </td>
+                    <td>{{ $row['category_name'] ?? 'Sin categoría' }}</td>
+                    <td class="text-center">{{ number_format((float) ($row['system_stock'] ?? 0), 2) }}</td>
+                    <td class="text-center">{{ number_format((float) ($row['counted_stock'] ?? 0), 2) }}</td>
+                    <td class="text-center">{{ number_format((float) ($row['damaged_stock'] ?? 0), 2) }}</td>
+                    <td class="text-center">{{ number_format((float) ($row['expired_stock'] ?? 0), 2) }}</td>
+                    <td class="text-center">
+                        {{ ($row['difference'] ?? null) === null ? '-' : number_format((float) $row['difference'], 2) }}
+                    </td>
+                    <td class="result result-{{ $result }}">{{ $row['status_label'] ?? 'Pendiente' }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="{{ count($headings) }}">No hay resultados con los filtros seleccionados.</td>
+                    <td colspan="9">No hay resultados con los filtros seleccionados.</td>
                 </tr>
             @endforelse
         </tbody>

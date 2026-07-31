@@ -22,7 +22,7 @@ class PhysicalCountPendingSheet implements FromArray, WithColumnFormatting, With
     public function array(): array
     {
         return [
-            ['Sucursal', 'Auditoría', 'Folio', 'Fecha', 'Código', 'Producto', 'Categoría', 'Stock inicial', 'Estado'],
+            ['Sucursal', 'Auditoría', 'Folio', 'Fecha', 'Código(s)', 'Producto', 'Categoría', 'Stock inicial', 'Estado'],
             ...collect($this->payload['reportRows'] ?? [])
                 ->where('row_type', 'pending')
                 ->map(fn (array $row) => [
@@ -30,7 +30,7 @@ class PhysicalCountPendingSheet implements FromArray, WithColumnFormatting, With
                     $row['audit_name'] ?? 'Sin auditoría',
                     $row['folio'] ?? 'Sin folio',
                     $row['audit_date'] ?? null,
-                    $row['scanned_code'] ?? '-',
+                    PhysicalCountBarcodeList::fromRow($row),
                     $row['product_name'] ?? 'Sin producto',
                     $row['category_name'] ?? 'Sin categoría',
                     (float) ($row['system_stock'] ?? 0),
