@@ -10,6 +10,7 @@ use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductBatch;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
 use Illuminate\Http\JsonResponse;
@@ -315,12 +316,31 @@ class ProductController extends Controller
             ]);
         }
 
+        $branchIds = collect($data['branch_ids'] ?? [])
+            ->push($branch->id)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $blockedRetirements = BranchProduct::query()
+            ->with('branch:id,name')
+            ->where('product_id', $product->id)
+            ->whereNotIn('branch_id', $branchIds->all())
+            ->get()
+            ->filter(fn (BranchProduct $branchProduct) => $this->hasProtectedInventory($branchProduct));
+
+        if ($blockedRetirements->isNotEmpty()) {
+            return back()->withErrors([
+                'branch_ids' => $this->protectedInventoryMessage($blockedRetirements),
+            ]);
+        }
+
         $previousBranchIds = BranchProduct::where('product_id', $product->id)
             ->pluck('branch_id')
             ->map(fn ($id) => (int) $id)
             ->values();
 
-        $branchIds = DB::transaction(function () use ($request, $data, $product, $branch, $barcodes) {
+        $branchIds = DB::transaction(function () use ($request, $data, $product, $barcodes, $branchIds) {
             $imagePath = $product->image;
 
             if ($request->hasFile('image')) {
@@ -358,31 +378,12 @@ class ProductController extends Controller
                 ]);
             }
 
-            $branchIds = collect($data['branch_ids'] ?? [])
-                ->push($branch->id)
-                ->map(fn ($id) => (int) $id)
-                ->unique()
-                ->values();
-
             foreach ($branchIds as $branchId) {
-                BranchProduct::updateOrCreate(
-                    [
-                        'branch_id' => $branchId,
-                        'product_id' => $product->id,
-                    ],
-                    [
-                        'stock' => $data['stock'] ?? 0,
-                        'min_stock' => $data['min_stock'] ?? 0,
-                        'status' => BranchProduct::STATUS_ACTIVE,
-                        'tracks_batches' => false,
-                        'tracks_expiration' => false,
-                        'entry_date' => $data['entry_date'],
-                    ]
-                );
+                $this->activateProductForBranch($product, $branchId, $data);
             }
 
             BranchProduct::where('product_id', $product->id)
-                ->whereNotIn('branch_id', $branchIds)
+                ->whereNotIn('branch_id', $branchIds->all())
                 ->update([
                     'status' => BranchProduct::STATUS_INACTIVE,
                 ]);
@@ -420,6 +421,12 @@ class ProductController extends Controller
         $productName = $product->name;
 
         if (! $deleteGlobally) {
+            if ($this->hasProtectedInventory($branchProduct)) {
+                return back()->withErrors([
+                    'product' => 'No se puede retirar este producto de la sucursal porque todavia tiene stock o lotes vigentes.',
+                ]);
+            }
+
             DB::transaction(fn () => $branchProduct->delete());
 
             broadcast(new ProductChanged('deleted', $productId, [$branch->id]))->toOthers();
@@ -434,7 +441,21 @@ class ProductController extends Controller
             return back()->with('success', "Producto retirado de {$branch->name} correctamente");
         }
 
-        $branchIds = BranchProduct::where('product_id', $product->id)
+        $branchProducts = BranchProduct::query()
+            ->with('branch:id,name')
+            ->where('product_id', $product->id)
+            ->get();
+
+        $blockedRetirements = $branchProducts
+            ->filter(fn (BranchProduct $branchProduct) => $this->hasProtectedInventory($branchProduct));
+
+        if ($blockedRetirements->isNotEmpty()) {
+            return back()->withErrors([
+                'product' => $this->protectedInventoryMessage($blockedRetirements),
+            ]);
+        }
+
+        $branchIds = $branchProducts
             ->pluck('branch_id')
             ->map(fn ($id) => (int) $id)
             ->values()
@@ -451,6 +472,60 @@ class ProductController extends Controller
         event(RealtimeActivityLogged::message('eliminó', 'el producto', $productName, 'Inventario', 'deleted'));
 
         return back()->with('success', 'Producto eliminado de todas las sucursales correctamente');
+    }
+
+    private function activateProductForBranch(Product $product, int $branchId, array $data): BranchProduct
+    {
+        $branchProduct = BranchProduct::withTrashed()->firstOrNew([
+            'branch_id' => $branchId,
+            'product_id' => $product->id,
+        ]);
+        $isNewAssignment = ! $branchProduct->exists;
+
+        if ($branchProduct->exists && $branchProduct->trashed()) {
+            $branchProduct->restore();
+        }
+
+        if ($isNewAssignment) {
+            $branchProduct->stock = $data['stock'] ?? 0;
+            $branchProduct->tracks_batches = false;
+            $branchProduct->tracks_expiration = false;
+        }
+
+        $branchProduct->min_stock = $data['min_stock'] ?? 0;
+        $branchProduct->status = BranchProduct::STATUS_ACTIVE;
+        $branchProduct->save();
+
+        return $branchProduct;
+    }
+
+    private function hasProtectedInventory(BranchProduct $branchProduct): bool
+    {
+        if ((float) $branchProduct->stock > 0) {
+            return true;
+        }
+
+        return $branchProduct->batches()
+            ->where(function ($query) {
+                $query
+                    ->where('quantity', '>', 0)
+                    ->orWhere('status', ProductBatch::STATUS_ACTIVE);
+            })
+            ->exists();
+    }
+
+    private function protectedInventoryMessage($branchProducts): string
+    {
+        $branchNames = $branchProducts
+            ->map(fn (BranchProduct $branchProduct) => $branchProduct->branch?->name)
+            ->filter()
+            ->unique()
+            ->values()
+            ->implode(', ');
+
+        $suffix = $branchNames ? " Sucursales afectadas: {$branchNames}." : '';
+
+        return "No se puede retirar el producto porque todavia tiene stock o lotes vigentes.{$suffix}";
     }
 
     private function resolveImageDisk(?string $path): ?string

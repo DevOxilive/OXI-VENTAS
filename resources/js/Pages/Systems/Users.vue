@@ -504,7 +504,6 @@ function reloadSystem() {
       'roles',
       'permissions',
       'branches',
-      'filters',
       'capabilities',
   ])
 }
@@ -524,13 +523,10 @@ onMounted(() => {
 
     if (
       showModal.value &&
-      selectedUserId.value === event.userId
+      selectedUserId.value === event.userId &&
+      event.action === 'deleted'
     ) {
-      const updatedPermissions = permissions.value
-        .filter((permission) => event.permissions.includes(permission.name))
-        .map((permission) => Number(permission.id))
-
-      form.permissions = updatedPermissions
+      closeModal()
     }
 
     reloadSystem()

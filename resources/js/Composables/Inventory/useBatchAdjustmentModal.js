@@ -5,6 +5,7 @@ import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 export function useBatchAdjustmentModal(products) {
     const selectedBatchId = ref(null);
     const processing = ref(false);
+    const hydratedBatchForm = ref(null);
 
     const form = reactive({
         id: null,
@@ -107,10 +108,39 @@ export function useBatchAdjustmentModal(products) {
         return "text-slate-900";
     });
 
+    function editableBatchForm() {
+        return {
+            id: form.id,
+            lot_number: form.lot_number,
+            expiration_date: form.expiration_date,
+            supplier: form.supplier,
+            received_at: form.received_at,
+            adjustment_type: form.adjustment_type,
+            adjustment_amount: form.adjustment_amount,
+            season_start_date: form.season_start_date,
+            season_end_date: form.season_end_date,
+            status: form.status,
+            notes: form.notes,
+        };
+    }
+
+    function hasPendingBatchChanges() {
+        if (!hydratedBatchForm.value) return false;
+
+        return JSON.stringify(editableBatchForm()) !==
+            JSON.stringify(hydratedBatchForm.value);
+    }
+
     watch(
         liveSelectedBatch,
         (batch) => {
             if (!batch) return;
+
+            const sameBatch = Number(form.id) === Number(batch.id);
+
+            if (sameBatch && hasPendingBatchChanges()) {
+                return;
+            }
 
             form.id = batch.id;
             form.lot_number = batch.lot_number || "";
@@ -124,6 +154,7 @@ export function useBatchAdjustmentModal(products) {
             form.season_end_date = batch.season_end_date || "";
             form.status = batch.status || "ACTIVE";
             form.notes = "";
+            hydratedBatchForm.value = editableBatchForm();
 
             clearErrors();
         },

@@ -17,7 +17,7 @@ import { getAttendanceSchedulesToolbarConfig } from '@/config/ToolbarConfigs/att
 
 defineOptions({ layout: AdminLayout })
 
-defineProps({ schedules: { type: Array, default: () => [] } })
+const props = defineProps({ schedules: { type: Array, default: () => [] } })
 const page = usePage()
 const { can } = usePermissions()
 let unsubscribeSchedules = null
@@ -172,15 +172,37 @@ function handleToolbarAction(action) {
   if (action === 'create') openCreateModal()
 }
 
+function refreshSchedules(event) {
+  if (!['schedule_created', 'schedule_updated', 'schedule_deleted'].includes(event?.action)) return
+
+  if (
+    event.action === 'schedule_deleted' &&
+    Number(event.recordId) === Number(selectedSchedule.value?.id)
+  ) {
+    closeModal()
+    selectedSchedule.value = null
+  }
+
+  refreshRealtimeProps(page, ['schedules'], {
+    onSuccess: () => {
+      if (!showModal.value || modalMode.value !== 'view' || !selectedSchedule.value?.id) return
+
+      const updatedSchedule = props.schedules.find((schedule) =>
+        Number(schedule.id) === Number(selectedSchedule.value.id)
+      )
+
+      if (!updatedSchedule) return
+
+      loadSchedule(updatedSchedule, 'view')
+    },
+  })
+}
+
 onMounted(() => {
   unsubscribeSchedules = subscribePrivateRealtime(
     REALTIME_CHANNELS.user(page.props.auth.user.id),
     REALTIME_EVENTS.attendanceChanged,
-    ({ action }) => {
-      if (['schedule_created', 'schedule_updated', 'schedule_deleted'].includes(action)) {
-        refreshRealtimeProps(page, ['schedules'])
-      }
-    },
+    refreshSchedules,
   )
 })
 

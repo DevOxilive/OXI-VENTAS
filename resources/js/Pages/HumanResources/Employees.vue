@@ -92,6 +92,12 @@ const liveSelectedEmployee = computed(() => {
     }) ?? selectedEmployee.value
 })
 
+const modalEmployee = computed(() => {
+    return modalMode.value === 'view'
+        ? liveSelectedEmployee.value
+        : selectedEmployee.value
+})
+
 function reloadEmployees() {
     router.get(route('human-resources.employees.index'), {
         search: search.value,
@@ -199,7 +205,7 @@ onBeforeUnmount(() => {
                 (modalMode === 'edit' && can('employees.update')) ||
                 (modalMode === 'view' && can('employees.view'))
             )
-        " :mode="modalMode" :employeeToEdit="liveSelectedEmployee"
+        " :mode="modalMode" :employeeToEdit="modalEmployee"
             :organization-options="organizationOptions" @close="closeModal" />
     </PageLayout>
 </template>

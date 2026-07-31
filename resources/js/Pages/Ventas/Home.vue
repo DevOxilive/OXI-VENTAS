@@ -33,6 +33,12 @@ import {
   normalizeTicketTemplate,
 } from "@/config/ticketTemplate";
 import { usePermissions } from "@/Composables/usePermissions";
+import {
+  REALTIME_CHANNELS,
+  REALTIME_EVENTS,
+  refreshRealtimeProps,
+  subscribeRealtime,
+} from "@/realtime";
 
 defineOptions({
   layout: AdminLayout,
@@ -102,6 +108,9 @@ let searchRequestId = 0;
 let productSearchCacheVersion = 0;
 const productSearchCache = new Map();
 const productSearchRequests = new Map();
+let unsubscribeStockUpdated = null;
+let unsubscribeProductChanged = null;
+let realtimeMounted = false;
 
 const saleForm = useForm({
   branch_id: props.currentBranch?.id ?? "",
@@ -137,6 +146,37 @@ function clearProductSearchCache() {
   productSearchRequests.clear();
 }
 
+function refreshSalesCatalog() {
+  clearProductSearchCache();
+
+  return refreshRealtimeProps(page, [
+    "productsDB",
+    "nearExpirationAlerts",
+  ]);
+}
+
+function subscribeSalesBranchRealtime(branchId) {
+  unsubscribeStockUpdated?.();
+  unsubscribeProductChanged?.();
+  unsubscribeStockUpdated = null;
+  unsubscribeProductChanged = null;
+
+  if (!branchId || props.selectorMode) return;
+
+  const channelName = REALTIME_CHANNELS.inventoryBranch(branchId);
+
+  unsubscribeStockUpdated = subscribeRealtime(
+    channelName,
+    REALTIME_EVENTS.stockUpdated,
+    refreshSalesCatalog,
+  );
+  unsubscribeProductChanged = subscribeRealtime(
+    channelName,
+    REALTIME_EVENTS.productChanged,
+    refreshSalesCatalog,
+  );
+}
+
 watch(
   () => props.currentBranch?.id,
   (branchId) => {
@@ -154,18 +194,28 @@ watch(
     if (!props.selectorMode) {
       focusSearch();
     }
+
+    if (realtimeMounted) {
+      subscribeSalesBranchRealtime(branchId);
+    }
   },
   { immediate: true }
 );
 
 onMounted(() => {
+  realtimeMounted = true;
+
   if (!props.selectorMode) {
     focusSearch();
+    subscribeSalesBranchRealtime(props.currentBranch?.id);
   }
 });
 
 onBeforeUnmount(() => {
+  realtimeMounted = false;
   clearPendingProductSearch();
+  unsubscribeStockUpdated?.();
+  unsubscribeProductChanged?.();
 });
 
 watch(

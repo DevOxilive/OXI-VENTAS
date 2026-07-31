@@ -135,10 +135,14 @@ export async function refreshRealtimeProps(page, propNames, options = {}) {
 
     const names = Array.isArray(propNames)
         ? [...new Set(propNames.filter(Boolean))]
-        : null
-    if (Array.isArray(names) && names.length === 0) return null
+        : []
 
-    const requestKey = `${page.component}:${names ? names.sort().join(',') : '*'}`
+    if (names.length === 0) {
+        console.warn('La sincronizacion en tiempo real requiere propiedades Inertia explicitas')
+        return null
+    }
+
+    const requestKey = `${page.component}:${names.sort().join(',')}`
     const pendingRequest = pendingPropRefreshes.get(requestKey)
     if (pendingRequest) return pendingRequest
 
@@ -146,17 +150,14 @@ export async function refreshRealtimeProps(page, propNames, options = {}) {
         headers: {
             Accept: 'text/html, application/xhtml+xml',
             'X-Inertia': 'true',
-            ...(names ? {
-                'X-Inertia-Partial-Component': page.component,
-                'X-Inertia-Partial-Data': names.join(','),
-            } : {}),
+            'X-Inertia-Partial-Component': page.component,
+            'X-Inertia-Partial-Data': names.join(','),
             ...(page.version ? { 'X-Inertia-Version': page.version } : {}),
         },
     }).then(({ data }) => {
         const nextProps = data?.props ?? {}
 
-        const namesToApply = names ?? Object.keys(nextProps)
-        namesToApply.forEach((name) => {
+        names.forEach((name) => {
             if (Object.prototype.hasOwnProperty.call(nextProps, name)) {
                 page.props[name] = nextProps[name]
             }

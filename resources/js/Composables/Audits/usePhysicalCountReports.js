@@ -91,7 +91,6 @@ export function usePhysicalCountReports(props) {
             'reportRows',
             'reportPagination',
             'audits',
-            'filters',
             'userSummary',
             'categorySummary',
             'branchSummary',
