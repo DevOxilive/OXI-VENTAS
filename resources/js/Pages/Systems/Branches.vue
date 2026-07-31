@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
-import { router, useForm } from "@inertiajs/vue3"
+import { router, useForm, usePage } from "@inertiajs/vue3"
 
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import PageLayout from "@/Layouts/PageLayout.vue"
@@ -14,7 +14,7 @@ import { usePermissions } from "@/Composables/usePermissions"
 import { getBranchModalConfig } from "@/config/ModalConfigs/branchModalConfig"
 import { branchTableConfig } from "@/config/TableConfigs/branchTableConfig"
 import { getBranchToolbarConfig } from "@/config/ToolbarConfigs/branchToolbarConfig"
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from "@/realtime"
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from "@/realtime"
 
 const props = defineProps({
   branches: {
@@ -32,6 +32,7 @@ defineOptions({
 })
 
 const { can } = usePermissions()
+const page = usePage()
 
 const search = ref("")
 const selectedBranch = ref(null)
@@ -299,10 +300,7 @@ function reloadBranches(event = null) {
     selectedBranch.value = null
   }
 
-  router.reload({
-    only: ["branches", "capabilities"],
-    preserveScroll: true,
-    preserveState: true,
+  refreshRealtimeProps(page, ["branches", "capabilities"], {
     onSuccess: () => {
       if (!selectedBranch.value?.id || modalMode.value === "create") return
 

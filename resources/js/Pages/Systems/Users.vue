@@ -15,7 +15,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import UserRegisterModal from '@/Components/Systems/UserRegisterModal.vue'
 import UserDetailModal from '@/Components/Systems/UserDetailModal.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 defineOptions({ layout: AdminLayout })
 
 const page = usePage()
@@ -499,18 +499,14 @@ function deleteUser(id) {
   })
 }
 function reloadSystem() {
-  router.reload({
-    only: [
+  refreshRealtimeProps(page, [
       'recordsDB',
       'roles',
       'permissions',
       'branches',
       'filters',
       'capabilities',
-    ],
-    preserveScroll: true,
-    preserveState: true,
-  })
+  ])
 }
 
 onMounted(() => {

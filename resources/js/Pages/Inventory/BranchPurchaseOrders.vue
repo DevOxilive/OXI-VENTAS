@@ -8,12 +8,11 @@ import GlobalCard from '@/Components/Cards/GlobalCard.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import BranchPurchaseOrderModal from '@/Components/Inventory/PurchaseReports/BranchPurchaseOrderModal.vue'
-import PendingPurchaseOrderEditModal from '@/Components/Inventory/PurchaseReports/PendingPurchaseOrderEditModal.vue'
 import { ErrorAlert } from '@/Components/Modales/UniversalActionModal'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { getBranchPurchaseOrdersTableConfig } from '@/config/TableConfigs/branchPurchaseOrdersTableConfig'
 import { getBranchPurchaseOrdersToolbarConfig } from '@/config/ToolbarConfigs/branchPurchaseOrdersToolbarConfig'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
 
@@ -44,7 +43,6 @@ const page = usePage()
 const { handlePageChange } = useGlobalTablePagination()
 const selectedOrder = ref(null)
 const modalMode = ref('view')
-const editingPendingOrder = ref(null)
 const loadingOrder = ref(false)
 const localFilters = ref({
     status: props.filters?.status ?? 'GENERATED',
@@ -83,7 +81,7 @@ onMounted(() => {
         (event) => {
             if (event?.action !== 'review_requested') return
 
-            router.reload({ only: ['ordersDB'], preserveScroll: true })
+            refreshRealtimeProps(page, ['ordersDB'])
         },
     )
 })
@@ -149,40 +147,12 @@ async function openOrder(order, mode = 'view') {
 }
 
 function handleTableAction({ action, row }) {
-    if (action === 'edit') {
-        if (row.status === 'GENERATED') {
-            openPendingOrderEditor(row)
-            return
-        }
-
+    if (action === 'receive') {
         openOrder(row, 'edit')
         return
     }
 
     if (action === 'view') openOrder(row, 'view')
-}
-
-async function openPendingOrderEditor(order) {
-    if (!order?.id || loadingOrder.value) return
-
-    loadingOrder.value = true
-
-    try {
-        const { data } = await window.axios.get(
-            route('inventory.branches.reports.purchases.show', {
-                branch: props.currentBranch.id,
-                purchaseReport: order.id,
-            }),
-        )
-        editingPendingOrder.value = data
-    } catch {
-        ErrorAlert({
-            title: 'No se pudo abrir la orden',
-            message: 'Actualiza la página y vuelve a intentarlo.',
-        })
-    } finally {
-        loadingOrder.value = false
-    }
 }
 
 function handleCompleted() {
@@ -242,13 +212,5 @@ function handleCompleted() {
             @completed="handleCompleted"
         />
 
-        <PendingPurchaseOrderEditModal
-            v-if="editingPendingOrder"
-            :order="editingPendingOrder"
-            :branch-id="currentBranch.id"
-            :update-url="route('inventory.branches.purchase-reports.update', { branch: currentBranch.id, purchaseReport: editingPendingOrder.id })"
-            @close="editingPendingOrder = null"
-            @updated="editingPendingOrder = null"
-        />
     </PageLayout>
 </template>

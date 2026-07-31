@@ -10,7 +10,7 @@ import AppButton from '@/Components/Buttons/AppButton.vue'
 import { GlobalToolbar } from '@/Components/Toolbars'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
 import { usePermissions } from '@/Composables/usePermissions'
 import { getAttendanceRegistrationToolbarConfig } from '@/config/ToolbarConfigs/attendanceToolbarConfig'
 
@@ -263,7 +263,7 @@ onMounted(() => {
     unsubscribeAttendance = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.attendanceChanged,
-        () => router.reload({ only: ['records', 'dashboard', 'registeredTypesToday'], preserveScroll: true, preserveState: true }),
+        () => refreshRealtimeProps(page, ['records', 'dashboard', 'registeredTypesToday']),
     )
     unsubscribeUserChanged = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
@@ -271,15 +271,11 @@ onMounted(() => {
         (event) => {
             if (Number(event?.userId) !== Number(page.props.auth.user.id)) return
 
-            router.reload({
-                only: [
+            refreshRealtimeProps(page, [
                     'records', 'dashboard', 'filters', 'options', 'canViewAttendance',
                     'canManage', 'canViewEvidence', 'canRegister', 'canRequestCorrection',
                     'canReviewCorrections', 'passkeyEnabled', 'registeredTypesToday',
-                ],
-                preserveScroll: true,
-                preserveState: true,
-            })
+            ])
         },
     )
 })

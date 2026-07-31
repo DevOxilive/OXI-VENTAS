@@ -14,6 +14,7 @@ import {
     REALTIME_BROWSER_EVENTS,
     REALTIME_CHANNELS,
     REALTIME_EVENTS,
+    refreshRealtimeProps,
     subscribePrivateRealtime,
     subscribeRealtime,
 } from '@/realtime'
@@ -126,10 +127,7 @@ function distributeGlobalDataChange(event) {
 
     window.clearTimeout(globalRefreshTimer)
     globalRefreshTimer = window.setTimeout(() => {
-        router.reload({
-            preserveScroll: true,
-            preserveState: true,
-        })
+        refreshRealtimeProps(page)
     }, 180)
 }
 

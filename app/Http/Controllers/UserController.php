@@ -93,7 +93,9 @@ class UserController extends Controller
                 $query
                     ->where('name', 'like', 'inventory.products.%')
                     ->orWhere('name', 'like', 'inventory.branches.%')
-                    ->orWhere('name', 'like', 'inventory.purchase-reports.%')
+                    ->orWhere('name', 'like', 'inventory.purchase-orders.%')
+                    ->orWhere('name', 'like', 'sales.purchase-lists.%')
+                    ->orWhere('name', 'like', 'sales.purchase-orders.%')
                     ->orWhere('name', 'like', 'audits.physical-counts.%')
                     ->orWhere('name', 'like', 'reports.%')
                     ->orWhere('name', 'like', 'sales.%')

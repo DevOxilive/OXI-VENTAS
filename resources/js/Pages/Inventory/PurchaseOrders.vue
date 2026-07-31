@@ -22,7 +22,7 @@ import { usePermissions } from '@/Composables/usePermissions'
 import { getPurchaseOrdersTableConfig } from '@/config/TableConfigs/purchaseOrdersTableConfig'
 import { getGeneralPurchaseSourceOrdersTableConfig } from '@/config/TableConfigs/generalPurchaseSourceOrdersTableConfig'
 import { getPurchaseOrdersToolbarConfig } from '@/config/ToolbarConfigs/purchaseOrdersToolbarConfig'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
 
@@ -61,8 +61,8 @@ let unsubscribeOrderActivity = null
 const activeStatus = computed(() => orders.localFilters.value.status || 'GENERATE')
 const tableMode = computed(() => activeStatus.value === 'COMPLETED' ? 'history' : 'purchasing')
 const activeViewPermission = computed(() => activeStatus.value === 'COMPLETED'
-    ? 'inventory.purchase-orders.completed.view'
-    : 'inventory.purchase-orders.purchasing.view')
+    ? 'inventory.purchase-orders.general.view'
+    : 'inventory.purchase-orders.general.view')
 const tableConfig = computed(() => getPurchaseOrdersTableConfig({
     mode: tableMode.value,
     viewPermission: activeViewPermission.value,
@@ -103,12 +103,12 @@ const selectedSourceOrders = computed(() => (props.generation?.orders ?? [])
 const selectedBranchesCount = computed(() => new Set(
     selectedSourceOrders.value.map((order) => Number(order.branch_id)),
 ).size)
-const canPrepareGeneralOrder = computed(() => can('inventory.purchase-orders.generate.create')
+const canPrepareGeneralOrder = computed(() => can('inventory.purchase-orders.general.create')
     && selectedSourceOrders.value.length > 0)
 const availableTabs = computed(() => [
-    can('inventory.purchase-orders.generate.view') && { key: 'GENERATE', label: 'Generar', icon: 'playlist_add' },
-    can('inventory.purchase-orders.purchasing.view') && { key: 'PURCHASING', label: 'En compra', icon: 'local_shipping' },
-    can('inventory.purchase-orders.completed.view') && { key: 'COMPLETED', label: 'Completadas', icon: 'task_alt' },
+    can('inventory.purchase-orders.source.view') && { key: 'GENERATE', label: 'Generar', icon: 'playlist_add' },
+    can('inventory.purchase-orders.general.view') && { key: 'PURCHASING', label: 'En compra', icon: 'local_shipping' },
+    can('inventory.purchase-orders.general.view') && { key: 'COMPLETED', label: 'Completadas', icon: 'task_alt' },
 ].filter(Boolean))
 const toolbarConfig = computed(() => getPurchaseOrdersToolbarConfig({
     filters: orders.localFilters.value,
@@ -144,7 +144,7 @@ onMounted(() => {
         (event) => {
             if (!['assigned', 'purchase_order_transferred'].includes(event?.action)) return
 
-            router.reload({ only: ['generation'], preserveScroll: true })
+            refreshRealtimeProps(page, ['generation'])
         },
     )
 })
@@ -171,7 +171,7 @@ async function openSourceOrder(order, edit = false) {
     try {
         const { data } = await window.axios.get(
             route('inventory.branches.reports.purchase-orders.source-orders.show', {
-                branch: props.currentBranch.id,
+                branch: order.branch_id,
                 purchaseOrder: order.id,
             }),
         )
@@ -246,7 +246,7 @@ async function reviewSourceOrder(order, reviewStatus) {
 
     router.put(
         route('inventory.branches.reports.purchase-orders.source-orders.review', {
-            branch: props.currentBranch.id,
+            branch: order.branch_id,
             purchaseOrder: order.id,
         }),
         { review_status: reviewStatus },
@@ -267,7 +267,7 @@ async function openTransferHistory(order) {
     try {
         const { data } = await window.axios.get(
             route('inventory.branches.reports.purchase-orders.source-orders.show', {
-                branch: props.currentBranch.id,
+                branch: order.branch_id,
                 purchaseOrder: order.id,
             }),
         )
@@ -435,7 +435,7 @@ async function generateGeneralOrder() {
                             <p class="truncate text-xs opacity-60">{{ order.branch_name }}</p>
                         </div>
                         <AppButton
-                            v-if="can('inventory.purchase-orders.generate.create')"
+                            v-if="can('inventory.purchase-orders.general.create')"
                             variant="secondary"
                             class="!px-2 !py-2"
                             title="Quitar de la Orden de compra general"
@@ -451,7 +451,7 @@ async function generateGeneralOrder() {
                 </div>
 
                 <div
-                    v-if="can('inventory.purchase-orders.generate.create')"
+                    v-if="can('inventory.purchase-orders.general.create')"
                     class="mt-4 grid gap-2"
                 >
                     <AppButton
@@ -507,7 +507,7 @@ async function generateGeneralOrder() {
             v-if="transferOrder"
             :order="transferOrder"
             :inventory-users="generation.inventory_users"
-            :context-branch-id="currentBranch.id"
+            :context-branch-id="transferOrder.branch_id"
             @close="transferOrder = null"
             @transferred="transferOrder = null"
         />
@@ -521,8 +521,8 @@ async function generateGeneralOrder() {
         <PendingPurchaseOrderEditModal
             v-if="editingSourceOrder"
             :order="editingSourceOrder"
-            :branch-id="currentBranch.id"
-            :update-url="route('inventory.branches.reports.purchase-orders.source-orders.update', { branch: currentBranch.id, purchaseOrder: editingSourceOrder.id })"
+            :branch-id="editingSourceOrder.branch.id"
+            :update-url="route('inventory.branches.reports.purchase-orders.source-orders.update', { branch: editingSourceOrder.branch.id, purchaseOrder: editingSourceOrder.id })"
             @close="editingSourceOrder = null"
             @updated="editingSourceOrder = null"
         />

@@ -27,7 +27,7 @@ const { handlePageChange } = useGlobalTablePagination()
 const selectedOrder = ref(null)
 const tableConfig = getPurchaseOrdersTableConfig({
     mode: 'history',
-    viewPermission: 'inventory.purchase-orders.completed.view',
+    viewPermission: 'inventory.purchase-orders.general.view',
 })
 const toolbarConfig = computed(() => getPurchaseOrdersToolbarConfig({
     filters: orders.localFilters.value,

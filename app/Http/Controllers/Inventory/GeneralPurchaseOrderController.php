@@ -186,7 +186,7 @@ class GeneralPurchaseOrderController extends Controller
             'branchOrders.items',
         ]);
 
-        $canViewCosts = $request->user()->hasPermission('inventory.purchase-orders.costs');
+        $canViewCosts = $request->user()->hasPermission('inventory.purchase-orders.general.update');
 
         return response()->json($this->orderPayload(
             $generalPurchaseOrder,
@@ -381,10 +381,11 @@ class GeneralPurchaseOrderController extends Controller
         $this->abortIfCannotManageSourceOrder($request, $purchaseOrder);
         abort_if($purchaseOrder->general_purchase_order_id, 422, 'La orden ya forma parte de una Orden de compra general.');
 
+        $purchaseOrder->loadMissing('branch');
         $editor = app(PendingPurchaseOrderEditor::class);
         $updatedOrder = $editor->update(
             $purchaseOrder,
-            $branch,
+            $purchaseOrder->branch,
             $request->validate($editor->rules())['items'],
             $request->user(),
             true,
@@ -431,8 +432,18 @@ class GeneralPurchaseOrderController extends Controller
         GeneralPurchaseOrder $generalPurchaseOrder
     ) {
         $this->abortIfUserCannotAccessBranch($request, $branch);
-        $this->abortIfCannotManageGeneralOrder($request, $generalPurchaseOrder);
-        abort_unless($generalPurchaseOrder->status === GeneralPurchaseOrder::STATUS_PURCHASING, 404);
+        $this->abortIfCannotManageGeneralOrder(
+            $request,
+            $generalPurchaseOrder,
+            'inventory.purchase-orders.general.complete'
+        );
+
+        if ($generalPurchaseOrder->status === GeneralPurchaseOrder::STATUS_COMPLETED) {
+            return $this->completedOrdersRedirect($branch)
+                ->with('success', 'La compra general ya estaba completada.');
+        }
+
+        abort_unless($generalPurchaseOrder->status === GeneralPurchaseOrder::STATUS_PURCHASING, 422);
 
         $completedOrder = $this->cycles->complete(
             $generalPurchaseOrder,
@@ -457,24 +468,29 @@ class GeneralPurchaseOrderController extends Controller
             ));
         }
 
-        return redirect()
-            ->route('inventory.branches.reports.purchase-orders', [
-                'branch' => $branch->id,
-                'status' => GeneralPurchaseOrder::STATUS_COMPLETED,
-            ])
+        return $this->completedOrdersRedirect($branch)
             ->with(
                 'success',
                 'Compra general completada y órdenes de sucursal enviadas a revisión.'
             );
     }
 
+    private function completedOrdersRedirect(Branch $branch)
+    {
+        return redirect()->route('inventory.branches.reports.purchase-orders', [
+            'branch' => $branch->id,
+            'status' => GeneralPurchaseOrder::STATUS_COMPLETED,
+        ]);
+    }
+
     private function abortIfCannotManageGeneralOrder(
         Request $request,
-        GeneralPurchaseOrder $generalPurchaseOrder
+        GeneralPurchaseOrder $generalPurchaseOrder,
+        string $permission = 'inventory.purchase-orders.general.update'
     ): void
     {
         abort_unless(
-            $this->canManageGeneralOrder($request, $generalPurchaseOrder),
+            $this->canManageGeneralOrder($request, $generalPurchaseOrder, $permission),
             403,
             'Solo la persona responsable o un administrador autorizado puede editar esta Orden de compra general.'
         );
@@ -482,11 +498,12 @@ class GeneralPurchaseOrderController extends Controller
 
     private function canManageGeneralOrder(
         Request $request,
-        GeneralPurchaseOrder $generalPurchaseOrder
+        GeneralPurchaseOrder $generalPurchaseOrder,
+        string $permission = 'inventory.purchase-orders.general.update'
     ): bool {
         $user = $request->user();
 
-        if (! $user?->hasPermission('inventory.purchase-orders.costs')) {
+        if (! $user?->hasPermission($permission)) {
             return false;
         }
 
@@ -499,9 +516,9 @@ class GeneralPurchaseOrderController extends Controller
     private function canViewStatus(Request $request, string $status): bool
     {
         $permission = match ($status) {
-            'GENERATE' => 'inventory.purchase-orders.generate.view',
-            GeneralPurchaseOrder::STATUS_PURCHASING => 'inventory.purchase-orders.purchasing.view',
-            GeneralPurchaseOrder::STATUS_COMPLETED => 'inventory.purchase-orders.completed.view',
+            'GENERATE' => 'inventory.purchase-orders.source.view',
+            GeneralPurchaseOrder::STATUS_PURCHASING => 'inventory.purchase-orders.general.view',
+            GeneralPurchaseOrder::STATUS_COMPLETED => 'inventory.purchase-orders.general.view',
             default => null,
         };
 

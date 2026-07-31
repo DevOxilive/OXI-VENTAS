@@ -11,7 +11,6 @@ use App\Models\Category;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\User;
-use App\Services\PendingPurchaseOrderEditor;
 use App\Services\PurchaseCycleService;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
@@ -88,6 +87,7 @@ class PurchaseReportController extends Controller
         $orders = PurchaseOrder::query()
             ->withCount('items')
             ->where('branch_id', $branch->id)
+            ->where('user_id', $request->user()?->id)
             ->where('status', $filters['status']);
 
         $orders = $orders
@@ -209,19 +209,6 @@ class PurchaseReportController extends Controller
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
 
-        if ($purchaseReport->status === PurchaseOrder::STATUS_GENERATED) {
-            $editor = app(PendingPurchaseOrderEditor::class);
-            $updatedOrder = $editor->update(
-                $purchaseReport,
-                $branch,
-                $request->validate($editor->rules())['items'],
-                $request->user(),
-                false,
-            );
-
-            return redirect()->back()->with('success', "La orden {$updatedOrder->folio} fue actualizada correctamente.");
-        }
-
         abort_unless($purchaseReport->status === PurchaseOrder::STATUS_DRAFT, 422, 'Solo se pueden modificar listas en borrador.');
         abort_if($purchaseReport->general_purchase_order_id, 422, 'La solicitud ya forma parte de una orden general.');
         $this->abortIfDraftDoesNotBelongToUser($request, $purchaseReport);
@@ -295,6 +282,7 @@ class PurchaseReportController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
+        abort_unless((int) $purchaseReport->user_id === (int) $request->user()?->id, 403);
         abort_unless(
             $purchaseReport->status === PurchaseOrder::STATUS_REVIEW,
             422,
@@ -487,11 +475,12 @@ class PurchaseReportController extends Controller
         ]);
     }
 
-    public function show(Branch $branch, PurchaseOrder $purchaseReport)
+    public function show(Request $request, Branch $branch, PurchaseOrder $purchaseReport)
     {
-        $this->abortIfUserCannotAccessBranch(request(), $branch);
+        $this->abortIfUserCannotAccessBranch($request, $branch);
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
+        abort_unless((int) $purchaseReport->user_id === (int) $request->user()?->id, 403);
 
         $purchaseReport->load([
             'user',
@@ -510,6 +499,7 @@ class PurchaseReportController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
+        abort_unless((int) $purchaseReport->user_id === (int) $request->user()?->id, 403);
 
         $purchaseReport->load([
             'branch:id,name',

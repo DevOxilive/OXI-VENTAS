@@ -6,14 +6,15 @@ import PageLayout from '@/Layouts/PageLayout.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import GlobalCard from '@/Components/Cards/GlobalCard.vue'
 import MetricCard from '@/Components/Cards/MetricCard.vue'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 
 defineProps({
     auditCount: Number,
     trashCount: Number,
 })
 
-const permissions = usePage().props.auth?.permissions ?? []
+const page = usePage()
+const permissions = page.props.auth?.permissions ?? []
 const can = (permission) => permissions.includes(permission)
 
 const sections = [
@@ -30,7 +31,7 @@ let auditRefreshTimer = null
 function refreshAuditCount() {
     clearTimeout(auditRefreshTimer)
     auditRefreshTimer = setTimeout(() => {
-        router.reload({ only: ['auditCount'], preserveScroll: true })
+        refreshRealtimeProps(page, ['auditCount'])
     }, 120)
 }
 
@@ -38,7 +39,7 @@ onMounted(() => {
     unsubscribeTrashRealtime = subscribeRealtime(
         REALTIME_CHANNELS.systems,
         REALTIME_EVENTS.systemTrashChanged,
-        () => router.reload({ only: ['trashCount'], preserveScroll: true }),
+        () => refreshRealtimeProps(page, ['trashCount']),
     )
 
     unsubscribeAuditRealtime = subscribeRealtime(

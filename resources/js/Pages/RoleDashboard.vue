@@ -5,7 +5,7 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import { usePermissions } from '@/Composables/usePermissions'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
 
@@ -167,10 +167,20 @@ const permissionLabelMap = {
     'inventory.branches.create': 'Entradas',
     'inventory.branches.update': 'Salidas y ajustes',
     'inventory.branches.delete': 'Eliminar stock',
-    'inventory.purchase-reports.view': 'Ver compras',
-    'inventory.purchase-reports.create': 'Crear compras',
-    'inventory.purchase-reports.update': 'Editar compras',
-    'inventory.purchase-reports.delete': 'Eliminar compras',
+    'sales.purchase-lists.view': 'Ver listas de compra',
+    'sales.purchase-lists.create': 'Crear listas de compra',
+    'sales.purchase-lists.update': 'Editar listas de compra',
+    'sales.purchase-lists.delete': 'Eliminar listas de compra',
+    'sales.purchase-orders.view': 'Ver seguimiento de órdenes',
+    'sales.purchase-orders.receive': 'Confirmar recepción de órdenes',
+    'inventory.purchase-orders.source.view': 'Ver Órdenes de compra',
+    'inventory.purchase-orders.source.update': 'Editar Órdenes de compra',
+    'inventory.purchase-orders.source.review': 'Revisar Órdenes de compra',
+    'inventory.purchase-orders.source.transfer': 'Transferir Órdenes de compra',
+    'inventory.purchase-orders.general.view': 'Ver Órdenes generales',
+    'inventory.purchase-orders.general.create': 'Crear Órdenes generales',
+    'inventory.purchase-orders.general.update': 'Editar Órdenes generales',
+    'inventory.purchase-orders.general.complete': 'Aplicar Órdenes generales',
     'audits.physical-counts.count': 'Capturar conteos',
     'reports.audits.view': 'Ver reportes de auditoría',
     'audits.physical-counts.view-stock': 'Ver stock',
@@ -236,6 +246,12 @@ const permissionCatalog = [
         permissions: ['inventory.products.view', 'inventory.products.create', 'inventory.products.update', 'inventory.products.delete', 'inventory.branches.view', 'inventory.branches.create', 'inventory.branches.update', 'inventory.branches.delete'],
     },
     {
+        key: 'purchase-orders',
+        title: 'Órdenes de compra',
+        icon: 'shopping_bag',
+        permissions: ['inventory.purchase-orders.source.view', 'inventory.purchase-orders.source.update', 'inventory.purchase-orders.source.review', 'inventory.purchase-orders.source.transfer', 'inventory.purchase-orders.general.view', 'inventory.purchase-orders.general.create', 'inventory.purchase-orders.general.update', 'inventory.purchase-orders.general.complete'],
+    },
+    {
         key: 'audits',
         title: 'Auditorias',
         icon: 'fact_check',
@@ -245,7 +261,7 @@ const permissionCatalog = [
         key: 'purchases',
         title: 'Listas de compra',
         icon: 'shopping_cart',
-        permissions: ['inventory.purchase-reports.view', 'inventory.purchase-reports.create', 'inventory.purchase-reports.update', 'inventory.purchase-reports.delete'],
+        permissions: ['sales.purchase-lists.view', 'sales.purchase-lists.create', 'sales.purchase-lists.update', 'sales.purchase-lists.delete', 'sales.purchase-orders.view', 'sales.purchase-orders.receive'],
     },
     {
         key: 'human',
@@ -309,10 +325,20 @@ const permissionAction = (permission) => {
         'inventory.branches.create': { icon: 'input', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
         'inventory.branches.update': { icon: 'sync_alt', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
         'inventory.branches.delete': { icon: 'delete', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
-        'inventory.purchase-reports.view': { icon: 'visibility', href: branchHref((branch) => route('inventory.branches.purchase-reports.index', { branch: branch.id })) },
-        'inventory.purchase-reports.create': { icon: 'add_shopping_cart', href: branchHref((branch) => route('inventory.branches.purchase-reports.index', { branch: branch.id })) },
-        'inventory.purchase-reports.update': { icon: 'edit', href: branchHref((branch) => route('inventory.branches.purchase-reports.index', { branch: branch.id })) },
-        'inventory.purchase-reports.delete': { icon: 'delete', href: branchHref((branch) => route('inventory.branches.purchase-reports.index', { branch: branch.id })) },
+        'sales.purchase-lists.view': { icon: 'visibility', href: route('ventas.purchase-reports.index') },
+        'sales.purchase-lists.create': { icon: 'add_shopping_cart', href: route('ventas.purchase-reports.index') },
+        'sales.purchase-lists.update': { icon: 'edit', href: route('ventas.purchase-reports.index') },
+        'sales.purchase-lists.delete': { icon: 'delete', href: route('ventas.purchase-reports.index') },
+        'sales.purchase-orders.view': { icon: 'visibility', href: route('ventas.purchase-orders.index') },
+        'sales.purchase-orders.receive': { icon: 'inventory', href: route('ventas.purchase-orders.index') },
+        'inventory.purchase-orders.source.view': { icon: 'visibility', href: branchHref((branch) => route('inventory.branches.reports.purchase-orders', { branch: branch.id })) },
+        'inventory.purchase-orders.source.update': { icon: 'edit', href: branchHref((branch) => route('inventory.branches.reports.purchase-orders', { branch: branch.id })) },
+        'inventory.purchase-orders.source.review': { icon: 'fact_check', href: branchHref((branch) => route('inventory.branches.reports.purchase-orders', { branch: branch.id })) },
+        'inventory.purchase-orders.source.transfer': { icon: 'swap_horiz', href: branchHref((branch) => route('inventory.branches.reports.purchase-orders', { branch: branch.id })) },
+        'inventory.purchase-orders.general.view': { icon: 'visibility', href: branchHref((branch) => route('inventory.branches.reports.purchase-orders', { branch: branch.id })) },
+        'inventory.purchase-orders.general.create': { icon: 'add_shopping_cart', href: branchHref((branch) => route('inventory.branches.reports.purchase-orders', { branch: branch.id })) },
+        'inventory.purchase-orders.general.update': { icon: 'edit', href: branchHref((branch) => route('inventory.branches.reports.purchase-orders', { branch: branch.id })) },
+        'inventory.purchase-orders.general.complete': { icon: 'task_alt', href: branchHref((branch) => route('inventory.branches.reports.purchase-orders', { branch: branch.id })) },
         'audits.physical-counts.count': { icon: 'checklist', href: branchHref((branch) => route('audits.physical-counts.index', { branch: branch.slug })) },
         'reports.audits.view': { icon: 'bar_chart', href: route('inventory.reports.select', { report: 'audits' }) },
         'audits.physical-counts.view-stock': { icon: 'inventory_2', href: branchHref((branch) => route('audits.physical-counts.index', { branch: branch.slug })) },
@@ -495,10 +521,7 @@ onMounted(() => {
     }
 
     const handleUserChanged = () => {
-        router.reload({
-            preserveScroll: true,
-            preserveState: false,
-        })
+        refreshRealtimeProps(page)
     }
 
     unsubscribeUserChanged = subscribePrivateRealtime(

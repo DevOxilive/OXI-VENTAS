@@ -13,7 +13,7 @@ import SelectField from '@/Components/Forms/SelectField.vue'
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import { usePermissions } from '@/Composables/usePermissions'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribePrivateRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
 import { getAttendanceScheduleAssignmentsToolbarConfig } from '@/config/ToolbarConfigs/attendanceScheduleAssignmentsToolbarConfig'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
@@ -63,7 +63,7 @@ onMounted(() => {
     REALTIME_EVENTS.attendanceChanged,
     ({ action: realtimeAction }) => {
       if (realtimeAction?.startsWith('schedule_')) {
-        router.reload({ only: ['assignments', 'employees', 'schedules'], preserveScroll: true, preserveState: true })
+        refreshRealtimeProps(page, ['assignments', 'employees', 'schedules'])
       }
     },
   )

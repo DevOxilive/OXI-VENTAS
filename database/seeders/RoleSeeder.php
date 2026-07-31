@@ -170,7 +170,8 @@ class RoleSeeder extends Seeder
                 (
                     str_starts_with($permission->name, 'sales.')
                 )
-                || str_starts_with($permission->name, 'inventory.purchase-reports.')
+                || str_starts_with($permission->name, 'sales.purchase-lists.')
+                || str_starts_with($permission->name, 'sales.purchase-orders.')
             ) {
                 DB::table('role_permission')->updateOrInsert([
                     'role_id' => $salesRole->id,
@@ -188,11 +189,7 @@ class RoleSeeder extends Seeder
 
         foreach ($permissions as $permission) {
             if (
-                (str_starts_with($permission->name, 'inventory.')
-                && $permission->name !== 'inventory.purchase-orders.costs'
-                && ! str_starts_with($permission->name, 'inventory.purchase-orders.generate.')
-                && $permission->name !== 'inventory.purchase-orders.purchasing.view'
-                && $permission->name !== 'inventory.purchase-orders.completed.view')
+                str_starts_with($permission->name, 'inventory.')
                 || str_starts_with($permission->name, 'audits.physical-counts.')
                 || in_array($permission->name, [
                     'reports.audits.view',

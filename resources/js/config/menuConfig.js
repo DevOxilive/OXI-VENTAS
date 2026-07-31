@@ -22,19 +22,22 @@ export function generateMenu(role, permissions = [], branches = []) {
             "inventory.branches.delete",
         ],
         purchaseReports: [
-            "inventory.purchase-reports.view",
-            "inventory.purchase-reports.create",
-            "inventory.purchase-reports.update",
-            "inventory.purchase-reports.delete",
+            "sales.purchase-lists.view",
+            "sales.purchase-lists.create",
+            "sales.purchase-lists.update",
+            "sales.purchase-lists.delete",
+            "sales.purchase-orders.view",
+            "sales.purchase-orders.receive",
         ],
         purchaseOrders: [
-            "inventory.purchase-orders.generate.view",
-            "inventory.purchase-orders.generate.create",
-            "inventory.purchase-orders.generate.update",
-            "inventory.purchase-orders.generate.transfer",
-            "inventory.purchase-orders.purchasing.view",
-            "inventory.purchase-orders.completed.view",
-            "inventory.purchase-orders.costs",
+            "inventory.purchase-orders.source.view",
+            "inventory.purchase-orders.source.update",
+            "inventory.purchase-orders.source.review",
+            "inventory.purchase-orders.source.transfer",
+            "inventory.purchase-orders.general.view",
+            "inventory.purchase-orders.general.create",
+            "inventory.purchase-orders.general.update",
+            "inventory.purchase-orders.general.complete",
         ],
         audits: [
             "audits.physical-counts.count",
@@ -236,13 +239,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         can("inventory.branches.create") ||
         can("inventory.branches.update") ||
         can("inventory.branches.delete") ||
-        can("inventory.purchase-orders.generate.view") ||
-        can("inventory.purchase-orders.generate.create") ||
-        can("inventory.purchase-orders.generate.update") ||
-        can("inventory.purchase-orders.generate.transfer") ||
-        can("inventory.purchase-orders.purchasing.view") ||
-        can("inventory.purchase-orders.completed.view") ||
-        can("inventory.purchase-orders.costs") ||
+        canUse("purchaseOrders") ||
         can("audits.physical-counts.count") ||
         can("audits.physical-counts.view-stock") ||
         can("audits.physical-counts.create") ||
@@ -293,12 +290,22 @@ export function generateMenu(role, permissions = [], branches = []) {
         icon: "shopping_bag",
         url: route("ventas.purchase-orders.index"),
     };
-    const canUsePurchaseNavigation = canUse("purchaseReports");
+    const canUsePurchaseLists = canAny([
+        "sales.purchase-lists.view",
+        "sales.purchase-lists.create",
+        "sales.purchase-lists.update",
+        "sales.purchase-lists.delete",
+    ]);
+    const canUsePurchaseOrderTracking = canAny([
+        "sales.purchase-orders.view",
+        "sales.purchase-orders.receive",
+    ]);
 
     if (
         canUse("sales") ||
         canUse("cashClosures") ||
-        canUsePurchaseNavigation ||
+        canUsePurchaseLists ||
+        canUsePurchaseOrderTracking ||
         canRegisterSalesAttendance
     ) {
         menu.push({
@@ -325,10 +332,10 @@ export function generateMenu(role, permissions = [], branches = []) {
                           },
                       ]
                     : []),
-                ...(canUsePurchaseNavigation
+                ...(canUsePurchaseLists
                     ? [purchaseListsMenuItem]
                     : []),
-                ...(canUsePurchaseNavigation
+                ...(canUsePurchaseOrderTracking
                     ? [branchPurchaseOrdersMenuItem]
                     : []),
                 ...(canRegisterSalesAttendance
