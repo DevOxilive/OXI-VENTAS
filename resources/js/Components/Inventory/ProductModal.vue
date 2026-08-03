@@ -44,6 +44,7 @@ const form = useForm({
   quantity: null,
   kilos: null,
   grams: null,
+  record_version: "",
 });
 const categoryInputMode = ref("select");
 const marginPercentage = ref("");
@@ -153,6 +154,7 @@ watch(
       product.entry_date ?? new Date().toISOString().slice(0, 10);
     form.active = true;
     form.image = product.image ?? null;
+    form.record_version = product.record_version ?? "";
 
     form.quantity = product.quantity ?? null;
     form.kilos = product.kilos ?? null;

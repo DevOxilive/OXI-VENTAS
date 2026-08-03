@@ -12,14 +12,17 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Carbon\Carbon;
 
 class PurchaseCycleService
 {
     public function currentOpenCycle(?User $user = null): PurchaseCycle
     {
-        return DB::transaction(function () use ($user) {
+        return Cache::lock('purchase-cycle:current-open', 15)->block(5, function () use ($user) {
+            return DB::transaction(function () use ($user) {
             $cycle = PurchaseCycle::query()
                 ->where('status', PurchaseCycle::STATUS_OPEN)
                 ->latest('id')
@@ -65,7 +68,8 @@ class PurchaseCycleService
                 $pendingOrder?->update(['purchase_cycle_id' => $cycle->id]);
             }
 
-            return $cycle;
+                return $cycle;
+            }, 3);
         });
     }
 
@@ -74,6 +78,7 @@ class PurchaseCycleService
         return DB::transaction(function () use ($order, $user) {
             $cycle = $this->currentOpenCycle($user);
             $participation = $this->participationFor($cycle, $order->branch_id);
+            $order = PurchaseOrder::query()->lockForUpdate()->findOrFail($order->id);
 
             $participation->update([
                 'purchase_order_id' => $participation->purchase_order_id ?: $order->id,
@@ -84,7 +89,7 @@ class PurchaseCycleService
             $order->update(['purchase_cycle_id' => $cycle->id]);
 
             return $cycle;
-        });
+        }, 3);
     }
 
     public function registerEmptyBranch(Branch $branch, ?User $user = null): PurchaseCycle
@@ -112,24 +117,27 @@ class PurchaseCycleService
         PurchaseCycle $cycle,
         User $user,
         array $orderIds,
-        ?int $draftId = null
+        ?int $draftId = null,
+        ?string $recordVersion = null
     ): GeneralPurchaseOrder {
-        return $this->persistGeneralSelection($cycle, $user, $orderIds, $draftId, false);
+        return $this->persistGeneralSelection($cycle, $user, $orderIds, $draftId, false, $recordVersion);
     }
 
     public function consolidate(
         PurchaseCycle $cycle,
         User $user,
         array $orderIds,
-        ?int $draftId = null
+        ?int $draftId = null,
+        ?string $recordVersion = null
     ): GeneralPurchaseOrder {
-        return $this->persistGeneralSelection($cycle, $user, $orderIds, $draftId, true);
+        return $this->persistGeneralSelection($cycle, $user, $orderIds, $draftId, true, $recordVersion);
     }
 
     public function saveCapture(GeneralPurchaseOrder $order, array $payload): GeneralPurchaseOrder
     {
         return DB::transaction(function () use ($order, $payload) {
             $order = GeneralPurchaseOrder::query()->lockForUpdate()->findOrFail($order->id);
+            $this->assertRecordVersion($order, $payload['record_version'] ?? null);
 
             if ($order->status !== GeneralPurchaseOrder::STATUS_PURCHASING) {
                 throw ValidationException::withMessages([
@@ -160,7 +168,13 @@ class PurchaseCycleService
     {
         return DB::transaction(function () use ($order, $payload, $user) {
             $order = $this->saveCapture($order, $payload);
-            $order->load(['items', 'branchOrders.items']);
+            $order->load('items');
+            PurchaseOrder::query()
+                ->where('general_purchase_order_id', $order->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $order->load('branchOrders.items');
 
             $invalidItem = $order->items->first(fn (GeneralPurchaseOrderItem $item) => ! $item->unavailable
                 && ((float) $item->package_quantity <= 0
@@ -195,7 +209,7 @@ class PurchaseCycleService
                 'completed_at' => now(),
             ]);
 
-            $cycle = $order->cycle;
+            $cycle = PurchaseCycle::query()->lockForUpdate()->findOrFail($order->purchase_cycle_id);
             $hasOtherActiveGeneralOrders = $cycle->generalOrders()
                 ->whereKeyNot($order->id)
                 ->where('status', '!=', GeneralPurchaseOrder::STATUS_COMPLETED)
@@ -213,7 +227,7 @@ class PurchaseCycleService
             }
 
             return $order->fresh(['items', 'branchOrders']);
-        });
+        }, 3);
     }
 
     private function allocateCapturedItemsToBranches(GeneralPurchaseOrder $order): void
@@ -305,7 +319,7 @@ class PurchaseCycleService
 
     private function participationFor(PurchaseCycle $cycle, int $branchId): PurchaseCycleBranch
     {
-        $participation = $cycle->branches()->where('branch_id', $branchId)->first();
+        $participation = $cycle->branches()->where('branch_id', $branchId)->lockForUpdate()->first();
 
         if (! $participation) {
             throw ValidationException::withMessages([
@@ -321,9 +335,10 @@ class PurchaseCycleService
         User $user,
         array $orderIds,
         ?int $draftId,
-        bool $generate
+        bool $generate,
+        ?string $recordVersion = null
     ): GeneralPurchaseOrder {
-        return DB::transaction(function () use ($cycle, $user, $orderIds, $draftId, $generate) {
+        return DB::transaction(function () use ($cycle, $user, $orderIds, $draftId, $generate, $recordVersion) {
             $cycle = PurchaseCycle::query()->lockForUpdate()->findOrFail($cycle->id);
             $selectedOrderIds = collect($orderIds)
                 ->map(fn ($orderId) => (int) $orderId)
@@ -353,6 +368,10 @@ class PurchaseCycleService
                 throw ValidationException::withMessages([
                     'draft_id' => 'El borrador seleccionado ya no está disponible.',
                 ]);
+            }
+
+            if ($draft) {
+                $this->assertRecordVersion($draft, $recordVersion);
             }
 
             $draft ??= GeneralPurchaseOrder::create([
@@ -447,6 +466,15 @@ class PurchaseCycleService
 
             return $draft->fresh(['items', 'branchOrders.branch']);
         });
+    }
+
+    private function assertRecordVersion($record, ?string $recordVersion): void
+    {
+        if (!$recordVersion || !$record->updated_at?->equalTo(Carbon::parse($recordVersion))) {
+            throw ValidationException::withMessages([
+                'record_version' => 'Otra persona modifico esta orden. Revisa la informacion actual antes de guardar nuevamente.',
+            ]);
+        }
     }
 
     private function createGeneralItem(

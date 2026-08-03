@@ -3,6 +3,7 @@ namespace App\Http\Controllers;
 
 use App\Events\BranchChanged;
 use App\Events\RealtimeActivityLogged;
+use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Models\Branch;
 use App\Models\Product;
 use App\Models\BranchProduct;
@@ -15,6 +16,8 @@ use Inertia\Inertia;
 
 class BranchController extends Controller
 {
+    use ValidatesRecordVersion;
+
     private function checkPermission(string $permission): void
     {
         $user = request()->user();
@@ -85,6 +88,14 @@ class BranchController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'color' => ['nullable', 'string', 'max:20'],
+            'street' => ['nullable', 'string', 'max:255'],
+            'external_number' => ['nullable', 'string', 'max:50'],
+            'internal_number' => ['nullable', 'string', 'max:50'],
+            'postal_code' => ['nullable', 'string', 'max:5'],
+            'neighborhood' => ['nullable', 'string', 'max:255'],
+            'municipality' => ['nullable', 'string', 'max:255'],
+            'address_state' => ['nullable', 'string', 'max:255'],
+            'maps_url' => ['nullable', 'string', 'max:1000'],
             'attendance_latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'attendance_longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'attendance_geofence_radius_meters' => ['nullable', 'integer', 'min:10', 'max:1000'],
@@ -95,6 +106,15 @@ class BranchController extends Controller
                 'name' => $data['name'],
                 'slug' => Str::slug($data['name']),
                 'color' => $data['color'] ?? null,
+                'address' => $this->formatAddress($data),
+                'street' => $data['street'] ?? null,
+                'external_number' => $data['external_number'] ?? null,
+                'internal_number' => $data['internal_number'] ?? null,
+                'postal_code' => $data['postal_code'] ?? null,
+                'neighborhood' => $data['neighborhood'] ?? null,
+                'municipality' => $data['municipality'] ?? null,
+                'address_state' => $data['address_state'] ?? null,
+                'maps_url' => $data['maps_url'] ?? null,
                 'attendance_latitude' => $data['attendance_latitude'] ?? null,
                 'attendance_longitude' => $data['attendance_longitude'] ?? null,
                 'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? 100,
@@ -138,21 +158,43 @@ class BranchController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'color' => ['nullable', 'string', 'max:20'],
+            'street' => ['nullable', 'string', 'max:255'],
+            'external_number' => ['nullable', 'string', 'max:50'],
+            'internal_number' => ['nullable', 'string', 'max:50'],
+            'postal_code' => ['nullable', 'string', 'max:5'],
+            'neighborhood' => ['nullable', 'string', 'max:255'],
+            'municipality' => ['nullable', 'string', 'max:255'],
+            'address_state' => ['nullable', 'string', 'max:255'],
+            'maps_url' => ['nullable', 'string', 'max:1000'],
             'active' => ['boolean'],
             'attendance_latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'attendance_longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'attendance_geofence_radius_meters' => ['nullable', 'integer', 'min:10', 'max:1000'],
         ]);
 
-        $branch->update([
+        $branch = DB::transaction(function () use ($request, $branch, $data) {
+            $branch = $this->lockCurrentVersion($request, $branch);
+            $branch->update([
             'name' => $data['name'],
             'slug' => Str::slug($data['name']),
             'color' => $data['color'] ?? null,
+            'address' => $this->formatAddress($data),
+            'street' => $data['street'] ?? null,
+            'external_number' => $data['external_number'] ?? null,
+            'internal_number' => $data['internal_number'] ?? null,
+            'postal_code' => $data['postal_code'] ?? null,
+            'neighborhood' => $data['neighborhood'] ?? null,
+            'municipality' => $data['municipality'] ?? null,
+            'address_state' => $data['address_state'] ?? null,
+            'maps_url' => $data['maps_url'] ?? null,
             'attendance_latitude' => $data['attendance_latitude'] ?? null,
             'attendance_longitude' => $data['attendance_longitude'] ?? null,
             'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? 100,
             'active' => $data['active'] ?? true,
-        ]);
+            ]);
+
+            return $branch;
+        });
 
         Cache::forget('active_branches');
         broadcast(BranchChanged::fromBranch($branch, 'updated'))->toOthers();
@@ -161,7 +203,7 @@ class BranchController extends Controller
         return redirect()->back();
     }
 
-    public function destroy(Branch $branch)
+    public function destroy(Request $request, Branch $branch)
     {
         $this->checkPermission('branches.delete');
 
@@ -169,12 +211,31 @@ class BranchController extends Controller
         $branchSlug = $branch->slug;
         $branchName = $branch->name;
 
-        $branch->delete();
+        DB::transaction(function () use ($request, $branch) {
+            $this->lockCurrentVersion($request, $branch)->delete();
+        });
 
         Cache::forget('active_branches');
         broadcast(new BranchChanged('deleted', $branchId, $branchSlug))->toOthers();
         event(RealtimeActivityLogged::message('eliminó', 'la sucursal', $branchName, 'Sistemas', 'deleted'));
 
         return back()->with('success', 'Sucursal eliminada correctamente');
+    }
+
+    private function formatAddress(array $data): ?string
+    {
+        $address = collect([
+            $data['street'] ?? null,
+            $data['external_number'] ?? null,
+            $data['internal_number'] ?? null,
+            $data['neighborhood'] ?? null,
+            $data['municipality'] ?? null,
+            $data['address_state'] ?? null,
+            $data['postal_code'] ?? null,
+        ])
+            ->filter(fn ($value) => filled($value))
+            ->implode(', ');
+
+        return $address !== '' ? $address : null;
     }
 }

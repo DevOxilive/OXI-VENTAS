@@ -57,6 +57,21 @@ export function getModalActionMessages({
     }
 }
 
+function getFirstRequestError(errors) {
+    if (!errors || typeof errors !== 'object') return null
+
+    for (const error of Object.values(errors)) {
+        if (Array.isArray(error)) {
+            const message = error.find((item) => typeof item === 'string' && item.trim())
+            if (message) return message
+        }
+
+        if (typeof error === 'string' && error.trim()) return error
+    }
+
+    return null
+}
+
 export function getModalRequestOptions({
     mode = 'save',
     entityName = 'Registro',
@@ -93,15 +108,15 @@ export function getModalRequestOptions({
 
             onSuccess?.(...args)
         },
-        onError: (...args) => {
+        onError: (errors, ...args) => {
             if (showError) {
                 ErrorAlert({
                     title: messages.errorTitle,
-                    message: messages.errorMessage,
+                    message: getFirstRequestError(errors) ?? messages.errorMessage,
                 })
             }
 
-            onError?.(...args)
+            onError?.(errors, ...args)
         },
     }
 }

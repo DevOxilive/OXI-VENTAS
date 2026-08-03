@@ -12,6 +12,7 @@ const props = defineProps({ order: { type: Object, required: true }, mode: { typ
 const emit = defineEmits(['close', 'completed'])
 const isEditing = computed(() => props.mode === 'edit')
 const form = useForm({
+    record_version: props.order.record_version || props.order.updated_at || null,
     items: (props.order.items ?? []).map((item) => ({ id: item.id, received_quantity: item.received_quantity ?? 0, receipt_notes: item.receipt_notes ?? '' })),
 })
 const itemLookup = computed(() => new Map((props.order.items ?? []).map((item) => [Number(item.id), item])))
@@ -39,6 +40,7 @@ function status(item) {
 }
 function increase(item) { item.received_quantity = Number(item.received_quantity || 0) + 1 }
 function decrease(item) { item.received_quantity = Math.max(0, Number(item.received_quantity || 0) - 1) }
+function updateReceivedQuantity(item, value) { item.received_quantity = value === '' ? '' : Math.max(0, Number(value || 0)) }
 async function completeReceipt() {
     if (form.processing) return
     const result = await confirmModalAction({ mode: 'update', entityName: 'orden de compra', title: 'Completar orden de compra', message: 'Se guardarán las piezas recibidas y la orden pasará a Completadas. ¿Deseas continuar?', confirmText: 'Completar orden' })
@@ -64,7 +66,7 @@ async function completeReceipt() {
                 <article v-for="item in (isEditing ? form.items : order.items)" :key="item.id" class="grid gap-3 rounded-xl border border-secondary bg-background px-3 py-3 md:grid-cols-[minmax(0,1fr)_110px_150px_100px] md:items-center">
                     <div class="flex min-w-0 items-center gap-3"><div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary"><img v-if="item.image_url" :src="item.image_url" :alt="item.product_name" class="h-full w-full rounded-lg object-cover"><span v-else class="material-symbols-outlined text-lg opacity-40">inventory_2</span></div><div class="min-w-0"><p class="truncate text-sm font-black">{{ isEditing ? sourceItem(item).product_name : item.product_name }}</p><p class="truncate text-xs opacity-60">{{ (isEditing ? sourceItem(item).product_code : item.product_code) || 'Sin código' }}</p></div></div>
                     <strong class="text-sm">{{ quantity(isEditing ? sourceItem(item).requested_quantity : item.requested_quantity) }} pzas.</strong>
-                    <QuantityStepper v-if="isEditing" :value="quantity(item.received_quantity)" :decrease-disabled="Number(item.received_quantity) <= 0" @decrease="decrease(item)" @increase="increase(item)" />
+                    <QuantityStepper v-if="isEditing" :value="item.received_quantity" :aria-label="`Piezas recibidas de ${sourceItem(item).product_name || 'producto'}`" :decrease-disabled="Number(item.received_quantity) <= 0" @decrease="decrease(item)" @increase="increase(item)" @update="updateReceivedQuantity(item, $event)" />
                     <span v-else class="w-fit rounded-full bg-secondary px-2 py-1 text-[11px] font-bold">{{ item.status_label }}</span>
                     <TextareaField v-if="isEditing" v-model="item.receipt_notes" :field="`receipt_notes_${item.id}`" placeholder="Notas" :rows="1" />
                 </article>

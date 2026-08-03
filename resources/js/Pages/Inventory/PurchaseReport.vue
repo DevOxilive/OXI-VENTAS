@@ -404,9 +404,11 @@ function selectBranch(branchId) {
                                     <span class="hidden text-[10px] font-semibold uppercase tracking-[0.1em] text-text opacity-50 sm:inline">Pzas.</span>
                                     <QuantityStepper
                                         :value="item.requested_quantity"
+                                        :aria-label="`Cantidad solicitada de ${item.name}`"
                                         :decrease-disabled="Number(item.requested_quantity || 0) <= 1"
                                         @decrease="report.decreaseQuantity(item.branch_product_id)"
                                         @increase="report.increaseQuantity(item.branch_product_id)"
+                                        @update="report.updateItem(item.branch_product_id, 'requested_quantity', $event)"
                                     />
                                 </div>
                             </article>

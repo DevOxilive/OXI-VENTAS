@@ -38,15 +38,23 @@ const search = ref("")
 const selectedBranch = ref(null)
 const modalMode = ref("create")
 const showCreateModal = ref(false)
-const googleMapsLocation = ref("")
 let unsubscribeBranchChanged = null
 
 const form = useForm({
   name: "",
   color: "#facc15",
+  street: "",
+  external_number: "",
+  internal_number: "",
+  postal_code: "",
+  neighborhood: "",
+  municipality: "",
+  address_state: "",
+  maps_url: "",
   attendance_latitude: "",
   attendance_longitude: "",
   attendance_geofence_radius_meters: 100,
+  record_version: "",
 })
 
 const canViewBranches = computed(() => {
@@ -58,6 +66,10 @@ const isBranchFormReadonly = computed(() => {
 })
 
 const selectedMapCoordinates = computed(() => {
+  if (form.attendance_latitude === "" || form.attendance_longitude === "") {
+    return null
+  }
+
   const latitude = Number(form.attendance_latitude)
   const longitude = Number(form.attendance_longitude)
 
@@ -68,24 +80,44 @@ const selectedMapCoordinates = computed(() => {
   return { latitude, longitude }
 })
 
+const fullAddress = computed(() => {
+  return [
+    form.street,
+    form.external_number,
+    form.internal_number,
+    form.neighborhood,
+    form.municipality,
+    form.address_state,
+    form.postal_code,
+  ].filter(Boolean).join(", ")
+})
+
 const googleMapsPreviewUrl = computed(() => {
   const coordinates = selectedMapCoordinates.value
 
-  if (!coordinates) {
-    return "https://maps.google.com/maps?q=Ciudad%20de%20Mexico&z=11&output=embed"
+  if (fullAddress.value) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(fullAddress.value)}&output=embed`
   }
 
-  return `https://maps.google.com/maps?q=${coordinates.latitude},${coordinates.longitude}&z=17&output=embed`
+  if (coordinates) {
+    return `https://maps.google.com/maps?q=${coordinates.latitude},${coordinates.longitude}&z=17&output=embed`
+  }
+
+  return `https://www.google.com/maps?q=${encodeURIComponent(form.name || "sucursal")}&output=embed`
 })
 
 const googleMapsOpenUrl = computed(() => {
+  const registeredUrl = form.maps_url?.trim()
+
+  if (registeredUrl) return registeredUrl
+
   const coordinates = selectedMapCoordinates.value
 
   if (coordinates) {
     return `https://www.google.com/maps/search/?api=1&query=${coordinates.latitude},${coordinates.longitude}`
   }
 
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(form.name || "sucursal")}`
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress.value || form.name || "sucursal")}`
 })
 
 const toolbarConfig = computed(() =>
@@ -152,21 +184,35 @@ function resetForm() {
   form.reset()
   form.clearErrors()
   form.color = "#facc15"
+  form.street = ""
+  form.external_number = ""
+  form.internal_number = ""
+  form.postal_code = ""
+  form.neighborhood = ""
+  form.municipality = ""
+  form.address_state = ""
+  form.maps_url = ""
   form.attendance_latitude = ""
   form.attendance_longitude = ""
   form.attendance_geofence_radius_meters = 100
-  googleMapsLocation.value = ""
+  form.record_version = ""
 }
 
 function fillBranchForm(branch) {
   form.name = branch.name
   form.color = branch.color || "#facc15"
+  form.street = branch.street || ""
+  form.external_number = branch.external_number || ""
+  form.internal_number = branch.internal_number || ""
+  form.postal_code = branch.postal_code || ""
+  form.neighborhood = branch.neighborhood || ""
+  form.municipality = branch.municipality || ""
+  form.address_state = branch.address_state || ""
+  form.maps_url = branch.maps_url || ""
   form.attendance_latitude = branch.attendance_latitude || ""
   form.attendance_longitude = branch.attendance_longitude || ""
   form.attendance_geofence_radius_meters = branch.attendance_geofence_radius_meters || 100
-  googleMapsLocation.value = selectedMapCoordinates.value
-    ? `${form.attendance_latitude}, ${form.attendance_longitude}`
-    : ""
+  form.record_version = branch.updated_at || ""
 }
 
 function openCreateModal() {
@@ -225,13 +271,20 @@ function parseGoogleMapsCoordinates(value = "") {
   return null
 }
 
-function applyGoogleMapsLocation() {
+function syncAttendanceLocationFromMapsUrl() {
   if (isBranchFormReadonly.value) return
 
-  const coordinates = parseGoogleMapsCoordinates(googleMapsLocation.value)
+  if (!form.maps_url?.trim()) {
+    form.attendance_latitude = ""
+    form.attendance_longitude = ""
+    form.clearErrors("attendance_latitude")
+    form.clearErrors("attendance_longitude")
+    return
+  }
+
+  const coordinates = parseGoogleMapsCoordinates(form.maps_url)
 
   if (!coordinates) {
-    form.setError("attendance_latitude", "Pega un enlace de Google Maps que incluya coordenadas.")
     return
   }
 
@@ -248,7 +301,7 @@ function applyGoogleMapsLocation() {
 function clearAttendanceLocation() {
   if (isBranchFormReadonly.value) return
 
-  googleMapsLocation.value = ""
+  form.maps_url = ""
   form.attendance_latitude = ""
   form.attendance_longitude = ""
   form.clearErrors("attendance_latitude")
@@ -277,6 +330,7 @@ async function deleteBranch(branch) {
 
   if (!result.isConfirmed) return
 
+  form.record_version = branch.updated_at || ""
   form.delete(route("branches.destroy", branch.id), getModalRequestOptions({
     mode: "delete",
     entityName: "Sucursal",
@@ -346,10 +400,17 @@ function submit() {
     onSuccess: () => {
       form.reset("name")
       form.color = "#facc15"
+      form.street = ""
+      form.external_number = ""
+      form.internal_number = ""
+      form.postal_code = ""
+      form.neighborhood = ""
+      form.municipality = ""
+      form.address_state = ""
+      form.maps_url = ""
       form.attendance_latitude = ""
       form.attendance_longitude = ""
       form.attendance_geofence_radius_meters = 100
-      googleMapsLocation.value = ""
     },
   }))
 }
@@ -385,6 +446,13 @@ watch(canViewBranches, (canView) => {
     closeCreateModal()
   }
 })
+
+watch(
+  () => form.maps_url,
+  () => {
+    syncAttendanceLocationFromMapsUrl()
+  },
+)
 
 onMounted(() => {
   unsubscribeBranchChanged = subscribeRealtime(
@@ -459,6 +527,68 @@ onBeforeUnmount(() => {
             :error="form.errors.color"
           />
 
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <InputField
+              v-model="form.street"
+              label="Calle"
+              field="street"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.street"
+            />
+
+            <InputField
+              v-model="form.external_number"
+              label="Numero exterior"
+              field="external_number"
+              validation-field="externalNumber"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.external_number"
+            />
+
+            <InputField
+              v-model="form.internal_number"
+              label="Numero interior"
+              field="internal_number"
+              validation-field="internalNumber"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.internal_number"
+            />
+
+            <InputField
+              v-model="form.postal_code"
+              label="Codigo postal"
+              field="postal_code"
+              validation-field="postalCode"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.postal_code"
+            />
+
+            <InputField
+              v-model="form.neighborhood"
+              label="Colonia"
+              field="neighborhood"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.neighborhood"
+            />
+
+            <InputField
+              v-model="form.municipality"
+              label="Municipio"
+              field="municipality"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.municipality"
+            />
+
+            <InputField
+              v-model="form.address_state"
+              label="Estado"
+              field="address_state"
+              validation-field="addressState"
+              :readonly="isBranchFormReadonly"
+              :error="form.errors.address_state"
+            />
+          </div>
+
           <div class="space-y-4 rounded-2xl border border-secondary bg-secondary p-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -477,7 +607,7 @@ onBeforeUnmount(() => {
                 rel="noopener noreferrer"
                 class="inline-flex items-center justify-center rounded-xl border border-primary bg-background px-3 py-2 text-xs font-semibold text-primary transition hover:bg-secondary"
               >
-                Abrir Google Maps
+                Abrir mapa
               </a>
             </div>
 
@@ -491,34 +621,17 @@ onBeforeUnmount(() => {
               />
             </div>
 
-            <div v-if="!isBranchFormReadonly" class="space-y-2">
-              <label for="branch-google-maps-location" class="text-xs font-semibold text-text">
-                Enlace del punto marcado en Google Maps
-              </label>
-
-              <div class="flex flex-col gap-2 sm:flex-row">
-                <input
-                  id="branch-google-maps-location"
-                  v-model="googleMapsLocation"
-                  type="text"
-                  class="min-h-11 flex-1 rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  placeholder="Pega aqui el enlace o coordenada copiada desde Google Maps"
-                  @keydown.enter.prevent="applyGoogleMapsLocation"
-                >
-
-                <button
-                  type="button"
-                  class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:brightness-95"
-                  @click="applyGoogleMapsLocation"
-                >
-                  Usar punto
-                </button>
-              </div>
-
-              <p v-if="form.errors.attendance_latitude" class="text-xs text-red-500">
-                {{ form.errors.attendance_latitude }}
-              </p>
-            </div>
+            <InputField
+              v-model="form.maps_url"
+              label="URL Google Maps"
+              field="maps_url"
+              validation-field="mapsUrl"
+              :readonly="isBranchFormReadonly"
+              :preserve-case="true"
+              placeholder="Pega el enlace de la sucursal en Google Maps"
+              :error="form.errors.maps_url || form.errors.attendance_latitude"
+              @blur="syncAttendanceLocationFromMapsUrl"
+            />
 
             <div class="flex flex-wrap items-center gap-2 text-xs text-text opacity-75">
               <span class="rounded-full bg-background px-3 py-1">

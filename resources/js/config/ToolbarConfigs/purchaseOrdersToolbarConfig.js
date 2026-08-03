@@ -11,7 +11,7 @@ export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, mode =
         title,
         subtitle,
         backButton: true,
-        backLabel: 'Centro de reportes',
+        backLabel: 'Inventario',
         search: filters.search ?? '',
         searchPlaceholder: 'Buscar por Orden de compra general, producto, código o sucursal',
         showSearch: mode !== 'view' || filters.status !== 'GENERATE',

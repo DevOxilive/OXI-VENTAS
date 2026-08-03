@@ -46,6 +46,7 @@ const form = useForm({
   minimum_work_minutes: 420,
   tolerances: { on_time_minutes: 10 },
   daily_schedule: daily(),
+  record_version: '',
 })
 
 const columns = [
@@ -75,6 +76,7 @@ function resetForm() {
   form.meal_end_at = '15:00'
   form.tolerances = { on_time_minutes: 10 }
   form.daily_schedule = daily()
+  form.record_version = ''
 }
 
 function openCreateModal() {
@@ -101,6 +103,7 @@ function loadSchedule(schedule, mode) {
   form.minimum_work_minutes = schedule.minimum_work_minutes ?? 420
   form.tolerances = { on_time_minutes: schedule.tolerances?.on_time_minutes ?? 10 }
   form.daily_schedule = schedule.daily_schedule || daily()
+  form.record_version = schedule.updated_at || ''
   showDayOverrides.value = Object.keys(form.daily_schedule).length > 0
   showModal.value = true
 }
@@ -120,6 +123,7 @@ function toggleDay(day) {
 }
 
 function addDayOverride() {
+  if (modalMode.value === 'view') return
   if (!selectedOverrideDay.value) return
   if (!form.daily_schedule?.[selectedOverrideDay.value]) toggleDay(selectedOverrideDay.value)
   selectedOverrideDay.value = ''
@@ -156,6 +160,7 @@ async function deleteSchedule(schedule) {
 
   if (!result.isConfirmed) return
 
+  form.record_version = schedule.updated_at || ''
   form.delete(route('human-resources.attendance-schedules.destroy', schedule.id), getModalRequestOptions({
     mode: 'delete',
     entityName: 'Horario',
@@ -248,7 +253,7 @@ onBeforeUnmount(() => unsubscribeSchedules?.())
         <div class="sm:col-span-2 border-t border-secondary pt-4">
           <button type="button" class="flex w-full items-center justify-between rounded-2xl border border-secondary bg-secondary/60 px-4 py-3.5 text-left transition hover:border-primary" @click="showDayOverrides = !showDayOverrides"><span class="flex items-center gap-3"><span class="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><span class="material-symbols-outlined text-[20px]">event_repeat</span></span><span><span class="block text-sm font-semibold text-text">Horario especial por día</span><span class="block text-xs text-text opacity-60">Agrega solo las excepciones necesarias.</span></span></span><span class="material-symbols-outlined text-text opacity-70">{{ showDayOverrides ? 'expand_less' : 'expand_more' }}</span></button>
           <div v-if="showDayOverrides" class="mt-3 rounded-2xl border border-secondary bg-secondary/35 p-4">
-            <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3"><SelectField v-model="selectedOverrideDay" label="Día a modificar" field="schedule-override-day" :options="days.map(day => ({ value: day.key, label: day.label }))" class="min-w-0" /><AppButton type="button" class="shrink-0" @click="addDayOverride">Agregar</AppButton></div>
+            <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3"><SelectField v-model="selectedOverrideDay" label="Día a modificar" field="schedule-override-day" :options="days.map(day => ({ value: day.key, label: day.label }))" :disabled="modalMode === 'view'" class="min-w-0" /><AppButton v-if="modalMode !== 'view'" type="button" class="shrink-0" @click="addDayOverride">Agregar</AppButton></div>
             <div v-for="day in days.filter(item => form.daily_schedule?.[item.key])" :key="`${day.key}-hours`" class="mt-3 rounded-xl border border-primary/30 bg-background p-3"><div class="mb-3 flex items-center"><p class="text-sm font-semibold text-text">{{ day.label }} · horario especial</p><button v-if="modalMode !== 'view'" type="button" class="ml-auto text-xs font-semibold text-primary" @click="toggleDay(day.key)">Quitar</button></div><div class="grid grid-cols-2 gap-3"><TimeField v-model="form.daily_schedule[day.key].check_in_at" compact label="Entrada" :field="`${day.key}-in`" :readonly="modalMode === 'view'" /><TimeField v-model="form.daily_schedule[day.key].check_out_at" compact label="Salida" :field="`${day.key}-out`" :readonly="modalMode === 'view'" /><TimeField v-model="form.daily_schedule[day.key].meal_start_at" compact label="Inicio de comida" :field="`${day.key}-meal-start`" :readonly="modalMode === 'view'" /><TimeField v-model="form.daily_schedule[day.key].meal_end_at" compact label="Fin de comida" :field="`${day.key}-meal-end`" :readonly="modalMode === 'view'" /></div></div>
           </div>
         </div>

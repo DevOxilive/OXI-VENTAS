@@ -25,6 +25,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -247,33 +249,38 @@ class PhysicalCountController extends Controller
         ]);
 
         $branch = $this->resolveBranch($data['branch']);
-        $nextId = (PhysicalCount::max('id') ?? 0) + 1;
-        $folio = 'AUD-'.now()->format('Ymd').'-'.str_pad($nextId, 4, '0', STR_PAD_LEFT);
 
-        $physicalCount = PhysicalCount::create([
-            'folio' => $folio,
-            'branch_id' => $branch->id,
-            'created_by' => Auth::id(),
-            'name' => $data['name'],
-            'status' => 'open',
-            'started_at' => now(),
-        ]);
+        $physicalCount = DB::transaction(function () use ($data, $branch) {
+            $physicalCount = PhysicalCount::create([
+                'folio' => 'AUD-PENDING-'.Str::uuid(),
+                'branch_id' => $branch->id,
+                'created_by' => Auth::id(),
+                'name' => $data['name'],
+                'status' => 'open',
+                'started_at' => now(),
+            ]);
+            $physicalCount->update([
+                'folio' => 'AUD-'.now()->format('Ymd').'-'.str_pad((string) $physicalCount->id, 4, '0', STR_PAD_LEFT),
+            ]);
 
-        $participantIds = collect($data['participant_ids'])
-            ->push(Auth::id())
-            ->filter()
-            ->unique()
-            ->values();
+            $participantIds = collect($data['participant_ids'])
+                ->push(Auth::id())
+                ->filter()
+                ->unique()
+                ->values();
 
-        $physicalCount->participants()->sync($participantIds);
-        $physicalCount->rounds()->create([
-            'round_number' => 1,
-            'type' => 'original',
-            'scope' => 'all',
-            'opened_by' => Auth::id(),
-            'started_at' => $physicalCount->started_at,
-        ]);
-        $this->snapshotService->ensureForAudit($physicalCount);
+            $physicalCount->participants()->sync($participantIds);
+            $physicalCount->rounds()->create([
+                'round_number' => 1,
+                'type' => 'original',
+                'scope' => 'all',
+                'opened_by' => Auth::id(),
+                'started_at' => $physicalCount->started_at,
+            ]);
+            $this->snapshotService->ensureForAudit($physicalCount);
+
+            return $physicalCount->fresh();
+        });
 
         broadcast(new PhysicalCountChanged($physicalCount, 'created'))->toOthers();
         event(RealtimeActivityLogged::message('creó', 'la auditoría', $physicalCount->folio, 'Auditorías', 'created'));
@@ -328,7 +335,17 @@ class PhysicalCountController extends Controller
 
         $branchSlug = $physicalCount->branch?->slug;
         $folio = $physicalCount->folio;
-        $physicalCount->delete();
+        DB::transaction(function () use ($physicalCount) {
+            $lockedAudit = PhysicalCount::query()->lockForUpdate()->findOrFail($physicalCount->id);
+
+            if ($lockedAudit->status !== 'open') {
+                throw ValidationException::withMessages([
+                    'status' => 'La auditoria cambio de estado y ya no puede eliminarse.',
+                ]);
+            }
+
+            $lockedAudit->delete();
+        });
 
         broadcast(new PhysicalCountChanged($physicalCount, 'deleted'));
         event(RealtimeActivityLogged::message('eliminó', 'la auditoría', $folio, 'Auditorías', 'deleted'));
@@ -439,20 +456,24 @@ class PhysicalCountController extends Controller
             ]);
         }
 
-        $entry = PhysicalCountEntry::create([
-            'physical_count_id' => $physicalCount->id,
-            'physical_count_round_id' => $this->currentRound($physicalCount)->id,
-            'branch_product_id' => $data['branch_product_id'],
-            'product_batch_id' => $data['product_batch_id'],
-            'product_id' => $branchProduct->product_id,
-            'user_id' => Auth::id(),
-            'scanned_code' => $data['scanned_code'] ?? null,
-            'counted_quantity' => $counted,
-            'damaged_quantity' => $damaged,
-            'expired_quantity' => $expired,
-            'expiration_date' => $data['expiration_date'] ?? null,
-            'notes' => $data['notes'] ?? null,
-        ]);
+        $entry = DB::transaction(function () use ($physicalCount, $data, $branchProduct, $counted, $damaged, $expired) {
+            $lockedAudit = $this->lockAuditForCapture($physicalCount->id);
+
+            return PhysicalCountEntry::create([
+                'physical_count_id' => $lockedAudit->id,
+                'physical_count_round_id' => $this->currentRound($lockedAudit)->id,
+                'branch_product_id' => $data['branch_product_id'],
+                'product_batch_id' => $data['product_batch_id'],
+                'product_id' => $branchProduct->product_id,
+                'user_id' => Auth::id(),
+                'scanned_code' => $data['scanned_code'] ?? null,
+                'counted_quantity' => $counted,
+                'damaged_quantity' => $damaged,
+                'expired_quantity' => $expired,
+                'expiration_date' => $data['expiration_date'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
+        });
 
         $entry->load('user:id,name');
         broadcast(new PhysicalCountChanged($physicalCount, 'entry_created', [
@@ -500,7 +521,10 @@ class PhysicalCountController extends Controller
             ]);
         }
 
-        $entry->update($data);
+        DB::transaction(function () use ($entry, $data) {
+            $this->lockAuditForCapture($entry->physical_count_id);
+            PhysicalCountEntry::query()->lockForUpdate()->findOrFail($entry->id)->update($data);
+        });
         broadcast(new PhysicalCountChanged($entry->physicalCount, 'entry_updated', [
             'entry' => [
                 'id' => $entry->id,
@@ -531,7 +555,10 @@ class PhysicalCountController extends Controller
             'branch_product_id' => $entry->branch_product_id,
             'product_batch_id' => $entry->product_batch_id,
         ];
-        $entry->delete();
+        DB::transaction(function () use ($entry) {
+            $this->lockAuditForCapture($entry->physical_count_id);
+            PhysicalCountEntry::query()->lockForUpdate()->findOrFail($entry->id)->delete();
+        });
 
         $remainingEntries = $this->currentRoundEntriesQuery($physicalCount)
             ->where('product_batch_id', $deletedEntry['product_batch_id'])
@@ -717,20 +744,23 @@ class PhysicalCountController extends Controller
 
         $lotNumber = $this->formatLotNumber($data['lot_number']);
 
-        ProductBatch::firstOrCreate(
-            [
-                'branch_product_id' => $branchProduct->id,
-                'lot_number' => $lotNumber,
-            ],
-            [
-                'expiration_date' => $data['expiration_date'],
-                'initial_quantity' => 0,
-                'quantity' => 0,
-                'supplier' => $data['supplier'] ?? null,
-                'received_at' => now()->toDateString(),
-                'status' => ProductBatch::STATUS_ACTIVE,
-            ]
-        );
+        DB::transaction(function () use ($physicalCount, $branchProduct, $lotNumber, $data) {
+            $this->lockAuditForCapture($physicalCount->id);
+            ProductBatch::firstOrCreate(
+                [
+                    'branch_product_id' => $branchProduct->id,
+                    'lot_number' => $lotNumber,
+                ],
+                [
+                    'expiration_date' => $data['expiration_date'],
+                    'initial_quantity' => 0,
+                    'quantity' => 0,
+                    'supplier' => $data['supplier'] ?? null,
+                    'received_at' => now()->toDateString(),
+                    'status' => ProductBatch::STATUS_ACTIVE,
+                ]
+            );
+        });
 
         broadcast(new PhysicalCountChanged($physicalCount, 'batch_created'));
         event(RealtimeActivityLogged::message('creó', 'un lote en la auditoría', $physicalCount->folio, 'Auditorías', 'batch_created'));
@@ -757,11 +787,15 @@ class PhysicalCountController extends Controller
             ]);
         }
 
-        $physicalCount->update([
-            'status' => 'closed',
-            'closed_at' => now(),
-        ]);
-        $this->currentRound($physicalCount)->update(['closed_at' => now()]);
+        DB::transaction(function () use ($physicalCount) {
+            $lockedAudit = $this->lockAuditForCapture($physicalCount->id);
+            $closedAt = now();
+            $lockedAudit->update([
+                'status' => 'closed',
+                'closed_at' => $closedAt,
+            ]);
+            $this->currentRound($lockedAudit)->update(['closed_at' => $closedAt]);
+        });
 
         broadcast(new PhysicalCountChanged($physicalCount, 'closed'));
         event(RealtimeActivityLogged::message('cerró', 'la auditoría', $physicalCount->folio, 'Auditorías', 'closed'));
@@ -786,6 +820,13 @@ class PhysicalCountController extends Controller
         $recaptureScope = $data['recapture_scope'] ?? 'all';
         DB::transaction(function () use ($physicalCount, $recaptureScope): void {
             $audit = PhysicalCount::whereKey($physicalCount->id)->lockForUpdate()->firstOrFail();
+
+            if ($audit->status !== 'closed') {
+                throw ValidationException::withMessages([
+                    'status' => 'La auditoria cambio de estado y ya no puede reabrirse.',
+                ]);
+            }
+
             $startedAt = now();
             $nextRound = ((int) $audit->rounds()->max('round_number')) + 1;
 
@@ -822,11 +863,21 @@ class PhysicalCountController extends Controller
             ]);
         }
 
-        $physicalCount->update([
-            'status' => 'finalized',
-            'finalized_at' => now(),
-            'finalized_by' => Auth::id(),
-        ]);
+        DB::transaction(function () use ($physicalCount) {
+            $lockedAudit = PhysicalCount::query()->lockForUpdate()->findOrFail($physicalCount->id);
+
+            if ($lockedAudit->status !== 'closed') {
+                throw ValidationException::withMessages([
+                    'status' => 'La auditoria cambio de estado y ya no puede finalizarse.',
+                ]);
+            }
+
+            $lockedAudit->update([
+                'status' => 'finalized',
+                'finalized_at' => now(),
+                'finalized_by' => Auth::id(),
+            ]);
+        });
 
         broadcast(new PhysicalCountChanged($physicalCount, 'finalized'));
         event(RealtimeActivityLogged::message('finalizó', 'la auditoría', $physicalCount->folio, 'Auditorías', 'finalized'));
@@ -846,6 +897,21 @@ class PhysicalCountController extends Controller
         }
 
         DB::transaction(function () use ($physicalCount) {
+            $physicalCount = PhysicalCount::query()
+                ->with('snapshot.items')
+                ->lockForUpdate()
+                ->findOrFail($physicalCount->id);
+
+            if ($physicalCount->status !== 'finalized') {
+                throw ValidationException::withMessages([
+                    'status' => 'Solo se pueden aplicar ajustes de una auditoria finalizada.',
+                ]);
+            }
+
+            $snapshotBatchStocks = $physicalCount->snapshot?->items
+                ?->whereNotNull('product_batch_id')
+                ->keyBy('product_batch_id');
+
             $comparison = $this->finalEntries($physicalCount)
                 ->whereNotNull('product_batch_id')
                 ->groupBy(fn ($entry) => $entry->branch_product_id.':'.$entry->product_batch_id)
@@ -878,13 +944,21 @@ class PhysicalCountController extends Controller
                     continue;
                 }
 
-                $previousBatchQuantity = (float) $batch->quantity;
+                $snapshotBatchQuantity = (float) ($snapshotBatchStocks?->get($batch->id)?->batch_stock ?? 0);
+                $currentBatchQuantity = (float) $batch->quantity;
                 $previousStock = (float) $branchProduct->stock;
                 $countedStock = (float) $item->counted_stock;
                 $damagedStock = (float) $item->damaged_stock;
                 $expiredStock = (float) $item->expired_stock;
-                $newBatchQuantity = max(0, $countedStock - $damagedStock - $expiredStock);
-                $difference = $newBatchQuantity - $previousBatchQuantity;
+                $countedBatchQuantity = max(0, $countedStock - $damagedStock - $expiredStock);
+                $difference = $countedBatchQuantity - $snapshotBatchQuantity;
+                $newBatchQuantity = $currentBatchQuantity + $difference;
+
+                if ($newBatchQuantity < 0) {
+                    throw ValidationException::withMessages([
+                        'stock' => "El lote {$batch->lot_number} cambio despues del conteo y la diferencia dejaria stock negativo.",
+                    ]);
+                }
 
                 if ($difference === 0.0) {
                     continue;
@@ -895,8 +969,6 @@ class PhysicalCountController extends Controller
                 ]);
 
                 $newStock = $this->syncBranchProductStockFromBatches($branchProduct);
-
-                $this->syncBranchInventoryStock($physicalCount, $branchProduct, $newStock);
 
                 $movement = StockMovement::create([
                     'branch_product_id' => $branchProduct->id,
@@ -920,7 +992,7 @@ class PhysicalCountController extends Controller
                     'stock_movement_id' => $movement->id,
                     'product_batch_id' => $batch->id,
                     'quantity' => abs($difference),
-                    'previous_batch_quantity' => $previousBatchQuantity,
+                    'previous_batch_quantity' => $currentBatchQuantity,
                     'new_batch_quantity' => $newBatchQuantity,
                     'allocation_method' => StockMovementBatch::ALLOCATION_MANUAL,
                 ]);
@@ -955,23 +1027,6 @@ class PhysicalCountController extends Controller
         ]);
 
         return $stock;
-    }
-
-    private function syncBranchInventoryStock(
-        PhysicalCount $physicalCount,
-        BranchProduct $branchProduct,
-        float $newStock
-    ): void {
-        DB::table('branch_inventory')->updateOrInsert(
-            [
-                'branch_id' => $physicalCount->branch_id,
-                'product_id' => $branchProduct->product_id,
-            ],
-            [
-                'current_stock' => $newStock,
-                'updated_at' => now(),
-            ]
-        );
     }
 
     public function exportPdf(Request $request, PhysicalCount $physicalCount)
@@ -1145,27 +1200,33 @@ class PhysicalCountController extends Controller
             ->firstWhere('branch_product_id', $branchProduct->id);
 
         if ($snapshotRow) {
+            $snapshotBatches = collect($snapshotRow['snapshot_batches'] ?? [])
+                ->map(function ($batch) use ($canViewStock) {
+                    $payload = [
+                        'id' => $batch['id'],
+                        'lot_number' => $batch['lot_number'],
+                        'expiration_date' => $batch['expiration_date'],
+                    ];
+
+                    if ($canViewStock) {
+                        $payload['quantity'] = $batch['quantity'];
+                    }
+
+                    return $payload;
+                })
+                ->values();
+
+            if ($snapshotBatches->isEmpty()) {
+                $snapshotBatches = $this->auditBatchesPayload($branchProduct, $canViewStock);
+            }
+
             $payload = [
                 'branch_product_id' => $branchProduct->id,
                 'product_id' => $branchProduct->product_id,
                 'name' => $snapshotRow['product_name'],
                 'barcode' => $snapshotRow['scanned_code'] ?: $code,
                 'scanned_code' => $code ?: ($snapshotRow['scanned_code'] ?: 'Sin código escaneado'),
-                'batches' => collect($snapshotRow['snapshot_batches'] ?? [])
-                    ->map(function ($batch) use ($canViewStock) {
-                        $payload = [
-                            'id' => $batch['id'],
-                            'lot_number' => $batch['lot_number'],
-                            'expiration_date' => $batch['expiration_date'],
-                        ];
-
-                        if ($canViewStock) {
-                            $payload['quantity'] = $batch['quantity'];
-                        }
-
-                        return $payload;
-                    })
-                    ->values(),
+                'batches' => $snapshotBatches,
             ];
 
             if ($canViewStock) {
@@ -1181,8 +1242,37 @@ class PhysicalCountController extends Controller
             return $payload;
         }
 
-        $batches = ProductBatch::where('branch_product_id', $branchProduct->id)
+        $batches = $this->auditBatchesPayload($branchProduct, $canViewStock);
+
+        $payload = [
+            'branch_product_id' => $branchProduct->id,
+            'product_id' => $branchProduct->product_id,
+            'name' => $branchProduct->product->name ?? 'Sin producto',
+            'barcode' => $branchProduct->barcode ?? $code,
+            'scanned_code' => $code ?: ($branchProduct->barcode ?? 'Sin código escaneado'),
+            'batches' => $batches,
+        ];
+
+        if ($canViewStock) {
+            $payload['stock'] = $branchProduct->stock;
+        }
+
+        $payload['batches'] = $this->withBatchCountingStatus(
+            $physicalCount,
+            $branchProduct,
+            collect($payload['batches'])
+        );
+
+        return $payload;
+    }
+
+    private function auditBatchesPayload(BranchProduct $branchProduct, bool $canViewStock): Collection
+    {
+        return ProductBatch::where('branch_product_id', $branchProduct->id)
+            ->where('quantity', '>', 0)
+            ->orderByRaw('expiration_date IS NULL')
             ->orderBy('expiration_date')
+            ->orderBy('id')
             ->get(['id', 'lot_number', 'quantity', 'expiration_date'])
             ->map(function ($batch) use ($canViewStock) {
                 $payload = [
@@ -1198,32 +1288,6 @@ class PhysicalCountController extends Controller
                 return $payload;
             })
             ->values();
-
-        $payload = [
-            'branch_product_id' => $branchProduct->id,
-            'product_id' => $branchProduct->product_id,
-            'name' => $branchProduct->product->name ?? 'Sin producto',
-            'barcode' => $branchProduct->barcode ?? $code,
-            'scanned_code' => $code ?: ($branchProduct->barcode ?? 'Sin código escaneado'),
-            'batches' => $batches,
-        ];
-
-        if ($canViewStock) {
-            $currentStock = DB::table('branch_inventory')
-                ->where('branch_id', $physicalCount->branch_id)
-                ->where('product_id', $branchProduct->product_id)
-                ->value('current_stock');
-
-            $payload['stock'] = $currentStock ?? $branchProduct->stock;
-        }
-
-        $payload['batches'] = $this->withBatchCountingStatus(
-            $physicalCount,
-            $branchProduct,
-            collect($payload['batches'])
-        );
-
-        return $payload;
     }
 
     private function withBatchCountingStatus(
@@ -1309,6 +1373,21 @@ class PhysicalCountController extends Controller
     private function canCaptureInStatus(PhysicalCount $physicalCount): bool
     {
         return $physicalCount->status === 'open';
+    }
+
+    private function lockAuditForCapture(int $physicalCountId): PhysicalCount
+    {
+        $physicalCount = PhysicalCount::query()
+            ->lockForUpdate()
+            ->findOrFail($physicalCountId);
+
+        if (! $this->canCaptureInStatus($physicalCount)) {
+            throw ValidationException::withMessages([
+                'status' => 'La auditoria cambio de estado y ya no acepta capturas.',
+            ]);
+        }
+
+        return $physicalCount;
     }
 
     private function canRecaptureBranchProduct(PhysicalCount $physicalCount, BranchProduct $branchProduct): bool

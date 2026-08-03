@@ -30,7 +30,7 @@ class ProductBranchAssignmentTest extends TestCase
             ->delete(route('inventory.branches.products.destroy', [
                 'branch' => $branch->slug,
                 'product' => $product->id,
-            ]))
+            ]), ['record_version' => $product->updated_at->toJSON()])
             ->assertSessionHasErrors('product');
 
         $this->assertDatabaseHas('branch_products', [
@@ -60,7 +60,7 @@ class ProductBranchAssignmentTest extends TestCase
             ->delete(route('inventory.branches.products.destroy', [
                 'branch' => $branch->slug,
                 'product' => $product->id,
-            ]))
+            ]), ['record_version' => $product->updated_at->toJSON()])
             ->assertSessionHasErrors('product');
 
         $this->assertDatabaseHas('branch_products', [
@@ -135,6 +135,7 @@ class ProductBranchAssignmentTest extends TestCase
                 'entry_date' => now()->toDateString(),
                 'active' => true,
                 'branch_ids' => [$branchA->id, $branchB->id],
+                'record_version' => $product->updated_at->toJSON(),
             ])
             ->assertRedirect();
 

@@ -28,6 +28,7 @@ const permissionModuleOrder = [
     "inventory.general-purchase-orders",
     "audits",
     "sales",
+    "sales.attendance",
     "sales.purchase-lists",
     "sales.purchase-orders",
     "reports.audits",
@@ -120,6 +121,10 @@ const permissionModules = {
     },
     sales: {
         label: "Ventas",
+        section: "sales",
+    },
+    "sales.attendance": {
+        label: "Asistencia",
         section: "sales",
     },
     "sales.purchase-lists": {
@@ -305,6 +310,7 @@ const permissionLabels = {
     "systems.labels.view": "Ver configuración actual de etiquetas",
     "systems.labels.update": "Editar configuracion de etiquetas",
     "systems.labels.print": "Imprimir etiquetas de productos",
+    "systems.qz.sign": "Firmar trabajos de impresion local",
 
     "system.center.access": "Acceder al Centro de Administración",
     "system.audit.view": "Consultar Auditoría del Sistema",
@@ -341,7 +347,7 @@ export function getPermissionModule(permissionName = "") {
         return "systems.cash-closure-tickets";
     }
 
-    if (permissionName.startsWith("systems.labels.")) {
+    if (permissionName.startsWith("systems.labels.") || permissionName === "systems.qz.sign") {
         return "systems.labels";
     }
 
@@ -394,7 +400,11 @@ export function getPermissionModule(permissionName = "") {
         return "sales.purchase-lists";
     }
 
-    if (permissionName === "attendance.view" || permissionName === "attendance.register" || permissionName === "attendance.manage" || permissionName.startsWith("attendance.export.") || permissionName.startsWith("attendance.corrections.")) {
+    if (permissionName === "attendance.register") {
+        return "sales.attendance";
+    }
+
+    if (permissionName === "attendance.view" || permissionName === "attendance.manage" || permissionName.startsWith("attendance.export.") || permissionName.startsWith("attendance.corrections.")) {
         return "attendance";
     }
 

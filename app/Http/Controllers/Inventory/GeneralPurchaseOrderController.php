@@ -202,6 +202,7 @@ class GeneralPurchaseOrderController extends Controller
             'order_ids' => ['required', 'array', 'min:1'],
             'order_ids.*' => ['required', 'integer', 'distinct'],
             'draft_id' => ['nullable', 'integer', 'exists:general_purchase_orders,id'],
+            'record_version' => ['nullable', 'required_with:draft_id', 'date'],
         ]);
 
         $cycle = $this->cycles->currentOpenCycle($request->user());
@@ -210,6 +211,7 @@ class GeneralPurchaseOrderController extends Controller
             $request->user(),
             $payload['order_ids'],
             $payload['draft_id'] ?? null,
+            $payload['record_version'] ?? null,
         );
 
         return redirect()->back()->with(
@@ -228,6 +230,7 @@ class GeneralPurchaseOrderController extends Controller
             'order_ids' => ['required', 'array', 'min:1'],
             'order_ids.*' => ['required', 'integer', 'distinct'],
             'draft_id' => ['nullable', 'integer', 'exists:general_purchase_orders,id'],
+            'record_version' => ['nullable', 'required_with:draft_id', 'date'],
         ]);
 
         $cycle = $this->cycles->currentOpenCycle($request->user());
@@ -236,6 +239,7 @@ class GeneralPurchaseOrderController extends Controller
             $request->user(),
             $payload['order_ids'],
             $payload['draft_id'] ?? null,
+            $payload['record_version'] ?? null,
         );
 
         return redirect()->back()->with('success', 'Borrador de orden general guardado correctamente.');
@@ -344,11 +348,16 @@ class GeneralPurchaseOrderController extends Controller
             ],
         ]);
 
-        $purchaseOrder->update([
-            'review_status' => $payload['review_status'],
-            'reviewed_by' => $request->user()?->id,
-            'reviewed_at' => now(),
-        ]);
+        DB::transaction(function () use ($purchaseOrder, $payload, $request) {
+            $lockedOrder = PurchaseOrder::query()->lockForUpdate()->findOrFail($purchaseOrder->id);
+            abort_if($lockedOrder->general_purchase_order_id, 422, 'La orden ya forma parte de una Orden de compra general.');
+            $lockedOrder->update([
+                'review_status' => $payload['review_status'],
+                'reviewed_by' => $request->user()?->id,
+                'reviewed_at' => now(),
+            ]);
+        }, 3);
+        $purchaseOrder->refresh();
 
         $label = $payload['review_status'] === PurchaseOrder::REVIEW_APPROVED
             ? 'aprobada'
@@ -383,12 +392,14 @@ class GeneralPurchaseOrderController extends Controller
 
         $purchaseOrder->loadMissing('branch');
         $editor = app(PendingPurchaseOrderEditor::class);
+        $validated = $request->validate($editor->rules());
         $updatedOrder = $editor->update(
             $purchaseOrder,
             $purchaseOrder->branch,
-            $request->validate($editor->rules())['items'],
+            $validated['items'],
             $request->user(),
             true,
+            $validated['record_version'],
         );
 
         app(SystemAuditService::class)->record('purchase-orders', 'inventory_edit', 'success', $request, [
@@ -529,6 +540,7 @@ class GeneralPurchaseOrderController extends Controller
     {
         return $request->validate([
             'purchased_at' => ['required', 'date'],
+            'record_version' => ['required', 'date'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'integer', 'exists:general_purchase_order_items,id'],
             'items.*.purchase_presentation' => ['required', 'string', 'max:30'],
@@ -636,6 +648,7 @@ class GeneralPurchaseOrderController extends Controller
             'id' => $purchaseOrder->id,
             'folio' => $purchaseOrder->folio,
             'status' => $purchaseOrder->status,
+            'record_version' => $purchaseOrder->updated_at?->toJSON(),
             'status_label' => $this->reviewStatusLabel($purchaseOrder->review_status),
             'review_status' => $purchaseOrder->review_status,
             'review_status_label' => $this->reviewStatusLabel($purchaseOrder->review_status),
@@ -711,6 +724,7 @@ class GeneralPurchaseOrderController extends Controller
                 : ($order->status === GeneralPurchaseOrder::STATUS_PURCHASING ? 'En compra' : 'Borrador'),
             'created_at' => $order->created_at,
             'completed_at' => $order->completed_at,
+            'record_version' => $order->updated_at?->toJSON(),
             'created_by' => [
                 'id' => $order->created_by,
                 'name' => $order->creator?->name ?? 'Sin información',

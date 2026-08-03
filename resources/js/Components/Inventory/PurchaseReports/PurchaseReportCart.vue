@@ -1,4 +1,5 @@
 <script setup>
+import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 
 defineProps({
@@ -24,12 +25,25 @@ defineProps({
     },
 })
 
-defineEmits([
+const emit = defineEmits([
     'update-notes',
     'update-item',
     'remove',
     'save',
 ])
+
+function updateQuantity(item, value) {
+    emit('update-item', item.branch_product_id, 'requested_quantity', value === '' ? '' : Math.max(1, Number(value || 1)))
+}
+
+function decreaseQuantity(item) {
+    const next = Number(item.requested_quantity || 0) - 1
+    emit('update-item', item.branch_product_id, 'requested_quantity', Math.max(1, next))
+}
+
+function increaseQuantity(item) {
+    emit('update-item', item.branch_product_id, 'requested_quantity', Number(item.requested_quantity || 0) + 1)
+}
 </script>
 
 <template>
@@ -93,11 +107,14 @@ defineEmits([
                 </div>
 
                 <div class="mt-3">
-                    <input :value="item.requested_quantity" type="number" min="0" step="0.01"
-                        placeholder="Cantidad manual"
-                        class="rounded-xl border border-secondary bg-background px-4 py-3 text-sm text-text focus:border-primary focus:ring-primary"
-                        @input="$emit('update-item', item.branch_product_id, 'requested_quantity', $event.target.value)">
-
+                    <QuantityStepper
+                        :value="item.requested_quantity"
+                        :aria-label="`Cantidad solicitada de ${item.name}`"
+                        :decrease-disabled="Number(item.requested_quantity || 0) <= 1"
+                        @decrease="decreaseQuantity(item)"
+                        @increase="increaseQuantity(item)"
+                        @update="updateQuantity(item, $event)"
+                    />
                 </div>
             </div>
         </div>

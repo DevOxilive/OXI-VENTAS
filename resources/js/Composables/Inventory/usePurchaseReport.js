@@ -11,6 +11,14 @@ function resolveStockStatus(product) {
     return "Disponible";
 }
 
+function normalizeQuantity(value, minimum = 1) {
+    if (value === "") return "";
+
+    const quantity = Number(String(value ?? "").replace(/[^\d]/g, ""));
+
+    return Math.max(minimum, Number.isFinite(quantity) ? quantity : minimum);
+}
+
 export function usePurchaseReport(props) {
     const assignedToUserId = ref("");
     const selectedItems = ref({});
@@ -83,12 +91,15 @@ export function usePurchaseReport(props) {
 
     function updateItem(productId, field, value) {
         if (!selectedItems.value[productId]) return;
+        const nextValue = field === "requested_quantity"
+            ? normalizeQuantity(value)
+            : value;
 
         selectedItems.value = {
             ...selectedItems.value,
             [productId]: {
                 ...selectedItems.value[productId],
-                [field]: value,
+                [field]: nextValue,
             },
         };
     }
@@ -188,6 +199,7 @@ export function usePurchaseReport(props) {
     function buildPayload() {
         return {
             assigned_to_user_id: assignedToUserId.value || null,
+            record_version: editingOrder.value?.record_version || null,
             items: selectedProducts.value.map((item) => ({
                 branch_product_id: item.branch_product_id,
                 requested_quantity: Number(item.requested_quantity || 0),

@@ -7,7 +7,6 @@ use App\Exports\AttendanceExport;
 use App\Models\AttendanceCorrectionRequest;
 use App\Models\AttendanceRecord;
 use App\Models\Branch;
-use App\Models\Department;
 use App\Models\Employee;
 use App\Services\SystemAuditService;
 use App\Services\AttendanceRuleEngine;
@@ -15,9 +14,12 @@ use App\Support\TablePagination;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use Throwable;
 
 class AttendanceController extends Controller
 {
@@ -55,9 +57,6 @@ class AttendanceController extends Controller
             'options' => [
                 'types' => collect(AttendanceRecord::TYPES)->map(fn ($type) => ['value' => $type, 'label' => $this->typeLabel($type)])->values(),
                 'branches' => $canViewAttendance ? Branch::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->map(fn ($branch) => ['value' => $branch->id, 'label' => $branch->name]) : [],
-                'departments' => $canViewAttendance
-                    ? Department::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->map(fn ($department) => ['value' => $department->id, 'label' => $department->name])
-                    : [],
             ],
             'canViewAttendance' => $canViewAttendance,
             'canManage' => $canManage,
@@ -88,7 +87,7 @@ class AttendanceController extends Controller
             'selfie' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
-        $user = $request->user();
+        $user = $request->user()->loadMissing('branches');
         if (! $this->canRegisterAttendance($user)) {
             return back()->withErrors([
                 'type' => 'Solo los usuarios con rol Ventas o Vendedor pueden registrar asistencia.',
@@ -100,7 +99,7 @@ class AttendanceController extends Controller
             ]);
         }
 
-        $branch = Branch::query()->find($user->branch_id);
+        $branch = $this->resolveAttendanceBranch($user);
         if (! $branch) {
             $temporaryGeofence = config('attendance.temporary_geofence');
             $branch = new Branch([
@@ -132,18 +131,31 @@ class AttendanceController extends Controller
 
         $now = now();
         $selfiePath = $request->file('selfie')->store("attendance/selfies/{$user->id}", 'local');
-        $record = AttendanceRecord::create([
-            'user_id' => $user->id, 'employee_id' => $user->employee_id, 'branch_id' => $branch->exists ? $branch->id : null,
-            'attendance_date' => $now->toDateString(), 'recorded_at' => $now, 'type' => $data['type'],
-            'status' => $this->rules->evaluate($user->employee, $data['type'], $now),
-            'latitude' => $data['latitude'], 'longitude' => $data['longitude'], 'location_accuracy' => $data['accuracy'] ?? null,
-            'approximate_address' => $data['approximateAddress'] ?? null, 'within_geofence' => true,
-            'geofence_snapshot' => ['branch_id' => $branch->exists ? $branch->id : null, 'label' => $branch->name, 'radius_meters' => (int) $branch->attendance_geofence_radius_meters, 'distance_meters' => round($distance, 1)],
-            'authentication_method' => $data['authenticationMethod'], 'authentication_result' => 'verified', 'selfie_path' => $selfiePath,
-            'operating_system' => data_get($data, 'device.operatingSystem'), 'browser' => data_get($data, 'device.browser'),
-            'device_type' => data_get($data, 'device.type'), 'user_agent' => $request->userAgent(), 'ip_address' => $request->ip(),
-            'metadata' => ['photo_captured' => true],
-        ]);
+        try {
+            $record = DB::transaction(fn () => AttendanceRecord::create([
+                'user_id' => $user->id, 'employee_id' => $user->employee_id, 'branch_id' => $branch->exists ? $branch->id : null,
+                'attendance_date' => $now->toDateString(), 'recorded_at' => $now, 'type' => $data['type'],
+                'operation_key' => "attendance:{$user->id}:{$now->toDateString()}:{$data['type']}",
+                'status' => $this->rules->evaluate($user->employee, $data['type'], $now),
+                'latitude' => $data['latitude'], 'longitude' => $data['longitude'], 'location_accuracy' => $data['accuracy'] ?? null,
+                'approximate_address' => $data['approximateAddress'] ?? null, 'within_geofence' => true,
+                'geofence_snapshot' => ['branch_id' => $branch->exists ? $branch->id : null, 'label' => $branch->name, 'radius_meters' => (int) $branch->attendance_geofence_radius_meters, 'distance_meters' => round($distance, 1)],
+                'authentication_method' => $data['authenticationMethod'], 'authentication_result' => 'verified', 'selfie_path' => $selfiePath,
+                'operating_system' => data_get($data, 'device.operatingSystem'), 'browser' => data_get($data, 'device.browser'),
+                'device_type' => data_get($data, 'device.type'), 'user_agent' => $request->userAgent(), 'ip_address' => $request->ip(),
+                'metadata' => ['photo_captured' => true],
+            ]));
+        } catch (Throwable $exception) {
+            Storage::disk('local')->delete($selfiePath);
+
+            if (str_contains($exception->getMessage(), 'attendance_records_user_date_type_unique')) {
+                throw ValidationException::withMessages([
+                    'type' => sprintf('Ya registraste %s el dia de hoy.', mb_strtolower($this->typeLabel($data['type']))),
+                ]);
+            }
+
+            throw $exception;
+        }
 
         $this->audit->record('attendance', 'create', 'success', $request, ['record_type' => AttendanceRecord::class, 'record_id' => $record->id, 'record_label' => $this->typeLabel($record->type)]);
         broadcast(new AttendanceChanged($record->id, 'created', $user->id));
@@ -171,7 +183,17 @@ class AttendanceController extends Controller
     {
         abort_unless($attendanceRecord->user_id === $request->user()->id || $request->user()->hasPermission('attendance.corrections.review'), 403);
         $data = $request->validate(['reason' => ['required', 'string', 'max:1000'], 'requestedChanges' => ['nullable', 'array']]);
-        $correction = AttendanceCorrectionRequest::create(['attendance_record_id' => $attendanceRecord->id, 'requested_by' => $request->user()->id, 'reason' => $data['reason'], 'requested_changes' => $data['requestedChanges'] ?? []]);
+        $correction = DB::transaction(function () use ($attendanceRecord, $request, $data) {
+            $attendanceRecord = AttendanceRecord::query()->lockForUpdate()->findOrFail($attendanceRecord->id);
+
+            if ($attendanceRecord->correctionRequests()->where('status', 'pending')->exists()) {
+                throw ValidationException::withMessages([
+                    'reason' => 'Este registro ya tiene una solicitud de correccion pendiente.',
+                ]);
+            }
+
+            return AttendanceCorrectionRequest::create(['attendance_record_id' => $attendanceRecord->id, 'requested_by' => $request->user()->id, 'reason' => $data['reason'], 'requested_changes' => $data['requestedChanges'] ?? [], 'pending_key' => "attendance-correction:{$attendanceRecord->id}:pending"]);
+        });
         $this->audit->record('attendance', 'request_correction', 'success', $request, ['record_type' => AttendanceCorrectionRequest::class, 'record_id' => $correction->id, 'record_label' => 'Solicitud de corrección']);
         broadcast(new AttendanceChanged($attendanceRecord->id, 'correction_requested', $request->user()->id));
         return back()->with('success', 'Solicitud de corrección enviada.');
@@ -180,11 +202,26 @@ class AttendanceController extends Controller
     public function reviewCorrection(Request $request, AttendanceCorrectionRequest $attendanceCorrectionRequest)
     {
         $data = $request->validate(['status' => ['required', 'in:approved,rejected'], 'reviewNotes' => ['nullable', 'string', 'max:1000']]);
-        $attendanceCorrectionRequest->update(['status' => $data['status'], 'review_notes' => $data['reviewNotes'] ?? null, 'reviewed_by' => $request->user()->id, 'reviewed_at' => now()]);
-        if ($data['status'] === 'approved') {
-            $changes = collect($attendanceCorrectionRequest->requested_changes ?? [])->only(['recorded_at', 'status', 'approximate_address'])->all();
-            if ($changes) $attendanceCorrectionRequest->attendanceRecord->update(array_merge($changes, ['status' => 'corrected']));
-        }
+        DB::transaction(function () use ($attendanceCorrectionRequest, $data, $request) {
+            $correction = AttendanceCorrectionRequest::query()
+                ->lockForUpdate()
+                ->findOrFail($attendanceCorrectionRequest->id);
+
+            if ($correction->status !== 'pending') {
+                throw ValidationException::withMessages([
+                    'status' => 'Esta solicitud ya fue revisada por otra persona.',
+                ]);
+            }
+
+            $correction->update(['status' => $data['status'], 'review_notes' => $data['reviewNotes'] ?? null, 'reviewed_by' => $request->user()->id, 'reviewed_at' => now(), 'pending_key' => null]);
+            if ($data['status'] === 'approved') {
+                $changes = collect($correction->requested_changes ?? [])->only(['recorded_at', 'status', 'approximate_address'])->all();
+                if ($changes) {
+                    AttendanceRecord::query()->lockForUpdate()->findOrFail($correction->attendance_record_id)
+                        ->update(array_merge($changes, ['status' => 'corrected']));
+                }
+            }
+        });
         $this->audit->record('attendance', 'review_correction', 'success', $request, ['record_type' => AttendanceCorrectionRequest::class, 'record_id' => $attendanceCorrectionRequest->id, 'record_label' => 'Solicitud de corrección']);
         broadcast(new AttendanceChanged($attendanceCorrectionRequest->attendance_record_id, 'correction_reviewed', $request->user()->id));
         return back()->with('success', 'Solicitud de corrección actualizada.');
@@ -218,7 +255,6 @@ class AttendanceController extends Controller
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
             'branch' => ['nullable', 'integer', 'exists:branches,id'],
-            'department' => ['nullable', 'integer', 'exists:departments,id'],
             'search' => ['nullable', 'string', 'max:100'],
             'type' => ['nullable', 'in:'.implode(',', AttendanceRecord::TYPES)],
             'per_page' => ['nullable', 'integer'],
@@ -235,12 +271,25 @@ class AttendanceController extends Controller
     private function recordsQuery(Request $request, bool $canViewAllAttendance, array $filters)
     {
         return AttendanceRecord::query()
-            ->with(['user.role', 'employee.position.department', 'branch'])
+            ->with(['user.role', 'user.branches', 'employee.position.department', 'branch'])
             ->when(! $canViewAllAttendance, fn ($query) => $query->where('user_id', $request->user()->id))
             ->when($filters['from'] ?? null, fn ($query, $value) => $query->where('attendance_date', '>=', $value))
             ->when($filters['to'] ?? null, fn ($query, $value) => $query->where('attendance_date', '<=', $value))
-            ->when($filters['branch'] ?? null, fn ($query, $value) => $query->where('branch_id', $value))
-            ->when($filters['department'] ?? null, fn ($query, $value) => $query->whereHas('employee.position', fn ($position) => $position->where('department_id', $value)))
+            ->when($filters['branch'] ?? null, function ($query, $value) {
+                $branchId = (int) $value;
+
+                $query->where(function ($records) use ($branchId) {
+                    $records
+                        ->where('branch_id', $branchId)
+                        ->orWhere(function ($fallback) use ($branchId) {
+                            $fallback
+                                ->whereNull('branch_id')
+                                ->whereHas('user', fn ($user) => $user
+                                    ->where('branch_id', $branchId)
+                                    ->orWhereHas('branches', fn ($branch) => $branch->where('branches.id', $branchId)));
+                        });
+                });
+            })
             ->when($filters['search'] ?? null, function ($query, $value) {
                 $term = '%'.trim($value).'%';
 
@@ -268,6 +317,22 @@ class AttendanceController extends Controller
         return in_array($user->role?->name, ['Ventas', 'Vendedor'], true);
     }
 
+    private function resolveAttendanceBranch($user): ?Branch
+    {
+        if ($user->branch_id) {
+            $branch = Branch::query()
+                ->where('active', true)
+                ->find($user->branch_id);
+
+            if ($branch) {
+                return $branch;
+            }
+        }
+
+        return $user->branches
+            ->first(fn (Branch $branch) => $branch->active);
+    }
+
     private function registeredTypesToday(int $userId): array
     {
         return AttendanceRecord::query()
@@ -288,7 +353,22 @@ class AttendanceController extends Controller
             ->exists();
     }
 
-    private function recordPayload(AttendanceRecord $record): array { return ['id' => $record->id, 'employee' => $record->employee ? trim($record->employee->first_name.' '.$record->employee->last_name) : $record->user?->name, 'role' => $record->user?->role?->name, 'branch' => $record->branch?->name ?? 'Sin sucursal', 'date' => $record->attendance_date?->format('d/m/Y'), 'time' => $record->recorded_at?->format('H:i'), 'type' => $this->typeLabel($record->type), 'status' => $this->statusLabel($record->status), 'authentication' => 'Biometría del dispositivo']; }
+    private function recordPayload(AttendanceRecord $record): array
+    {
+        $fallbackBranch = $record->user?->branches?->first();
+
+        return [
+            'id' => $record->id,
+            'employee' => $record->employee ? trim($record->employee->first_name.' '.$record->employee->last_name) : $record->user?->name,
+            'role' => $record->user?->role?->name,
+            'branch' => $record->branch?->name ?? $fallbackBranch?->name ?? 'Sin sucursal',
+            'date' => $record->attendance_date?->format('d/m/Y'),
+            'time' => $record->recorded_at?->format('H:i'),
+            'type' => $this->typeLabel($record->type),
+            'status' => $this->statusLabel($record->status),
+            'authentication' => 'Biometría del dispositivo',
+        ];
+    }
     private function evidencePayload(AttendanceRecord $record): ?array
     {
         if (! $record->selfie_path) return null;

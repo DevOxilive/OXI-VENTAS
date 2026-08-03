@@ -303,6 +303,7 @@ function saveDraft() {
         {
             order_ids: selectedOrderIds.value,
             draft_id: props.generation?.draft?.id ?? null,
+            record_version: props.generation?.draft?.updated_at ?? null,
         },
         getModalRequestOptions({
             mode: 'create',
@@ -334,6 +335,7 @@ async function generateGeneralOrder() {
         {
             order_ids: selectedOrderIds.value,
             draft_id: props.generation?.draft?.id ?? null,
+            record_version: props.generation?.draft?.updated_at ?? null,
         },
         getModalRequestOptions({
             mode: 'create',
@@ -354,7 +356,7 @@ async function generateGeneralOrder() {
         <template #toolbar>
             <GlobalToolbar
                 v-bind="toolbarConfig"
-                @back="orders.backToReportsCenter"
+                @back="orders.backToBranchInventory"
                 @update:search="orders.localFilters.value.search = $event"
                 @update:filter="orders.updateFilter"
                 @update:records-per-page="orders.localFilters.value.per_page = $event"

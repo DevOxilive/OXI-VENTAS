@@ -123,6 +123,10 @@ function collapseOtherBranches(activeBranchKey) {
 }
 
 function isOpen(item) {
+    if (openItems[item.key] === false) {
+        return false
+    }
+
     if (hasActiveChild(item)) {
         return true
     }
@@ -140,6 +144,16 @@ function closeAllItems() {
     })
 
     saveOpenItems()
+}
+
+function closeItemTree(item) {
+    if (!item?.key) return
+
+    openItems[item.key] = false
+
+    item.children?.forEach((child) => {
+        closeItemTree(child)
+    })
 }
 
 function toggleItem(item) {
@@ -162,7 +176,12 @@ function toggleItem(item) {
         collapseOtherBranches(item.key)
     }
 
-    openItems[item.key] = nextValue
+    if (nextValue) {
+        openItems[item.key] = true
+    } else {
+        closeItemTree(item)
+    }
+
     saveOpenItems()
 }
 

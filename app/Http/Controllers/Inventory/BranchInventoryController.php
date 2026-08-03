@@ -21,6 +21,21 @@ class BranchInventoryController extends Controller
 {
     use AuthorizesBranchAccess;
 
+    public function landing(Request $request)
+    {
+        $branch = $request->user()
+            ?->accessibleBranchesQuery()
+            ->select(['branches.id', 'branches.name'])
+            ->orderBy('branches.name')
+            ->first();
+
+        abort_unless($branch, 403, 'No tienes sucursales habilitadas para consultar inventario.');
+
+        return redirect()->route('inventory.branches.inventory', [
+            'branch' => $branch->id,
+        ]);
+    }
+
     public function index(Request $request)
     {
         return $this->renderInventory($request, null);
@@ -353,8 +368,11 @@ class BranchInventoryController extends Controller
             ->get();
     }
 
-    public function details(BranchProduct $branchProduct): JsonResponse
+    public function details(Request $request, BranchProduct $branchProduct): JsonResponse
     {
+        $branchProduct->loadMissing('branch');
+        $this->abortIfUserCannotAccessBranch($request, $branchProduct->branch);
+
         return response()->json($this->serializeBranchProductDetails($branchProduct));
     }
 
@@ -401,6 +419,9 @@ class BranchInventoryController extends Controller
             'status' => ['nullable', 'in:active,inactive,seasonal'],
         ]);
 
+        $branch = Branch::query()->findOrFail($validated['branch_id']);
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
         $branchProduct = BranchProduct::create([
             'branch_id' => $validated['branch_id'],
             'product_id' => $validated['product_id'],
@@ -425,6 +446,9 @@ class BranchInventoryController extends Controller
 
     public function updateConfig(Request $request, BranchProduct $branchProduct)
     {
+        $branchProduct->loadMissing('branch');
+        $this->abortIfUserCannotAccessBranch($request, $branchProduct->branch);
+
         $validated = $request->validate([
             'min_stock' => ['required', 'numeric', 'min:0'],
             'status' => ['required', 'in:active,inactive,seasonal'],

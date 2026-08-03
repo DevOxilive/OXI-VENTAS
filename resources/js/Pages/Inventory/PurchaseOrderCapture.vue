@@ -8,6 +8,7 @@ import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import FormPanel from '@/Components/Cards/FormPanel.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import InputField from '@/Components/Forms/InputField.vue'
+import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
@@ -109,8 +110,28 @@ function number(value) {
     return Number(value || 0)
 }
 
+function quantityInput(value) {
+    if (value === '') return ''
+
+    const quantity = Number(String(value ?? '').replace(/[^\d]/g, ''))
+
+    return Number.isFinite(quantity) ? quantity : 0
+}
+
+function updateItemQuantity(item, field, value, minimum = 1) {
+    item[field] = value === '' ? '' : Math.max(minimum, quantityInput(value))
+}
+
+function increaseItemQuantity(item, field) {
+    item[field] = quantityInput(item[field]) + 1
+}
+
+function decreaseItemQuantity(item, field, minimum = 1) {
+    item[field] = Math.max(minimum, quantityInput(item[field]) - 1)
+}
+
 function quantity(value) {
-    return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(number(value))
+    return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 0 }).format(number(value))
 }
 
 function currency(value) {
@@ -169,6 +190,7 @@ function togglePromotion(item) {
 function payload() {
     return {
         purchased_at: form.purchased_at,
+        record_version: props.orderDB.record_version || props.orderDB.updated_at || null,
         items: form.items.map((item) => ({
             id: item.id,
             purchase_presentation: presentationName(item),
@@ -323,29 +345,44 @@ async function completeOrder() {
                                     :options="presentationOptions"
                                     :disabled="item.unavailable"
                                 />
-                                <InputField
-                                    v-model="item.package_quantity"
-                                    :field="`general_order_${item.id}_quantity`"
-                                    validation-field="purchase_order_quantity"
-                                    :label="quantityLabel(item)"
-                                    type="text"
-                                    inputmode="decimal"
-                                    :suffix="quantitySuffix(item)"
-                                    :show-counter="false"
-                                    :disabled="item.unavailable"
-                                />
-                                <InputField
-                                    v-if="requiresBoxContent(item)"
-                                    v-model="item.units_per_package"
-                                    :field="`general_order_${item.id}_box_content`"
-                                    validation-field="purchase_order_quantity"
-                                    label="Contenido por caja"
-                                    type="text"
-                                    inputmode="decimal"
-                                    :suffix="item.base_unit || 'pzas.'"
-                                    :show-counter="false"
-                                    :disabled="item.unavailable"
-                                />
+                                <div>
+                                    <label class="mb-1 block text-sm font-semibold text-text">
+                                        {{ quantityLabel(item) }}
+                                    </label>
+                                    <div class="flex items-center gap-2">
+                                        <QuantityStepper
+                                            :value="item.package_quantity"
+                                            :aria-label="quantityLabel(item)"
+                                            :disabled="item.unavailable"
+                                            :decrease-disabled="quantityInput(item.package_quantity) <= 1"
+                                            @decrease="decreaseItemQuantity(item, 'package_quantity')"
+                                            @increase="increaseItemQuantity(item, 'package_quantity')"
+                                            @update="updateItemQuantity(item, 'package_quantity', $event)"
+                                        />
+                                        <span v-if="quantitySuffix(item)" class="text-xs font-semibold text-text opacity-60">
+                                            {{ quantitySuffix(item) }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div v-if="requiresBoxContent(item)">
+                                    <label class="mb-1 block text-sm font-semibold text-text">
+                                        Contenido por caja
+                                    </label>
+                                    <div class="flex items-center gap-2">
+                                        <QuantityStepper
+                                            :value="item.units_per_package"
+                                            :aria-label="`Contenido por caja de ${item.product_name}`"
+                                            :disabled="item.unavailable"
+                                            :decrease-disabled="quantityInput(item.units_per_package) <= 1"
+                                            @decrease="decreaseItemQuantity(item, 'units_per_package')"
+                                            @increase="increaseItemQuantity(item, 'units_per_package')"
+                                            @update="updateItemQuantity(item, 'units_per_package', $event)"
+                                        />
+                                        <span class="text-xs font-semibold text-text opacity-60">
+                                            {{ item.base_unit || 'pzas.' }}
+                                        </span>
+                                    </div>
+                                </div>
                                 <InputField
                                     v-model="item.purchase_price"
                                     :field="`general_order_${item.id}_purchase_price`"

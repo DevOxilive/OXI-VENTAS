@@ -54,6 +54,7 @@ export function useProductActions() {
             getModalRequestOptions({
                 data: {
                     delete_globally: deleteGlobally,
+                    record_version: product.record_version,
                 },
                 mode: "delete",
                 entityName: "Producto",

@@ -16,6 +16,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'updated'])
 const form = useForm({
+    record_version: props.order.record_version || props.order.updated_at || null,
     items: (props.order.items ?? []).map((item) => ({
         branch_product_id: item.branch_product_id,
         requested_quantity: Number(item.requested_quantity ?? 1),
@@ -56,8 +57,12 @@ function decrease(item) {
     if (next >= 1) item.requested_quantity = next
 }
 
+function updateQuantity(item, value) {
+    item.requested_quantity = value === '' ? '' : Math.max(1, Number(value || 1))
+}
+
 function quantity(value) {
-    return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(Number(value || 0))
+    return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 0 }).format(Number(value || 0))
 }
 
 function formatDate(value) {
@@ -108,7 +113,7 @@ function save() {
 
                 <div class="text-sm text-text"><span class="md:hidden text-xs opacity-55">Solicitadas: </span><strong>{{ quantity(item.requested_quantity) }} pzas.</strong></div>
 
-                <div><span class="mb-1 block text-xs opacity-55 md:hidden">Ajustar cantidad</span><QuantityStepper :value="quantity(item.requested_quantity)" :decrease-disabled="Number(item.requested_quantity) <= 1" @decrease="decrease(item)" @increase="increase(item)" /></div>
+                <div><span class="mb-1 block text-xs opacity-55 md:hidden">Ajustar cantidad</span><QuantityStepper :value="item.requested_quantity" :aria-label="`Cantidad solicitada de ${item.product_name}`" :decrease-disabled="Number(item.requested_quantity) <= 1" @decrease="decrease(item)" @increase="increase(item)" @update="updateQuantity(item, $event)" /></div>
 
                 <ActionIconButton
                     icon="delete"

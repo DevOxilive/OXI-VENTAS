@@ -10,7 +10,20 @@ class PermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        $permissions = [
+        foreach (self::catalog() as $permission) {
+            DB::table('permissions')->updateOrInsert(
+                ['name' => $permission],
+                [
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+    }
+
+    public static function catalog(): array
+    {
+        return array_values(array_unique([
             // Inicio
             'dashboard.executive.view',
 
@@ -135,16 +148,7 @@ class PermissionSeeder extends Seeder
             'systems.labels.view',
             'systems.labels.update',
             'systems.labels.print',
-        ];
-
-        foreach (array_unique($permissions) as $permission) {
-            DB::table('permissions')->updateOrInsert(
-                ['name' => $permission],
-                [
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]
-            );
-        }
+            'systems.qz.sign',
+        ]));
     }
 }

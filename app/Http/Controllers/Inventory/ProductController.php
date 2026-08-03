@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Events\ProductChanged;
 use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
+use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
@@ -12,16 +13,18 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductBatch;
 use App\Support\FlexibleSearch;
+use App\Support\SystemPermission;
 use App\Support\TablePagination;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Throwable;
 
 class ProductController extends Controller
 {
-    use AuthorizesBranchAccess;
+    use AuthorizesBranchAccess, ValidatesRecordVersion;
 
     private const PRODUCT_IMAGE_PRIVATE_DISK = 'local';
     private const PRODUCT_IMAGE_LEGACY_DISK = 'public';
@@ -47,7 +50,7 @@ class ProductController extends Controller
         $query = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
-                'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,active,created_at',
+                'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,active,created_at,updated_at',
                 'product.category:id,name',
                 'product.barcodes:id,product_id,code',
             ])
@@ -212,14 +215,22 @@ class ProductController extends Controller
             ->filter(fn ($code) => filled($code))
             ->values();
 
+        $requestedBranchIds = collect($data['branch_ids'] ?? [])
+            ->push($branch->id)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $this->abortIfAnyBranchIsInaccessible($request, $requestedBranchIds);
+
         $imagePath = null;
 
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('products', self::PRODUCT_IMAGE_PRIVATE_DISK);
         }
 
-        [$product, $branchIds] = DB::transaction(function () use ($data, $branch, $imagePath, $barcodes) {
-            $product = Product::create([
+        try {
+            [$product, $branchIds] = DB::transaction(function () use ($data, $imagePath, $barcodes, $requestedBranchIds) {
+                $product = Product::create([
                 'name' => $data['name'],
                 'description' => null,
                 'image' => $imagePath,
@@ -231,8 +242,8 @@ class ProductController extends Controller
                 'active' => $data['active'] ?? true,
             ]);
 
-            foreach ($barcodes as $index => $code) {
-                DB::table('barcodes')->insert([
+                foreach ($barcodes as $index => $code) {
+                    DB::table('barcodes')->insert([
                     'product_id' => $product->id,
                     'code' => $code,
                     'type' => $index === 0 ? 'PRINCIPAL' : 'ALTERNO',
@@ -241,16 +252,10 @@ class ProductController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
-            }
+                }
 
-            $branchIds = collect($data['branch_ids'] ?? [])
-                ->push($branch->id)
-                ->map(fn ($id) => (int) $id)
-                ->unique()
-                ->values();
-
-            foreach ($branchIds as $branchId) {
-                BranchProduct::create([
+                foreach ($requestedBranchIds as $branchId) {
+                    BranchProduct::create([
                     'branch_id' => $branchId,
                     'product_id' => $product->id,
                     'min_stock' => $data['min_stock'] ?? 0,
@@ -259,10 +264,14 @@ class ProductController extends Controller
                     'tracks_expiration' => false,
                     'entry_date' => $data['entry_date'],
                 ]);
-            }
+                }
 
-            return [$product, $branchIds->all()];
-        });
+                return [$product, $requestedBranchIds->all()];
+            });
+        } catch (Throwable $exception) {
+            $this->deleteProductImage($imagePath);
+            throw $exception;
+        }
 
         broadcast(new ProductChanged('created', $product->id, $branchIds))->toOthers();
         event(RealtimeActivityLogged::message('creó', 'el producto', $product->name, 'Inventario', 'created'));
@@ -321,6 +330,31 @@ class ProductController extends Controller
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values();
+        $this->abortIfAnyBranchIsInaccessible($request, $branchIds);
+
+        $previousBranchIds = BranchProduct::where('product_id', $product->id)
+            ->pluck('branch_id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+        $preservedBranchIds = $previousBranchIds
+            ->reject(fn (int $branchId) => $request->user()->hasBranchAccess($branchId));
+        $branchIds = $branchIds->merge($preservedBranchIds)->unique()->values();
+
+        $currentBarcodes = $product->barcodes()->orderBy('id')->pluck('code')->values();
+        $changesGlobalProduct = $request->hasFile('image')
+            || (string) $product->name !== (string) $data['name']
+            || (int) $product->category_id !== (int) $data['category_id']
+            || (float) $product->cost !== (float) $data['cost']
+            || (float) $product->sale_price !== (float) $data['sale_price']
+            || (string) $product->unit !== (string) $data['unit']
+            || (bool) $product->active !== (bool) ($data['active'] ?? true)
+            || $currentBarcodes->all() !== $barcodes->all();
+
+        if ($changesGlobalProduct && $preservedBranchIds->isNotEmpty()) {
+            return back()->withErrors([
+                'product' => 'No puedes modificar los datos globales de un producto asignado a sucursales sin acceso.',
+            ]);
+        }
 
         $blockedRetirements = BranchProduct::query()
             ->with('branch:id,name')
@@ -335,25 +369,19 @@ class ProductController extends Controller
             ]);
         }
 
-        $previousBranchIds = BranchProduct::where('product_id', $product->id)
-            ->pluck('branch_id')
-            ->map(fn ($id) => (int) $id)
-            ->values();
+        $previousImagePath = $product->image;
+        $newImagePath = $request->hasFile('image')
+            ? $request->file('image')->store('products', self::PRODUCT_IMAGE_PRIVATE_DISK)
+            : $previousImagePath;
 
-        $branchIds = DB::transaction(function () use ($request, $data, $product, $barcodes, $branchIds) {
-            $imagePath = $product->image;
+        try {
+            $branchIds = DB::transaction(function () use ($request, $data, $product, $barcodes, $branchIds, $newImagePath) {
 
-            if ($request->hasFile('image')) {
-                if ($product->image) {
-                    $this->deleteProductImage($product->image);
-                }
-
-                $imagePath = $request->file('image')->store('products', self::PRODUCT_IMAGE_PRIVATE_DISK);
-            }
+            $product = $this->lockCurrentVersion($request, $product);
 
             $product->update([
                 'name' => $data['name'],
-                'image' => $imagePath,
+                'image' => $newImagePath,
                 'category_id' => $data['category_id'],
                 'cost' => $data['cost'],
                 'sale_price' => $data['sale_price'],
@@ -388,8 +416,18 @@ class ProductController extends Controller
                     'status' => BranchProduct::STATUS_INACTIVE,
                 ]);
 
-            return $branchIds->all();
-        });
+                return $branchIds->all();
+            });
+        } catch (Throwable $exception) {
+            if ($newImagePath !== $previousImagePath) {
+                $this->deleteProductImage($newImagePath);
+            }
+            throw $exception;
+        }
+
+        if ($newImagePath !== $previousImagePath) {
+            $this->deleteProductImage($previousImagePath);
+        }
 
         $affectedBranchIds = $previousBranchIds
             ->merge($branchIds)
@@ -412,6 +450,10 @@ class ProductController extends Controller
         ]);
 
         $deleteGlobally = (bool) ($data['delete_globally'] ?? false);
+
+        if ($deleteGlobally && ! $request->user()?->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL)) {
+            abort(403, 'Solo un usuario con acceso global a sucursales puede eliminar el producto globalmente.');
+        }
         $branchProduct = BranchProduct::query()
             ->where('branch_id', $branch->id)
             ->where('product_id', $product->id)
@@ -427,7 +469,18 @@ class ProductController extends Controller
                 ]);
             }
 
-            DB::transaction(fn () => $branchProduct->delete());
+            DB::transaction(function () use ($request, $product, $branchProduct) {
+                $this->lockCurrentVersion($request, $product);
+                $lockedBranchProduct = BranchProduct::query()->whereKey($branchProduct->id)->lockForUpdate()->firstOrFail();
+
+                if ($this->hasProtectedInventory($lockedBranchProduct)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'product' => 'No se puede retirar este producto porque el inventario cambio mientras confirmabas la operacion.',
+                    ]);
+                }
+
+                $lockedBranchProduct->delete();
+            });
 
             broadcast(new ProductChanged('deleted', $productId, [$branch->id]))->toOthers();
             event(RealtimeActivityLogged::message(
@@ -461,7 +514,8 @@ class ProductController extends Controller
             ->values()
             ->all();
 
-        DB::transaction(function () use ($product) {
+        DB::transaction(function () use ($request, $product) {
+            $product = $this->lockCurrentVersion($request, $product);
             // La eliminacion global retira el producto maestro y sus asignaciones.
             $product->branchProducts()->delete();
             $product->barcodes()->delete();
@@ -497,6 +551,14 @@ class ProductController extends Controller
         $branchProduct->save();
 
         return $branchProduct;
+    }
+
+    private function abortIfAnyBranchIsInaccessible(Request $request, $branchIds): void
+    {
+        $hasInaccessibleBranch = collect($branchIds)
+            ->contains(fn ($branchId) => ! $request->user()?->hasBranchAccess((int) $branchId));
+
+        abort_if($hasInaccessibleBranch, 403, 'No tienes acceso a una de las sucursales seleccionadas.');
     }
 
     private function hasProtectedInventory(BranchProduct $branchProduct): bool
@@ -586,6 +648,7 @@ class ProductController extends Controller
                 2
             ),
             'active' => $product?->active ?? true,
+            'record_version' => $product?->updated_at?->toJSON(),
             'status' => $branchProduct->status,
             'tracks_batches' => $branchProduct->tracks_batches,
             'tracks_expiration' => $branchProduct->tracks_expiration,

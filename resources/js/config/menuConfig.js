@@ -112,17 +112,6 @@ export function generateMenu(role, permissions = [], branches = []) {
                         url: route("human-resources.employees.index"),
                     }]
                     : []),
-                ...(can("attendance.view") || can("attendance.export.excel") || can("attendance.export.pdf")
-                    ? [{
-                        text: "Asistencias",
-                        key: "human-resources.attendance",
-                        icon: "fact_check",
-                        url: route("human-resources.attendance.index"),
-                    }]
-                    : []),
-                ...(canUse("attendanceSchedules") ? [{ text: "Horarios", key: "human-resources.attendance-schedules", icon: "schedule", url: route("human-resources.attendance-schedules.index") }] : []),
-                ...(canUse("attendanceScheduleAssignments") ? [{ text: "Asignación de horarios", key: "human-resources.attendance-schedule-assignments", icon: "assignment_ind", url: route("human-resources.attendance-schedule-assignments.index") }] : []),
-                ...(canUse("attendanceIncidents") ? [{ text: "Incidencias", key: "human-resources.attendance-incidents", icon: "event_note", url: route("human-resources.attendance-incidents.index") }] : []),
                 ...(canUse("organizationStructure")
                     ? [{
                         text: "Registro de Departamentos",
@@ -131,6 +120,17 @@ export function generateMenu(role, permissions = [], branches = []) {
                         url: route("human-resources.departments.index"),
                     }]
                     : []),
+                ...(canUse("attendanceSchedules") ? [{ text: "Horarios", key: "human-resources.attendance-schedules", icon: "schedule", url: route("human-resources.attendance-schedules.index") }] : []),
+                ...(canUse("attendanceScheduleAssignments") ? [{ text: "Asignación de horarios", key: "human-resources.attendance-schedule-assignments", icon: "assignment_ind", url: route("human-resources.attendance-schedule-assignments.index") }] : []),
+                ...(can("attendance.view") || can("attendance.export.excel") || can("attendance.export.pdf")
+                    ? [{
+                        text: "Asistencias",
+                        key: "human-resources.attendance",
+                        icon: "fact_check",
+                        url: route("human-resources.attendance.index"),
+                    }]
+                    : []),
+                ...(canUse("attendanceIncidents") ? [{ text: "Incidencias", key: "human-resources.attendance-incidents", icon: "event_note", url: route("human-resources.attendance-incidents.index") }] : []),
             ],
         });
     }

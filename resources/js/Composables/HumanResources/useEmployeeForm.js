@@ -59,6 +59,7 @@ export function useEmployeeForm(props, emit) {
         hasImss: false,
         nss: "",
         rfc: "",
+        record_version: "",
     });
 
     const allDepartments = computed(
@@ -174,6 +175,7 @@ export function useEmployeeForm(props, emit) {
             hasImss: Boolean(props.employeeToEdit.nss),
             nss: props.employeeToEdit.nss || "",
             rfc: props.employeeToEdit.rfc || "",
+            record_version: props.employeeToEdit.recordVersion || "",
         });
 
         employee.reset();

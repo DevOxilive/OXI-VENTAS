@@ -45,8 +45,8 @@ export function usePurchaseOrders(props, routeName = 'inventory.branches.reports
         localFilters.value[key] = value
     }
 
-    function backToReportsCenter() {
-        router.get(route('inventory.branches.reports', {
+    function backToBranchInventory() {
+        router.get(route('inventory.branches.inventory', {
             branch: props.currentBranch.id,
         }))
     }
@@ -79,7 +79,7 @@ export function usePurchaseOrders(props, routeName = 'inventory.branches.reports
         rows,
         pagination,
         updateFilter,
-        backToReportsCenter,
+        backToBranchInventory,
         createPurchaseList,
         fetchOrder,
         loadingOrder,

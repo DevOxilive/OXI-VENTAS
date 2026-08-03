@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Http\Controllers\Inventory\BranchInventoryController;
 use Illuminate\Routing\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -43,5 +44,17 @@ class InventoryPermissionRoutingTest extends TestCase
                 'permission:inventory.branches.stock-adjust',
             ],
         ];
+    }
+
+    public function test_legacy_inventory_action_pages_redirect_to_the_real_branch_inventory(): void
+    {
+        foreach (['inventory.transfers', 'inventory.adjustments'] as $routeName) {
+            $route = app('router')->getRoutes()->getByName($routeName);
+
+            $this->assertSame(
+                BranchInventoryController::class.'@landing',
+                $route->getActionName()
+            );
+        }
     }
 }
