@@ -7,7 +7,6 @@ use App\Exports\AttendanceExport;
 use App\Models\AttendanceCorrectionRequest;
 use App\Models\AttendanceRecord;
 use App\Models\Branch;
-use App\Models\Department;
 use App\Models\Employee;
 use App\Services\SystemAuditService;
 use App\Services\AttendanceRuleEngine;
@@ -58,9 +57,6 @@ class AttendanceController extends Controller
             'options' => [
                 'types' => collect(AttendanceRecord::TYPES)->map(fn ($type) => ['value' => $type, 'label' => $this->typeLabel($type)])->values(),
                 'branches' => $canViewAttendance ? Branch::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->map(fn ($branch) => ['value' => $branch->id, 'label' => $branch->name]) : [],
-                'departments' => $canViewAttendance
-                    ? Department::query()->where('active', true)->orderBy('name')->get(['id', 'name'])->map(fn ($department) => ['value' => $department->id, 'label' => $department->name])
-                    : [],
             ],
             'canViewAttendance' => $canViewAttendance,
             'canManage' => $canManage,
@@ -91,7 +87,7 @@ class AttendanceController extends Controller
             'selfie' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
-        $user = $request->user();
+        $user = $request->user()->loadMissing('branches');
         if (! $this->canRegisterAttendance($user)) {
             return back()->withErrors([
                 'type' => 'Solo los usuarios con rol Ventas o Vendedor pueden registrar asistencia.',
@@ -103,7 +99,7 @@ class AttendanceController extends Controller
             ]);
         }
 
-        $branch = Branch::query()->find($user->branch_id);
+        $branch = $this->resolveAttendanceBranch($user);
         if (! $branch) {
             $temporaryGeofence = config('attendance.temporary_geofence');
             $branch = new Branch([
@@ -259,7 +255,6 @@ class AttendanceController extends Controller
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
             'branch' => ['nullable', 'integer', 'exists:branches,id'],
-            'department' => ['nullable', 'integer', 'exists:departments,id'],
             'search' => ['nullable', 'string', 'max:100'],
             'type' => ['nullable', 'in:'.implode(',', AttendanceRecord::TYPES)],
             'per_page' => ['nullable', 'integer'],
@@ -276,12 +271,25 @@ class AttendanceController extends Controller
     private function recordsQuery(Request $request, bool $canViewAllAttendance, array $filters)
     {
         return AttendanceRecord::query()
-            ->with(['user.role', 'employee.position.department', 'branch'])
+            ->with(['user.role', 'user.branches', 'employee.position.department', 'branch'])
             ->when(! $canViewAllAttendance, fn ($query) => $query->where('user_id', $request->user()->id))
             ->when($filters['from'] ?? null, fn ($query, $value) => $query->where('attendance_date', '>=', $value))
             ->when($filters['to'] ?? null, fn ($query, $value) => $query->where('attendance_date', '<=', $value))
-            ->when($filters['branch'] ?? null, fn ($query, $value) => $query->where('branch_id', $value))
-            ->when($filters['department'] ?? null, fn ($query, $value) => $query->whereHas('employee.position', fn ($position) => $position->where('department_id', $value)))
+            ->when($filters['branch'] ?? null, function ($query, $value) {
+                $branchId = (int) $value;
+
+                $query->where(function ($records) use ($branchId) {
+                    $records
+                        ->where('branch_id', $branchId)
+                        ->orWhere(function ($fallback) use ($branchId) {
+                            $fallback
+                                ->whereNull('branch_id')
+                                ->whereHas('user', fn ($user) => $user
+                                    ->where('branch_id', $branchId)
+                                    ->orWhereHas('branches', fn ($branch) => $branch->where('branches.id', $branchId)));
+                        });
+                });
+            })
             ->when($filters['search'] ?? null, function ($query, $value) {
                 $term = '%'.trim($value).'%';
 
@@ -309,6 +317,22 @@ class AttendanceController extends Controller
         return in_array($user->role?->name, ['Ventas', 'Vendedor'], true);
     }
 
+    private function resolveAttendanceBranch($user): ?Branch
+    {
+        if ($user->branch_id) {
+            $branch = Branch::query()
+                ->where('active', true)
+                ->find($user->branch_id);
+
+            if ($branch) {
+                return $branch;
+            }
+        }
+
+        return $user->branches
+            ->first(fn (Branch $branch) => $branch->active);
+    }
+
     private function registeredTypesToday(int $userId): array
     {
         return AttendanceRecord::query()
@@ -329,7 +353,22 @@ class AttendanceController extends Controller
             ->exists();
     }
 
-    private function recordPayload(AttendanceRecord $record): array { return ['id' => $record->id, 'employee' => $record->employee ? trim($record->employee->first_name.' '.$record->employee->last_name) : $record->user?->name, 'role' => $record->user?->role?->name, 'branch' => $record->branch?->name ?? 'Sin sucursal', 'date' => $record->attendance_date?->format('d/m/Y'), 'time' => $record->recorded_at?->format('H:i'), 'type' => $this->typeLabel($record->type), 'status' => $this->statusLabel($record->status), 'authentication' => 'Biometría del dispositivo']; }
+    private function recordPayload(AttendanceRecord $record): array
+    {
+        $fallbackBranch = $record->user?->branches?->first();
+
+        return [
+            'id' => $record->id,
+            'employee' => $record->employee ? trim($record->employee->first_name.' '.$record->employee->last_name) : $record->user?->name,
+            'role' => $record->user?->role?->name,
+            'branch' => $record->branch?->name ?? $fallbackBranch?->name ?? 'Sin sucursal',
+            'date' => $record->attendance_date?->format('d/m/Y'),
+            'time' => $record->recorded_at?->format('H:i'),
+            'type' => $this->typeLabel($record->type),
+            'status' => $this->statusLabel($record->status),
+            'authentication' => 'Biometría del dispositivo',
+        ];
+    }
     private function evidencePayload(AttendanceRecord $record): ?array
     {
         if (! $record->selfie_path) return null;

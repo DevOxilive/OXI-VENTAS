@@ -1200,27 +1200,33 @@ class PhysicalCountController extends Controller
             ->firstWhere('branch_product_id', $branchProduct->id);
 
         if ($snapshotRow) {
+            $snapshotBatches = collect($snapshotRow['snapshot_batches'] ?? [])
+                ->map(function ($batch) use ($canViewStock) {
+                    $payload = [
+                        'id' => $batch['id'],
+                        'lot_number' => $batch['lot_number'],
+                        'expiration_date' => $batch['expiration_date'],
+                    ];
+
+                    if ($canViewStock) {
+                        $payload['quantity'] = $batch['quantity'];
+                    }
+
+                    return $payload;
+                })
+                ->values();
+
+            if ($snapshotBatches->isEmpty()) {
+                $snapshotBatches = $this->auditBatchesPayload($branchProduct, $canViewStock);
+            }
+
             $payload = [
                 'branch_product_id' => $branchProduct->id,
                 'product_id' => $branchProduct->product_id,
                 'name' => $snapshotRow['product_name'],
                 'barcode' => $snapshotRow['scanned_code'] ?: $code,
                 'scanned_code' => $code ?: ($snapshotRow['scanned_code'] ?: 'Sin código escaneado'),
-                'batches' => collect($snapshotRow['snapshot_batches'] ?? [])
-                    ->map(function ($batch) use ($canViewStock) {
-                        $payload = [
-                            'id' => $batch['id'],
-                            'lot_number' => $batch['lot_number'],
-                            'expiration_date' => $batch['expiration_date'],
-                        ];
-
-                        if ($canViewStock) {
-                            $payload['quantity'] = $batch['quantity'];
-                        }
-
-                        return $payload;
-                    })
-                    ->values(),
+                'batches' => $snapshotBatches,
             ];
 
             if ($canViewStock) {
@@ -1236,23 +1242,7 @@ class PhysicalCountController extends Controller
             return $payload;
         }
 
-        $batches = ProductBatch::where('branch_product_id', $branchProduct->id)
-            ->orderBy('expiration_date')
-            ->get(['id', 'lot_number', 'quantity', 'expiration_date'])
-            ->map(function ($batch) use ($canViewStock) {
-                $payload = [
-                    'id' => $batch->id,
-                    'lot_number' => $batch->lot_number,
-                    'expiration_date' => optional($batch->expiration_date)->toDateString(),
-                ];
-
-                if ($canViewStock) {
-                    $payload['quantity'] = $batch->quantity;
-                }
-
-                return $payload;
-            })
-            ->values();
+        $batches = $this->auditBatchesPayload($branchProduct, $canViewStock);
 
         $payload = [
             'branch_product_id' => $branchProduct->id,
@@ -1274,6 +1264,30 @@ class PhysicalCountController extends Controller
         );
 
         return $payload;
+    }
+
+    private function auditBatchesPayload(BranchProduct $branchProduct, bool $canViewStock): Collection
+    {
+        return ProductBatch::where('branch_product_id', $branchProduct->id)
+            ->where('quantity', '>', 0)
+            ->orderByRaw('expiration_date IS NULL')
+            ->orderBy('expiration_date')
+            ->orderBy('id')
+            ->get(['id', 'lot_number', 'quantity', 'expiration_date'])
+            ->map(function ($batch) use ($canViewStock) {
+                $payload = [
+                    'id' => $batch->id,
+                    'lot_number' => $batch->lot_number,
+                    'expiration_date' => optional($batch->expiration_date)->toDateString(),
+                ];
+
+                if ($canViewStock) {
+                    $payload['quantity'] = $batch->quantity;
+                }
+
+                return $payload;
+            })
+            ->values();
     }
 
     private function withBatchCountingStatus(

@@ -82,6 +82,7 @@ Route::middleware([
     $cashClosureTicketsAccess = 'permission:systems.cash-closure-tickets.view,systems.cash-closure-tickets.update';
     $labelsAccess = 'permission:systems.labels.view,systems.labels.update,systems.labels.print';
     $productsAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete';
+    $productImagesAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete,sales.view,sales.create,sales.purchase-lists.view,sales.purchase-lists.create,sales.purchase-orders.view,sales.purchase-orders.receive,inventory.purchase-orders.general.view,inventory.purchase-orders.general.create,inventory.purchase-orders.general.update,inventory.purchase-orders.general.complete';
     $branchInventoryAccess = 'permission:inventory.branches.view,inventory.branches.stock-in,inventory.branches.stock-out,inventory.branches.stock-adjust,inventory.branches.batches.update,inventory.branches.config.update';
     $purchaseReportsAccess = 'permission:sales.purchase-lists.view,sales.purchase-lists.create,sales.purchase-lists.update,sales.purchase-lists.delete,sales.purchase-orders.view,sales.purchase-orders.receive';
     $generalPurchaseOrdersAccess = 'permission:inventory.purchase-orders.general.view,inventory.purchase-orders.general.create,inventory.purchase-orders.general.update,inventory.purchase-orders.general.complete';
@@ -442,6 +443,7 @@ Route::middleware([
     Route::prefix('inventory')->name('inventory.')->group(function () use (
         $reportsAccess,
         $productsAccess,
+        $productImagesAccess,
         $branchInventoryAccess,
         $inventoryReportsAccess,
         $movementReportsAccess,
@@ -462,7 +464,7 @@ Route::middleware([
             ->name('branches.products.snapshot');
 
         Route::get('/products/{product}/image', [ProductController::class, 'image'])
-            ->middleware($productsAccess)
+            ->middleware($productImagesAccess)
             ->name('products.image');
 
         Route::post('/branches/{branch:slug}/products', [ProductController::class, 'store'])

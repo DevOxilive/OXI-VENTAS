@@ -48,7 +48,7 @@ const attendanceRoutePrefix = computed(() => {
 })
 const filters = reactive({
     from: props.filters.from || '', to: props.filters.to || '', branch: props.filters.branch || '',
-    department: props.filters.department || '', search: props.filters.search || '', type: props.filters.type || '',
+    search: props.filters.search || '', type: props.filters.type || '',
     per_page: Number(props.filters.per_page ?? 30),
 })
 const attendanceType = ref('check_in')
@@ -76,8 +76,7 @@ const attendanceRegistrationToolbarConfig = computed(() => getAttendanceRegistra
     filters,
     types: props.options.types || [],
     branches: props.options.branches || [],
-    departments: props.options.departments || [],
-    canManage: props.canManage,
+    canViewAttendance: props.canViewAttendance,
     total: Number(props.records?.total ?? 0),
 }))
 
@@ -102,6 +101,8 @@ const attendanceActions = [
 ]
 
 watch(filters, () => {
+    if (!props.canViewAttendance) return
+
     clearTimeout(filterTimer)
     filterTimer = setTimeout(() => {
         router.get(

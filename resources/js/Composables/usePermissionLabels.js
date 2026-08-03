@@ -28,6 +28,7 @@ const permissionModuleOrder = [
     "inventory.general-purchase-orders",
     "audits",
     "sales",
+    "sales.attendance",
     "sales.purchase-lists",
     "sales.purchase-orders",
     "reports.audits",
@@ -120,6 +121,10 @@ const permissionModules = {
     },
     sales: {
         label: "Ventas",
+        section: "sales",
+    },
+    "sales.attendance": {
+        label: "Asistencia",
         section: "sales",
     },
     "sales.purchase-lists": {
@@ -395,7 +400,11 @@ export function getPermissionModule(permissionName = "") {
         return "sales.purchase-lists";
     }
 
-    if (permissionName === "attendance.view" || permissionName === "attendance.register" || permissionName === "attendance.manage" || permissionName.startsWith("attendance.export.") || permissionName.startsWith("attendance.corrections.")) {
+    if (permissionName === "attendance.register") {
+        return "sales.attendance";
+    }
+
+    if (permissionName === "attendance.view" || permissionName === "attendance.manage" || permissionName.startsWith("attendance.export.") || permissionName.startsWith("attendance.corrections.")) {
         return "attendance";
     }
 
