@@ -47,6 +47,7 @@ const expiredQuantity = computed(() => Number(form.expired_quantity || 0))
 const invalidQuantities = computed(() =>
     damagedQuantity.value + expiredQuantity.value > countedQuantity.value,
 )
+const isKilogram = computed(() => props.product?.inventory_unit === 'kg')
 
 watch(
     () => props.product,
@@ -155,9 +156,9 @@ function submit() {
                     v-model="form.counted_quantity"
                     label="Cantidad contada"
                     field="counted_quantity"
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="text"
+                    :inputmode="isKilogram ? 'decimal' : 'numeric'"
+                    :validation-field="isKilogram ? 'kilogram_quantity' : 'quantity'"
                     placeholder="Ej. 10"
                     :error="form.errors.counted_quantity"
                 />
@@ -166,9 +167,9 @@ function submit() {
                     v-model="form.damaged_quantity"
                     label="Cantidad dañada"
                     field="damaged_quantity"
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="text"
+                    :inputmode="isKilogram ? 'decimal' : 'numeric'"
+                    :validation-field="isKilogram ? 'kilogram_quantity' : 'quantity'"
                     placeholder="Ej. 2"
                     :error="form.errors.damaged_quantity"
                 />
@@ -177,9 +178,9 @@ function submit() {
                     v-model="form.expired_quantity"
                     label="Cantidad caducada"
                     field="expired_quantity"
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="text"
+                    :inputmode="isKilogram ? 'decimal' : 'numeric'"
+                    :validation-field="isKilogram ? 'kilogram_quantity' : 'quantity'"
                     placeholder="Ej. 1"
                     :error="form.errors.expired_quantity"
                 />

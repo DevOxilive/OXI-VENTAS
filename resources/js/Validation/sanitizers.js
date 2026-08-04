@@ -4,6 +4,7 @@ const patterns = {
     letters: /[^\p{L}\s]/gu,
     numeric: /[^0-9]/g,
     decimal: /[^0-9.]/g,
+    product_name: /[^\p{L}\p{N}\s.,/_-]/gu,
     alphanumeric: /[^\p{L}\p{N}\-_\s]/gu,
     email: /[\s]/g,
     address: /[^\p{L}\p{N}\s#.,\-]/gu,
@@ -19,7 +20,7 @@ function toTitleCase(text) {
         ));
 }
 
-export function sanitizeField(value, config = {}) {
+export function sanitizeField(value, config = {}, options = {}) {
     if (value === null || value === undefined) return "";
 
     let clean = value.toString();
@@ -50,17 +51,37 @@ export function sanitizeField(value, config = {}) {
             : boundedInteger;
     }
 
-    if (config.uppercase && !config.preserveCase) {
+    if (options.formatCase !== false && config.uppercase && !config.preserveCase) {
         clean = clean.toUpperCase();
     }
 
-    if (config.titleCase && !config.uppercase && !config.preserveCase) {
+    if (options.formatCase !== false && config.titleCase && !config.uppercase && !config.preserveCase) {
         clean = toTitleCase(clean);
     }
 
-    if (config.max) {
+    if (options.enforceMax !== false && config.max) {
         clean = clean.slice(0, config.max);
     }
 
     return clean;
+}
+
+export function sanitizeFieldWithCursor(value, config = {}, selectionStart = 0, selectionEnd = selectionStart) {
+    const rawValue = String(value ?? '');
+    const safeStart = Math.max(0, Math.min(selectionStart, rawValue.length));
+    const safeEnd = Math.max(safeStart, Math.min(selectionEnd, rawValue.length));
+    const options = { formatCase: false, enforceMax: false };
+    const sanitized = sanitizeField(rawValue, config, options);
+
+    return {
+        value: sanitized,
+        selectionStart: Math.min(
+            sanitizeField(rawValue.slice(0, safeStart), config, options).length,
+            sanitized.length,
+        ),
+        selectionEnd: Math.min(
+            sanitizeField(rawValue.slice(0, safeEnd), config, options).length,
+            sanitized.length,
+        ),
+    };
 }

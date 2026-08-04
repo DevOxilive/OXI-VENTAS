@@ -6,7 +6,7 @@ import {
 import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 import { validateSingleField, validateForm } from "@/Validation/schemaBuilder";
 
-const adjustmentFields = ["type", "reason", "quantity", "notes"];
+const adjustmentFields = ["type", "reason", "notes"];
 
 export function useAdjustStockForm(props, emit) {
     const form = useForm({
@@ -54,6 +54,10 @@ export function useAdjustStockForm(props, emit) {
     const currentStock = computed(() => Number(props.product.stock ?? 0));
 
     const movementQuantity = computed(() => Number(form.quantity || 0));
+
+    const isKilogramUnit = computed(() => {
+        return String(props.product?.inventory_unit ?? props.product?.unit ?? "").toLowerCase() === "kg";
+    });
 
     const absoluteMovementQuantity = computed(() => {
         return Math.abs(movementQuantity.value);
@@ -178,6 +182,9 @@ export function useAdjustStockForm(props, emit) {
         frontendErrors.batches = "";
         frontendErrors.branch_allocations = "";
         frontendErrors.manual_batches = "";
+        frontendErrors.lot_number = "";
+        frontendErrors.expiration_date = "";
+        frontendErrors.received_at = "";
 
         Object.keys(frontendErrors).forEach((key) => {
             if (key.startsWith("batch_") || key.startsWith("manual_batch_")) {
@@ -192,6 +199,18 @@ export function useAdjustStockForm(props, emit) {
         Object.entries(errors).forEach(([field, message]) => {
             frontendErrors[field] = message;
         });
+
+        const rawQuantity = String(form.quantity ?? "");
+        const quantityPattern = isKilogramUnit.value
+            ? /^\d{1,3}(\.\d{1,3})?$/
+            : /^\d{1,3}$/;
+
+        if (!quantityPattern.test(rawQuantity)) {
+            frontendErrors.quantity = isKilogramUnit.value
+                ? "Los kilogramos permiten hasta 999.999 con un máximo de tres decimales."
+                : "La cantidad debe ser un número entero entre 1 y 999.";
+            return;
+        }
 
         if (!movementQuantity.value) {
             frontendErrors.quantity = "La cantidad no puede ser cero.";
@@ -213,12 +232,24 @@ export function useAdjustStockForm(props, emit) {
     function validateIncomingBatches() {
         if (!isIncomingMovement.value || !form.batches.length) return;
 
-        if (totalBatchQuantity.value !== absoluteMovementQuantity.value) {
+        if (Math.round(totalBatchQuantity.value * 1000) !== Math.round(absoluteMovementQuantity.value * 1000)) {
             frontendErrors.batches =
                 "La suma de los lotes debe coincidir con la cantidad total.";
         }
 
         form.batches.forEach((batch, index) => {
+            if (!batch.lot_number?.trim()) {
+                frontendErrors.lot_number = "El número de lote es obligatorio para registrar una entrada.";
+            }
+
+            if (!batch.expiration_date) {
+                frontendErrors.expiration_date = "La caducidad es obligatoria para registrar una entrada.";
+            }
+
+            if (!batch.received_at) {
+                frontendErrors.received_at = "La fecha de ingreso es obligatoria para registrar una entrada.";
+            }
+
             if (!batch.quantity || Number(batch.quantity) <= 0) {
                 frontendErrors[`batch_${index}`] =
                     "La cantidad del lote debe ser mayor a cero.";
@@ -263,7 +294,7 @@ export function useAdjustStockForm(props, emit) {
         }
 
         if (
-            totalManualBatchQuantity.value !== manualBatchTargetQuantity.value
+            Math.round(totalManualBatchQuantity.value * 1000) !== Math.round(manualBatchTargetQuantity.value * 1000)
         ) {
             frontendErrors.manual_batches =
                 "La suma del stock seleccionado debe coincidir con la cantidad total.";

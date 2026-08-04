@@ -233,6 +233,10 @@ Route::middleware([
         ->middleware($branchesAccess)
         ->name('branches.index');
 
+    Route::post('/branches/geocode', [BranchController::class, 'geocode'])
+        ->middleware('permission:branches.create,branches.update')
+        ->name('branches.geocode');
+
     Route::post('/branches', [BranchController::class, 'store'])
         ->middleware('permission:branches.create')
         ->name('branches.store');

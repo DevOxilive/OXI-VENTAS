@@ -16,7 +16,9 @@
 /node_modules
 /public/build
 /public/hot
+/public/report_screenshots/
 /public/storage
+/report_screenshots/
 /tools/cloudflared.exe
 /storage/*.key
 /storage/framework/app-tunnel.json

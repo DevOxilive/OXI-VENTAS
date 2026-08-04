@@ -432,7 +432,8 @@ class PhysicalCountController extends Controller
             ]);
         }
 
-        $branchProduct = BranchProduct::findOrFail($data['branch_product_id']);
+        $branchProduct = BranchProduct::with('product')->findOrFail($data['branch_product_id']);
+        $this->validateAuditQuantities($branchProduct, $counted, $damaged, $expired);
 
         if ($branchProduct->branch_id !== $physicalCount->branch_id) {
             return back()->withErrors([
@@ -493,7 +494,7 @@ class PhysicalCountController extends Controller
 
     public function updateEntry(Request $request, PhysicalCountEntry $entry)
     {
-        $entry->load('physicalCount');
+        $entry->load('physicalCount', 'branchProduct.product');
         $this->abortIfCannotCapture($request, $entry->physicalCount);
 
         if (! $this->canCaptureInStatus($entry->physicalCount)) {
@@ -513,6 +514,7 @@ class PhysicalCountController extends Controller
         $counted = (float) $data['counted_quantity'];
         $damaged = (float) $data['damaged_quantity'];
         $expired = (float) $data['expired_quantity'];
+        $this->validateAuditQuantities($entry->branchProduct, $counted, $damaged, $expired);
 
         if (($damaged + $expired) > $counted) {
             return back()->withErrors([
@@ -936,7 +938,7 @@ class PhysicalCountController extends Controller
                     continue;
                 }
 
-                $branchProduct = BranchProduct::whereKey($batch->branch_product_id)
+                $branchProduct = BranchProduct::with('product')->whereKey($batch->branch_product_id)
                     ->lockForUpdate()
                     ->first();
 
@@ -975,7 +977,7 @@ class PhysicalCountController extends Controller
                     'type' => StockMovement::TYPE_ADJUSTMENT,
                     'reason' => StockMovement::REASON_INVENTORY_DIFFERENCE,
                     'quantity' => abs($difference),
-                    'unit_cost' => $branchProduct->product?->cost ?? 0,
+                    'unit_cost' => $branchProduct->product?->cost_per_piece ?? $branchProduct->product?->cost ?? 0,
                     'previous_stock' => $previousStock,
                     'new_stock' => $newStock,
                     'user_id' => Auth::id(),
@@ -1187,6 +1189,38 @@ class PhysicalCountController extends Controller
             ->all();
     }
 
+    private function validateAuditQuantities(
+        BranchProduct $branchProduct,
+        float $counted,
+        float $damaged,
+        float $expired
+    ): void {
+        $product = $branchProduct->product;
+
+        if ($product?->inventory_quantity_mode === 'legacy_presentation') {
+            throw ValidationException::withMessages([
+                'counted_quantity' => 'Este producto conserva existencias históricas en cajas y debe conciliarse antes de auditarse.',
+            ]);
+        }
+
+        $values = compact('counted', 'damaged', 'expired');
+        $isKilogram = ($product?->inventory_unit ?? $product?->unit ?? 'pza') === 'kg';
+
+        foreach ($values as $field => $value) {
+            if ($isKilogram && ($value > 999.999 || abs($value - round($value, 3)) > 0.0000001)) {
+                throw ValidationException::withMessages([
+                    "{$field}_quantity" => 'Los kilogramos permiten hasta tres decimales y un máximo de 999.999.',
+                ]);
+            }
+
+            if (! $isKilogram && abs($value - round($value)) > 0.0000001) {
+                throw ValidationException::withMessages([
+                    "{$field}_quantity" => 'Las piezas deben registrarse con números enteros.',
+                ]);
+            }
+        }
+    }
+
     private function scannedProductPayload(
         Request $request,
         PhysicalCount $physicalCount,
@@ -1224,6 +1258,8 @@ class PhysicalCountController extends Controller
                 'branch_product_id' => $branchProduct->id,
                 'product_id' => $branchProduct->product_id,
                 'name' => $snapshotRow['product_name'],
+                'inventory_unit' => $branchProduct->product?->inventory_unit ?? $branchProduct->product?->unit ?? 'pza',
+                'inventory_quantity_mode' => $branchProduct->product?->inventory_quantity_mode ?? 'base',
                 'barcode' => $snapshotRow['scanned_code'] ?: $code,
                 'scanned_code' => $code ?: ($snapshotRow['scanned_code'] ?: 'Sin código escaneado'),
                 'batches' => $snapshotBatches,
@@ -1248,6 +1284,8 @@ class PhysicalCountController extends Controller
             'branch_product_id' => $branchProduct->id,
             'product_id' => $branchProduct->product_id,
             'name' => $branchProduct->product->name ?? 'Sin producto',
+            'inventory_unit' => $branchProduct->product?->inventory_unit ?? $branchProduct->product?->unit ?? 'pza',
+            'inventory_quantity_mode' => $branchProduct->product?->inventory_quantity_mode ?? 'base',
             'barcode' => $branchProduct->barcode ?? $code,
             'scanned_code' => $code ?: ($branchProduct->barcode ?? 'Sin código escaneado'),
             'batches' => $batches,

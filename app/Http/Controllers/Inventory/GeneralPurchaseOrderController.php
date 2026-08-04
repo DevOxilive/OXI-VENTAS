@@ -90,7 +90,7 @@ class GeneralPurchaseOrderController extends Controller
 
         $generalPurchaseOrder->load([
             'creator',
-            'items.product:id,image,cost,description',
+            'items.product:id,image,cost,description,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,cost_per_box',
             'branchOrders.branch',
             'branchOrders.items',
         ]);
@@ -181,7 +181,7 @@ class GeneralPurchaseOrderController extends Controller
 
         $generalPurchaseOrder->load([
             'creator',
-            'items.product:id,image,cost,description',
+            'items.product:id,image,cost,description,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,cost_per_box',
             'branchOrders.branch',
             'branchOrders.items',
         ]);
@@ -543,9 +543,9 @@ class GeneralPurchaseOrderController extends Controller
             'record_version' => ['required', 'date'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'integer', 'exists:general_purchase_order_items,id'],
-            'items.*.purchase_presentation' => ['required', 'string', 'max:30'],
-            'items.*.package_quantity' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
-            'items.*.units_per_package' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
+            'items.*.purchase_presentation' => ['required', 'in:Pieza,Caja,Kilo'],
+            'items.*.package_quantity' => ['nullable', 'numeric', 'decimal:0,3', 'min:0', 'max:9999.999'],
+            'items.*.units_per_package' => ['nullable', 'integer', 'min:0', 'max:9999'],
             'items.*.purchase_price' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:999999.99'],
             'items.*.purchase_notes' => ['nullable', 'string', 'max:1000'],
             'items.*.unavailable' => ['nullable', 'boolean'],
@@ -773,13 +773,18 @@ class GeneralPurchaseOrderController extends Controller
                     ]);
 
                 return array_merge($itemPayload, [
+                    'base_unit' => $item->product?->inventory_unit
+                        ?? $item->product?->unit
+                        ?? $item->base_unit,
+                    'has_box_presentation' => (bool) $item->product?->has_box_presentation,
+                    'product_pieces_per_box' => (int) ($item->product?->pieces_per_box ?? 0),
                     'branch_breakdown' => $breakdown,
                     'image_url' => $item->product?->image
                         ? route('inventory.products.image', ['product' => $item->product_id])
                         : null,
                     'product_description' => $item->product_description
                         ?: $item->product?->description,
-                    'previous_cost' => (float) ($item->estimated_unit_price ?? $item->product?->cost ?? 0),
+                    'previous_cost' => (float) ($item->estimated_unit_price ?? $item->product?->cost_per_piece ?? $item->product?->cost ?? 0),
                 ]);
             })->values(),
         ];

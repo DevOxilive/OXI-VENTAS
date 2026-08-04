@@ -197,6 +197,10 @@ async function registerPasskey() {
 }
 
 async function assertPlatformBiometricsAvailable() {
+    if (!window.isSecureContext || window.location.protocol !== 'https:') {
+        throw new Error('La biometría requiere una conexión HTTPS válida. Abre la URL actual del túnel sin aceptar advertencias de certificado y vuelve a intentarlo.')
+    }
+
     if (!window.PublicKeyCredential || !navigator.credentials?.create || !navigator.credentials?.get) {
         throw new Error('Este navegador no permite autenticación segura. En iPhone abre la aplicación desde Safari; en Android usa Chrome.')
     }

@@ -134,7 +134,7 @@ class PurchaseReportController extends Controller
             ],
             'items' => ['required', 'array', 'min:1'],
             'items.*.branch_product_id' => ['required', 'exists:branch_products,id'],
-            'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:9999.99'],
+            'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
         ]);
 
         $generateOrder = (bool) ($validated['generate_order'] ?? false);
@@ -162,7 +162,7 @@ class PurchaseReportController extends Controller
                     ->where('branch_id', $branch->id)
                     ->findOrFail($item['branch_product_id']);
 
-                $estimatedPrice = (float) ($product->product?->cost ?? 0);
+                $estimatedPrice = (float) ($product->product?->cost_per_piece ?? $product->product?->cost ?? 0);
                 $requestedQuantity = (float) $item['requested_quantity'];
 
                 $report->items()->create([
@@ -717,7 +717,7 @@ class PurchaseReportController extends Controller
             ],
             'items' => ['required', 'array', 'min:1'],
             'items.*.branch_product_id' => ['required', 'exists:branch_products,id'],
-            'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:9999.99'],
+            'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
         ];
 
         return $request->validate($rules);
@@ -741,7 +741,7 @@ class PurchaseReportController extends Controller
                 ->findOrFail($item['branch_product_id']);
 
             $requestedQuantity = (float) $item['requested_quantity'];
-            $estimatedPrice = (float) ($branchProduct->product?->cost ?? 0);
+            $estimatedPrice = (float) ($branchProduct->product?->cost_per_piece ?? $branchProduct->product?->cost ?? 0);
             $purchasedQuantity = isset($item['purchased_quantity'])
                 ? (float) $item['purchased_quantity']
                 : null;

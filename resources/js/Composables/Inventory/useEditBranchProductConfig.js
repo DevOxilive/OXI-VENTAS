@@ -37,7 +37,7 @@ export function useEditBranchProductConfig(product) {
     });
 
     const unit = computed(() => {
-        return product.value?.unit ?? "pieza";
+        return product.value?.inventory_unit ?? product.value?.unit ?? "pza";
     });
 
     const stockLabel = computed(() => {

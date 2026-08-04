@@ -130,7 +130,7 @@ class BranchInventoryController extends Controller
             })
             ->with([
                 'branch:id,name',
-                'product:id,name,category_id,sale_price,cost,unit',
+                'product:id,name,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
                 'product.category:id,name',
                 'product.barcodes:id,product_id,code',
             ])
@@ -166,7 +166,7 @@ class BranchInventoryController extends Controller
             ->selectRaw('SUM(CASE WHEN branch_products.stock <= branch_products.min_stock AND branch_products.stock > 0 THEN 1 ELSE 0 END) as low_stock')
             ->selectRaw('SUM(CASE WHEN branch_products.stock <= 0 THEN 1 ELSE 0 END) as out_of_stock')
             ->selectRaw('SUM(CASE WHEN branch_products.last_restocked_at IS NOT NULL AND DATE_ADD(branch_products.last_restocked_at, INTERVAL branch_products.inactive_candidate_after_days DAY) <= NOW() THEN 1 ELSE 0 END) as inactive_candidates')
-            ->selectRaw('COALESCE(SUM(branch_products.stock * products.sale_price), 0) as inventory_value')
+            ->selectRaw('COALESCE(SUM(branch_products.stock * COALESCE(products.sale_price_per_piece, products.sale_price)), 0) as inventory_value')
             ->first();
 
         $batchAggregate = (clone $batchAlertsQuery)
@@ -199,7 +199,9 @@ class BranchInventoryController extends Controller
                 'expiration_date' => $batch->expiration_date,
                 'formatted_expiration_date' => $batch->formatted_expiration_date,
                 'quantity' => $batch->quantity,
-                'unit' => $product?->unit ?? 'piezas',
+                'unit' => $product?->inventory_quantity_mode === 'legacy_presentation'
+                    ? ($product?->unit ?? 'piezas')
+                    : ($product?->inventory_unit ?? $product?->unit ?? 'piezas'),
                 'initial_quantity' => $batch->initial_quantity,
                 'status' => $batch->status,
                 'expiration_status' => $batch->expiration_status,
@@ -230,7 +232,9 @@ class BranchInventoryController extends Controller
                 'name' => $productName ?: 'Producto sin nombre',
                 'code' => $productCode,
                 'stock' => $branchProduct->stock,
-                'unit' => $product?->unit ?? 'piezas',
+                'unit' => $product?->inventory_quantity_mode === 'legacy_presentation'
+                    ? ($product?->unit ?? 'piezas')
+                    : ($product?->inventory_unit ?? $product?->unit ?? 'piezas'),
                 'minStock' => $branchProduct->min_stock,
                 'min_stock' => $branchProduct->min_stock,
                 'status' => 'Stock bajo',
@@ -314,7 +318,7 @@ class BranchInventoryController extends Controller
             ],
 
             'productsDB' => Product::query()
-                ->select(['products.id', 'products.name', 'products.sale_price', 'products.cost', 'products.unit', 'products.category_id'])
+                ->select(['products.id', 'products.name', 'products.sale_price', 'products.cost', 'products.unit', 'products.inventory_unit', 'products.pieces_per_box', 'products.has_box_presentation', 'products.inventory_quantity_mode', 'products.category_id'])
                 ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
                 ->when($branch, fn ($query) => $query->where('branch_products.branch_id', $branch->id))
                 ->where('products.active', true)
@@ -370,7 +374,7 @@ class BranchInventoryController extends Controller
 
     public function details(Request $request, BranchProduct $branchProduct): JsonResponse
     {
-        $branchProduct->loadMissing('branch');
+        $branchProduct->loadMissing('branch', 'product:id,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box');
         $this->abortIfUserCannotAccessBranch($request, $branchProduct->branch);
 
         return response()->json($this->serializeBranchProductDetails($branchProduct));
@@ -446,11 +450,11 @@ class BranchInventoryController extends Controller
 
     public function updateConfig(Request $request, BranchProduct $branchProduct)
     {
-        $branchProduct->loadMissing('branch');
+        $branchProduct->loadMissing('branch', 'product:id,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box');
         $this->abortIfUserCannotAccessBranch($request, $branchProduct->branch);
 
         $validated = $request->validate([
-            'min_stock' => ['required', 'numeric', 'min:0'],
+            'min_stock' => $this->minimumStockRules((string) ($branchProduct->product?->inventory_unit ?? $branchProduct->product?->unit ?? 'pza')),
             'status' => ['required', 'in:active,inactive,seasonal'],
             'season_start_date' => ['nullable', 'date', 'required_if:status,seasonal'],
             'season_end_date' => ['nullable', 'date', 'required_if:status,seasonal', 'after_or_equal:season_start_date'],
@@ -480,11 +484,20 @@ class BranchInventoryController extends Controller
         return back()->with('success', 'Configuracion del producto actualizada correctamente.');
     }
 
+    private function minimumStockRules(string $unit): array
+    {
+        if ($unit === 'kg') {
+            return ['required', 'numeric', 'decimal:0,3', 'min:0', 'max:999.999'];
+        }
+
+        return ['required', 'integer', 'min:0', 'max:999'];
+    }
+
     private function serializeBranchProductRow(BranchProduct $branchProduct): array
     {
         $branchProduct->loadMissing([
             'branch:id,name,slug',
-            'product:id,name,category_id,sale_price,cost,unit',
+            'product:id,name,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
             'product.category:id,name',
             'product.barcodes:id,product_id,code',
         ]);
@@ -520,7 +533,7 @@ class BranchInventoryController extends Controller
     {
         $branchProduct->load([
             'branch:id,name,slug',
-            'product:id,name,category_id,sale_price,cost,unit',
+            'product:id,name,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
             'product.category:id,name',
             'product.barcodes:id,product_id,code',
             'batches' => fn($query) => $query
@@ -562,7 +575,16 @@ class BranchInventoryController extends Controller
                 ->latest(),
         ]);
 
-        return $branchProduct->toArray();
+        $payload = $branchProduct->toArray();
+        $payload['assigned_branch_ids'] = BranchProduct::query()
+            ->where('product_id', $branchProduct->product_id)
+            ->where('status', BranchProduct::STATUS_ACTIVE)
+            ->pluck('branch_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        return $payload;
     }
 
     private function inventoryBaseStatsQuery(?Branch $branch)
@@ -615,7 +637,7 @@ class BranchInventoryController extends Controller
             'inactive_candidates' => (clone $inactiveCandidateProductsQuery)->count(),
             'inventory_value' => (clone $baseStatsQuery)
                 ->join('products', 'products.id', '=', 'branch_products.product_id')
-                ->selectRaw('COALESCE(SUM(branch_products.stock * products.sale_price), 0) as total')
+                ->selectRaw('COALESCE(SUM(branch_products.stock * COALESCE(products.sale_price_per_piece, products.sale_price)), 0) as total')
                 ->value('total'),
         ];
     }
@@ -708,7 +730,9 @@ class BranchInventoryController extends Controller
             'expiration_date' => $batch->expiration_date,
             'formatted_expiration_date' => $batch->formatted_expiration_date,
             'quantity' => $batch->quantity,
-            'unit' => $product?->unit ?? 'piezas',
+            'unit' => $product?->inventory_quantity_mode === 'legacy_presentation'
+                ? ($product?->unit ?? 'piezas')
+                : ($product?->inventory_unit ?? $product?->unit ?? 'piezas'),
             'initial_quantity' => $batch->initial_quantity,
             'status' => $batch->status,
             'expiration_status' => $batch->expiration_status,
@@ -740,7 +764,9 @@ class BranchInventoryController extends Controller
             'name' => $productName ?: 'Producto sin nombre',
             'code' => $productCode,
             'stock' => $branchProduct->stock,
-            'unit' => $product?->unit ?? 'piezas',
+            'unit' => $product?->inventory_quantity_mode === 'legacy_presentation'
+                ? ($product?->unit ?? 'piezas')
+                : ($product?->inventory_unit ?? $product?->unit ?? 'piezas'),
             'minStock' => $branchProduct->min_stock,
             'min_stock' => $branchProduct->min_stock,
             'status' => 'Stock bajo',

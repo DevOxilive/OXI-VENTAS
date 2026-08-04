@@ -27,7 +27,7 @@ defineProps({
   },
 })
 
-defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-discount"])
+defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-discount", "set-presentation", "update-quantity"])
 </script>
 
 <template>
@@ -56,8 +56,29 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
             <p class="mt-1 truncate text-xs text-text opacity-70">
               {{ item.barcode || "Sin codigo" }}
             </p>
+            <div
+              v-if="item.has_box_presentation"
+              class="mt-2 inline-flex rounded-lg border border-secondary bg-background p-1"
+            >
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-xs font-semibold"
+                :class="item.presentation === 'piece' ? 'bg-primary text-white' : 'text-text'"
+                @click="$emit('set-presentation', 'piece')"
+              >
+                Piezas
+              </button>
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-xs font-semibold"
+                :class="item.presentation === 'box' ? 'bg-primary text-white' : 'text-text'"
+                @click="$emit('set-presentation', 'box')"
+              >
+                Cajas
+              </button>
+            </div>
             <p class="mt-2 text-xs text-text opacity-70">
-              Stock disponible: {{ Number(item.stock).toFixed(0) }}
+              Stock disponible: {{ Number(item.available_quantity ?? item.stock).toFixed(3) }} {{ item.presentation === 'box' ? 'cajas' : item.inventory_unit }}
             </p>
           </div>
         </div>
@@ -84,10 +105,14 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
         </p>
         <QuantityStepper
           :value="item.quantity"
+          :allow-decimal="item.presentation === 'piece' && item.inventory_unit === 'kg'"
+          :max-integer-digits="3"
+          :max-decimal-digits="3"
           :decrease-disabled="Number(item.quantity) <= 0"
-          :increase-disabled="Number(item.quantity) >= Number(item.stock)"
+          :increase-disabled="Number(item.quantity) >= Number(item.available_quantity ?? item.stock)"
           @decrease="$emit('decrease')"
           @increase="$emit('increase')"
+          @update="$emit('update-quantity', $event)"
         />
       </div>
 

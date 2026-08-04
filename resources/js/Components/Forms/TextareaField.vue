@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, useAttrs } from 'vue'
 import { fieldRegistry } from '@/Validation/fieldRegistry'
-import { sanitizeField } from '@/Validation/sanitizers'
+import { sanitizeField, sanitizeFieldWithCursor } from '@/Validation/sanitizers'
 
 defineOptions({
     inheritAttrs: false,
@@ -76,34 +76,37 @@ function resizeTextarea(textarea) {
 }
 
 function handleInput(e) {
-    const value = sanitizeField(e.target.value, normalizedFieldConfig.value)
+    const sanitized = sanitizeFieldWithCursor(
+        e.target.value,
+        normalizedFieldConfig.value,
+        e.target.selectionStart ?? 0,
+        e.target.selectionEnd ?? 0,
+    )
 
-    e.target.value = value
+    if (e.target.value !== sanitized.value) {
+        e.target.value = sanitized.value
+    }
 
-    emit('update:modelValue', value)
+    emit('update:modelValue', sanitized.value)
     emit('validate', props.field)
 
-    nextTick(() => resizeTextarea(e.target))
+    nextTick(() => {
+        e.target.setSelectionRange?.(sanitized.selectionStart, sanitized.selectionEnd)
+        resizeTextarea(e.target)
+    })
 }
 
-function blockExtraInput(e) {
-    const config = fieldConfig.value
-    if (!config) return
+function handleBlur(e) {
+    const value = sanitizeField(e.target.value, normalizedFieldConfig.value)
 
-    const allowedKeys = [
-        'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight',
-        'ArrowUp', 'ArrowDown', 'Tab', 'Home', 'End', 'Enter'
-    ]
-
-    if (e.ctrlKey || e.metaKey) return
-    if (allowedKeys.includes(e.key)) return
-
-    const currentLength = (props.modelValue || '').toString().length
-
-    if (config.max && currentLength >= config.max) {
-        e.preventDefault()
+    if (value !== e.target.value) {
+        e.target.value = value
+        emit('update:modelValue', value)
     }
+
+    emit('validate', props.field)
 }
+
 </script>
 
 <template>
@@ -113,8 +116,9 @@ function blockExtraInput(e) {
         </label>
 
         <textarea v-bind="attrs" :id="textareaId" :name="field" :value="modelValue" :rows="rows" :readonly="readonly"
-            :style="{ maxHeight: textareaMaxHeight }" @keydown="blockExtraInput" @input="handleInput"
-            @blur="emit('validate', field)" :class="[
+            :maxlength="normalizedFieldConfig?.max || undefined"
+            :style="{ maxHeight: textareaMaxHeight }" @input="handleInput"
+            @blur="handleBlur" :class="[
                 'w-full resize-none rounded-xl border px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
                 readonly ? 'cursor-not-allowed border-secondary bg-secondary text-text opacity-60' : 'bg-background text-text',
                 error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'

@@ -80,7 +80,7 @@ class PendingPurchaseOrderEditor
             foreach ($items as $item) {
                 $branchProduct = $branchProducts->get((int) $item['branch_product_id']);
                 $requestedQuantity = (float) $item['requested_quantity'];
-                $estimatedPrice = (float) ($branchProduct->product?->cost ?? 0);
+                $estimatedPrice = (float) ($branchProduct->product?->cost_per_piece ?? $branchProduct->product?->cost ?? 0);
 
                 $purchaseOrder->items()->updateOrCreate(
                     ['branch_product_id' => $branchProduct->id],

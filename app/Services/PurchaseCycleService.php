@@ -146,7 +146,7 @@ class PurchaseCycleService
             }
 
             $incomingItems = collect($payload['items'])->keyBy('id');
-            $order->items()->each(function (GeneralPurchaseOrderItem $item) use ($incomingItems) {
+            $order->items()->with('product')->each(function (GeneralPurchaseOrderItem $item) use ($incomingItems) {
                 $input = $incomingItems->get($item->id);
 
                 if (! $input) {
@@ -297,22 +297,29 @@ class PurchaseCycleService
                 continue;
             }
 
-            $unitsPerPresentation = $item->purchase_presentation === 'Caja'
-                ? max(0.01, (float) $item->units_per_package)
-                : 1;
-            $unitCost = round((float) $item->purchase_price / $unitsPerPresentation, 2);
             $product = Product::query()->find($item->product_id);
 
             if (! $product) {
                 continue;
             }
 
-            $salePrice = (float) $product->sale_price;
+            if ($item->purchase_presentation === 'Caja') {
+                $boxCost = (float) $item->purchase_price;
+                $boxSalePrice = round($boxCost * (1 + ((float) $product->margin_percentage / 100)), 4);
+                $product->update([
+                    'cost_per_box' => $boxCost,
+                    'sale_price_per_box' => $boxSalePrice,
+                ]);
+                continue;
+            }
+
+            $pieceCost = (float) $item->purchase_price;
+            $pieceSalePrice = round($pieceCost * (1 + ((float) $product->margin_percentage / 100)), 4);
             $product->update([
-                'cost' => $unitCost,
-                'margin_percentage' => $unitCost > 0
-                    ? round((($salePrice - $unitCost) / $unitCost) * 100, 2)
-                    : 0,
+                'cost_per_piece' => $pieceCost,
+                'sale_price_per_piece' => $pieceSalePrice,
+                'cost' => $pieceCost,
+                'sale_price' => $pieceSalePrice,
             ]);
         }
     }
@@ -487,7 +494,8 @@ class PurchaseCycleService
         $requestedQuantity = (float) $items->sum('requested_quantity');
         $estimatedTotal = (float) $items->sum('estimated_total');
         $estimatedUnitPrice = $requestedQuantity > 0 ? $estimatedTotal / $requestedQuantity : 0;
-        $purchasePresentation = in_array(strtolower((string) $product?->unit), ['kg', 'kilo', 'kilogramo'], true)
+        $inventoryUnit = $product?->inventory_unit ?? $product?->unit ?? 'pza';
+        $purchasePresentation = $inventoryUnit === 'kg'
             ? 'Kilo'
             : 'Pieza';
 
@@ -496,7 +504,7 @@ class PurchaseCycleService
             'product_name' => $product?->name ?? 'Producto sin nombre',
             'product_description' => $product?->description,
             'product_code' => $product?->barcodes?->first()?->code,
-            'base_unit' => $product?->unit ?: 'pieza',
+            'base_unit' => $inventoryUnit,
             'requested_quantity' => $requestedQuantity,
             'estimated_unit_price' => round($estimatedUnitPrice, 2),
             'estimated_total' => 0,
@@ -513,12 +521,41 @@ class PurchaseCycleService
 
     private function applyCapture(GeneralPurchaseOrderItem $item, array $input): void
     {
+        $product = $item->product;
+        if (! $product || $product->inventory_quantity_mode === 'legacy_presentation') {
+            throw ValidationException::withMessages([
+                'items' => 'Hay productos con existencias históricas pendientes de conciliar.',
+            ]);
+        }
+
         $unavailable = (bool) ($input['unavailable'] ?? false);
         $presentation = (string) ($input['purchase_presentation'] ?? 'Pieza');
+        $inventoryUnit = $product->inventory_unit ?? $product->unit ?? 'pza';
+
+        if ($inventoryUnit === 'kg' && $presentation !== 'Kilo') {
+            throw ValidationException::withMessages(['items' => "{$product->name} debe comprarse en kilogramos."]);
+        }
+
+        if ($inventoryUnit !== 'kg' && ! in_array($presentation, ['Pieza', 'Caja'], true)) {
+            throw ValidationException::withMessages(['items' => "La presentación de {$product->name} no es válida."]);
+        }
+
+        if ($presentation === 'Caja' && (! $product->has_box_presentation || (int) $product->pieces_per_box < 2)) {
+            throw ValidationException::withMessages(['items' => "{$product->name} no tiene una caja configurada."]);
+        }
+
         $packageQuantity = $unavailable ? 0 : (float) ($input['package_quantity'] ?? 0);
         $unitsPerPackage = $unavailable
             ? 0
-            : ($presentation === 'Caja' ? (float) ($input['units_per_package'] ?? 0) : 1);
+            : ($presentation === 'Caja' ? (int) $product->pieces_per_box : 1);
+
+        if ($presentation !== 'Kilo' && abs($packageQuantity - round($packageQuantity)) > 0.0000001) {
+            throw ValidationException::withMessages(['items' => 'Las piezas y cajas deben capturarse en cantidades enteras.']);
+        }
+
+        if ($presentation === 'Kilo') {
+            $packageQuantity = round($packageQuantity, 3);
+        }
         $purchasePrice = $unavailable ? 0 : (float) ($input['purchase_price'] ?? 0);
         $purchasedQuantity = $packageQuantity * $unitsPerPackage;
         $grossTotal = $packageQuantity * $purchasePrice;

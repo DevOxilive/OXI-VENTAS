@@ -79,8 +79,10 @@ const productName = computed(() => {
 })
 
 const unit = computed(() => {
-    return props.product?.unit ?? 'pieza'
+    return props.product?.inventory_unit ?? props.product?.unit ?? 'pza'
 })
+
+const isKilogramUnit = computed(() => String(unit.value).toLowerCase() === 'kg')
 
 const batches = computed(() => {
     return props.product?.batches ?? []
@@ -390,8 +392,10 @@ function selectBatch(batch) {
                                 <InputField
                                     v-model="form.adjustment_amount"
                                     label="Cantidad"
-                                    type="number"
                                     field="adjustment_amount"
+                                    :validation-field="isKilogramUnit ? 'kilogram_quantity' : undefined"
+                                    type="text"
+                                    :inputmode="isKilogramUnit ? 'decimal' : 'numeric'"
                                     placeholder="Ej. 2"
                                     :readonly="processing"
                                     :error="frontendErrors.adjustment_amount"

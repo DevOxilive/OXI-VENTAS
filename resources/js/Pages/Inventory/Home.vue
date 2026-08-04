@@ -56,6 +56,10 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  canManagePricing: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const productsState = ref(cloneProductsPayload(props.productsDB))
@@ -298,6 +302,6 @@ onBeforeUnmount(() => {
         (modalMode === 'view' && can('inventory.products.view'))
       )
     " :mode="modalMode" :product="selectedProduct" :categoriesDB="categoriesDB"
-      :branchesDB="branchesDB" :branch="branch" @close="closeModal" />
+      :branchesDB="branchesDB" :branch="branch" :can-manage-pricing="canManagePricing" @close="closeModal" />
   </PageLayout>
 </template>
