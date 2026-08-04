@@ -682,6 +682,44 @@ function cartItemSubtotal(item) {
   return Number((cartItemUnitPrice(item) * Number(item.quantity || 0)).toFixed(2));
 }
 
+function cartItemAvailableQuantity(item) {
+  if (item.presentation === "box") {
+    return Math.floor(Number(item.stock || 0) / Number(item.pieces_per_box || 1));
+  }
+
+  return Number(item.stock || 0);
+}
+
+function setCartPresentation(index, presentation) {
+  const item = cart.value[index];
+  if (!item || (presentation === "box" && !item.has_box_presentation)) return;
+
+  item.presentation = presentation;
+  item.original_price = presentation === "box"
+    ? Number(item.sale_price_per_box || 0)
+    : Number(item.sale_price_per_piece || item.price || 0);
+  item.available_quantity = cartItemAvailableQuantity(item);
+  item.quantity = Math.max(1, Math.min(Number(item.quantity || 1), item.available_quantity));
+}
+
+function saleQuantityStep(item) {
+  return item.presentation === "piece" && item.inventory_unit === "kg" ? 0.001 : 1;
+}
+
+function updateCartQuantity(index, value) {
+  const item = cart.value[index];
+  if (!item) return;
+
+  const step = saleQuantityStep(item);
+  const raw = Number(String(value ?? "").replace(",", "."));
+  if (!Number.isFinite(raw)) return;
+
+  const normalized = step === 1
+    ? Math.floor(raw)
+    : Math.round(raw * 1000) / 1000;
+  item.quantity = Math.max(step, Math.min(normalized, cartItemAvailableQuantity(item)));
+}
+
 function addProduct(product) {
   if (!canCreateSale.value) {
     WarningAlert({
@@ -698,7 +736,7 @@ function addProduct(product) {
   );
 
   if (existing) {
-    if (Number(existing.quantity) >= Number(product.stock || 0)) {
+    if (Number(existing.quantity) >= cartItemAvailableQuantity(existing)) {
       ErrorAlert({
         title: "Stock agotado",
         message: `Solo hay ${product.stock} unidad(es) disponibles de ${product.name}.`,
@@ -728,7 +766,14 @@ function addProduct(product) {
     barcode: product.barcode,
     image: product.image,
     original_price: Number(product.price || 0),
+    sale_price_per_piece: Number(product.sale_price_per_piece ?? product.price ?? 0),
+    sale_price_per_box: Number(product.sale_price_per_box ?? 0),
+    has_box_presentation: Boolean(product.has_box_presentation),
+    pieces_per_box: Number(product.pieces_per_box || 0),
+    inventory_unit: product.inventory_unit ?? "pza",
+    presentation: "piece",
     stock: Number(product.stock || 0),
+    available_quantity: Number(product.stock || 0),
     quantity: 1,
     discount_enabled: false,
     discount_percentage: 0,
@@ -941,21 +986,22 @@ function increaseQuantity(index) {
   const item = cart.value[index];
   if (!item) return;
 
-  if (Number(item.quantity) >= Number(item.stock)) return;
+  if (Number(item.quantity) >= cartItemAvailableQuantity(item)) return;
 
-  item.quantity += 1;
+  item.quantity = Number((Number(item.quantity) + saleQuantityStep(item)).toFixed(3));
 }
 
 function decreaseQuantity(index) {
   const item = cart.value[index];
   if (!item) return;
 
-  if (Number(item.quantity) <= 1) {
+  const step = saleQuantityStep(item);
+  if (Number(item.quantity) <= step) {
     cart.value.splice(index, 1);
     return;
   }
 
-  item.quantity -= 1;
+  item.quantity = Number((Number(item.quantity) - step).toFixed(3));
 }
 
 function removeItem(index) {
@@ -1238,6 +1284,7 @@ function submitSale() {
     product_id: item.product_id,
     barcode_id: item.barcode_id ?? null,
     quantity: item.quantity,
+    presentation: item.presentation,
     original_unit_price: Number(item.original_price || 0),
     discount_percentage: item.discount_enabled
       ? Number(item.discount_percentage || 0)
@@ -1681,6 +1728,8 @@ function submitSale() {
                 @increase="increaseQuantity(index)"
                 @decrease="decreaseQuantity(index)"
                 @remove="removeItem(index)"
+                @set-presentation="setCartPresentation(index, $event)"
+                @update-quantity="updateCartQuantity(index, $event)"
                 @toggle-discount="toggleDiscount(item)"
                 @normalize-discount="normalizeDiscount(item)"
               />

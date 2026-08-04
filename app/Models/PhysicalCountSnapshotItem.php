@@ -27,8 +27,8 @@ class PhysicalCountSnapshotItem extends Model
 
     protected $casts = [
         'expiration_date' => 'date',
-        'system_stock' => 'decimal:2',
-        'batch_stock' => 'decimal:2',
+        'system_stock' => 'decimal:3',
+        'batch_stock' => 'decimal:3',
     ];
 
     public function snapshot()

@@ -19,6 +19,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Throwable;
 
@@ -41,6 +43,78 @@ class ProductController extends Controller
         return round((($salePrice - $cost) / $cost) * 100, 2);
     }
 
+    private function canManagePricing(Request $request): bool
+    {
+        return in_array($request->user()?->role?->name, [
+            'Administrador',
+            'Super Administrador',
+        ], true);
+    }
+
+    private function resolvePresentationPricing(array &$data, bool $canManagePricing): void
+    {
+        $hasBoxPresentation = (bool) ($data['has_box_presentation'] ?? false);
+        $costPerPiece = (float) $data['cost_per_piece'];
+        $costPerBox = $hasBoxPresentation ? (float) $data['cost_per_box'] : null;
+
+        if (!$canManagePricing) {
+            $data['sale_price_per_piece'] = round($costPerPiece * 1.10, 2);
+            $data['sale_price_per_box'] = $hasBoxPresentation
+                ? round($costPerBox * 1.10, 2)
+                : null;
+        }
+
+        $pieceMargin = $this->calculateMarginPercentage($costPerPiece, $data['sale_price_per_piece']);
+        $boxMargin = $hasBoxPresentation
+            ? $this->calculateMarginPercentage($costPerBox, $data['sale_price_per_box'])
+            : null;
+
+        if ($hasBoxPresentation && $pieceMargin !== null && $boxMargin !== null && abs($pieceMargin - $boxMargin) > 0.01) {
+            throw ValidationException::withMessages([
+                'sale_price_per_box' => 'El porcentaje de ganancia de caja debe coincidir con el de pieza.',
+            ]);
+        }
+
+        $margins = array_filter([$pieceMargin, $boxMargin], fn ($margin) => $margin !== null);
+
+        if ($margins !== [] && min($margins) < 10 && !($canManagePricing && ($data['allow_low_margin'] ?? false))) {
+            throw ValidationException::withMessages([
+                'sale_price_per_piece' => 'El porcentaje de ganancia no puede ser menor al 10%. Un administrador debe autorizar esta excepción.',
+            ]);
+        }
+
+        // Existing modules keep using the base-unit fields until their own migration.
+        $data['cost'] = $costPerPiece;
+        $data['sale_price'] = $data['sale_price_per_piece'];
+        $data['margin_percentage'] = $pieceMargin;
+    }
+
+    /**
+     * El precio de venta y su margen son datos administrados. Inventario puede
+     * registrar el producto, pero el sistema calcula un margen inicial del 10%.
+     */
+    private function resolvePricing(array &$data, bool $canManagePricing, ?Product $currentProduct = null): void
+    {
+        if (!$canManagePricing) {
+            $data['sale_price'] = $currentProduct
+                ? (float) $currentProduct->sale_price
+                : round(((float) $data['cost']) * 1.10, 2);
+        }
+
+        $margin = $this->calculateMarginPercentage($data['cost'], $data['sale_price']);
+        $pricingChanged = !$currentProduct
+            || (float) $currentProduct->cost !== (float) $data['cost']
+            || (float) $currentProduct->sale_price !== (float) $data['sale_price'];
+
+        if ($pricingChanged && $margin !== null && $margin < 10 && !($canManagePricing && ($data['allow_low_margin'] ?? false))) {
+            throw ValidationException::withMessages([
+                'sale_price' => 'El porcentaje de ganancia no puede ser menor al 10%. Un administrador debe autorizar esta excepción.',
+            ]);
+        }
+
+        $data['margin_percentage'] = $margin;
+    }
+
     public function index(Request $request, Branch $branch)
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
@@ -50,7 +124,7 @@ class ProductController extends Controller
         $query = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
-                'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,active,created_at,updated_at',
+                'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at,updated_at',
                 'product.category:id,name',
                 'product.barcodes:id,product_id,code',
             ])
@@ -126,6 +200,7 @@ class ProductController extends Controller
                 'category_id' => $request->category_id,
                 'per_page' => $perPage,
             ],
+            'canManagePricing' => $this->canManagePricing($request),
         ]);
     }
 
@@ -136,7 +211,7 @@ class ProductController extends Controller
         $branchProduct = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
-                'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,active,created_at',
+                'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at',
                 'product.category:id,name',
                 'product.barcodes:id,product_id,code',
             ])
@@ -182,24 +257,44 @@ class ProductController extends Controller
     public function store(Request $request, Branch $branch)
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
+        $canManagePricing = $this->canManagePricing($request);
 
         $data = $request->validate([
             'barcodes' => ['nullable', 'array'],
             'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct', 'unique:barcodes,code'],
-            'unit' => ['required', 'string', 'max:20'],
-            'name' => ['required', 'string', 'max:255'],
+            'inventory_unit' => ['required', Rule::in(['pza', 'kg'])],
+            'has_box_presentation' => ['nullable', 'boolean'],
+            'pieces_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
+            'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\pN\s.,\/_-]+$/u'],
             'image' => ['nullable', 'image', 'max:2048'],
 
-            'min_stock' => ['nullable', 'numeric', 'min:0'],
+            'min_stock' => $this->minimumStockRules((string) $request->input('inventory_unit')),
             'category_id' => ['nullable', 'required_without:category_name', 'exists:categories,id'],
             'category_name' => ['nullable', 'required_without:category_id', 'string', 'max:255'],
-            'cost' => ['required', 'numeric', 'min:0'],
-            'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
+            'cost_per_piece' => ['required', 'numeric', 'min:0'],
+            'sale_price_per_piece' => $canManagePricing
+                ? ['required', 'numeric', 'min:0', 'gte:cost_per_piece']
+                : ['nullable', 'numeric', 'min:0'],
+            'cost_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0'],
+            'sale_price_per_box' => $canManagePricing
+                ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0', 'gte:cost_per_box']
+                : ['nullable', 'numeric', 'min:0'],
+            'allow_low_margin' => ['nullable', 'boolean'],
             'entry_date' => ['required', 'date'],
             'active' => ['boolean'],
             'branch_ids' => ['nullable', 'array'],
             'branch_ids.*' => ['exists:branches,id'],
         ]);
+
+        $data['has_box_presentation'] = $request->boolean('has_box_presentation');
+
+        $this->resolvePresentationPricing($data, $canManagePricing);
+
+        if ($data['inventory_unit'] === 'kg' && $data['has_box_presentation']) {
+            throw ValidationException::withMessages([
+                'has_box_presentation' => 'La presentación por caja solo aplica a productos inventariados por pieza.',
+            ]);
+        }
 
         if (blank($data['category_id'] ?? null) && filled($data['category_name'] ?? null)) {
             $categoryName = trim($data['category_name']);
@@ -236,8 +331,16 @@ class ProductController extends Controller
                 'image' => $imagePath,
                 'cost' => $data['cost'],
                 'sale_price' => $data['sale_price'],
-                'margin_percentage' => $this->calculateMarginPercentage($data['cost'], $data['sale_price']),
-                'unit' => $data['unit'],
+                'margin_percentage' => $data['margin_percentage'],
+                'unit' => $data['inventory_unit'],
+                'inventory_unit' => $data['inventory_unit'],
+                'has_box_presentation' => (bool) $data['has_box_presentation'],
+                'inventory_quantity_mode' => 'base',
+                'pieces_per_box' => $data['has_box_presentation'] ? $data['pieces_per_box'] : null,
+                'cost_per_piece' => $data['cost_per_piece'],
+                'sale_price_per_piece' => $data['sale_price_per_piece'],
+                'cost_per_box' => $data['has_box_presentation'] ? $data['cost_per_box'] : null,
+                'sale_price_per_box' => $data['has_box_presentation'] ? $data['sale_price_per_box'] : null,
                 'category_id' => $data['category_id'],
                 'active' => $data['active'] ?? true,
             ]);
@@ -282,23 +385,43 @@ class ProductController extends Controller
     public function update(Request $request, Branch $branch, Product $product)
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
+        $canManagePricing = $this->canManagePricing($request);
 
         $data = $request->validate([
             'barcodes' => ['nullable', 'array'],
             'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct'],
-            'unit' => ['required', 'string', 'max:20'],
-            'name' => ['required', 'string', 'max:255'],
+            'inventory_unit' => ['required', Rule::in(['pza', 'kg'])],
+            'has_box_presentation' => ['nullable', 'boolean'],
+            'pieces_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
+            'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\pN\s.,\/_-]+$/u'],
             'image' => ['nullable', 'image', 'max:2048'],
-            'min_stock' => ['nullable', 'numeric', 'min:0'],
+            'min_stock' => $this->minimumStockRules((string) $request->input('inventory_unit')),
             'category_id' => ['nullable', 'required_without:category_name', 'exists:categories,id'],
             'category_name' => ['nullable', 'required_without:category_id', 'string', 'max:255'],
-            'cost' => ['required', 'numeric', 'min:0'],
-            'sale_price' => ['required', 'numeric', 'min:0', 'gte:cost'],
+            'cost_per_piece' => ['required', 'numeric', 'min:0'],
+            'sale_price_per_piece' => $canManagePricing
+                ? ['required', 'numeric', 'min:0', 'gte:cost_per_piece']
+                : ['nullable', 'numeric', 'min:0'],
+            'cost_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0'],
+            'sale_price_per_box' => $canManagePricing
+                ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0', 'gte:cost_per_box']
+                : ['nullable', 'numeric', 'min:0'],
+            'allow_low_margin' => ['nullable', 'boolean'],
             'entry_date' => ['required', 'date'],
             'active' => ['boolean'],
             'branch_ids' => ['nullable', 'array'],
             'branch_ids.*' => ['exists:branches,id'],
         ]);
+
+        $data['has_box_presentation'] = $request->boolean('has_box_presentation');
+
+        $this->resolvePresentationPricing($data, $canManagePricing);
+
+        if ($data['inventory_unit'] === 'kg' && $data['has_box_presentation']) {
+            throw ValidationException::withMessages([
+                'has_box_presentation' => 'La presentación por caja solo aplica a productos inventariados por pieza.',
+            ]);
+        }
 
         if (blank($data['category_id'] ?? null) && filled($data['category_name'] ?? null)) {
             $categoryName = trim($data['category_name']);
@@ -341,12 +464,29 @@ class ProductController extends Controller
         $branchIds = $branchIds->merge($preservedBranchIds)->unique()->values();
 
         $currentBarcodes = $product->barcodes()->orderBy('id')->pluck('code')->values();
+        $isLegacyPresentationProduct = $product->inventory_quantity_mode === 'legacy_presentation';
+        $storageUnit = $isLegacyPresentationProduct
+            ? $product->unit
+            : $data['inventory_unit'];
+
+        if ($isLegacyPresentationProduct) {
+            // The historical stock is still expressed as boxes. Its legacy
+            // price fields remain unchanged until the inventory migration.
+            $data['cost'] = $product->cost;
+            $data['sale_price'] = $product->sale_price;
+            $data['margin_percentage'] = $product->margin_percentage;
+        }
+
         $changesGlobalProduct = $request->hasFile('image')
             || (string) $product->name !== (string) $data['name']
             || (int) $product->category_id !== (int) $data['category_id']
-            || (float) $product->cost !== (float) $data['cost']
-            || (float) $product->sale_price !== (float) $data['sale_price']
-            || (string) $product->unit !== (string) $data['unit']
+            || (float) $product->cost_per_piece !== (float) $data['cost_per_piece']
+            || (float) $product->sale_price_per_piece !== (float) $data['sale_price_per_piece']
+            || (float) $product->cost_per_box !== (float) ($data['has_box_presentation'] ? $data['cost_per_box'] : 0)
+            || (float) $product->sale_price_per_box !== (float) ($data['has_box_presentation'] ? $data['sale_price_per_box'] : 0)
+            || (string) $product->inventory_unit !== (string) $data['inventory_unit']
+            || (bool) $product->has_box_presentation !== (bool) $data['has_box_presentation']
+            || (int) $product->pieces_per_box !== (int) ($data['has_box_presentation'] ? $data['pieces_per_box'] : 0)
             || (bool) $product->active !== (bool) ($data['active'] ?? true)
             || $currentBarcodes->all() !== $barcodes->all();
 
@@ -375,7 +515,7 @@ class ProductController extends Controller
             : $previousImagePath;
 
         try {
-            $branchIds = DB::transaction(function () use ($request, $data, $product, $barcodes, $branchIds, $newImagePath) {
+            $branchIds = DB::transaction(function () use ($request, $data, $product, $barcodes, $branchIds, $newImagePath, $storageUnit, $isLegacyPresentationProduct) {
 
             $product = $this->lockCurrentVersion($request, $product);
 
@@ -385,8 +525,16 @@ class ProductController extends Controller
                 'category_id' => $data['category_id'],
                 'cost' => $data['cost'],
                 'sale_price' => $data['sale_price'],
-                'margin_percentage' => $this->calculateMarginPercentage($data['cost'], $data['sale_price']),
-                'unit' => $data['unit'],
+                'margin_percentage' => $data['margin_percentage'],
+                'unit' => $storageUnit,
+                'inventory_unit' => $data['inventory_unit'],
+                'has_box_presentation' => (bool) $data['has_box_presentation'],
+                'inventory_quantity_mode' => $isLegacyPresentationProduct ? 'legacy_presentation' : 'base',
+                'pieces_per_box' => $data['has_box_presentation'] ? $data['pieces_per_box'] : null,
+                'cost_per_piece' => $data['cost_per_piece'],
+                'sale_price_per_piece' => $data['sale_price_per_piece'],
+                'cost_per_box' => $data['has_box_presentation'] ? $data['cost_per_box'] : null,
+                'sale_price_per_box' => $data['has_box_presentation'] ? $data['sale_price_per_box'] : null,
                 'active' => $data['active'] ?? true,
             ]);
 
@@ -614,6 +762,15 @@ class ProductController extends Controller
         }
     }
 
+    private function minimumStockRules(string $unit): array
+    {
+        if ($unit === 'kg') {
+            return ['nullable', 'numeric', 'decimal:0,3', 'min:0', 'max:999.999'];
+        }
+
+        return ['nullable', 'integer', 'min:0', 'max:999'];
+    }
+
     private function serializeProductRow(BranchProduct $branchProduct, array $branchIds = []): array
     {
         $product = $branchProduct->product;
@@ -630,6 +787,10 @@ class ProductController extends Controller
             'barcodes' => $product?->barcodes?->pluck('code')->values() ?? [],
             'barcode' => $product?->barcodes?->first()?->code ?? 'Sin código',
             'unit' => $product?->unit ?? '',
+            'inventory_unit' => $product?->inventory_unit ?? ($product?->unit === 'kg' ? 'kg' : 'pza'),
+            'pieces_per_box' => $product?->pieces_per_box,
+            'has_box_presentation' => (bool) ($product?->has_box_presentation ?? $product?->unit === 'cj'),
+            'inventory_quantity_mode' => $product?->inventory_quantity_mode ?? 'base',
             'name' => $product?->name ?? 'Producto sin nombre',
             'image' => $imageUrl,
             'image_path' => $product?->image,
@@ -638,9 +799,13 @@ class ProductController extends Controller
             'category' => $product?->category?->name ?? 'Sin categoría',
             'min_stock' => $branchProduct->min_stock ?? 0,
             'cost' => $product?->cost ?? 0,
+            'cost_per_piece' => $product?->cost_per_piece ?? $product?->cost ?? 0,
+            'cost_per_box' => $product?->cost_per_box,
             'price' => $product?->sale_price ?? 0,
             'sale_price' => $product?->sale_price ?? 0,
             'salePrice' => $product?->sale_price ?? 0,
+            'sale_price_per_piece' => $product?->sale_price_per_piece ?? $product?->sale_price ?? 0,
+            'sale_price_per_box' => $product?->sale_price_per_box,
             'margin_percentage' => $product?->margin_percentage
                 ?? $this->calculateMarginPercentage($product?->cost ?? 0, $product?->sale_price ?? 0),
             'profit' => number_format(

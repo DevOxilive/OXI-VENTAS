@@ -1,7 +1,8 @@
 <script setup>
+import { nextTick } from 'vue'
 import { useToolbarConfig } from './useToolbarConfig'
 import { getToolbarActionClasses } from './toolbarClasses'
-import { sanitizeToolbarFilter, sanitizeToolbarSearch } from './toolbarInputSanitizer'
+import { sanitizeToolbarFilterWithCursor, sanitizeToolbarSearchWithCursor } from './toolbarInputSanitizer'
 
 const props = defineProps({
     backButton: {
@@ -85,17 +86,28 @@ function optionToneClasses(option, active) {
 }
 
 function handleSearchInput(event) {
-    const value = sanitizeToolbarSearch(event.target.value)
+    const result = sanitizeToolbarSearchWithCursor(
+        event.target.value,
+        event.target.selectionStart ?? 0,
+        event.target.selectionEnd ?? 0,
+    )
 
-    event.target.value = value
-    return value
+    event.target.value = result.value
+    nextTick(() => event.target.setSelectionRange?.(result.selectionStart, result.selectionEnd))
+    return result.value
 }
 
 function handleTextFilterInput(event, filter) {
-    const value = sanitizeToolbarFilter(event.target.value, filter)
+    const result = sanitizeToolbarFilterWithCursor(
+        event.target.value,
+        filter,
+        event.target.selectionStart ?? 0,
+        event.target.selectionEnd ?? 0,
+    )
 
-    event.target.value = value
-    return value
+    event.target.value = result.value
+    nextTick(() => event.target.setSelectionRange?.(result.selectionStart, result.selectionEnd))
+    return result.value
 }
 
 function normalizeMultiValue(value) {
@@ -225,6 +237,7 @@ function multiFilterLabel(filter) {
         <div v-if="hasSearch || hasRecordsPerPage || visibleFilters.length"
             class="flex flex-wrap items-end gap-3">
             <input v-if="hasSearch" :value="search" type="text" :placeholder="searchPlaceholder"
+                maxlength="120"
                 class="h-11 w-full min-w-[280px] flex-[2_1_360px] rounded-xl border border-secondary bg-background px-4 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
                 @input="$emit('update:search', handleSearchInput($event))" />
 
@@ -274,6 +287,7 @@ function multiFilterLabel(filter) {
                         })" />
 
                     <input v-else-if="filter.type === 'text'" :value="filter.value ?? ''" type="text"
+                        :maxlength="filter.maxLength ?? 120"
                         :placeholder="filter.placeholder || filter.label"
                         class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
                         :disabled="filter.disabled"

@@ -19,9 +19,9 @@ class StockMovementBatch extends Model
     ];
 
     protected $casts = [
-        'quantity' => 'decimal:2',
-        'previous_batch_quantity' => 'decimal:2',
-        'new_batch_quantity' => 'decimal:2',
+        'quantity' => 'decimal:3',
+        'previous_batch_quantity' => 'decimal:3',
+        'new_batch_quantity' => 'decimal:3',
     ];
 
     public function stockMovement()

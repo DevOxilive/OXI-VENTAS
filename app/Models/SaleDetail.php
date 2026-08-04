@@ -12,6 +12,9 @@ class SaleDetail extends Model
         'barcode_id',
         'lot_id',
         'quantity',
+        'sale_unit',
+        'base_quantity',
+        'pieces_per_box',
         'original_unit_price',
         'discount_percentage',
         'discount_amount',
@@ -22,6 +25,8 @@ class SaleDetail extends Model
 
     protected $casts = [
         'quantity' => 'decimal:3',
+        'base_quantity' => 'decimal:3',
+        'pieces_per_box' => 'integer',
         'original_unit_price' => 'decimal:2',
         'discount_percentage' => 'decimal:2',
         'discount_amount' => 'decimal:2',

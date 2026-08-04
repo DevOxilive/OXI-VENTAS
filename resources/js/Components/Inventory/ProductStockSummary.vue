@@ -43,7 +43,7 @@ defineProps({
                     </span>
 
                     <span class="text-lg font-black text-text">
-                        {{ currentStock }} {{ product.unit ?? 'piezas' }}
+                        {{ currentStock }} {{ product.inventory_unit ?? product.unit ?? 'pzas' }}
                     </span>
                 </div>
 
@@ -53,7 +53,7 @@ defineProps({
                     </span>
 
                     <span class="text-lg font-black" :class="projectedStock < 0 ? 'text-primary' : 'text-accent'">
-                        {{ projectedStock }} {{ product.unit ?? 'piezas' }}
+                        {{ projectedStock }} {{ product.inventory_unit ?? product.unit ?? 'pzas' }}
                     </span>
                 </div>
             </div>

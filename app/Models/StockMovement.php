@@ -37,10 +37,10 @@ class StockMovement extends Model
     ];
 
     protected $casts = [
-        'quantity' => 'decimal:2',
+        'quantity' => 'decimal:3',
         'unit_cost' => 'decimal:4',
-        'previous_stock' => 'decimal:2',
-        'new_stock' => 'decimal:2',
+        'previous_stock' => 'decimal:3',
+        'new_stock' => 'decimal:3',
     ];
 
     public function branchProduct()

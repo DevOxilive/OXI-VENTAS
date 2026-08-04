@@ -22,7 +22,7 @@ const emit = defineEmits(['close'])
 
 const numberFormatter = new Intl.NumberFormat('es-MX', {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 3,
 })
 
 const longDateFormatter = new Intl.DateTimeFormat('es-MX', {

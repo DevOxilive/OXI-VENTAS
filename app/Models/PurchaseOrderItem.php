@@ -30,11 +30,11 @@ class PurchaseOrderItem extends Model
     ];
 
     protected $casts = [
-        'current_stock' => 'decimal:2',
-        'min_stock' => 'decimal:2',
-        'requested_quantity' => 'decimal:2',
-        'purchased_quantity' => 'decimal:2',
-        'received_quantity' => 'decimal:2',
+        'current_stock' => 'decimal:3',
+        'min_stock' => 'decimal:3',
+        'requested_quantity' => 'decimal:3',
+        'purchased_quantity' => 'decimal:3',
+        'received_quantity' => 'decimal:3',
         'estimated_price' => 'decimal:2',
         'estimated_total' => 'decimal:2',
         'actual_price' => 'decimal:2',

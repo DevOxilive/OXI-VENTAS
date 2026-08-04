@@ -30,13 +30,13 @@ class GeneralPurchaseOrderItem extends Model
     ];
 
     protected $casts = [
-        'requested_quantity' => 'decimal:2',
+        'requested_quantity' => 'decimal:3',
         'estimated_unit_price' => 'decimal:2',
         'estimated_total' => 'decimal:2',
-        'package_quantity' => 'decimal:2',
-        'units_per_package' => 'decimal:2',
+        'package_quantity' => 'decimal:3',
+        'units_per_package' => 'decimal:3',
         'purchase_price' => 'decimal:2',
-        'purchased_quantity' => 'decimal:2',
+        'purchased_quantity' => 'decimal:3',
         'gross_total' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'actual_total' => 'decimal:2',

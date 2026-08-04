@@ -21,22 +21,26 @@ const props = defineProps({
     orderDB: { type: Object, required: true },
 })
 
-const presentationOptions = [
-    { label: 'Pieza', value: 'Pieza' },
-    { label: 'Caja', value: 'Caja' },
-    { label: 'Kilo', value: 'Kilo' },
-    { label: 'Costal', value: 'Costal' },
-    { label: 'Bolsa', value: 'Bolsa' },
-    { label: 'Paquete', value: 'Paquete' },
-]
+function presentationOptions(item) {
+    if (item.base_unit === 'kg') {
+        return [{ label: 'Kilogramo', value: 'Kilo' }]
+    }
+
+    return [
+        { label: 'Pieza', value: 'Pieza' },
+        ...(item.has_box_presentation ? [{ label: 'Caja', value: 'Caja' }] : []),
+    ]
+}
 const form = reactive({
     purchased_at: props.orderDB.purchased_at || new Date().toISOString().slice(0, 10),
     items: (props.orderDB.items || []).map((item) => ({
         ...item,
-        purchase_presentation: item.purchase_presentation || 'Pieza',
+        purchase_presentation: item.base_unit === 'kg'
+            ? 'Kilo'
+            : (item.purchase_presentation === 'Caja' && item.has_box_presentation ? 'Caja' : 'Pieza'),
         package_quantity: number(item.package_quantity ?? item.requested_quantity),
         units_per_package: item.purchase_presentation === 'Caja'
-            ? number(item.units_per_package) || 1
+            ? number(item.product_pieces_per_box ?? item.units_per_package) || 1
             : 1,
         purchase_price: number(item.purchase_price ?? item.previous_cost),
         promotion_status: item.purchase_notes ? 'YES' : 'NO',
@@ -142,7 +146,7 @@ function currency(value) {
 }
 
 function requiresBoxContent(item) {
-    return item.purchase_presentation === 'Caja'
+    return item.purchase_presentation === 'Caja' && Boolean(item.has_box_presentation)
 }
 
 function presentationName(item) {
@@ -342,7 +346,7 @@ async function completeOrder() {
                                     v-model="item.purchase_presentation"
                                     :field="`general_order_${item.id}_presentation`"
                                     label="Presentación"
-                                    :options="presentationOptions"
+                                    :options="presentationOptions(item)"
                                     :disabled="item.unavailable"
                                 />
                                 <div>

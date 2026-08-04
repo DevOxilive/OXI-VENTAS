@@ -10,7 +10,7 @@ function parseDateValue(value) {
 export function useProductMovementsModal(props, emit) {
     const productName = computed(() => props.product?.name ?? "Producto");
     const productCode = computed(() => props.product?.code ?? "Sin código");
-    const unit = computed(() => props.product?.unit ?? "pieza");
+    const unit = computed(() => props.product?.inventory_unit ?? props.product?.unit ?? "pza");
     const currentStock = computed(() => Number(props.product?.stock ?? 0));
 
     const filters = reactive({

@@ -39,6 +39,8 @@ const modalConfig = computed(() => getBranchProductConfigModalConfig({
     processing: Boolean(form.processing),
 }))
 
+const isKilogramUnit = computed(() => String(unit.value).toLowerCase() === 'kg')
+
 function closeModal() {
     if (form.processing) return
 
@@ -89,7 +91,9 @@ function submitConfig() {
                             v-model="form.min_stock"
                             :label="`Stock minimo (${unit})`"
                             field="min_stock"
-                            type="number"
+                            :validation-field="isKilogramUnit ? 'kilogram_quantity' : undefined"
+                            type="text"
+                            :inputmode="isKilogramUnit ? 'decimal' : 'numeric'"
                             :readonly="form.processing"
                             :error="frontendErrors.min_stock || form.errors.min_stock"
                             @validate="validateField"

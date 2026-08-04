@@ -44,6 +44,8 @@ const modalConfig = computed(() => getStockExitModalConfig({
     processing: form.processing,
     productName: productName.value,
 }))
+
+const isKilogramUnit = computed(() => String(unit.value).toLowerCase() === 'kg')
 </script>
 
 <template>
@@ -63,8 +65,10 @@ const modalConfig = computed(() => getStockExitModalConfig({
                     <InputField
                         v-model="form.quantity"
                         :label="`Cantidad a retirar (${unit})`"
-                        type="number"
                         field="quantity"
+                        :validation-field="isKilogramUnit ? 'kilogram_quantity' : undefined"
+                        type="text"
+                        :inputmode="isKilogramUnit ? 'decimal' : 'numeric'"
                         :readonly="form.processing"
                         :error="frontendErrors.quantity || form.errors.quantity"
                         @blur="validateField('quantity')"

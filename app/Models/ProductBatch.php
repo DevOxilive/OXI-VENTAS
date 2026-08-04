@@ -31,8 +31,8 @@ class ProductBatch extends Model
     protected $casts = [
         'expiration_date' => 'date',
         'received_at' => 'date',
-        'initial_quantity' => 'decimal:2',
-        'quantity' => 'decimal:2',
+        'initial_quantity' => 'decimal:3',
+        'quantity' => 'decimal:3',
         'season_start_date' => 'date',
         'season_end_date' => 'date',
     ];

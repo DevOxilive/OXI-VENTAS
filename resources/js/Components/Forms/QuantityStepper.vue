@@ -1,5 +1,5 @@
 <script setup>
-defineProps({
+const props = defineProps({
   value: {
     type: [String, Number],
     required: true,
@@ -20,12 +20,42 @@ defineProps({
     type: String,
     default: 'Cantidad',
   },
+  allowDecimal: {
+    type: Boolean,
+    default: false,
+  },
+  maxIntegerDigits: {
+    type: Number,
+    default: null,
+  },
+  maxDecimalDigits: {
+    type: Number,
+    default: 3,
+  },
 })
 
 const emit = defineEmits(["decrease", "increase", "update", "update:value"])
 
 function cleanQuantity(value) {
-  return String(value ?? '').replace(/[^\d]/g, '')
+  const rawValue = String(value ?? '').replace(',', '.')
+
+  if (!props.allowDecimal) {
+    const integer = rawValue.replace(/[^\d]/g, '')
+
+    return props.maxIntegerDigits
+      ? integer.slice(0, props.maxIntegerDigits)
+      : integer
+  }
+
+  const clean = rawValue.replace(/[^\d.]/g, '')
+  const [integerPart = '', ...decimalParts] = clean.split('.')
+  const integer = props.maxIntegerDigits
+    ? integerPart.slice(0, props.maxIntegerDigits)
+    : integerPart
+  const hasDecimalPoint = clean.includes('.')
+  const decimal = decimalParts.join('').slice(0, props.maxDecimalDigits)
+
+  return hasDecimalPoint ? `${integer || '0'}.${decimal}` : integer
 }
 
 function handleInput(event) {
@@ -55,7 +85,7 @@ function preventWheel(event) {
     <input
       :value="value"
       type="text"
-      inputmode="numeric"
+      :inputmode="allowDecimal ? 'decimal' : 'numeric'"
       autocomplete="off"
       :aria-label="ariaLabel"
       :disabled="disabled"

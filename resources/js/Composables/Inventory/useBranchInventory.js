@@ -171,7 +171,16 @@ export function useBranchInventory(props) {
             const stock = Number(item.stock ?? 0);
             const minStock = Number(item.min_stock ?? 0);
             const price = Number(item.price ?? item.product?.sale_price ?? 0);
-            const unit = detail.product?.unit ?? item.product?.unit ?? "pieza";
+            const inventoryQuantityMode = detail.product?.inventory_quantity_mode
+                ?? item.product?.inventory_quantity_mode
+                ?? "base";
+            const inventoryUnit = detail.product?.inventory_unit
+                ?? item.product?.inventory_unit
+                ?? item.product?.unit
+                ?? "pza";
+            const unit = inventoryQuantityMode === "legacy_presentation"
+                ? (detail.product?.unit ?? item.product?.unit ?? inventoryUnit)
+                : inventoryUnit;
             const tracksBatches = Boolean(
                 item.tracks_batches ?? item.tracksBatches ?? false,
             );
@@ -209,6 +218,17 @@ export function useBranchInventory(props) {
                 stock,
                 minStock,
                 unit,
+                inventory_unit: inventoryUnit,
+                inventory_quantity_mode: inventoryQuantityMode,
+                has_box_presentation: Boolean(
+                    detail.product?.has_box_presentation ?? item.product?.has_box_presentation,
+                ),
+                pieces_per_box: Number(
+                    detail.product?.pieces_per_box ?? item.product?.pieces_per_box ?? 0,
+                ) || null,
+                assigned_branch_ids: Array.isArray(detail.assigned_branch_ids)
+                    ? detail.assigned_branch_ids.map(Number)
+                    : [],
                 stockLabel: `${stock} ${unit}`,
                 minStockLabel: `${minStock} ${unit}`,
                 price,
@@ -614,8 +634,8 @@ export function useBranchInventory(props) {
         selectedAlertType.value = null;
     };
 
-    const openEntryModal = (product) => {
-        selectedMovementProduct.value = product;
+    const openEntryModal = async (product) => {
+        selectedMovementProduct.value = await ensureProductDetails(product);
         showEntryModal.value = true;
     };
 

@@ -31,8 +31,8 @@ class BranchProduct extends Model
     ];
 
     protected $casts = [
-        'stock' => 'decimal:2',
-        'min_stock' => 'decimal:2',
+        'stock' => 'decimal:3',
+        'min_stock' => 'decimal:3',
         'tracks_batches' => 'boolean',
         'tracks_expiration' => 'boolean',
         'last_restocked_at' => 'datetime',

@@ -25,19 +25,28 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  canManagePricing: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(["close"]);
 const form = useForm({
   barcodes: [""],
   branch_ids: [],
-  unit: "",
+  inventory_unit: "pza",
+  has_box_presentation: false,
+  pieces_per_box: "",
   name: "",
   min_stock: 0,
   category_id: "",
   category_name: "",
-  cost: "",
-  sale_price: "",
+  cost_per_piece: "",
+  sale_price_per_piece: "",
+  cost_per_box: "",
+  sale_price_per_box: "",
+  allow_low_margin: false,
   entry_date: new Date().toISOString().slice(0, 10),
   active: true,
   image: null,
@@ -71,19 +80,28 @@ function formatDecimal(value) {
 }
 
 function syncSalePriceFromPercentage() {
-  const cost = parseDecimal(form.cost);
+  const cost = parseDecimal(form.cost_per_piece);
   const percentage = parseDecimal(marginPercentage.value);
 
   if (cost === null || percentage === null) return;
 
   syncingPricing.value = true;
-  form.sale_price = formatDecimal(cost * (1 + percentage / 100));
+  form.sale_price_per_piece = formatDecimal(cost * (1 + percentage / 100));
+
+  if (hasBoxPresentation.value) {
+    const boxCost = parseDecimal(form.cost_per_box);
+
+    form.sale_price_per_box = boxCost === null
+      ? ""
+      : formatDecimal(boxCost * (1 + percentage / 100));
+  }
+
   syncingPricing.value = false;
 }
 
-function syncPercentageFromSalePrice() {
-  const cost = parseDecimal(form.cost);
-  const salePrice = parseDecimal(form.sale_price);
+function syncPercentageFromSalePrice(costValue, salePriceValue) {
+  const cost = parseDecimal(costValue);
+  const salePrice = parseDecimal(salePriceValue);
 
   if (cost === null || salePrice === null || cost <= 0) {
     syncingPricing.value = true;
@@ -97,11 +115,11 @@ function syncPercentageFromSalePrice() {
   syncingPricing.value = false;
 }
 
-function initializePricingFields(costValue, salePriceValue) {
+function initializePricingFields() {
   syncingPricing.value = true;
 
-  const cost = parseDecimal(costValue);
-  const salePrice = parseDecimal(salePriceValue);
+  const cost = parseDecimal(form.cost_per_piece);
+  const salePrice = parseDecimal(form.sale_price_per_piece);
   const storedMargin = parseDecimal(props.product?.margin_percentage);
 
   if (storedMargin !== null) {
@@ -112,7 +130,7 @@ function initializePricingFields(costValue, salePriceValue) {
     marginPercentage.value = "";
   }
 
-  pricingDriver.value = "sale_price";
+  pricingDriver.value = "percentage";
   syncingPricing.value = false;
 }
 
@@ -122,8 +140,13 @@ function handleMarginPercentageChange(value) {
 }
 
 function handleSalePriceChange(value) {
-  pricingDriver.value = "sale_price";
-  form.sale_price = value;
+  pricingDriver.value = "piece_price";
+  form.sale_price_per_piece = value;
+}
+
+function handleBoxSalePriceChange(value) {
+  pricingDriver.value = "box_price";
+  form.sale_price_per_box = value;
 }
 
 watch(
@@ -138,7 +161,9 @@ watch(
       ? product.barcodes
       : [product.barcode ?? ""];
 
-    form.unit = product.unit ?? "";
+    form.inventory_unit = product.inventory_unit ?? (product.unit === "kg" ? "kg" : "pza");
+    form.has_box_presentation = Boolean(product.has_box_presentation ?? product.unit === "cj");
+    form.pieces_per_box = product.pieces_per_box ?? "";
     form.name = product.name ?? "";
     form.branch_ids = product?.branch_ids?.length
       ? product.branch_ids.map(Number)
@@ -148,8 +173,10 @@ watch(
     form.min_stock = product.min_stock ?? 0;
     form.category_id = product.category_id ?? "";
     form.category_name = "";
-    form.cost = product.cost ?? "";
-    form.sale_price = product.price ?? "";
+    form.cost_per_piece = product.cost_per_piece ?? product.cost ?? "";
+    form.sale_price_per_piece = product.sale_price_per_piece ?? product.price ?? "";
+    form.cost_per_box = product.cost_per_box ?? "";
+    form.sale_price_per_box = product.sale_price_per_box ?? "";
     form.entry_date =
       product.entry_date ?? new Date().toISOString().slice(0, 10);
     form.active = true;
@@ -159,18 +186,23 @@ watch(
     form.quantity = product.quantity ?? null;
     form.kilos = product.kilos ?? null;
     form.liters = product.liters ?? null;
-    initializePricingFields(form.cost, form.sale_price);
+    initializePricingFields();
   },
   { immediate: true }
 );
 
 const units = [
   { label: "Pieza", value: "pza" },
-  { label: "Caja", value: "cj" },
   { label: "Kilogramo", value: "kg" },
-  { label: "Gramo", value: "g" },
-  { label: "Litro", value: "l" },
 ];
+
+const isKilogramUnit = computed(() => form.inventory_unit === "kg");
+const hasBoxPresentation = computed(() => Boolean(form.has_box_presentation));
+const marginBelowMinimum = computed(() => {
+  const margin = parseDecimal(marginPercentage.value);
+
+  return margin !== null && margin < 10;
+});
 
 const modalConfig = computed(() =>
   getProductModalConfig({
@@ -261,10 +293,13 @@ function handleDrop(event) {
 }
 
 const invalidPrice = computed(() => {
-  const cost = Number(form.cost || 0);
-  const salePrice = Number(form.sale_price || 0);
+  const pieceCost = Number(form.cost_per_piece || 0);
+  const piecePrice = Number(form.sale_price_per_piece || 0);
+  const boxCost = Number(form.cost_per_box || 0);
+  const boxPrice = Number(form.sale_price_per_box || 0);
 
-  return salePrice > 0 && cost > 0 && salePrice < cost;
+  return (piecePrice > 0 && pieceCost > 0 && piecePrice < pieceCost)
+    || (hasBoxPresentation.value && boxPrice > 0 && boxCost > 0 && boxPrice < boxCost);
 });
 function addBarcode() {
   form.barcodes.push("");
@@ -283,20 +318,25 @@ function setCreateDefaults() {
   form.branch_ids = [];
   ensureCurrentBranchSelected();
   categoryInputMode.value = "select";
-  form.unit = "";
+  form.inventory_unit = "pza";
+  form.has_box_presentation = false;
+  form.pieces_per_box = "";
   form.name = "";
   form.min_stock = 0;
   form.category_id = "";
   form.category_name = "";
-  form.cost = "";
-  form.sale_price = "";
+  form.cost_per_piece = "";
+  form.sale_price_per_piece = "";
+  form.cost_per_box = "";
+  form.sale_price_per_box = "";
+  form.allow_low_margin = false;
   form.entry_date = new Date().toISOString().slice(0, 10);
   form.active = true;
   form.image = null;
   form.quantity = null;
   form.kilos = null;
   form.liters = null;
-  initializePricingFields(form.cost, form.sale_price);
+  initializePricingFields();
 }
 
 function ensureCurrentBranchSelected() {
@@ -334,12 +374,19 @@ watch(
 );
 
 watch(
-  () => form.cost,
+  () => [form.cost_per_piece, form.cost_per_box, form.has_box_presentation],
   () => {
     if (syncingPricing.value) return;
 
-    if (pricingDriver.value === "sale_price") {
-      syncPercentageFromSalePrice();
+    if (pricingDriver.value === "piece_price") {
+      syncPercentageFromSalePrice(form.cost_per_piece, form.sale_price_per_piece);
+      syncSalePriceFromPercentage();
+      return;
+    }
+
+    if (pricingDriver.value === "box_price") {
+      syncPercentageFromSalePrice(form.cost_per_box, form.sale_price_per_box);
+      syncSalePriceFromPercentage();
       return;
     }
 
@@ -353,10 +400,32 @@ watch(marginPercentage, () => {
 });
 
 watch(
-  () => form.sale_price,
+  () => form.sale_price_per_piece,
   () => {
-    if (syncingPricing.value || pricingDriver.value !== "sale_price") return;
-    syncPercentageFromSalePrice();
+    if (syncingPricing.value || pricingDriver.value !== "piece_price") return;
+    syncPercentageFromSalePrice(form.cost_per_piece, form.sale_price_per_piece);
+    syncSalePriceFromPercentage();
+  }
+);
+
+watch(
+  () => form.sale_price_per_box,
+  () => {
+    if (syncingPricing.value || pricingDriver.value !== "box_price") return;
+    syncPercentageFromSalePrice(form.cost_per_box, form.sale_price_per_box);
+    syncSalePriceFromPercentage();
+  }
+);
+
+watch(
+  () => form.inventory_unit,
+  (unit) => {
+    if (unit === "kg") {
+      form.has_box_presentation = false;
+      form.pieces_per_box = "";
+      form.cost_per_box = "";
+      form.sale_price_per_box = "";
+    }
   }
 );
 
@@ -385,6 +454,15 @@ function submit() {
     ErrorAlert({
       title: "Precio inválido",
       message: "El precio de venta no puede ser menor al precio inicial.",
+    });
+
+    return;
+  }
+
+  if (marginBelowMinimum.value && !form.allow_low_margin) {
+    ErrorAlert({
+      title: "Porcentaje de ganancia menor al permitido",
+      message: "El porcentaje mínimo es 10%. Usa el botón de autorización para continuar con un porcentaje menor.",
     });
 
     return;
@@ -478,9 +556,11 @@ function submit() {
                 errors.name ||
                 errors.category_id ||
                 errors.category_name ||
-                errors.unit ||
-                errors.cost ||
-                errors.sale_price ||
+                errors.inventory_unit ||
+                errors.cost_per_piece ||
+                errors.cost_per_box ||
+                errors.sale_price_per_piece ||
+                errors.sale_price_per_box ||
                 errors.branch_ids ||
                 "Revisa los datos capturados",
             });
@@ -510,7 +590,6 @@ function submit() {
         <section class="hidden xl:block">
           <div class="mb-3">
             <h3 class="text-sm font-semibold text-text">Imagen</h3>
-            <p class="mt-1 text-xs text-text opacity-70">Foto opcional del producto.</p>
           </div>
 
           <button
@@ -555,7 +634,6 @@ function submit() {
         <section class="space-y-3 xl:hidden">
           <div>
             <h3 class="text-sm font-semibold text-text">Imagen</h3>
-            <p class="mt-1 text-xs text-text opacity-70">Foto opcional del producto.</p>
           </div>
 
           <button
@@ -598,7 +676,6 @@ function submit() {
         <section class="space-y-3">
           <div>
             <h3 class="text-sm font-semibold text-text">Códigos de barras</h3>
-            <p class="text-xs text-text opacity-70">Principal y alternos del producto.</p>
           </div>
 
           <div class="rounded-[22px] border border-secondary bg-secondary p-3">
@@ -648,22 +725,18 @@ function submit() {
         </section>
 
         <section class="space-y-4">
-          <div class="flex items-start justify-between gap-3">
-            <div class="flex items-center gap-2">
-              <h3 class="text-sm font-semibold text-text">Datos básicos</h3>
-            </div>
-
-            <div class="pt-0.5 text-right">
-              <p class="text-xs text-text opacity-70">Identificación, categoría, unidad y precios.</p>
-            </div>
+          <div>
+            <h3 class="text-sm font-semibold text-text">Datos básicos</h3>
           </div>
 
           <div class="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
             <InputField
               label="Nombre"
               field="name"
+              validation-field="product_name"
               v-model="form.name"
               :error="form.errors.name"
+              :preserve-case="true"
               :readonly="mode === 'view'"
               class="md:col-span-2 2xl:col-span-3"
             />
@@ -728,60 +801,141 @@ function submit() {
             </template>
 
             <SelectField
-              label="Unidad de medida"
-              field="unit"
-              v-model="form.unit"
+              label="Unidad base de inventario"
+              field="inventory_unit"
+              v-model="form.inventory_unit"
               :options="units"
-              placeholder="Selecciona unidad"
+              placeholder="Selecciona unidad base"
               :disabled="mode === 'view'"
+            />
+
+            <label
+              v-if="!isKilogramUnit"
+              class="flex min-h-[72px] items-center gap-3 rounded-xl border border-secondary bg-secondary px-4 py-3"
+            >
+              <input
+                v-model="form.has_box_presentation"
+                type="checkbox"
+                class="h-5 w-5 accent-primary"
+                :disabled="mode === 'view'"
+              />
+              <span>
+                <span class="block text-sm font-semibold text-text">Presentación por caja</span>
+                <span class="block text-xs text-text opacity-70">Permite capturar y vender por caja sin cambiar el inventario base.</span>
+              </span>
+            </label>
+
+            <InputField
+              v-if="hasBoxPresentation"
+              label="Piezas por caja"
+              field="pieces_per_box"
+              validation-field="quantity"
+              v-model="form.pieces_per_box"
+              :error="form.errors.pieces_per_box"
+              type="text"
+              inputmode="numeric"
+              placeholder="Ej. 12"
+              :readonly="mode === 'view'"
             />
 
             <InputField
               label="Stock mínimo"
               field="min_stock"
+              :validation-field="isKilogramUnit ? 'kilogram_quantity' : undefined"
               v-model="form.min_stock"
               :error="form.errors.min_stock"
-              type="number"
+              type="text"
+              :inputmode="isKilogramUnit ? 'decimal' : 'numeric'"
               :readonly="mode === 'view'"
             />
 
             <InputField
-              label="Precio compra"
-              field="cost"
-              v-model="form.cost"
+              :label="isKilogramUnit ? 'Precio compra por kilogramo' : 'Precio compra por pieza'"
+              field="cost_per_piece"
+              v-model="form.cost_per_piece"
               prefix="$"
-              :error="form.errors.cost"
+              :error="form.errors.cost_per_piece"
               type="text"
               step="0.01"
               :readonly="mode === 'view'"
             />
 
             <InputField
-              label="Porcentaje"
-              field="margin_percentage"
-              :model-value="marginPercentage"
-              @update:modelValue="handleMarginPercentageChange"
-              suffix="%"
-              type="text"
-              step="0.01"
-              :readonly="mode === 'view'"
-            />
-
-            <InputField
-              label="Precio venta"
-              field="sale_price"
-              :model-value="form.sale_price"
-              @update:modelValue="handleSalePriceChange"
+              v-if="hasBoxPresentation"
+              label="Precio compra por caja"
+              field="cost_per_box"
+              v-model="form.cost_per_box"
               prefix="$"
-              :error="
-                invalidPrice
-                  ? 'El precio de venta no puede ser menor al precio inicial'
-                  : form.errors.sale_price
-              "
+              :error="form.errors.cost_per_box"
               type="text"
               step="0.01"
               :readonly="mode === 'view'"
             />
+
+            <template v-if="canManagePricing">
+              <InputField
+                label="Porcentaje"
+                field="margin_percentage"
+                :model-value="marginPercentage"
+                @update:modelValue="handleMarginPercentageChange"
+                suffix="%"
+                type="text"
+                step="0.01"
+                :readonly="mode === 'view'"
+              />
+
+              <InputField
+                :label="isKilogramUnit ? 'Precio venta por kilogramo' : 'Precio venta por pieza'"
+                field="sale_price_per_piece"
+                :model-value="form.sale_price_per_piece"
+                @update:modelValue="handleSalePriceChange"
+                prefix="$"
+                :error="
+                  invalidPrice
+                    ? 'El precio de venta no puede ser menor al precio de compra'
+                    : form.errors.sale_price_per_piece
+                "
+                type="text"
+                step="0.01"
+                :readonly="mode === 'view'"
+              />
+
+              <template v-if="hasBoxPresentation">
+                <InputField
+                  label="Precio venta por caja"
+                  field="sale_price_per_box"
+                  :model-value="form.sale_price_per_box"
+                  @update:modelValue="handleBoxSalePriceChange"
+                  prefix="$"
+                  :error="invalidPrice ? 'El precio de venta no puede ser menor al precio de compra' : form.errors.sale_price_per_box"
+                  type="text"
+                  step="0.01"
+                  :readonly="mode === 'view'"
+                />
+              </template>
+
+              <div
+                v-if="marginBelowMinimum && mode !== 'view'"
+                class="rounded-xl border border-primary bg-secondary p-3 md:col-span-2 2xl:col-span-3"
+              >
+                <p class="text-sm font-semibold text-primary">
+                  El porcentaje de ganancia es menor al 10%.
+                </p>
+                <p class="mt-1 text-xs text-text opacity-75">
+                  Esta excepción debe autorizarse antes de guardar el producto.
+                </p>
+                <button
+                  type="button"
+                  class="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold transition"
+                  :class="form.allow_low_margin
+                    ? 'border-accent bg-accent text-white'
+                    : 'border-primary bg-background text-primary hover:bg-secondary'"
+                  @click="form.allow_low_margin = !form.allow_low_margin"
+                >
+                  {{ form.allow_low_margin ? 'Excepción autorizada' : 'Autorizar porcentaje menor al 10%' }}
+                </button>
+              </div>
+            </template>
           </div>
         </section>
 

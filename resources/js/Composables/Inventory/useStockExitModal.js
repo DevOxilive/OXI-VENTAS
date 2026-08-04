@@ -26,7 +26,7 @@ export function useStockExitModal(props, emit) {
         );
     });
 
-    const unit = computed(() => props.product?.unit ?? "pieza");
+    const unit = computed(() => props.product?.inventory_unit ?? props.product?.unit ?? "pza");
 
     const reasonOptions = [
         { label: "Producto dañado", value: "DAMAGED" },

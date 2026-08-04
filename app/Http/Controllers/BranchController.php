@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -78,7 +79,91 @@ class BranchController extends Controller
                 'updateBranches' => $canUpdateBranches,
                 'deleteBranches' => $canDeleteBranches,
             ],
+            'googleMapsApiKey' => config('services.google_maps.api_key'),
         ]);
+    }
+
+    public function geocode(Request $request)
+    {
+        $this->checkAnyPermission(['branches.create', 'branches.update']);
+
+        $data = $request->validate([
+            'address' => ['nullable', 'string', 'max:500', 'required_without_all:latitude,longitude'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_without:address'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_without:address'],
+        ]);
+
+        $apiKey = config('services.google_maps.geocoding_key');
+
+        if (blank($apiKey)) {
+            return response()->json([
+                'message' => 'La llave privada de Geocoding no esta configurada.',
+            ], 503);
+        }
+
+        $isReverseGeocode = filled($data['latitude'] ?? null) && filled($data['longitude'] ?? null);
+        $lookup = $isReverseGeocode
+            ? number_format((float) $data['latitude'], 7, '.', '').','.number_format((float) $data['longitude'], 7, '.', '')
+            : trim($data['address']);
+        $cacheKey = 'branch-geocode:'.sha1(($isReverseGeocode ? 'coordinates:' : 'address:').mb_strtolower($lookup));
+        $result = Cache::get($cacheKey);
+
+        if (! $result) {
+            $parameters = [
+                'key' => $apiKey,
+                'region' => 'mx',
+            ];
+            $parameters[$isReverseGeocode ? 'latlng' : 'address'] = $lookup;
+            $response = Http::timeout(10)->get('https://maps.googleapis.com/maps/api/geocode/json', $parameters);
+
+            if ($response->successful() && $response->json('status') === 'OK') {
+                $location = $response->json('results.0.geometry.location');
+
+                if (isset($location['lat'], $location['lng'])) {
+                    $result = [
+                        'formatted_address' => $response->json('results.0.formatted_address'),
+                        'latitude' => (float) $location['lat'],
+                        'longitude' => (float) $location['lng'],
+                        'address_fields' => $this->addressFieldsFromGoogleComponents(
+                            $response->json('results.0.address_components', []),
+                        ),
+                    ];
+
+                    Cache::put($cacheKey, $result, now()->addDays(30));
+                }
+            }
+        }
+
+        if (! $result) {
+            return response()->json([
+                'message' => 'No fue posible encontrar esa direccion. Revisa los datos o marca el punto directamente en el mapa.',
+            ], 422);
+        }
+
+        return response()->json([
+            ...$result,
+            'maps_url' => 'https://www.google.com/maps/search/?api=1&query='.$result['latitude'].','.$result['longitude'],
+        ]);
+    }
+
+    private function addressFieldsFromGoogleComponents(array $components): array
+    {
+        $byType = [];
+
+        foreach ($components as $component) {
+            foreach ($component['types'] ?? [] as $type) {
+                $byType[$type] ??= $component['long_name'] ?? null;
+            }
+        }
+
+        return array_filter([
+            'street' => $byType['route'] ?? null,
+            'external_number' => $byType['street_number'] ?? null,
+            'postal_code' => $byType['postal_code'] ?? null,
+            'neighborhood' => $byType['neighborhood'] ?? $byType['sublocality'] ?? $byType['sublocality_level_1'] ?? null,
+            'municipality' => $byType['locality'] ?? $byType['administrative_area_level_2'] ?? null,
+            'address_state' => $byType['administrative_area_level_1'] ?? null,
+        ], fn ($value) => filled($value));
     }
 
     public function store(Request $request)

@@ -288,6 +288,24 @@ export const fieldRegistry = {
         spamMessage: "El nombre parece texto de prueba o inválido.",
     },
 
+    product_name: {
+        required: true,
+        type: "product_name",
+        min: 3,
+        max: 255,
+        preserveCase: true,
+        message: "El nombre permite letras, numeros, espacios, puntos, comas, barras y guiones.",
+    },
+
+    kilogram_quantity: {
+        required: true,
+        type: "decimal",
+        max: 7,
+        maxIntegerDigits: 3,
+        maxDecimalDigits: 3,
+        message: "La cantidad permite hasta 999.999 kilogramos.",
+    },
+
     description: {
         required: false,
         type: "text",
