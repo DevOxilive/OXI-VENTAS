@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use App\Support\SystemPermission;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -11,7 +10,7 @@ class RoleSeeder extends Seeder
 {
     public function run(): void
     {
-        $roles = [
+        $roleNames = [
             'Super Administrador',
             'Administrador',
             'Sistemas',
@@ -21,56 +20,49 @@ class RoleSeeder extends Seeder
             'Inventario',
         ];
 
-        foreach ($roles as $role) {
+        foreach ($roleNames as $roleName) {
             DB::table('roles')->updateOrInsert(
-                ['name' => $role],
-                [
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]
+                ['name' => $roleName],
+                ['created_at' => now(), 'updated_at' => now()]
             );
         }
 
-        $superAdministratorRole = DB::table('roles')->where('name', 'Super Administrador')->first();
-        $adminRole = DB::table('roles')->where('name', 'Administrador')->first();
-        $systemsRole = DB::table('roles')->where('name', 'Sistemas')->first();
-        $humanResourcesRole = DB::table('roles')->where('name', 'Recursos Humanos')->first();
-        $salesRole = DB::table('roles')->where('name', 'Ventas')->first();
-        $sellerRole = DB::table('roles')->where('name', 'Vendedor')->first();
-        $inventoryRole = DB::table('roles')->where('name', 'Inventario')->first();
+        $roles = DB::table('roles')
+            ->whereIn('name', $roleNames)
+            ->get()
+            ->keyBy('name');
 
-        $permissions = DB::table('permissions')->get();
+        $permissionIdsByName = DB::table('permissions')
+            ->pluck('id', 'name')
+            ->map(fn ($id) => (int) $id);
 
-        foreach ($permissions as $permission) {
-            if (
-                in_array($permission->name, SystemPermission::exclusive(), true)
-                || in_array($permission->name, ['attendance.register', 'attendance.corrections.request'], true)
-            ) {
-                continue;
-            }
+        $allPermissionNames = $permissionIdsByName->keys()->all();
 
-            DB::table('role_permission')->updateOrInsert([
-                'role_id' => $adminRole->id,
-                'permission_id' => $permission->id,
-            ]);
-        }
+        $this->syncRolePermissions($roles['Administrador']->id, $allPermissionNames, $permissionIdsByName);
+        $this->syncRolePermissions($roles['Super Administrador']->id, $allPermissionNames, $permissionIdsByName);
 
-        $attendanceSelfPermissionIds = DB::table('permissions')
-            ->whereIn('name', ['attendance.register', 'attendance.corrections.request'])
-            ->pluck('id');
+        $this->syncRolePermissions(
+            $roles['Sistemas']->id,
+            $this->permissionsStartingWith($permissionIdsByName, ['users.', 'systems.']),
+            $permissionIdsByName
+        );
 
-        foreach ([$salesRole, $sellerRole] as $role) {
-            if (! $role) {
-                continue;
-            }
-
-            foreach ($attendanceSelfPermissionIds as $permissionId) {
-                DB::table('role_permission')->updateOrInsert(['role_id' => $role->id, 'permission_id' => $permissionId]);
-            }
-        }
-
-        $attendanceManagementPermissionIds = DB::table('permissions')
-            ->whereIn('name', [
+        $this->syncRolePermissions(
+            $roles['Recursos Humanos']->id,
+            [
+                'employees.view',
+                'employees.create',
+                'employees.update',
+                'employees.delete',
+                'departments.view',
+                'departments.create',
+                'departments.update',
+                'departments.delete',
+                'positions.view',
+                'positions.create',
+                'positions.update',
+                'positions.delete',
+                'attendance.view',
                 'attendance.manage',
                 'attendance.corrections.review',
                 'attendance.export.excel',
@@ -89,135 +81,105 @@ class RoleSeeder extends Seeder
                 'attendance.incidents.delete',
                 'attendance.incidents.approve',
                 'attendance.incidents.reject',
-            ])
-            ->pluck('id');
+                'files.export',
+            ],
+            $permissionIdsByName
+        );
 
-        foreach ([$superAdministratorRole, $adminRole] as $role) {
-            foreach ($attendanceManagementPermissionIds as $permissionId) {
-                DB::table('role_permission')->updateOrInsert(['role_id' => $role->id, 'permission_id' => $permissionId]);
-            }
-        }
+        $salesPermissions = [
+            'sales.view',
+            'sales.create',
+            'sales.purchase-lists.view',
+            'sales.purchase-lists.create',
+            'sales.purchase-lists.update',
+            'sales.purchase-lists.delete',
+            'sales.purchase-orders.view',
+            'sales.purchase-orders.receive',
+            'systems.qz.sign',
+        ];
 
-        $attendanceViewPermissionId = DB::table('permissions')
-            ->where('name', 'attendance.view')
-            ->value('id');
+        $this->syncRolePermissions($roles['Ventas']->id, $salesPermissions, $permissionIdsByName);
+        $this->syncRolePermissions($roles['Vendedor']->id, $salesPermissions, $permissionIdsByName);
 
-        foreach ([$superAdministratorRole, $adminRole, $humanResourcesRole] as $role) {
-            DB::table('role_permission')->updateOrInsert([
-                'role_id' => $role->id,
-                'permission_id' => $attendanceViewPermissionId,
-            ]);
-        }
-
-        // Super Administrador is Administrador plus the exclusive system controls.
-        // Rebuilding this role from those two sources prevents permissions drifting.
-        $superAdministratorPermissionIds = DB::table('role_permission')
-            ->where('role_id', $adminRole->id)
-            ->pluck('permission_id')
-            ->merge(
-                DB::table('permissions')
-                    ->whereIn('name', SystemPermission::exclusive())
-                    ->pluck('id')
-            )
-            ->unique()
-            ->values();
-
-        DB::table('role_permission')
-            ->where('role_id', $superAdministratorRole->id)
-            ->delete();
-
-        foreach ($superAdministratorPermissionIds as $permissionId) {
-            DB::table('role_permission')->insert([
-                'role_id' => $superAdministratorRole->id,
-                'permission_id' => $permissionId,
-            ]);
-        }
-
-        foreach ($permissions as $permission) {
-            if (
-                str_starts_with($permission->name, 'users.')
-                || str_starts_with($permission->name, 'systems.tickets.')
-                || str_starts_with($permission->name, 'systems.cash-closure-tickets.')
-                || str_starts_with($permission->name, 'systems.labels.')
-            ) {
-                DB::table('role_permission')->updateOrInsert([
-                    'role_id' => $systemsRole->id,
-                    'permission_id' => $permission->id,
-                ]);
-            }
-        }
-
-        foreach ($permissions as $permission) {
-            if (
-                str_starts_with($permission->name, 'employees.')
-                || str_starts_with($permission->name, 'departments.')
-                || str_starts_with($permission->name, 'positions.')
-                || in_array($permission->name, [
-                    'attendance.incidents.view',
-                    'attendance.incidents.create',
-                    'attendance.incidents.update',
-                ], true)
-            ) {
-                DB::table('role_permission')->updateOrInsert([
-                    'role_id' => $humanResourcesRole->id,
-                    'permission_id' => $permission->id,
-                ]);
-            }
-        }
-
-        foreach ($permissions as $permission) {
-            if (
-                (
-                    str_starts_with($permission->name, 'sales.')
-                )
-                || str_starts_with($permission->name, 'sales.purchase-lists.')
-                || str_starts_with($permission->name, 'sales.purchase-orders.')
-                || str_starts_with($permission->name, 'reports.cash-closures.')
-                || $permission->name === 'systems.qz.sign'
-            ) {
-                DB::table('role_permission')->updateOrInsert([
-                    'role_id' => $salesRole->id,
-                    'permission_id' => $permission->id,
-                ]);
-
-                if ($sellerRole) {
-                    DB::table('role_permission')->updateOrInsert([
-                        'role_id' => $sellerRole->id,
-                        'permission_id' => $permission->id,
-                    ]);
-                }
-            }
-        }
-
-        foreach ($permissions as $permission) {
-            if (
-                str_starts_with($permission->name, 'inventory.')
-                || str_starts_with($permission->name, 'audits.physical-counts.')
-                || in_array($permission->name, [
-                    'reports.audits.view',
-                    'reports.audits.export.excel',
-                    'reports.audits.export.pdf',
-                    'reports.inventory.view',
-                    'reports.inventory.export.excel',
-                    'reports.inventory.export.pdf',
-                    'reports.movements.view',
-                    'reports.movements.export.excel',
-                    'reports.movements.export.pdf',
-                ], true)
-                || $permission->name === 'files.export'
-            ) {
-                DB::table('role_permission')->updateOrInsert([
-                    'role_id' => $inventoryRole->id,
-                    'permission_id' => $permission->id,
-                ]);
-            }
-        }
+        $this->syncRolePermissions(
+            $roles['Inventario']->id,
+            [
+                'inventory.products.view',
+                'inventory.products.create',
+                'inventory.products.update',
+                'inventory.products.delete',
+                'inventory.branches.view',
+                'inventory.branches.stock-in',
+                'inventory.branches.stock-out',
+                'inventory.branches.stock-adjust',
+                'inventory.branches.batches.update',
+                'inventory.branches.config.update',
+                'inventory.purchase-orders.source.view',
+                'inventory.purchase-orders.source.update',
+                'inventory.purchase-orders.source.review',
+                'inventory.purchase-orders.source.transfer',
+                'inventory.purchase-orders.general.view',
+                'inventory.purchase-orders.general.create',
+                'inventory.purchase-orders.general.update',
+                'inventory.purchase-orders.general.complete',
+                'audits.physical-counts.count',
+                'audits.physical-counts.view-stock',
+                'audits.physical-counts.create',
+                'audits.physical-counts.close',
+                'audits.physical-counts.reopen',
+                'audits.physical-counts.finalize',
+                'audits.physical-counts.participants',
+                'audits.physical-counts.apply',
+                'audits.physical-counts.delete',
+                'reports.audits.view',
+                'reports.audits.export.excel',
+                'reports.audits.export.pdf',
+                'reports.inventory.view',
+                'reports.inventory.export.excel',
+                'reports.inventory.export.pdf',
+                'reports.movements.view',
+                'reports.movements.export.excel',
+                'reports.movements.export.pdf',
+            ],
+            $permissionIdsByName
+        );
 
         $adminUser = User::where('email', 'carlos@oxilive.com.mx')->first();
 
-        if ($adminUser && $adminRole) {
-            $adminUser->role_id = $adminRole->id;
-            $adminUser->save();
+        if ($adminUser) {
+            $adminUser->forceFill(['role_id' => $roles['Administrador']->id])->save();
         }
+    }
+
+    private function syncRolePermissions(int $roleId, array $permissionNames, $permissionIdsByName): void
+    {
+        $permissionIds = collect($permissionNames)
+            ->unique()
+            ->map(fn (string $permissionName) => $permissionIdsByName[$permissionName] ?? null)
+            ->filter()
+            ->values()
+            ->all();
+
+        DB::table('role_permission')
+            ->where('role_id', $roleId)
+            ->delete();
+
+        foreach ($permissionIds as $permissionId) {
+            DB::table('role_permission')->insert([
+                'role_id' => $roleId,
+                'permission_id' => $permissionId,
+            ]);
+        }
+    }
+
+    private function permissionsStartingWith($permissionIdsByName, array $prefixes): array
+    {
+        return $permissionIdsByName
+            ->keys()
+            ->filter(fn (string $permissionName) => collect($prefixes)->contains(
+                fn (string $prefix) => str_starts_with($permissionName, $prefix)
+            ))
+            ->values()
+            ->all();
     }
 }

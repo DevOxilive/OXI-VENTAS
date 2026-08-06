@@ -21,10 +21,7 @@ class DepartmentSeeder extends Seeder
         foreach ($departments as $department) {
             DB::table('departments')->updateOrInsert(
                 ['name' => $department['name']],
-                array_merge($department, [
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ])
+                array_merge($department, ['created_at' => now(), 'updated_at' => now()])
             );
         }
     }

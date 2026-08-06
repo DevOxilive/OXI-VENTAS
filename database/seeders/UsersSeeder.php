@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Branch;
 use App\Models\Employee;
-use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -13,29 +13,31 @@ class UsersSeeder extends Seeder
 {
     public function run(): void
     {
+        User::query()
+            ->where('email', 'brayan@oxilive.com.mx')
+            ->delete();
+
         $users = [
-            ['name' => 'Kevin', 'email' => 'kevin@oxilive.com.mx', 'role' => 'Sistemas'],
-            ['name' => 'Brayan', 'email' => 'brayan@oxilive.com.mx', 'role' => 'Sistemas'],
-            ['name' => 'Asael', 'email' => 'asael@oxilive.com.mx', 'role' => 'Super Administrador'],
-            ['name' => 'Ana Lilia', 'email' => 'ana.lilia@oxilive.com.mx', 'role' => 'Inventario'],
-            ['name' => 'Laura', 'email' => 'laura@oxilive.com.mx', 'role' => 'Inventario'],
-            ['name' => 'Blanca', 'email' => 'blanca@oxilive.com.mx', 'role' => 'Inventario'],
-            ['name' => 'Diana', 'email' => 'diana@oxilive.com.mx', 'role' => 'Inventario'],
-            ['name' => 'Rodrigo', 'email' => 'rodrigo@oxilive.com.mx', 'role' => 'Inventario'],
-            ['name' => 'Toño', 'email' => 'tono@oxilive.com.mx', 'role' => 'Inventario'],
-            ['name' => 'Margarita', 'email' => 'margarita@oxilive.com.mx', 'role' => 'Ventas'],
-            ['name' => 'Mairani', 'email' => 'mairani@oxilive.com.mx', 'role' => 'Ventas'],
-            ['name' => 'Patria', 'email' => 'patria@oxilive.com.mx', 'role' => 'Recursos Humanos'],
-            ['name' => 'Carlos', 'email' => 'carlos@oxilive.com.mx', 'role' => 'Administrador'],
+            ['name' => 'Kevin', 'email' => 'kevin@oxilive.com.mx', 'role' => 'Sistemas', 'branches' => []],
+            ['name' => 'Asael', 'email' => 'asael@oxilive.com.mx', 'role' => 'Super Administrador', 'branches' => 'all'],
+            ['name' => 'Ana', 'email' => 'ana.lilia@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Ajusco', 'Diana']],
+            ['name' => 'Laura', 'email' => 'laura@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Lago', 'Cecilia']],
+            ['name' => 'Blanca', 'email' => 'blanca@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Ajusco']],
+            ['name' => 'Diana', 'email' => 'diana@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Diana']],
+            ['name' => 'Rodrigo', 'email' => 'rodrigo@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Lago']],
+            ['name' => 'Tono', 'email' => 'tono@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Cecilia']],
+            ['name' => 'Margarita', 'email' => 'margarita@oxilive.com.mx', 'role' => 'Ventas', 'branches' => ['Ajusco', 'Diana']],
+            ['name' => 'Mairani', 'email' => 'mairani@oxilive.com.mx', 'role' => 'Ventas', 'branches' => ['Lago', 'Cecilia']],
+            ['name' => 'Patria', 'email' => 'patria@oxilive.com.mx', 'role' => 'Recursos Humanos', 'branches' => []],
+            ['name' => 'Doctor Carlos', 'email' => 'carlos@oxilive.com.mx', 'role' => 'Administrador', 'branches' => 'all'],
+            ['name' => 'Adriana Cuevas', 'email' => 'adriana.cuevas@oxilive.com.mx', 'role' => 'Super Administrador', 'branches' => 'all'],
         ];
 
-        $permissionIds = Permission::query()
-            ->pluck('id')
+        $branchIdsByName = Branch::query()
+            ->where('active', true)
+            ->pluck('id', 'name')
             ->map(fn ($id) => (int) $id);
-        $fullAccessEmails = [
-            'asael@oxilive.com.mx',
-            'carlos@oxilive.com.mx',
-        ];
+        $allBranchIds = $branchIdsByName->values()->all();
 
         foreach ($users as $userData) {
             $employee = Employee::query()->where('email', $userData['email'])->firstOrFail();
@@ -48,23 +50,40 @@ class UsersSeeder extends Seeder
                     'name' => $userData['name'],
                     'password' => Hash::make('123123123'),
                     'role_id' => $role->id,
+                    'branch_id' => $this->primaryBranchId($userData['branches'], $branchIdsByName),
                     'is_active' => true,
                 ],
             );
 
             $user->forceFill(['email_verified_at' => now()])->save();
 
-            $mode = in_array($userData['email'], $fullAccessEmails, true)
-                ? 'allow'
-                : 'deny';
-
-            $user->permissions()->sync(
-                $permissionIds
-                    ->mapWithKeys(fn (int $permissionId) => [
-                        $permissionId => ['mode' => $mode],
-                    ])
-                    ->all()
-            );
+            // Los permisos directos se limpian para que el rol sea la fuente real.
+            $user->permissions()->sync([]);
+            $user->branches()->sync($this->branchIdsForUser($userData['branches'], $branchIdsByName, $allBranchIds));
         }
+    }
+
+    private function branchIdsForUser(array|string $branches, $branchIdsByName, array $allBranchIds): array
+    {
+        if ($branches === 'all') {
+            return $allBranchIds;
+        }
+
+        return collect($branches)
+            ->map(fn (string $branchName) => $branchIdsByName[$branchName] ?? null)
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function primaryBranchId(array|string $branches, $branchIdsByName): ?int
+    {
+        if ($branches === 'all' || $branches === []) {
+            return null;
+        }
+
+        $firstBranchName = collect($branches)->first();
+
+        return $firstBranchName ? ($branchIdsByName[$firstBranchName] ?? null) : null;
     }
 }

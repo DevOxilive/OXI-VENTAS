@@ -18,7 +18,7 @@ class TripSeeder extends Seeder
                 'arrival_date' => null,
                 'employee_id' => $employeeId,
                 'vehicle_id' => 1,
-                'destination' => 'MainBranch',
+                'destination' => 'Ruta Ajusco - Diana para reposición de stock',
                 'status' => 'pending',
                 'created_at' => now(),
                 'updated_at' => now(),

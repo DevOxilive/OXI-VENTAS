@@ -13,7 +13,7 @@ class TripDetailSeeder extends Seeder
             ['id' => 1],
             [
                 'trip_id' => 1,
-                'cargo_description' => 'InitialInventoryDelivery',
+                'cargo_description' => 'Reposición de bebidas, químicos y productos por caja',
                 'quantity' => 10,
                 'weight' => 120.00,
                 'created_at' => now(),

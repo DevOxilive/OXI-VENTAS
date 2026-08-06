@@ -13,7 +13,7 @@ class IncidentSeeder extends Seeder
             ['id' => 1],
             [
                 'trip_id' => 1,
-                'description' => 'NoIncidentsReported',
+                'description' => 'Ruta sin incidencias; entrega recibida completa.',
                 'date' => now(),
                 'created_at' => now(),
                 'updated_at' => now(),
