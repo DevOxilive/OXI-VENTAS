@@ -72,6 +72,14 @@ class PermissionSeeder extends Seeder
             // Administración global
             SystemPermission::BRANCHES_ACCESS_ALL,
             ...SystemPermission::exclusive(),
+            SystemPermission::SETTINGS_MANAGE,
+            SystemPermission::INTEGRATIONS_MANAGE,
+            SystemPermission::TOOLS_ACCESS,
+            SystemPermission::MONITORING_VIEW,
+            SystemPermission::STATISTICS_VIEW,
+            SystemPermission::LOGS_VIEW,
+            SystemPermission::MAINTENANCE_MANAGE,
+            SystemPermission::RECORDS_VIEW_ALL,
 
             'branches.view',
             'branches.create',
@@ -126,6 +134,9 @@ class PermissionSeeder extends Seeder
             'sales.purchase-orders.receive',
 
             // Reportes
+            'reports.sales.view',
+            'reports.sales.export.excel',
+            'reports.sales.export.pdf',
             'reports.audits.view',
             'reports.audits.export.excel',
             'reports.audits.export.pdf',

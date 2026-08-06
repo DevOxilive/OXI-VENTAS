@@ -52,13 +52,14 @@ export function generateMenu(role, permissions = [], branches = []) {
             "audits.physical-counts.apply",
             "audits.physical-counts.delete",
         ],
-        sales: ["sales.view", "sales.create", "sales.update", "sales.delete", "sales.reports"],
+        sales: ["sales.view", "sales.create", "sales.update", "sales.delete"],
         cashClosures: [
             "sales.cash-closures.view",
             "sales.cash-closures.create",
             "sales.cash-closures.update",
             "sales.cash-closures.delete",
         ],
+        salesReports: ["reports.sales.view"],
         auditReports: ["reports.audits.view"],
         cashClosureReports: ["reports.cash-closures.view"],
         inventoryReports: ["reports.inventory.view"],
@@ -355,12 +356,12 @@ export function generateMenu(role, permissions = [], branches = []) {
     }
 
     const reportMenuItems = [
-        ...(canUse("auditReports")
+        ...(canUse("salesReports")
             ? [{
-                text: "Reportes de auditoría",
-                key: "reports.audits",
-                icon: "fact_check",
-                url: route("inventory.reports.select", { report: "audits" }),
+                text: "Reportes de ventas",
+                key: "reports.sales",
+                icon: "monitoring",
+                url: route("inventory.reports.sales"),
             }]
             : []),
         ...(canUse("cashClosureReports")
@@ -369,6 +370,14 @@ export function generateMenu(role, permissions = [], branches = []) {
                 key: "reports.cash-closures",
                 icon: "summarize",
                 url: route("inventory.reports.select", { report: "cash-closures" }),
+            }]
+            : []),
+        ...(canUse("auditReports")
+            ? [{
+                text: "Reportes de auditoría",
+                key: "reports.audits",
+                icon: "fact_check",
+                url: route("inventory.reports.select", { report: "audits" }),
             }]
             : []),
         ...(canUse("inventoryReports")

@@ -31,6 +31,7 @@ const permissionModuleOrder = [
     "sales.attendance",
     "sales.purchase-lists",
     "sales.purchase-orders",
+    "reports.sales",
     "reports.audits",
     "reports.cash-closures",
     "reports.inventory",
@@ -134,6 +135,10 @@ const permissionModules = {
     "sales.purchase-orders": {
         label: "Seguimiento de Órdenes de compra",
         section: "sales",
+    },
+    "reports.sales": {
+        label: "Reportes de ventas",
+        section: "reports",
     },
     "reports.audits": {
         label: "Reportes de auditoría",
@@ -247,6 +252,9 @@ const permissionLabels = {
     "sales.update": "Editar ventas",
     "sales.delete": "Eliminar ventas",
     "sales.reports": "Ver reportes de ventas",
+    "reports.sales.view": "Ver reportes de ventas",
+    "reports.sales.export.excel": "Exportar reportes de ventas en Excel",
+    "reports.sales.export.pdf": "Exportar reportes de ventas en PDF",
     "sales.cash-closures.view": "Ver cortes de caja registrados",
     "sales.cash-closures.create": "Crear cortes de caja",
     "sales.cash-closures.update": "Editar cortes de caja",

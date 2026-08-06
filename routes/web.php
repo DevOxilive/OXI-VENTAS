@@ -28,6 +28,7 @@ use App\Http\Controllers\TicketTemplateController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Ventas\CashRegisterClosureController;
 use App\Http\Controllers\Ventas\SalesController;
+use App\Http\Controllers\Ventas\SalesReportController;
 use App\Models\Branch;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -42,6 +43,52 @@ require base_path('vendor/laravel/passkeys/routes/routes.php');
 | PÚBLICO
 |--------------------------------------------------------------------------
 */
+
+Route::get('/pwa/manifest.webmanifest', function () {
+    $manifest = [
+        'id' => '/',
+        'name' => 'Super-Kay',
+        'short_name' => 'Super-Kay',
+        'start_url' => '/',
+        'scope' => '/',
+        'display' => 'standalone',
+        'background_color' => '#ffffff',
+        'theme_color' => '#e0000f',
+        'description' => 'Sistema Super-Kay instalado como app.',
+        'icons' => [
+            [
+                'src' => '/icons/icon-192.png',
+                'sizes' => '192x192',
+                'type' => 'image/png',
+                'purpose' => 'any',
+            ],
+            [
+                'src' => '/icons/icon-512.png',
+                'sizes' => '512x512',
+                'type' => 'image/png',
+                'purpose' => 'any',
+            ],
+            [
+                'src' => '/icons/maskable-512.png',
+                'sizes' => '512x512',
+                'type' => 'image/png',
+                'purpose' => 'maskable',
+            ],
+            [
+                'src' => '/icons/maskable-192.png',
+                'sizes' => '192x192',
+                'type' => 'image/png',
+                'purpose' => 'maskable',
+            ],
+        ],
+    ];
+
+    return response()->json($manifest, 200, [
+        'Content-Type' => 'application/manifest+json',
+        'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma' => 'no-cache',
+    ]);
+})->name('pwa.manifest');
 
 Route::get('/', function () {
     return redirect('/login');
@@ -89,7 +136,7 @@ Route::middleware([
     $auditsAccess = 'permission:audits.physical-counts.count,audits.physical-counts.view-stock,audits.physical-counts.create,audits.physical-counts.close,audits.physical-counts.reopen,audits.physical-counts.finalize,audits.physical-counts.participants,audits.physical-counts.apply,audits.physical-counts.delete';
     $inventoryReportsAccess = 'permission:reports.inventory.view';
     $movementReportsAccess = 'permission:reports.movements.view';
-    $reportsAccess = 'permission:reports.audits.view,reports.cash-closures.view,reports.inventory.view,reports.movements.view';
+    $reportsAccess = 'permission:reports.sales.view,reports.audits.view,reports.cash-closures.view,reports.inventory.view,reports.movements.view';
 
     /*
     |--------------------------------------------------------------------------
@@ -599,9 +646,25 @@ Route::middleware([
             ->middleware($reportsAccess)
             ->name('reports');
 
+        Route::get('/reports/sales', [SalesReportController::class, 'global'])
+            ->middleware('permission:reports.sales.view')
+            ->name('reports.sales');
+
+        Route::get('/reports/sales/products/excel', [SalesReportController::class, 'exportGlobalProductsExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('reports.sales.products.excel');
+
+        Route::get('/reports/sales/registered/excel', [SalesReportController::class, 'exportGlobalSalesExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('reports.sales.registered.excel');
+
+        Route::get('/reports/sales/registered/pdf', [SalesReportController::class, 'exportGlobalSalesPdf'])
+            ->middleware('permission:reports.sales.export.pdf')
+            ->name('reports.sales.registered.pdf');
+
         Route::get('/reports/{report}', [ReportController::class, 'select'])
             ->middleware($reportsAccess)
-            ->whereIn('report', ['audits', 'cash-closures', 'inventory', 'movements'])
+            ->whereIn('report', ['sales', 'audits', 'cash-closures', 'inventory', 'movements'])
             ->name('reports.select');
 
         Route::get('/branches/{branch}/reports', [ReportController::class, 'index'])
@@ -623,10 +686,6 @@ Route::middleware([
         Route::post('/branches/{branch}/reports/purchase-orders/consolidate', [GeneralPurchaseOrderController::class, 'consolidate'])
             ->middleware(['permission:inventory.purchase-orders.general.create', 'idempotent'])
             ->name('branches.reports.purchase-orders.consolidate');
-
-        Route::post('/branches/{branch}/reports/purchase-orders/draft', [GeneralPurchaseOrderController::class, 'saveDraft'])
-            ->middleware(['permission:inventory.purchase-orders.general.create', 'idempotent'])
-            ->name('branches.reports.purchase-orders.draft');
 
         Route::get('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}', [GeneralPurchaseOrderController::class, 'sourceOrder'])
             ->middleware('permission:inventory.purchase-orders.source.view')
@@ -679,6 +738,30 @@ Route::middleware([
         Route::get('/branches/{branch}/reports/cash-closures', [CashRegisterClosureController::class, 'reports'])
             ->middleware($cashClosureReportsAccess)
             ->name('branches.reports.cash-closures');
+
+        Route::get('/branches/{branch}/reports/sales', [SalesReportController::class, 'index'])
+            ->middleware('permission:reports.sales.view')
+            ->name('branches.reports.sales');
+
+        Route::get('/branches/{branch}/reports/sales/products/excel', [SalesReportController::class, 'exportProductsExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('branches.reports.sales.products.excel');
+
+        Route::get('/branches/{branch}/reports/sales/registered/excel', [SalesReportController::class, 'exportSalesExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('branches.reports.sales.registered.excel');
+
+        Route::get('/branches/{branch}/reports/sales/registered/pdf', [SalesReportController::class, 'exportSalesPdf'])
+            ->middleware('permission:reports.sales.export.pdf')
+            ->name('branches.reports.sales.registered.pdf');
+
+        Route::get('/reports/sales/{sale}/excel', [SalesReportController::class, 'exportSaleExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('reports.sales.sale.excel');
+
+        Route::get('/reports/sales/{sale}/pdf', [SalesReportController::class, 'exportSalePdf'])
+            ->middleware('permission:reports.sales.export.pdf')
+            ->name('reports.sales.sale.pdf');
 
         Route::get('/branches/{branch}/reports/inventory', [ReportController::class, 'inventory'])
             ->middleware($inventoryReportsAccess)

@@ -24,11 +24,35 @@ class ReportPermissionRoutingTest extends TestCase
         return [
             'entrada de reportes' => [
                 'inventory.reports',
-                'permission:reports.audits.view,reports.cash-closures.view,reports.inventory.view,reports.movements.view',
+                'permission:reports.sales.view,reports.audits.view,reports.cash-closures.view,reports.inventory.view,reports.movements.view',
             ],
             'selector de reporte' => [
                 'inventory.reports.select',
-                'permission:reports.audits.view,reports.cash-closures.view,reports.inventory.view,reports.movements.view',
+                'permission:reports.sales.view,reports.audits.view,reports.cash-closures.view,reports.inventory.view,reports.movements.view',
+            ],
+            'reporte de ventas' => [
+                'inventory.branches.reports.sales',
+                'permission:reports.sales.view',
+            ],
+            'exportar productos vendidos excel' => [
+                'inventory.branches.reports.sales.products.excel',
+                'permission:reports.sales.export.excel',
+            ],
+            'exportar ventas registradas excel' => [
+                'inventory.branches.reports.sales.registered.excel',
+                'permission:reports.sales.export.excel',
+            ],
+            'exportar ventas registradas pdf' => [
+                'inventory.branches.reports.sales.registered.pdf',
+                'permission:reports.sales.export.pdf',
+            ],
+            'exportar venta individual excel' => [
+                'inventory.reports.sales.sale.excel',
+                'permission:reports.sales.export.excel',
+            ],
+            'exportar venta individual pdf' => [
+                'inventory.reports.sales.sale.pdf',
+                'permission:reports.sales.export.pdf',
             ],
             'reporte de auditoria' => [
                 'audits.physical-counts.reports',
