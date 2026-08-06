@@ -64,6 +64,7 @@ export const inventoryMovementReportTableConfig = {
             key: 'quantity',
             label: 'Cantidad',
             format: 'number',
+            formatOptions: { unitKey: 'inventory_unit' },
             mobileLabel: 'Cantidad',
             mobileDisplay: true,
         },

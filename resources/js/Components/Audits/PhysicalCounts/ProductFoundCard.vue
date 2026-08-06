@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import FormPanel from '@/Components/Cards/FormPanel.vue'
+import { formatInventoryQuantity } from '@/utils/quantityFormatter'
 
 const props = defineProps({
     product: {
@@ -25,6 +26,16 @@ const scannedCodeLabel = computed(() => {
 })
 
 const availableBatchesCount = computed(() => props.product?.batches?.length ?? 0)
+const primaryCode = computed(() => props.product?.primary_code || props.product?.barcode || '')
+const relatedCodes = computed(() =>
+    (props.product?.related_codes || [])
+        .filter((code) => String(code || '').trim() && String(code) !== String(primaryCode.value))
+)
+const unitLabel = computed(() => props.product?.inventory_unit === 'kg' ? 'kg' : 'piezas')
+
+function formatQuantity(value) {
+    return formatInventoryQuantity(value, props.product?.inventory_unit ?? 'pza')
+}
 </script>
 
 <template>
@@ -59,26 +70,35 @@ const availableBatchesCount = computed(() => props.product?.batches?.length ?? 0
             <div class="rounded-xl border border-secondary bg-background p-3">
                 <p class="text-xs font-medium text-text opacity-55">Código principal</p>
                 <p class="mt-1 break-all text-sm font-semibold text-text">
-                    {{ product.barcode || 'Sin código' }}
+                    {{ primaryCode || 'Sin código' }}
                 </p>
             </div>
 
             <div class="rounded-xl border border-secondary bg-background p-3">
                 <p class="text-xs font-medium text-text opacity-55">
-                    {{ canViewStock ? 'Existencia actual' : 'Lotes disponibles' }}
+                    {{ canViewStock ? 'Stock actual' : 'Lotes disponibles' }}
                 </p>
                 <p class="mt-1 text-lg font-bold text-text">
-                    {{ canViewStock ? (product.stock ?? 0) : availableBatchesCount }}
+                    {{ canViewStock ? `${formatQuantity(product.stock)} ${unitLabel}` : availableBatchesCount }}
                 </p>
             </div>
 
             <div
-                v-if="canViewStock"
+                v-if="relatedCodes.length || canViewStock"
                 class="rounded-xl border border-secondary bg-background p-3 sm:col-span-2 xl:col-span-4"
             >
-                <div class="flex items-center justify-between gap-3">
-                    <span class="text-sm text-text opacity-65">Lotes disponibles</span>
-                    <strong class="text-text">{{ availableBatchesCount }}</strong>
+                <div class="grid gap-3 md:grid-cols-2">
+                    <div v-if="relatedCodes.length">
+                        <p class="text-xs font-medium text-text opacity-55">Códigos relacionados</p>
+                        <p class="mt-1 break-all text-sm font-semibold text-text">
+                            {{ relatedCodes.join(', ') }}
+                        </p>
+                    </div>
+
+                    <div v-if="canViewStock" class="flex items-center justify-between gap-3">
+                        <span class="text-sm text-text opacity-65">Lotes disponibles</span>
+                        <strong class="text-text">{{ availableBatchesCount }}</strong>
+                    </div>
                 </div>
             </div>
         </div>

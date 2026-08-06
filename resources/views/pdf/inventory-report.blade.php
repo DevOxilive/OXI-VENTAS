@@ -17,6 +17,10 @@
     </style>
 </head>
 <body>
+    @php
+        $formatQuantity = fn ($value, $unit = 'pza') => \App\Support\QuantityFormatter::format($value, $unit);
+    @endphp
+
     <h1>{{ $isMovements ? 'Reporte de movimientos' : 'Reporte de inventario' }}</h1>
 
     <p class="muted">
@@ -89,7 +93,7 @@
                         <td>{{ $row->user ?? '-' }}</td>
                         <td>{{ $row->status_label ?? '-' }}</td>
                         <td>{{ $row->movement_reason_label ?? $row->movement_reason ?? '-' }}</td>
-                        <td class="right">{{ number_format((float) ($row->quantity ?? 0), 2) }}</td>
+                        <td class="right">{{ $formatQuantity($row->quantity ?? 0, $row->inventory_unit ?? $row->unit ?? 'pza') }}</td>
                         <td>{{ $row->movement_date ?? '-' }}</td>
                         <td>{{ $row->notes ?? '-' }}</td>
                     </tr>

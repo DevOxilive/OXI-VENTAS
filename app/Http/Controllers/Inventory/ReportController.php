@@ -22,6 +22,13 @@ class ReportController extends Controller
     use AuthorizesBranchAccess;
 
     private const REPORT_TYPES = [
+        'sales' => [
+            'permission' => 'reports.sales.view',
+            'route' => 'inventory.reports.sales',
+            'branch_route' => 'inventory.branches.reports.sales',
+            'label' => 'Reportes de ventas',
+            'global' => true,
+        ],
         'audits' => [
             'permission' => 'reports.audits.view',
             'route' => 'inventory.branches.reports.audits',
@@ -52,6 +59,10 @@ class ReportController extends Controller
 
         abort_unless($report, 403, 'No tienes permiso para consultar reportes.');
 
+        if (self::REPORT_TYPES[$report]['global'] ?? false) {
+            return redirect()->route(self::REPORT_TYPES[$report]['route']);
+        }
+
         return redirect()->route('inventory.reports.select', [
             'report' => $report,
         ]);
@@ -69,6 +80,10 @@ class ReportController extends Controller
         );
 
         $branches = $this->reportBranches($request);
+
+        if ($reportConfig['global'] ?? false) {
+            return redirect()->route($reportConfig['route']);
+        }
 
         if ($branches->count() === 1) {
             return redirect()->route($reportConfig['route'], [
@@ -96,7 +111,7 @@ class ReportController extends Controller
 
         abort_unless($report, 403, 'No tienes permiso para consultar reportes.');
 
-        return redirect()->route(self::REPORT_TYPES[$report]['route'], [
+        return redirect()->route(self::REPORT_TYPES[$report]['branch_route'] ?? self::REPORT_TYPES[$report]['route'], [
             'branch' => $branch->id,
         ]);
     }
@@ -184,7 +199,7 @@ class ReportController extends Controller
             'branch' => $branch,
             'filters' => $filters,
             'rows' => $rows,
-            'summary' => $reportService->summary($branch),
+            'summary' => $reportService->summaryForRows($rows),
             'title' => $this->reportTitle($filters['report'] ?? 'dashboard'),
             'reportType' => 'inventory',
         ])->setPaper('letter', 'landscape');

@@ -141,7 +141,10 @@ onBeforeUnmount(() => clearTimeout(timeout))
                             {{ product.name }}
                         </p>
                         <p class="mt-0.5 text-xs text-text opacity-60">
-                            Código: {{ product.barcode ?? 'Sin código' }}
+                            Código principal: {{ product.primary_code || product.barcode || 'Sin código' }}
+                            <template v-if="product.related_codes?.length">
+                                · Relacionados: {{ product.related_codes.join(', ') }}
+                            </template>
                         </p>
                     </button>
                 </div>

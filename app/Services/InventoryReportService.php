@@ -41,6 +41,11 @@ class InventoryReportService
         $batchSummary = ProductBatch::query()
             ->join('branch_products', 'branch_products.id', '=', 'product_batches.branch_product_id')
             ->where('branch_products.branch_id', $branch->id)
+            ->whereIn('product_batches.status', [
+                ProductBatch::STATUS_ACTIVE,
+                ProductBatch::STATUS_SEASONAL,
+            ])
+            ->where('product_batches.quantity', '>', 0)
             ->selectRaw('
                 SUM(CASE WHEN product_batches.expiration_date IS NOT NULL AND product_batches.expiration_date < CURDATE() THEN 1 ELSE 0 END) as expired_batches,
                 SUM(CASE WHEN product_batches.expiration_date IS NOT NULL AND product_batches.expiration_date >= CURDATE() AND product_batches.expiration_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as near_expiration_batches
@@ -73,10 +78,17 @@ class InventoryReportService
                 $join->on('last_entries.branch_product_id', '=', 'branch_products.id');
             })
             ->where('branch_products.branch_id', $branch->id)
+            ->whereIn('product_batches.status', [
+                ProductBatch::STATUS_ACTIVE,
+                ProductBatch::STATUS_SEASONAL,
+            ])
+            ->where('product_batches.quantity', '>', 0)
             ->select([
                 'product_batches.id',
                 DB::raw($this->productCodeExpression().' as code'),
                 'products.name as product',
+                'products.inventory_unit',
+                'products.unit',
                 'categories.name as category',
                 'product_batches.lot_number',
                 'product_batches.initial_quantity',
@@ -126,6 +138,37 @@ class InventoryReportService
         return $this->resolveTableResult($query, $filters, $paginate);
     }
 
+    public function summaryForRows($rows): array
+    {
+        $rows = collect($rows);
+        $today = today();
+        $nearLimit = now()->addDays(30);
+
+        return [
+            'total_products' => $rows->pluck('product')->filter()->unique()->count(),
+            'total_stock' => (float) $rows->sum(fn ($row) => (float) ($row->quantity ?? 0)),
+            'low_stock' => $rows
+                ->filter(fn ($row) => (float) ($row->current_stock ?? 0) > 0
+                    && (float) ($row->current_stock ?? 0) <= (float) ($row->min_stock ?? 0))
+                ->pluck('product')
+                ->unique()
+                ->count(),
+            'out_of_stock' => $rows
+                ->filter(fn ($row) => (float) ($row->current_stock ?? 0) <= 0)
+                ->pluck('product')
+                ->unique()
+                ->count(),
+            'expired_batches' => $rows
+                ->filter(fn ($row) => $row->expiration_date && \Carbon\Carbon::parse($row->expiration_date)->lt($today))
+                ->count(),
+            'near_expiration_batches' => $rows
+                ->filter(fn ($row) => $row->expiration_date
+                    && \Carbon\Carbon::parse($row->expiration_date)->betweenIncluded($today, $nearLimit))
+                ->count(),
+            'attention_products' => 0,
+        ];
+    }
+
     public function movements(Branch $branch, array $filters, bool $paginate = false)
     {
         $query = StockMovement::query()
@@ -140,6 +183,8 @@ class InventoryReportService
                 'stock_movements.id',
                 DB::raw('MAX('.$this->productCodeExpression().') as code'),
                 'products.name as product',
+                'products.inventory_unit',
+                'products.unit',
                 'categories.name as category',
                 DB::raw('GROUP_CONCAT(DISTINCT product_batches.lot_number ORDER BY product_batches.lot_number SEPARATOR ", ") as lot_number'),
                 DB::raw('NULL as initial_quantity'),
@@ -182,6 +227,8 @@ class InventoryReportService
             ->groupBy([
                 'stock_movements.id',
                 'products.name',
+                'products.inventory_unit',
+                'products.unit',
                 'categories.name',
                 'stock_movements.quantity',
                 'branch_products.stock',
@@ -264,6 +311,8 @@ class InventoryReportService
                 'branch_products.id',
                 DB::raw($this->productCodeExpression().' as code'),
                 'products.name as product',
+                'products.inventory_unit',
+                'products.unit',
                 'categories.name as category',
                 DB::raw('NULL as lot_number'),
                 DB::raw('NULL as initial_quantity'),
@@ -358,6 +407,8 @@ class InventoryReportService
                 'branch_products.id',
                 DB::raw($this->productCodeExpression().' as code'),
                 'products.name as product',
+                'products.inventory_unit',
+                'products.unit',
                 'categories.name as category',
                 DB::raw('NULL as lot_number'),
                 DB::raw('NULL as initial_quantity'),

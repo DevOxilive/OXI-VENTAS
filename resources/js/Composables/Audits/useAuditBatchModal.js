@@ -34,6 +34,7 @@ export function useAuditBatchModal(props, emit) {
     function formatLotNumber(value) {
         return String(value || '')
             .trim()
+            .toUpperCase()
             .replace(/\s+/g, '-')
             .replace(/-+/g, '-')
     }
@@ -44,8 +45,7 @@ export function useAuditBatchModal(props, emit) {
     }
 
     function saveBatch() {
-        const cleanLotNumber = formatLotNumber(form.lot_number)
-        const lotNumber = cleanLotNumber ? `${cleanLotNumber}-${today.value}` : ''
+        const lotNumber = formatLotNumber(form.lot_number)
 
         form.lot_number = lotNumber
 

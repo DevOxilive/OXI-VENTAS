@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\QuantityFormatter;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -60,7 +61,7 @@ class InventoryReportExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     $row->user ?? '-',
                     $row->status_label ?? '-',
                     $row->movement_reason_label ?? $row->movement_reason ?? '-',
-                    (float) ($row->quantity ?? 0),
+                    QuantityFormatter::format($row->quantity ?? 0, $row->inventory_unit ?? $row->unit ?? 'pza'),
                     $row->movement_date ?? '-',
                     $row->notes ?? '-',
                 ])

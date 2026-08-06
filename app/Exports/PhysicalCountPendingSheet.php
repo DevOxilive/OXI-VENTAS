@@ -41,7 +41,7 @@ class PhysicalCountPendingSheet implements FromArray, WithColumnFormatting, With
 
     public function columnFormats(): array
     {
-        return ['D' => 'yyyy-mm-dd', 'E' => NumberFormat::FORMAT_TEXT, 'H' => '#,##0.00'];
+        return ['D' => 'yyyy-mm-dd', 'E' => NumberFormat::FORMAT_TEXT, 'H' => '#,##0.###'];
     }
 
     public function styles(Worksheet $sheet): array

@@ -22,7 +22,6 @@ const {
     form,
     modalConfig,
     productName,
-    today,
     minExpirationDate,
     totalErrors,
     closeModal,
@@ -39,9 +38,16 @@ const {
         <form @submit.prevent="saveBatch">
             <FormPanel
                 :title="productName"
-                :description="`Código escaneado: ${product.scanned_code || product.barcode || 'Sin código'}`"
+                :description="`Código principal: ${product.primary_code || product.barcode || 'Sin código'}`"
                 body-class="space-y-4"
             >
+                <div class="rounded-xl border border-secondary bg-background px-4 py-3">
+                    <p class="text-sm font-semibold text-text">{{ productName }}</p>
+                    <p class="mt-1 text-xs text-text opacity-70">
+                        Registra solo los datos del lote. La cantidad se aplicará al cerrar y aplicar la auditoría.
+                    </p>
+                </div>
+
                 <div class="flex items-start gap-3 rounded-xl border border-accent bg-background px-4 py-3">
                     <span class="material-symbols-outlined text-xl text-accent">info</span>
                     <div>
@@ -49,8 +55,7 @@ const {
                             El número de lote es obligatorio.
                         </p>
                         <p class="mt-1 text-xs text-text opacity-70">
-                            Si el producto no tiene lote, genera uno. Por ejemplo, “Dulce de leche”
-                            se guardará como “Dulce-De-Leche-{{ today }}”.
+                            Si el producto no tiene lote, captura una clave simple. Ej. OXI-1.
                         </p>
                     </div>
                 </div>
@@ -58,33 +63,21 @@ const {
                 <InputField
                     v-model="form.lot_number"
                     label="Número de lote"
-                    placeholder="Ej. Dulce de leche"
+                    placeholder="Ej. OXI-1"
                     field="lot_number"
                     :readonly="form.processing"
                     :error="form.errors.lot_number"
                 />
 
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <InputField
-                        :model-value="today"
-                        label="Fecha de entrada"
-                        type="date"
-                        field="received_at"
-                        :readonly="true"
-                        :min="today"
-                        :max="today"
-                    />
-
-                    <InputField
-                        v-model="form.expiration_date"
-                        label="Caducidad"
-                        type="date"
-                        field="expiration_date"
-                        :readonly="form.processing"
-                        :min="minExpirationDate"
-                        :error="form.errors.expiration_date"
-                    />
-                </div>
+                <InputField
+                    v-model="form.expiration_date"
+                    label="Caducidad"
+                    type="date"
+                    field="expiration_date"
+                    :readonly="form.processing"
+                    :min="minExpirationDate"
+                    :error="form.errors.expiration_date"
+                />
 
                 <InputField
                     v-model="form.supplier"

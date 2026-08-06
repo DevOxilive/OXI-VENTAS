@@ -48,7 +48,7 @@ const tableRows = computed(() =>
         column,
         value,
         subValue: column.subKey ? getNestedValue(row, column.subKey) : null,
-        content: renderCellContentFromValue(value, column),
+        content: renderCellContentFromValue(value, column, row),
       }
     }),
     visibleActions: canViewActions.value
@@ -99,8 +99,8 @@ function handleRowClick(row) {
   emit('row-click', row)
 }
 
-function renderCellContentFromValue(value, column) {
-  const formatted = formatCellValue(value, column)
+function renderCellContentFromValue(value, column, row) {
+  const formatted = formatCellValue(value, column, row)
 
   if (column.format === 'badge') {
     const statusMap = column.formatOptions?.statusMap || {}

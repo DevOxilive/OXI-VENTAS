@@ -67,7 +67,7 @@ class PhysicalCountAuditSummarySheet implements FromArray, ShouldAutoSize, WithC
     {
         return [
             'K' => NumberFormat::FORMAT_PERCENTAGE_00,
-            'L' => '#,##0.00',
+            'L' => '#,##0.###',
         ];
     }
 

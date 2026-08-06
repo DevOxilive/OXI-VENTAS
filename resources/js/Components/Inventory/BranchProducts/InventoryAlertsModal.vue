@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { getInventoryAlertsModalConfig } from '@/config/ModalConfigs/inventoryAlertsModalConfig'
+import { formatInventoryQuantity } from '@/utils/quantityFormatter'
 
 const props = defineProps({
     title: {
@@ -19,11 +20,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
-
-const numberFormatter = new Intl.NumberFormat('es-MX', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 3,
-})
 
 const longDateFormatter = new Intl.DateTimeFormat('es-MX', {
     day: 'numeric',
@@ -227,8 +223,8 @@ function formatLongDate(value, fallback = 'Sin fecha') {
     return longDateFormatter.format(parsedDate)
 }
 
-function formatQuantity(value) {
-    return numberFormatter.format(Number(value ?? 0))
+function formatQuantity(value, unit = 'pza') {
+    return formatInventoryQuantity(value, unit)
 }
 
 function productName(item) {
@@ -248,11 +244,11 @@ function productCode(item) {
 }
 
 function productStock(item) {
-    return formatQuantity(item.stock)
+    return formatQuantity(item.stock, item.unit)
 }
 
 function productMinStock(item) {
-    return formatQuantity(item.minStock ?? item.min_stock)
+    return formatQuantity(item.minStock ?? item.min_stock, item.unit)
 }
 
 function productStatus(item) {
@@ -291,7 +287,7 @@ function batchExpirationDate(batch) {
 }
 
 function batchQuantity(batch) {
-    return formatQuantity(batch.quantity)
+    return formatQuantity(batch.quantity, batch.unit)
 }
 
 function batchStatus(batch) {

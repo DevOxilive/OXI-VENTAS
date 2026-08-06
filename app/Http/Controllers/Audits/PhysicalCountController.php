@@ -622,7 +622,14 @@ class PhysicalCountController extends Controller
             ->limit(10)
             ->get()
             ->map(function ($branchProduct) use ($search, $canViewStock) {
-                $matchedCode = $branchProduct->barcode;
+                $branchProduct->loadMissing('product.barcodes');
+                $codes = collect([$branchProduct->barcode])
+                    ->merge($branchProduct->product?->barcodes?->pluck('code') ?? [])
+                    ->map(fn ($value) => trim((string) $value))
+                    ->filter()
+                    ->unique()
+                    ->values();
+                $matchedCode = $codes->first();
 
                 if (! $matchedCode) {
                     $matchedCode = DB::table('barcodes')
@@ -635,7 +642,9 @@ class PhysicalCountController extends Controller
                     'branch_product_id' => $branchProduct->id,
                     'product_id' => $branchProduct->product_id,
                     'name' => $branchProduct->product?->name ?? 'Sin producto',
-                    'barcode' => $branchProduct->barcode,
+                    'barcode' => $codes->first(),
+                    'primary_code' => $codes->first(),
+                    'related_codes' => $codes->slice(1)->values()->all(),
                     'matched_code' => $matchedCode,
                 ] + ($canViewStock ? ['stock' => $branchProduct->stock] : []);
             })
@@ -758,8 +767,11 @@ class PhysicalCountController extends Controller
                     'initial_quantity' => 0,
                     'quantity' => 0,
                     'supplier' => $data['supplier'] ?? null,
+                    'notes' => $data['notes'] ?? null,
                     'received_at' => now()->toDateString(),
-                    'status' => ProductBatch::STATUS_ACTIVE,
+                    'status' => ProductBatch::STATUS_INACTIVE,
+                    'has_real_lot' => true,
+                    'entry_type' => 'PURCHASE_BATCH',
                 ]
             );
         });
@@ -968,6 +980,9 @@ class PhysicalCountController extends Controller
 
                 $batch->update([
                     'quantity' => $newBatchQuantity,
+                    'status' => $newBatchQuantity > 0
+                        ? ProductBatch::STATUS_ACTIVE
+                        : $batch->status,
                 ]);
 
                 $newStock = $this->syncBranchProductStockFromBatches($branchProduct);
@@ -1228,6 +1243,14 @@ class PhysicalCountController extends Controller
         ?string $code = null
     ): array {
         $canViewStock = $this->canViewAuditStock($request);
+        $branchProduct->loadMissing('product.barcodes');
+        $productCodes = collect([$branchProduct->barcode])
+            ->merge($branchProduct->product?->barcodes?->pluck('code') ?? [])
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->values();
+        $primaryCode = $productCodes->first();
         $physicalCount->loadMissing('snapshot.items');
         $snapshotRow = $this->snapshotService
             ->buildProductRows(collect([$physicalCount]))
@@ -1250,9 +1273,10 @@ class PhysicalCountController extends Controller
                 })
                 ->values();
 
-            if ($snapshotBatches->isEmpty()) {
-                $snapshotBatches = $this->auditBatchesPayload($branchProduct, $canViewStock);
-            }
+            $snapshotBatches = $snapshotBatches
+                ->merge($this->auditBatchesPayload($branchProduct, $canViewStock))
+                ->unique('id')
+                ->values();
 
             $payload = [
                 'branch_product_id' => $branchProduct->id,
@@ -1260,7 +1284,11 @@ class PhysicalCountController extends Controller
                 'name' => $snapshotRow['product_name'],
                 'inventory_unit' => $branchProduct->product?->inventory_unit ?? $branchProduct->product?->unit ?? 'pza',
                 'inventory_quantity_mode' => $branchProduct->product?->inventory_quantity_mode ?? 'base',
-                'barcode' => $snapshotRow['scanned_code'] ?: $code,
+                'barcode' => $primaryCode ?: ($snapshotRow['scanned_code'] ?: $code),
+                'primary_code' => $primaryCode,
+                'related_codes' => $productCodes->slice(1)->values()->all(),
+                'has_box_presentation' => (bool) $branchProduct->product?->has_box_presentation,
+                'pieces_per_box' => $branchProduct->product?->pieces_per_box,
                 'scanned_code' => $code ?: ($snapshotRow['scanned_code'] ?: 'Sin código escaneado'),
                 'batches' => $snapshotBatches,
             ];
@@ -1286,7 +1314,11 @@ class PhysicalCountController extends Controller
             'name' => $branchProduct->product->name ?? 'Sin producto',
             'inventory_unit' => $branchProduct->product?->inventory_unit ?? $branchProduct->product?->unit ?? 'pza',
             'inventory_quantity_mode' => $branchProduct->product?->inventory_quantity_mode ?? 'base',
-            'barcode' => $branchProduct->barcode ?? $code,
+            'barcode' => $primaryCode ?: ($branchProduct->barcode ?? $code),
+            'primary_code' => $primaryCode,
+            'related_codes' => $productCodes->slice(1)->values()->all(),
+            'has_box_presentation' => (bool) $branchProduct->product?->has_box_presentation,
+            'pieces_per_box' => $branchProduct->product?->pieces_per_box,
             'scanned_code' => $code ?: ($branchProduct->barcode ?? 'Sin código escaneado'),
             'batches' => $batches,
         ];
@@ -1307,16 +1339,24 @@ class PhysicalCountController extends Controller
     private function auditBatchesPayload(BranchProduct $branchProduct, bool $canViewStock): Collection
     {
         return ProductBatch::where('branch_product_id', $branchProduct->id)
-            ->where('quantity', '>', 0)
+            ->where(function ($query) {
+                $query->where('quantity', '>', 0)
+                    ->orWhere(function ($pendingQuery) {
+                        $pendingQuery
+                            ->where('quantity', 0)
+                            ->where('status', ProductBatch::STATUS_INACTIVE);
+                    });
+            })
             ->orderByRaw('expiration_date IS NULL')
             ->orderBy('expiration_date')
             ->orderBy('id')
-            ->get(['id', 'lot_number', 'quantity', 'expiration_date'])
+            ->get(['id', 'lot_number', 'quantity', 'expiration_date', 'status'])
             ->map(function ($batch) use ($canViewStock) {
                 $payload = [
                     'id' => $batch->id,
                     'lot_number' => $batch->lot_number,
                     'expiration_date' => optional($batch->expiration_date)->toDateString(),
+                    'status' => $batch->status,
                 ];
 
                 if ($canViewStock) {

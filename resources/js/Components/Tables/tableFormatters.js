@@ -92,19 +92,34 @@ export const formatters = {
 
   number: (value, options = {}) => {
     if (value === null || value === undefined) return options.fallback || '0'
-    const decimals = options.decimals ?? 0
     const num = Number(value)
     if (isNaN(num)) return options.fallback || '0'
-    return num.toFixed(decimals)
+
+    const unit = options.unit
+      || (options.unitKey && options.row ? getNestedValue(options.row, options.unitKey) : null)
+    const normalizedUnit = String(unit ?? '').trim().toLowerCase()
+    const isDecimalUnit = ['kg', 'kilo', 'kilogramo'].includes(normalizedUnit)
+    const decimals = options.decimals ?? (isDecimalUnit ? 3 : 0)
+
+    if (!isDecimalUnit) {
+      return new Intl.NumberFormat(options.locale || 'es-MX', {
+        maximumFractionDigits: 0,
+      }).format(Math.round(num))
+    }
+
+    return new Intl.NumberFormat(options.locale || 'es-MX', {
+      minimumFractionDigits: options.minimumFractionDigits ?? 0,
+      maximumFractionDigits: decimals,
+    }).format(num)
   },
 }
 
-export function formatCellValue(value, column = {}) {
+export function formatCellValue(value, column = {}, row = null) {
   const format = column.format || 'text'
   const formatter = formatters[format] || formatters.text
 
   try {
-    return formatter(value, column.formatOptions || {})
+    return formatter(value, { ...(column.formatOptions || {}), row })
   } catch (e) {
     console.error(`Error formatting value with format "${format}":`, e)
     return column.formatOptions?.fallback || '-'

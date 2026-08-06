@@ -127,7 +127,7 @@ class PhysicalCountConcentratedSheet implements FromArray, WithColumnFormatting,
 
         return [
             'A' => NumberFormat::FORMAT_TEXT,
-            'D:'.$lastColumn => '#,##0.00',
+            'D:'.$lastColumn => '#,##0.###',
         ];
     }
 

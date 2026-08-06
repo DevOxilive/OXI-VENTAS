@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { formatInventoryQuantity } from '@/utils/quantityFormatter'
 
 const props = defineProps({
   comparison: {
@@ -35,6 +36,20 @@ const statusClass = (status) => {
   return 'bg-green-100 text-green-700'
 }
 
+function unit(item) {
+  return item.inventory_unit ?? item.base_unit ?? 'pza'
+}
+
+function quantity(item, key) {
+  return formatInventoryQuantity(item[key] ?? 0, unit(item))
+}
+
+function difference(item) {
+  if (item.difference === null || item.difference === undefined) return '-'
+
+  const formatted = quantity(item, 'difference')
+  return Number(item.difference) > 0 ? `+${formatted}` : formatted
+}
 
 </script>
 
@@ -90,22 +105,22 @@ const statusClass = (status) => {
             </td>
 
             <td class="py-3">
-              {{ item.system_stock }}
+              {{ quantity(item, 'system_stock') }}
             </td>
 
             <td class="py-3">
-              {{ item.counted_stock }}
+              {{ quantity(item, 'counted_stock') }}
             </td>
 
             <td class="py-3">
-              {{ item.damaged_stock }}
+              {{ quantity(item, 'damaged_stock') }}
             </td>
 
             <td class="py-3">
-              {{ item.expired_stock }}
+              {{ quantity(item, 'expired_stock') }}
             </td>
             <td class="py-3 font-semibold text-slate-900">
-{{ item.sellable_stock }}
+{{ quantity(item, 'sellable_stock') }}
 </td>
 
             <td
@@ -116,9 +131,7 @@ const statusClass = (status) => {
                 'text-yellow-600': item.difference > 0,
               }"
             >
-              {{
-                item.difference > 0 ? `+${item.difference}` : item.difference
-              }}
+              {{ difference(item) }}
             </td>
 
             <td class="py-3">

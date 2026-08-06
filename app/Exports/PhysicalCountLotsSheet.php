@@ -81,11 +81,11 @@ class PhysicalCountLotsSheet implements FromArray, WithColumnFormatting, WithEve
                     ?->round?->type;
                 $participantDetail = $group
                     ->groupBy('user_id')
-                    ->map(function (Collection $participantEntries) {
+                    ->map(function (Collection $participantEntries) use ($row) {
                         $name = $participantEntries->first()?->user?->name ?? 'Sin usuario';
                         $quantity = (float) $participantEntries->sum('counted_quantity');
 
-                        return $name . ' (' . number_format($quantity, 2, '.', ',') . ')';
+                        return $name . ' (' . \App\Support\QuantityFormatter::format($quantity, $row['inventory_unit'] ?? 'pza') . ')';
                     })
                     ->values()
                     ->join(', ');
@@ -130,7 +130,7 @@ class PhysicalCountLotsSheet implements FromArray, WithColumnFormatting, WithEve
         return [
             'A' => NumberFormat::FORMAT_TEXT,
             'E' => 'yyyy-mm-dd',
-            'F:J' => '#,##0.00',
+            'F:J' => '#,##0.###',
         ];
     }
 

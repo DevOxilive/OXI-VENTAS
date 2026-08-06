@@ -8,8 +8,10 @@ import AppButton from '@/Components/Buttons/AppButton.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 import AuditBatchSelect from '@/Components/Audits/PhysicalCounts/AuditBatchSelect.vue'
+import PresentationSwitch from '@/Components/Inventory/PresentationSwitch.vue'
 import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
 import { confirmModalAction } from '@/Components/Modales/useModalConfig'
+import { formatInventoryQuantity } from '@/utils/quantityFormatter'
 
 const props = defineProps({
     physicalCountId: {
@@ -34,6 +36,7 @@ const form = useForm({
     counted_quantity: '',
     damaged_quantity: '',
     expired_quantity: '',
+    count_presentation: 'piece',
     expiration_date: '',
     notes: '',
 })
@@ -48,6 +51,25 @@ const invalidQuantities = computed(() =>
     damagedQuantity.value + expiredQuantity.value > countedQuantity.value,
 )
 const isKilogram = computed(() => props.product?.inventory_unit === 'kg')
+const hasBoxPresentation = computed(() => Boolean(props.product?.has_box_presentation) && !isKilogram.value)
+const piecesPerBox = computed(() => {
+    const pieces = Number(props.product?.pieces_per_box || 0)
+
+    return Number.isInteger(pieces) && pieces > 1 ? pieces : 1
+})
+const countPresentation = computed(() =>
+    hasBoxPresentation.value && form.count_presentation === 'box' ? 'box' : 'piece'
+)
+const visualUnitLabel = computed(() => {
+    if (countPresentation.value === 'box') return 'cajas'
+    if (isKilogram.value) return 'kg'
+
+    return 'piezas'
+})
+const baseUnitLabel = computed(() => isKilogram.value ? 'kg' : 'piezas')
+const countedBaseQuantity = computed(() => visualToBaseQuantity(form.counted_quantity))
+const damagedBaseQuantity = computed(() => visualToBaseQuantity(form.damaged_quantity))
+const expiredBaseQuantity = computed(() => visualToBaseQuantity(form.expired_quantity))
 
 watch(
     () => props.product,
@@ -60,6 +82,7 @@ watch(
         form.branch_product_id = product.branch_product_id
         form.product_id = product.product_id
         form.scanned_code = product.scanned_code
+        form.count_presentation = hasBoxPresentation.value ? form.count_presentation : 'piece'
 
         const pendingBatch = pendingLotNumber.value
             ? product.batches?.find((batch) => batch.lot_number === pendingLotNumber.value)
@@ -77,6 +100,26 @@ watch(
 
 function handleBatchCreated(lotNumber) {
     pendingLotNumber.value = lotNumber
+}
+
+function visualToBaseQuantity(value) {
+    const quantity = Number(String(value ?? '').replace(',', '.')) || 0
+
+    return countPresentation.value === 'box'
+        ? Math.round(quantity * piecesPerBox.value * 1000) / 1000
+        : quantity
+}
+
+function formatQuantity(value) {
+    return formatInventoryQuantity(value, isKilogram.value ? 'kg' : 'pza')
+}
+
+function formatBaseQuantity(value) {
+    return formatInventoryQuantity(value, 'pza')
+}
+
+function setCountPresentation(value) {
+    form.count_presentation = value
 }
 
 async function handleBatchSelection(batchId) {
@@ -112,7 +155,16 @@ async function handleBatchSelection(batchId) {
 function submit() {
     if (!props.product || invalidQuantities.value) return
 
-    form.post(route('audits.physical-counts.entries.store', props.physicalCountId), {
+    form
+        .transform((data) => ({
+            ...data,
+            counted_quantity: visualToBaseQuantity(data.counted_quantity),
+            damaged_quantity: visualToBaseQuantity(data.damaged_quantity),
+            expired_quantity: visualToBaseQuantity(data.expired_quantity),
+            count_presentation: countPresentation.value,
+            pieces_per_box: countPresentation.value === 'box' ? piecesPerBox.value : null,
+        }))
+        .post(route('audits.physical-counts.entries.store', props.physicalCountId), {
         preserveScroll: true,
         onSuccess: () => {
             form.reset()
@@ -136,10 +188,23 @@ function submit() {
         panel-class="bg-background"
     >
         <template #header>
-            <AppButton variant="secondary" @click="showCreateBatch = true">
-                <span class="material-symbols-outlined mr-2 text-[18px]">add_box</span>
-                Crear lote
-            </AppButton>
+            <div class="flex flex-wrap items-center justify-end gap-3">
+                <div
+                    v-if="hasBoxPresentation"
+                    class="flex items-center gap-2"
+                >
+                    <span class="text-xs font-semibold text-text opacity-60">Contar por</span>
+                    <PresentationSwitch
+                        :model-value="countPresentation"
+                        @change="setCountPresentation"
+                    />
+                </div>
+
+                <AppButton variant="secondary" @click="showCreateBatch = true">
+                    <span class="material-symbols-outlined mr-2 text-[18px]">add_box</span>
+                    Crear lote
+                </AppButton>
+            </div>
         </template>
 
         <form class="space-y-4" @submit.prevent="submit">
@@ -151,10 +216,27 @@ function submit() {
                 @update:model-value="handleBatchSelection"
             />
 
+            <div
+                class="grid grid-cols-1 gap-3 rounded-xl border border-secondary bg-secondary px-4 py-3 text-sm text-text md:grid-cols-3"
+            >
+                <div>
+                    <p class="text-xs font-medium opacity-60">Conteo visual</p>
+                    <p class="mt-1 font-semibold">{{ visualUnitLabel }}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-medium opacity-60">Stock actual</p>
+                    <p class="mt-1 font-semibold">{{ formatQuantity(product?.stock ?? 0) }} {{ baseUnitLabel }}</p>
+                </div>
+                <div v-if="countPresentation === 'box'">
+                    <p class="text-xs font-medium opacity-60">Equivalencia</p>
+                    <p class="mt-1 font-semibold">1 caja = {{ piecesPerBox }} piezas</p>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <InputField
                     v-model="form.counted_quantity"
-                    label="Cantidad contada"
+                    :label="`Cantidad contada (${visualUnitLabel})`"
                     field="counted_quantity"
                     type="text"
                     :inputmode="isKilogram ? 'decimal' : 'numeric'"
@@ -165,7 +247,7 @@ function submit() {
 
                 <InputField
                     v-model="form.damaged_quantity"
-                    label="Cantidad dañada"
+                    :label="`Cantidad dañada (${visualUnitLabel})`"
                     field="damaged_quantity"
                     type="text"
                     :inputmode="isKilogram ? 'decimal' : 'numeric'"
@@ -176,7 +258,7 @@ function submit() {
 
                 <InputField
                     v-model="form.expired_quantity"
-                    label="Cantidad caducada"
+                    :label="`Cantidad caducada (${visualUnitLabel})`"
                     field="expired_quantity"
                     type="text"
                     :inputmode="isKilogram ? 'decimal' : 'numeric'"
@@ -192,6 +274,14 @@ function submit() {
             >
                 La suma de productos dañados y caducados no puede superar la cantidad contada.
             </div>
+
+            <p
+                v-if="countPresentation === 'box'"
+                class="text-xs font-medium text-text opacity-70"
+            >
+                Se guardará en inventario como {{ formatBaseQuantity(countedBaseQuantity) }} piezas contadas,
+                {{ formatBaseQuantity(damagedBaseQuantity) }} dañadas y {{ formatBaseQuantity(expiredBaseQuantity) }} caducadas.
+            </p>
 
             <TextareaField
                 v-model="form.notes"
