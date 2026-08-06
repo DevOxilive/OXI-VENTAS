@@ -6,6 +6,7 @@ use App\Events\AttendanceChanged;
 use App\Exports\AttendanceExport;
 use App\Models\AttendanceCorrectionRequest;
 use App\Models\AttendanceRecord;
+use App\Models\AttendanceScheduleAssignment;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Services\SystemAuditService;
@@ -37,7 +38,8 @@ class AttendanceController extends Controller
             || $request->user()->hasPermission('attendance.export.excel')
             || $request->user()->hasPermission('attendance.export.pdf');
         $canViewEvidence = $request->user()->hasPermission('attendance.manage');
-        $registeredTypesToday = $this->registeredTypesToday($request->user()->id);
+        $attendanceShifts = $this->attendanceShiftsForUser($request->user());
+        $attendanceBranches = $this->attendanceBranchesForUser($request->user());
         $records = $canViewAttendance
             ? $this->recordsQuery($request, $canViewAttendance, $filters)
                 ->paginate(TablePagination::resolvePerPage($request, 30, [10, 30, 50, 100]))
@@ -65,7 +67,8 @@ class AttendanceController extends Controller
             'canRequestCorrection' => $request->user()->hasPermission('attendance.corrections.request'),
             'canReviewCorrections' => $request->user()->hasPermission('attendance.corrections.review'),
             'passkeyEnabled' => $request->user()->hasPasskeysEnabled(),
-            'registeredTypesToday' => $registeredTypesToday,
+            'attendanceShifts' => $attendanceShifts,
+            'attendanceBranches' => $attendanceBranches,
         ]);
     }
 
@@ -78,6 +81,8 @@ class AttendanceController extends Controller
     {
         $data = $request->validate([
             'type' => ['required', 'in:'.implode(',', AttendanceRecord::TYPES)],
+            'attendance_schedule_assignment_id' => ['nullable', 'integer', 'exists:attendance_schedule_assignments,id'],
+            'attendance_branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'accuracy' => ['nullable', 'integer', 'min:0'],
@@ -93,13 +98,12 @@ class AttendanceController extends Controller
                 'type' => 'Solo los usuarios con rol Ventas o Vendedor pueden registrar asistencia.',
             ]);
         }
-        if ($this->hasRegisteredTypeToday($user->id, $data['type'])) {
+        $branch = $this->resolveAttendanceBranch($user, $data['attendance_branch_id'] ?? null);
+        if (filled($data['attendance_branch_id'] ?? null) && ! $branch) {
             return back()->withErrors([
-                'type' => sprintf('Ya registraste %s el dia de hoy.', mb_strtolower($this->typeLabel($data['type']))),
+                'attendance_branch_id' => 'La sucursal seleccionada no está asignada a tu usuario.',
             ]);
         }
-
-        $branch = $this->resolveAttendanceBranch($user);
         if (! $branch) {
             $temporaryGeofence = config('attendance.temporary_geofence');
             $branch = new Branch([
@@ -130,13 +134,17 @@ class AttendanceController extends Controller
         }
 
         $now = now();
+        $shiftContext = $this->shiftContextForRegistration($user, $data, $now);
+        $this->assertNextShiftRecord($user->id, $now, $shiftContext['assignment_id'], $data['type']);
         $selfiePath = $request->file('selfie')->store("attendance/selfies/{$user->id}", 'local');
         try {
             $record = DB::transaction(fn () => AttendanceRecord::create([
                 'user_id' => $user->id, 'employee_id' => $user->employee_id, 'branch_id' => $branch->exists ? $branch->id : null,
                 'attendance_date' => $now->toDateString(), 'recorded_at' => $now, 'type' => $data['type'],
-                'operation_key' => "attendance:{$user->id}:{$now->toDateString()}:{$data['type']}",
-                'status' => $this->rules->evaluate($user->employee, $data['type'], $now),
+                'attendance_schedule_assignment_id' => $shiftContext['assignment_id'],
+                'shift_label' => $shiftContext['label'], 'shift_order' => $shiftContext['order'],
+                'operation_key' => "attendance:{$user->id}:{$now->toDateString()}:{$shiftContext['key']}:{$data['type']}",
+                'status' => $this->rules->evaluate($user->employee, $data['type'], $now, $shiftContext['schedule']),
                 'latitude' => $data['latitude'], 'longitude' => $data['longitude'], 'location_accuracy' => $data['accuracy'] ?? null,
                 'approximate_address' => $data['approximateAddress'] ?? null, 'within_geofence' => true,
                 'geofence_snapshot' => ['branch_id' => $branch->exists ? $branch->id : null, 'label' => $branch->name, 'radius_meters' => (int) $branch->attendance_geofence_radius_meters, 'distance_meters' => round($distance, 1)],
@@ -148,9 +156,9 @@ class AttendanceController extends Controller
         } catch (Throwable $exception) {
             Storage::disk('local')->delete($selfiePath);
 
-            if (str_contains($exception->getMessage(), 'attendance_records_user_date_type_unique')) {
+            if (str_contains($exception->getMessage(), 'operation_key')) {
                 throw ValidationException::withMessages([
-                    'type' => sprintf('Ya registraste %s el dia de hoy.', mb_strtolower($this->typeLabel($data['type']))),
+                    'type' => sprintf('Ya registraste %s para este turno.', mb_strtolower($this->typeLabel($data['type']))),
                 ]);
             }
 
@@ -271,7 +279,7 @@ class AttendanceController extends Controller
     private function recordsQuery(Request $request, bool $canViewAllAttendance, array $filters)
     {
         return AttendanceRecord::query()
-            ->with(['user.role', 'user.branches', 'employee.position.department', 'branch'])
+            ->with(['user.role', 'user.branches', 'employee.position.department', 'branch', 'scheduleAssignment.schedule'])
             ->when(! $canViewAllAttendance, fn ($query) => $query->where('user_id', $request->user()->id))
             ->when($filters['from'] ?? null, fn ($query, $value) => $query->where('attendance_date', '>=', $value))
             ->when($filters['to'] ?? null, fn ($query, $value) => $query->where('attendance_date', '<=', $value))
@@ -317,9 +325,28 @@ class AttendanceController extends Controller
         return in_array($user->role?->name, ['Ventas', 'Vendedor'], true);
     }
 
-    private function resolveAttendanceBranch($user): ?Branch
+    private function attendanceBranchesForUser($user): array
     {
-        if ($user->branch_id) {
+        return $user->accessibleBranchesQuery()
+            ->orderBy('branches.name')
+            ->get(['branches.id', 'branches.name'])
+            ->map(fn (Branch $branch) => [
+                'value' => $branch->id,
+                'label' => $branch->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function resolveAttendanceBranch($user, ?int $requestedBranchId = null): ?Branch
+    {
+        if ($requestedBranchId) {
+            return $user->accessibleBranchesQuery()
+                ->whereKey($requestedBranchId)
+                ->first();
+        }
+
+        if ($user->branch_id && $user->hasBranchAccess((int) $user->branch_id)) {
             $branch = Branch::query()
                 ->where('active', true)
                 ->find($user->branch_id);
@@ -333,24 +360,133 @@ class AttendanceController extends Controller
             ->first(fn (Branch $branch) => $branch->active);
     }
 
-    private function registeredTypesToday(int $userId): array
+    private function attendanceShiftsForUser($user): array
+    {
+        $employee = $user->employee;
+        $assignments = $employee
+            ? $this->rules->shiftsFor($employee, Carbon::today())
+            : collect();
+
+        if ($assignments->isEmpty()) {
+            return [[
+                'id' => null,
+                'label' => 'Turno general',
+                'order' => 1,
+                'registered_types' => $this->registeredTypesForShift($user->id, Carbon::today(), null),
+            ]];
+        }
+
+        $hasPendingEarlierShift = false;
+
+        return $assignments->map(function (AttendanceScheduleAssignment $assignment) use ($user, &$hasPendingEarlierShift) {
+            $registeredTypes = $this->registeredTypesForShift($user->id, Carbon::today(), $assignment->id);
+            $isCompleted = count($registeredTypes) === 4;
+            $isLocked = $hasPendingEarlierShift;
+
+            if (! $isCompleted) {
+                $hasPendingEarlierShift = true;
+            }
+
+            return [
+                'id' => $assignment->id,
+                'label' => $this->shiftLabel($assignment),
+                'order' => $assignment->shift_order,
+                'registered_types' => $registeredTypes,
+                'completed' => $isCompleted,
+                'locked' => $isLocked,
+            ];
+        })->values()->all();
+    }
+
+    private function shiftContextForRegistration($user, array $data, Carbon $recordedAt): array
+    {
+        $assignments = $user->employee
+            ? $this->rules->shiftsFor($user->employee, $recordedAt)
+            : collect();
+        $assignmentId = filled($data['attendance_schedule_assignment_id'] ?? null)
+            ? (int) $data['attendance_schedule_assignment_id']
+            : null;
+
+        if ($assignments->isEmpty()) {
+            if ($assignmentId !== null) {
+                throw ValidationException::withMessages([
+                    'attendance_schedule_assignment_id' => 'El turno seleccionado ya no esta disponible para hoy.',
+                ]);
+            }
+
+            return ['assignment_id' => null, 'key' => 'general', 'label' => 'Turno general', 'order' => 1, 'schedule' => null];
+        }
+
+        $assignment = $assignments->firstWhere('id', $assignmentId);
+        if (! $assignment) {
+            throw ValidationException::withMessages([
+                'attendance_schedule_assignment_id' => 'Selecciona uno de tus turnos programados para hoy.',
+            ]);
+        }
+
+        $nextAssignment = $assignments->first(function (AttendanceScheduleAssignment $candidate) use ($user, $recordedAt) {
+            return count($this->registeredTypesForShift($user->id, $recordedAt, $candidate->id)) < 4;
+        });
+
+        if ($nextAssignment && (int) $assignment->id !== (int) $nextAssignment->id) {
+            throw ValidationException::withMessages([
+                'attendance_schedule_assignment_id' => 'Completa las cuatro asistencias de '.$this->shiftLabel($nextAssignment).' antes de iniciar el siguiente horario.',
+            ]);
+        }
+
+        return [
+            'assignment_id' => $assignment->id,
+            'key' => 'shift-'.$assignment->id,
+            'label' => $this->shiftLabel($assignment),
+            'order' => $assignment->shift_order,
+            'schedule' => $assignment->schedule,
+        ];
+    }
+
+    private function assertNextShiftRecord(int $userId, Carbon $recordedAt, ?int $assignmentId, string $type): void
+    {
+        $sequence = ['check_in', 'meal_start', 'meal_end', 'check_out'];
+        $registeredTypes = $this->registeredTypesForShift($userId, $recordedAt, $assignmentId);
+        $nextType = collect($sequence)->first(fn (string $expectedType) => ! in_array($expectedType, $registeredTypes, true));
+
+        if ($nextType === null) {
+            throw ValidationException::withMessages([
+                'type' => 'Este turno ya tiene todos sus registros completados.',
+            ]);
+        }
+
+        if ($type !== $nextType) {
+            throw ValidationException::withMessages([
+                'type' => sprintf('Para este turno primero registra %s.', mb_strtolower($this->typeLabel($nextType))),
+            ]);
+        }
+    }
+
+    private function registeredTypesForShift(int $userId, Carbon $date, ?int $assignmentId): array
     {
         return AttendanceRecord::query()
             ->where('user_id', $userId)
-            ->where('attendance_date', Carbon::today()->toDateString())
+            ->whereDate('attendance_date', $date)
+            ->when(
+                $assignmentId,
+                fn ($query, $id) => $query->where('attendance_schedule_assignment_id', $id),
+                fn ($query) => $query->whereNull('attendance_schedule_assignment_id'),
+            )
             ->pluck('type')
             ->unique()
             ->values()
             ->all();
     }
 
-    private function hasRegisteredTypeToday(int $userId, string $type): bool
+    private function shiftLabel(AttendanceScheduleAssignment $assignment): string
     {
-        return AttendanceRecord::query()
-            ->where('user_id', $userId)
-            ->where('attendance_date', Carbon::today()->toDateString())
-            ->where('type', $type)
-            ->exists();
+        $schedule = $assignment->schedule;
+        $hours = collect([$schedule?->check_in_at, $schedule?->check_out_at])
+            ->filter()
+            ->map(fn ($time) => substr((string) $time, 0, 5))
+            ->join(' - ');
+
+        return trim(($schedule?->name ?? 'Horario').' '.($hours ? "({$hours})" : ''));
     }
 
     private function recordPayload(AttendanceRecord $record): array
@@ -364,6 +500,7 @@ class AttendanceController extends Controller
             'branch' => $record->branch?->name ?? $fallbackBranch?->name ?? 'Sin sucursal',
             'date' => $record->attendance_date?->format('d/m/Y'),
             'time' => $record->recorded_at?->format('H:i'),
+            'shift' => $record->shift_label ?? $record->scheduleAssignment?->schedule?->name ?? 'Turno general',
             'type' => $this->typeLabel($record->type),
             'status' => $this->statusLabel($record->status),
             'authentication' => 'Biometría del dispositivo',
@@ -428,6 +565,6 @@ class AttendanceController extends Controller
     }
     private function statusFor(string $type, Carbon $now): string { return $type === 'check_in' ? ($now->format('H:i') > '09:10' ? 'late' : 'on_time') : 'on_time'; }
     private function distanceInMeters(float $latitude, float $longitude, float $branchLatitude, float $branchLongitude): float { $earthRadius = 6371000; $latDelta = deg2rad($branchLatitude - $latitude); $lonDelta = deg2rad($branchLongitude - $longitude); $a = sin($latDelta / 2) ** 2 + cos(deg2rad($latitude)) * cos(deg2rad($branchLatitude)) * sin($lonDelta / 2) ** 2; return $earthRadius * 2 * atan2(sqrt($a), sqrt(1 - $a)); }
-    private function typeLabel(string $type): string { return ['check_in'=>'Entrada','check_out'=>'Salida','meal_start'=>'Inicio de comida','meal_end'=>'Fin de comida','break_start'=>'Inicio de descanso','break_end'=>'Fin de descanso','remote_work'=>'Trabajo remoto','commission'=>'Comisión','training'=>'Capacitación'][$type] ?? $type; }
+    private function typeLabel(string $type): string { return ['check_in'=>'Entrada','meal_start'=>'Salida a comida','meal_end'=>'Entrada de comida','check_out'=>'Salida general','break_start'=>'Inicio de descanso','break_end'=>'Fin de descanso','remote_work'=>'Trabajo remoto','commission'=>'Comisión','training'=>'Capacitación'][$type] ?? $type; }
     private function statusLabel(string $status): string { return ['on_time'=>'Puntual','late'=>'Retardo','absent'=>'Falta','justified'=>'Justificada','outside_zone'=>'Fuera de zona','pending'=>'Pendiente','corrected'=>'Corregida'][$status] ?? $status; }
 }

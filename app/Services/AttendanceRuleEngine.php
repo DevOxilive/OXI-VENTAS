@@ -10,11 +10,11 @@ use Illuminate\Support\Carbon;
 
 class AttendanceRuleEngine
 {
-    public function evaluate(?Employee $employee, string $type, Carbon $recordedAt): string
+    public function evaluate(?Employee $employee, string $type, Carbon $recordedAt, ?AttendanceSchedule $schedule = null): string
     {
         if ($type !== 'check_in') return 'on_time';
 
-        $schedule = $employee ? $this->scheduleFor($employee, $recordedAt) : null;
+        $schedule ??= $employee ? $this->scheduleFor($employee, $recordedAt) : null;
         if (! $schedule?->check_in_at) return 'on_time';
 
         $dayKey = strtolower($recordedAt->englishDayOfWeek);
@@ -34,6 +34,15 @@ class AttendanceRuleEngine
 
     public function scheduleFor(Employee $employee, Carbon $date): ?AttendanceSchedule
     {
+        return $this->shiftsFor($employee, $date)
+            ->pluck('schedule')
+            ->first();
+    }
+
+    public function shiftsFor(Employee $employee, Carbon $date)
+    {
+        $dayKey = strtolower($date->englishDayOfWeek);
+
         return AttendanceScheduleAssignment::query()
             ->with('schedule')
             ->where('assignable_type', Employee::class)
@@ -41,10 +50,15 @@ class AttendanceRuleEngine
             ->where('active', true)
             ->where(fn ($query) => $query->whereNull('effective_from')->orWhereDate('effective_from', '<=', $date))
             ->where(fn ($query) => $query->whereNull('effective_to')->orWhereDate('effective_to', '>=', $date))
+            ->orderBy('shift_order')
             ->orderBy('priority')
             ->get()
-            ->pluck('schedule')
-            ->first(fn ($schedule) => $schedule?->active);
+            ->filter(function (AttendanceScheduleAssignment $assignment) use ($dayKey) {
+                $workingDays = $assignment->working_days ?: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+
+                return $assignment->schedule?->active && in_array($dayKey, $workingDays, true);
+            })
+            ->values();
     }
 
     private function hasApprovedIncident(Employee $employee, Carbon $date): bool

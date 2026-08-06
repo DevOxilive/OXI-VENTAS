@@ -12,20 +12,21 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping, Sho
 {
     public function __construct(private readonly Collection $records) {}
     public function collection(): Collection { return $this->records; }
-    public function headings(): array { return ['Empleado', 'Rol', 'Sucursal', 'Fecha', 'Hora', 'Tipo', 'Estado', 'Autenticación']; }
+    public function headings(): array { return ['Empleado', 'Rol', 'Sucursal', 'Turno', 'Fecha', 'Hora', 'Tipo', 'Estado', 'Autenticación']; }
     public function map($record): array
     {
         return [
             trim(($record->employee?->first_name ?? $record->user?->name ?? '').' '.($record->employee?->last_name ?? '')),
             $record->user?->role?->name,
             $record->branch?->name,
+            $record->shift_label ?? $record->scheduleAssignment?->schedule?->name ?? 'Turno general',
             optional($record->attendance_date)->format('d/m/Y'),
             optional($record->recorded_at)->format('H:i'),
             match ($record->type) {
                 'check_in' => 'Entrada',
-                'meal_start' => 'Inicio de comida',
-                'meal_end' => 'Fin de comida',
-                'check_out' => 'Salida',
+                'meal_start' => 'Salida a comida',
+                'meal_end' => 'Entrada de comida',
+                'check_out' => 'Salida general',
                 default => $record->type,
             },
             match ($record->status) {

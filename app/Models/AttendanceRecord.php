@@ -21,6 +21,7 @@ class AttendanceRecord extends Model
 
     protected $fillable = [
         'user_id', 'employee_id', 'branch_id', 'attendance_date', 'recorded_at', 'type', 'status',
+        'attendance_schedule_assignment_id', 'shift_label', 'shift_order',
         'latitude', 'longitude', 'location_accuracy', 'approximate_address', 'within_geofence',
         'geofence_snapshot', 'authentication_method', 'authentication_result', 'operating_system',
         'browser', 'device_type', 'user_agent', 'ip_address', 'selfie_path', 'metadata',
@@ -41,5 +42,6 @@ class AttendanceRecord extends Model
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function employee(): BelongsTo { return $this->belongsTo(Employee::class); }
     public function branch(): BelongsTo { return $this->belongsTo(Branch::class); }
+    public function scheduleAssignment(): BelongsTo { return $this->belongsTo(AttendanceScheduleAssignment::class, 'attendance_schedule_assignment_id'); }
     public function correctionRequests(): HasMany { return $this->hasMany(AttendanceCorrectionRequest::class); }
 }
