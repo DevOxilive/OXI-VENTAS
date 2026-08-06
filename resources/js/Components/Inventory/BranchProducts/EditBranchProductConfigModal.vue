@@ -91,7 +91,7 @@ function submitConfig() {
                             v-model="form.min_stock"
                             :label="`Stock minimo (${unit})`"
                             field="min_stock"
-                            :validation-field="isKilogramUnit ? 'kilogram_quantity' : undefined"
+                            :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'quantity'"
                             type="text"
                             :inputmode="isKilogramUnit ? 'decimal' : 'numeric'"
                             :readonly="form.processing"

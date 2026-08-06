@@ -8,6 +8,7 @@ import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 import { getProductBatchesModalConfig } from '@/config/ModalConfigs/productBatchesModalConfig'
+import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 
 const emit = defineEmits(['close', 'select-batch', 'save', 'adjust-batch'])
 
@@ -79,10 +80,12 @@ const productName = computed(() => {
 })
 
 const unit = computed(() => {
-    return props.product?.inventory_unit ?? props.product?.unit ?? 'pza'
+    return normalizeInventoryUnit(props.product?.inventory_unit ?? props.product?.unit ?? 'pza')
 })
 
 const isKilogramUnit = computed(() => String(unit.value).toLowerCase() === 'kg')
+
+const unitLabel = computed(() => isKilogramUnit.value ? 'kg' : 'pza')
 
 const batches = computed(() => {
     return props.product?.batches ?? []
@@ -165,6 +168,10 @@ function selectBatch(batch) {
 
     emit('select-batch', batch)
 }
+
+function quantity(value) {
+    return formatInventoryQuantity(value, unit.value)
+}
 </script>
 
 <template>
@@ -173,282 +180,271 @@ function selectBatch(batch) {
         @save="$emit('save')"
         @close="closeModal"
     >
-        <section class="flex h-full min-h-0 w-full flex-col overflow-hidden">
-            <div class="grid h-full min-h-0 grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)]">
-                <aside class="flex min-h-[250px] max-h-[340px] flex-col border-b border-secondary bg-secondary xl:h-full xl:min-h-0 xl:max-h-full xl:border-b-0 xl:border-r">
-                    <div class="border-b border-secondary bg-background px-5 py-4">
-                        <p class="text-sm font-semibold text-text">
-                            {{ batches.length }} lote(s) registrados
-                        </p>
-                    </div>
+        <template #content>
+            <section class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 md:p-6">
+                <div class="mx-auto flex w-full max-w-6xl flex-col gap-5 min-[1700px]:grid min-[1700px]:h-full min-[1700px]:max-w-none min-[1700px]:grid-cols-[340px_minmax(0,1fr)] min-[1700px]:gap-0 min-[1700px]:overflow-hidden">
+                    <aside class="flex max-h-[34dvh] min-h-[180px] flex-col overflow-hidden rounded-2xl border border-secondary bg-secondary min-[1700px]:h-full min-[1700px]:max-h-full min-[1700px]:min-h-0 min-[1700px]:rounded-r-none min-[1700px]:border-r-0">
+                        <div class="border-b border-secondary bg-background px-5 py-4">
+                            <p class="text-sm font-semibold text-text">
+                                {{ batches.length }} lote(s) registrados
+                            </p>
+                        </div>
 
-                    <div class="min-h-0 flex-1 overflow-y-auto p-3">
-                        <div
-                            v-if="batches.length"
-                            class="space-y-2"
-                        >
-                            <button
-                                v-for="batch in batches"
-                                :key="batch.id"
-                                type="button"
-                                class="w-full rounded-2xl border bg-background px-4 py-3 text-left transition"
-                                :class="isSelectedBatch(batch)
-                                    ? 'border-primary bg-secondary shadow-sm'
-                                    : 'border-secondary hover:border-primary'"
-                                @click="selectBatch(batch)"
-                            >
-                                <div class="flex items-start justify-between gap-2">
-                                    <div class="min-w-0">
-                                        <p class="truncate text-sm font-black text-text">
-                                            {{ batchLabel(batch) }}
-                                        </p>
+                        <div class="min-h-0 flex-1 overflow-y-auto p-3">
+                            <div v-if="batches.length" class="space-y-2">
+                                <button
+                                    v-for="batch in batches"
+                                    :key="batch.id"
+                                    type="button"
+                                    class="w-full rounded-2xl border bg-background px-4 py-3 text-left transition"
+                                    :class="isSelectedBatch(batch)
+                                        ? 'border-primary bg-secondary shadow-sm'
+                                        : 'border-secondary hover:border-primary'"
+                                    @click="selectBatch(batch)"
+                                >
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <p class="truncate text-sm font-black text-text">
+                                                {{ batchLabel(batch) }}
+                                            </p>
 
-                                        <p class="mt-1 text-xs text-text opacity-70">
-                                            {{ seasonLabel(batch) }}
-                                        </p>
+                                            <p class="mt-1 text-xs text-text opacity-70">
+                                                {{ seasonLabel(batch) }}
+                                            </p>
+                                        </div>
+
+                                        <span
+                                            class="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-black"
+                                            :class="statusClass(batch.status)"
+                                        >
+                                            {{ statusLabel(batch.status) }}
+                                        </span>
                                     </div>
 
-                                    <span
-                                        class="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-black"
-                                        :class="statusClass(batch.status)"
-                                    >
-                                        {{ statusLabel(batch.status) }}
+                                    <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text opacity-70">
+                                        <span>Stock: <span class="font-semibold text-text">{{ quantity(batch.quantity) }} {{ unitLabel }}</span></span>
+                                        <span>Proveedor: <span class="font-semibold text-text">{{ batch.supplier || 'Sin proveedor' }}</span></span>
+                                    </div>
+                                </button>
+                            </div>
+
+                            <div v-else class="rounded-2xl border border-secondary bg-background px-4 py-10 text-center">
+                                <p class="text-sm font-semibold text-text opacity-80">
+                                    Este producto no tiene lotes registrados.
+                                </p>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <section class="flex min-h-0 flex-col rounded-2xl border border-secondary bg-background min-[1700px]:h-full min-[1700px]:overflow-hidden min-[1700px]:rounded-l-none">
+                        <div class="border-b border-secondary px-5 py-4">
+                            <SectionHeading
+                                :description="'Ajusta la informacion del lote y su cantidad sin navegar entre tarjetas grandes.'"
+                                spacing="sm"
+                            >
+                                <template #title>
+                                    <h3 class="truncate font-black text-text">
+                                        {{ selectedBatchTitle }}
+                                    </h3>
+                                </template>
+
+                                <template #aside>
+                                    <span class="rounded-full border border-secondary bg-secondary px-3 py-1 text-xs font-semibold text-text opacity-80">
+                                        Disponible: {{ quantity(availableQuantity) }} {{ unitLabel }}
                                     </span>
-                                </div>
-
-                                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text opacity-70">
-                                    <span>Stock: <span class="font-semibold text-text">{{ batch.quantity }} {{ unit }}</span></span>
-                                    <span>Proveedor: <span class="font-semibold text-text">{{ batch.supplier || 'Sin proveedor' }}</span></span>
-                                </div>
-                            </button>
+                                </template>
+                            </SectionHeading>
                         </div>
 
-                        <div
-                            v-else
-                            class="rounded-2xl border border-secondary bg-background px-4 py-10 text-center"
-                        >
-                            <p class="text-sm font-semibold text-text opacity-80">
-                                Este producto no tiene lotes registrados.
-                            </p>
-                        </div>
-                    </div>
-                </aside>
+                        <div v-if="selectedBatch" class="grid gap-5 p-5 min-[1700px]:min-h-0 min-[1700px]:flex-1 min-[1700px]:grid-cols-[minmax(0,1fr)_320px] min-[1700px]:gap-0 min-[1700px]:overflow-hidden min-[1700px]:p-0">
+                            <div class="min-h-0 min-[1700px]:overflow-y-auto min-[1700px]:p-5">
+                                <FormPanel
+                                    title="Informacion del lote"
+                                    description="Edita los datos generales, fechas y notas del lote seleccionado."
+                                    panel-class="bg-secondary shadow-none"
+                                    body-class="space-y-5"
+                                >
+                                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                                        <InputField
+                                            v-model="form.lot_number"
+                                            label="Numero de lote"
+                                            placeholder="Ej. AX-3-2026-07-08"
+                                            field="lot_number"
+                                            :readonly="processing"
+                                            :error="frontendErrors.lot_number"
+                                            @validate="validateField"
+                                        />
 
-                <section class="flex min-h-[520px] flex-col bg-background xl:h-full xl:min-h-0">
-                    <div class="border-b border-secondary px-5 py-4">
-                        <SectionHeading
-                            :description="'Ajusta la informacion del lote y su cantidad sin navegar entre tarjetas grandes.'"
-                            spacing="sm"
-                        >
-                            <template #title>
-                                <h3 class="truncate font-black text-text">
-                                    {{ selectedBatchTitle }}
-                                </h3>
-                            </template>
+                                        <InputField
+                                            v-model="form.expiration_date"
+                                            label="Caducidad"
+                                            field="expiration_date"
+                                            type="date"
+                                            :readonly="processing"
+                                            :error="frontendErrors.expiration_date"
+                                            @validate="validateField"
+                                        />
 
-                            <template #aside>
-                                <span class="rounded-full border border-secondary bg-secondary px-3 py-1 text-xs font-semibold text-text opacity-80">
-                                    Disponible: {{ availableQuantity }} {{ unit }}
-                                </span>
-                            </template>
-                        </SectionHeading>
-                    </div>
+                                        <SelectField
+                                            v-model="form.status"
+                                            label="Estado"
+                                            field="status"
+                                            :disabled="processing"
+                                            :options="batchStatusOptions"
+                                            :error="frontendErrors.status"
+                                            @validate="validateField"
+                                        />
+                                    </div>
 
-                    <div
-                        v-if="selectedBatch"
-                        class="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_280px]"
-                    >
-                        <div class="min-h-0 overflow-y-auto px-5 py-5">
-                            <FormPanel
-                                title="Informacion del lote"
-                                description="Edita los datos generales, fechas y notas del lote seleccionado."
-                                panel-class="bg-secondary shadow-none"
-                                body-class="space-y-5"
-                            >
-                                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                                        <InputField
+                                            v-model="form.received_at"
+                                            label="Fecha de ingreso"
+                                            field="received_at"
+                                            type="date"
+                                            :readonly="processing"
+                                            :error="frontendErrors.received_at"
+                                            @validate="validateField"
+                                        />
+
+                                        <InputField
+                                            v-model="form.season_start_date"
+                                            label="Inicio de temporada"
+                                            field="season_start_date"
+                                            type="date"
+                                            :readonly="processing || !isSeasonal"
+                                            :error="frontendErrors.season_start_date"
+                                            @validate="validateField"
+                                        />
+
+                                        <InputField
+                                            v-model="form.season_end_date"
+                                            label="Fin de temporada"
+                                            field="season_end_date"
+                                            type="date"
+                                            :readonly="processing || !isSeasonal"
+                                            :error="frontendErrors.season_end_date"
+                                            @validate="validateField"
+                                        />
+                                    </div>
+
+                                    <div class="grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+                                        <InputField
+                                            v-model="form.supplier"
+                                            label="Proveedor"
+                                            placeholder="Opcional"
+                                            field="supplier"
+                                            :readonly="processing"
+                                            :error="frontendErrors.supplier"
+                                            @validate="validateField"
+                                        />
+
+                                        <TextareaField
+                                            v-model="form.notes"
+                                            label="Notas"
+                                            field="notes"
+                                            :readonly="processing"
+                                            :rows="7"
+                                            :max-height="260"
+                                            placeholder="Ej. Correccion por captura, conteo fisico o ajuste operativo..."
+                                            :error="frontendErrors.notes"
+                                            @validate="validateField"
+                                        />
+                                    </div>
+                                </FormPanel>
+                            </div>
+
+                            <div class="min-h-0 min-[1700px]:overflow-y-auto min-[1700px]:border-l min-[1700px]:border-secondary min-[1700px]:bg-secondary min-[1700px]:p-5">
+                                <FormPanel
+                                    title="Ajuste de cantidad"
+                                    description="Captura siempre la cantidad en positivo."
+                                    panel-class="bg-secondary shadow-none min-[1700px]:bg-background"
+                                    body-class="space-y-4"
+                                >
+                                    <div class="grid grid-cols-2 rounded-full bg-background p-1">
+                                        <button
+                                            type="button"
+                                            class="rounded-full px-4 py-2 text-sm font-black transition"
+                                            :class="form.adjustment_type === 'ADD'
+                                                ? 'bg-accent text-background shadow-sm'
+                                                : 'text-text opacity-70'"
+                                            :disabled="processing"
+                                            @click="setAdjustmentType('ADD')"
+                                        >
+                                            Agregar
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            class="rounded-full px-4 py-2 text-sm font-black transition"
+                                            :class="form.adjustment_type === 'REMOVE'
+                                                ? 'bg-primary text-white shadow-sm'
+                                                : 'text-text opacity-70'"
+                                            :disabled="processing"
+                                            @click="setAdjustmentType('REMOVE')"
+                                        >
+                                            Eliminar
+                                        </button>
+                                    </div>
+
                                     <InputField
-                                        v-model="form.lot_number"
-                                        label="Numero de lote"
-                                        placeholder="Ej. AX-3-2026-07-08"
-                                        field="lot_number"
+                                        v-model="form.adjustment_amount"
+                                        label="Cantidad"
+                                        field="adjustment_amount"
+                                        :validation-field="isKilogramUnit ? 'kilogram_quantity' : undefined"
+                                        type="text"
+                                        :inputmode="isKilogramUnit ? 'decimal' : 'numeric'"
+                                        placeholder="Ej. 2"
                                         :readonly="processing"
-                                        :error="frontendErrors.lot_number"
+                                        :error="frontendErrors.adjustment_amount"
                                         @validate="validateField"
                                     />
 
-                                    <InputField
-                                        v-model="form.expiration_date"
-                                        label="Caducidad"
-                                        field="expiration_date"
-                                        type="date"
-                                        :readonly="processing"
-                                        :error="frontendErrors.expiration_date"
-                                        @validate="validateField"
-                                    />
+                                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <div class="rounded-2xl border border-secondary bg-background px-4 py-3">
+                                            <p class="text-xs font-semibold text-text opacity-70">
+                                                Actual
+                                            </p>
 
-                                    <SelectField
-                                        v-model="form.status"
-                                        label="Estado"
-                                        field="status"
-                                        :disabled="processing"
-                                        :options="batchStatusOptions"
-                                        :error="frontendErrors.status"
-                                        @validate="validateField"
-                                    />
-                                </div>
+                                            <p class="mt-1 text-2xl font-black text-text">
+                                                {{ quantity(form.original_quantity) }}
+                                            </p>
+                                        </div>
 
-                                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                    <InputField
-                                        v-model="form.received_at"
-                                        label="Fecha de ingreso"
-                                        field="received_at"
-                                        type="date"
-                                        :readonly="processing"
-                                        :error="frontendErrors.received_at"
-                                        @validate="validateField"
-                                    />
+                                        <div class="rounded-2xl border border-secondary bg-background px-4 py-3">
+                                            <p class="text-xs font-semibold text-text opacity-70">
+                                                Resultado
+                                            </p>
 
-                                    <InputField
-                                        v-model="form.season_start_date"
-                                        label="Inicio de temporada"
-                                        field="season_start_date"
-                                        type="date"
-                                        :readonly="processing || !isSeasonal"
-                                        :error="frontendErrors.season_start_date"
-                                        @validate="validateField"
-                                    />
-
-                                    <InputField
-                                        v-model="form.season_end_date"
-                                        label="Fin de temporada"
-                                        field="season_end_date"
-                                        type="date"
-                                        :readonly="processing || !isSeasonal"
-                                        :error="frontendErrors.season_end_date"
-                                        @validate="validateField"
-                                    />
-                                </div>
-
-                                <div class="grid grid-cols-1 gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
-                                    <InputField
-                                        v-model="form.supplier"
-                                        label="Proveedor"
-                                        placeholder="Opcional"
-                                        field="supplier"
-                                        :readonly="processing"
-                                        :error="frontendErrors.supplier"
-                                        @validate="validateField"
-                                    />
-
-                                    <TextareaField
-                                        v-model="form.notes"
-                                        label="Notas"
-                                        field="notes"
-                                        :readonly="processing"
-                                        :rows="7"
-                                        :max-height="260"
-                                        placeholder="Ej. Correccion por captura, conteo fisico o ajuste operativo..."
-                                        :error="frontendErrors.notes"
-                                        @validate="validateField"
-                                    />
-                                </div>
-                            </FormPanel>
-                        </div>
-
-                        <aside class="border-t border-secondary bg-secondary px-5 py-5 xl:border-l xl:border-t-0">
-                            <FormPanel
-                                title="Ajuste de cantidad"
-                                description="Captura siempre la cantidad en positivo."
-                                panel-class="bg-background shadow-none"
-                                body-class="space-y-4"
-                            >
-
-                                <div class="grid grid-cols-2 rounded-full bg-background p-1">
-                                    <button
-                                        type="button"
-                                        class="rounded-full px-4 py-2 text-sm font-black transition"
-                                        :class="form.adjustment_type === 'ADD'
-                                            ? 'bg-accent text-background shadow-sm'
-                                            : 'text-text opacity-70'"
-                                        :disabled="processing"
-                                        @click="setAdjustmentType('ADD')"
-                                    >
-                                        Agregar
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        class="rounded-full px-4 py-2 text-sm font-black transition"
-                                        :class="form.adjustment_type === 'REMOVE'
-                                            ? 'bg-primary text-white shadow-sm'
-                                            : 'text-text opacity-70'"
-                                        :disabled="processing"
-                                        @click="setAdjustmentType('REMOVE')"
-                                    >
-                                        Eliminar
-                                    </button>
-                                </div>
-
-                                <InputField
-                                    v-model="form.adjustment_amount"
-                                    label="Cantidad"
-                                    field="adjustment_amount"
-                                    :validation-field="isKilogramUnit ? 'kilogram_quantity' : undefined"
-                                    type="text"
-                                    :inputmode="isKilogramUnit ? 'decimal' : 'numeric'"
-                                    placeholder="Ej. 2"
-                                    :readonly="processing"
-                                    :error="frontendErrors.adjustment_amount"
-                                    @validate="validateField"
-                                />
-
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div class="rounded-2xl border border-secondary bg-background px-4 py-3">
-                                        <p class="text-xs font-semibold text-text opacity-70">
-                                            Actual
-                                        </p>
-
-                                        <p class="mt-1 text-2xl font-black text-text">
-                                            {{ form.original_quantity }}
-                                        </p>
+                                            <p class="mt-1 text-2xl font-black" :class="quantityResultColor">
+                                                {{ quantity(calculatedQuantity) }}
+                                            </p>
+                                        </div>
                                     </div>
 
                                     <div class="rounded-2xl border border-secondary bg-background px-4 py-3">
-                                        <p class="text-xs font-semibold text-text opacity-70">
-                                            Resultado
-                                        </p>
-
-                                        <p class="mt-1 text-2xl font-black" :class="quantityResultColor">
-                                            {{ calculatedQuantity }}
+                                        <p class="text-sm font-semibold text-text">
+                                            {{ adjustmentText }}
                                         </p>
                                     </div>
-                                </div>
-
-                                <div class="rounded-2xl border border-secondary bg-background px-4 py-3">
-                                    <p class="text-sm font-semibold text-text">
-                                        {{ adjustmentText }}
-                                    </p>
-                                </div>
-                            </FormPanel>
-                        </aside>
-                    </div>
-
-                    <div
-                        v-else
-                        class="flex min-h-[340px] items-center justify-center px-6 py-10 text-center"
-                    >
-                        <div class="max-w-md">
-                            <p class="text-lg font-black text-text">
-                                Selecciona un lote para editarlo
-                            </p>
-
-                            <p class="mt-2 text-sm text-text opacity-70">
-                                Desde la lista de la izquierda puedes ajustar fechas, estado, proveedor y cantidad.
-                            </p>
+                                </FormPanel>
+                            </div>
                         </div>
-                    </div>
-                </section>
-            </div>
-        </section>
+
+                        <div v-else class="flex min-h-[340px] items-center justify-center px-6 py-10 text-center">
+                            <div class="max-w-md">
+                                <p class="text-lg font-black text-text">
+                                    Selecciona un lote para editarlo
+                                </p>
+
+                                <p class="mt-2 text-sm text-text opacity-70">
+                                    Desde la lista de la izquierda puedes ajustar fechas, estado, proveedor y cantidad.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </section>
+        </template>
     </GlobalModal>
 </template>

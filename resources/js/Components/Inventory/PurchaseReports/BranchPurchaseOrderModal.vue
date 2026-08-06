@@ -7,13 +7,19 @@ import AppButton from '@/Components/Buttons/AppButton.vue'
 import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
+import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 
 const props = defineProps({ order: { type: Object, required: true }, mode: { type: String, default: 'view' }, branchId: { type: [Number, String], required: true } })
 const emit = defineEmits(['close', 'completed'])
 const isEditing = computed(() => props.mode === 'edit')
 const form = useForm({
     record_version: props.order.record_version || props.order.updated_at || null,
-    items: (props.order.items ?? []).map((item) => ({ id: item.id, received_quantity: item.received_quantity ?? 0, receipt_notes: item.receipt_notes ?? '' })),
+    items: (props.order.items ?? []).map((item) => ({
+        id: item.id,
+        received_quantity: item.received_quantity ?? 0,
+        receipt_notes: item.receipt_notes ?? '',
+        base_unit: item.base_unit ?? item.inventory_unit ?? item.unit ?? 'pza',
+    })),
 })
 const itemLookup = computed(() => new Map((props.order.items ?? []).map((item) => [Number(item.id), item])))
 const summary = computed(() => [
@@ -27,7 +33,9 @@ const summary = computed(() => [
 ])
 
 function sourceItem(item) { return itemLookup.value.get(Number(item.id)) ?? {} }
-function quantity(value) { return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(Number(value || 0)) }
+function itemUnit(item) { return normalizeInventoryUnit((isEditing.value ? sourceItem(item).base_unit ?? item.base_unit : item.base_unit) ?? item.inventory_unit ?? item.unit ?? 'pza') }
+function unitLabel(item) { return itemUnit(item) === 'kg' ? 'kg' : 'pzas.' }
+function quantity(value, item = null) { return formatInventoryQuantity(value, item ? itemUnit(item) : 'pza') }
 function dateTime(value) {
     return value
         ? new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
@@ -60,13 +68,13 @@ async function completeReceipt() {
     >
         <template #products>
             <div class="space-y-2">
-                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_110px_150px_100px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 md:grid">
+                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_110px_150px_100px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 lg:grid">
                     <span>Producto</span><span>Solicitadas</span><span>{{ isEditing ? 'Recibidas' : 'Estado' }}</span><span v-if="isEditing">Notas</span>
                 </div>
-                <article v-for="item in (isEditing ? form.items : order.items)" :key="item.id" class="grid gap-3 rounded-xl border border-secondary bg-background px-3 py-3 md:grid-cols-[minmax(0,1fr)_110px_150px_100px] md:items-center">
+                <article v-for="item in (isEditing ? form.items : order.items)" :key="item.id" class="grid gap-3 rounded-xl border border-secondary bg-background px-3 py-3 lg:grid-cols-[minmax(0,1fr)_110px_150px_100px] lg:items-center">
                     <div class="flex min-w-0 items-center gap-3"><div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary"><img v-if="item.image_url" :src="item.image_url" :alt="item.product_name" class="h-full w-full rounded-lg object-cover"><span v-else class="material-symbols-outlined text-lg opacity-40">inventory_2</span></div><div class="min-w-0"><p class="truncate text-sm font-black">{{ isEditing ? sourceItem(item).product_name : item.product_name }}</p><p class="truncate text-xs opacity-60">{{ (isEditing ? sourceItem(item).product_code : item.product_code) || 'Sin código' }}</p></div></div>
-                    <strong class="text-sm">{{ quantity(isEditing ? sourceItem(item).requested_quantity : item.requested_quantity) }} pzas.</strong>
-                    <QuantityStepper v-if="isEditing" :value="item.received_quantity" :aria-label="`Piezas recibidas de ${sourceItem(item).product_name || 'producto'}`" :decrease-disabled="Number(item.received_quantity) <= 0" @decrease="decrease(item)" @increase="increase(item)" @update="updateReceivedQuantity(item, $event)" />
+                    <strong class="text-sm">{{ quantity(isEditing ? sourceItem(item).requested_quantity : item.requested_quantity, item) }} {{ unitLabel(item) }}</strong>
+                    <QuantityStepper v-if="isEditing" :value="item.received_quantity" :allow-decimal="itemUnit(item) === 'kg'" :aria-label="`Cantidad recibida de ${sourceItem(item).product_name || 'producto'}`" :decrease-disabled="Number(item.received_quantity) <= 0" @decrease="decrease(item)" @increase="increase(item)" @update="updateReceivedQuantity(item, $event)" />
                     <span v-else class="w-fit rounded-full bg-secondary px-2 py-1 text-[11px] font-bold">{{ item.status_label }}</span>
                     <TextareaField v-if="isEditing" v-model="item.receipt_notes" :field="`receipt_notes_${item.id}`" placeholder="Notas" :rows="1" />
                 </article>

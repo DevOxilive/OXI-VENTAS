@@ -102,7 +102,10 @@ function handleInput(e) {
     emit('validate', props.field)
 
     nextTick(() => {
-        e.target.setSelectionRange?.(sanitized.selectionStart, sanitized.selectionEnd)
+        // Los campos numericos no permiten mover el cursor con setSelectionRange.
+        if (e.target.type !== 'number') {
+            e.target.setSelectionRange?.(sanitized.selectionStart, sanitized.selectionEnd)
+        }
     })
 }
 

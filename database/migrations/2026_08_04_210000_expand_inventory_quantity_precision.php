@@ -62,6 +62,10 @@ return new class extends Migration
 
     private function change(string $table, array $columns): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         if (! Schema::hasTable($table)) {
             return;
         }

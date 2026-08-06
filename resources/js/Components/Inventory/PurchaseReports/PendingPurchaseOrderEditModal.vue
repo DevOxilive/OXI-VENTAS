@@ -7,6 +7,7 @@ import AppButton from '@/Components/Buttons/AppButton.vue'
 import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
 import { getModalRequestOptions } from '@/Components/Modales/useModalConfig'
+import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -22,6 +23,7 @@ const form = useForm({
         requested_quantity: Number(item.requested_quantity ?? 1),
         product_name: item.product_name,
         product_code: item.product_code,
+        base_unit: item.base_unit ?? item.inventory_unit ?? item.unit ?? 'pza',
     })),
 })
 
@@ -61,9 +63,9 @@ function updateQuantity(item, value) {
     item.requested_quantity = value === '' ? '' : Math.max(1, Number(value || 1))
 }
 
-function quantity(value) {
-    return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 0 }).format(Number(value || 0))
-}
+function itemUnit(item) { return normalizeInventoryUnit(item.base_unit ?? item.inventory_unit ?? item.unit ?? 'pza') }
+function unitLabel(item) { return itemUnit(item) === 'kg' ? 'kg' : 'pzas.' }
+function quantity(value, item = null) { return formatInventoryQuantity(value, item ? itemUnit(item) : 'pza') }
 
 function formatDate(value) {
     if (!value) return 'Sin fecha'
@@ -98,22 +100,22 @@ function save() {
     >
         <template #products>
             <div class="space-y-2">
-                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_110px_150px_40px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 md:grid">
+                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_110px_150px_40px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 lg:grid">
                     <span>Producto</span><span>Solicitadas</span><span>Ajustar</span><span></span>
                 </div>
             <article
                 v-for="(item, index) in form.items"
                 :key="item.branch_product_id"
-                class="grid gap-3 rounded-xl border border-secondary bg-background px-3 py-3 md:grid-cols-[minmax(0,1fr)_110px_150px_40px] md:items-center"
+                class="grid gap-3 rounded-xl border border-secondary bg-background px-3 py-3 lg:grid-cols-[minmax(0,1fr)_110px_150px_40px] lg:items-center"
             >
                 <div class="min-w-0">
                     <p class="truncate text-sm font-black text-text">{{ item.product_name }}</p>
                     <p class="mt-1 truncate text-xs text-text opacity-60">{{ item.product_code || 'Sin código' }}</p>
                 </div>
 
-                <div class="text-sm text-text"><span class="md:hidden text-xs opacity-55">Solicitadas: </span><strong>{{ quantity(item.requested_quantity) }} pzas.</strong></div>
+                <div class="text-sm text-text"><span class="lg:hidden text-xs opacity-55">Solicitadas: </span><strong>{{ quantity(item.requested_quantity, item) }} {{ unitLabel(item) }}</strong></div>
 
-                <div><span class="mb-1 block text-xs opacity-55 md:hidden">Ajustar cantidad</span><QuantityStepper :value="item.requested_quantity" :aria-label="`Cantidad solicitada de ${item.product_name}`" :decrease-disabled="Number(item.requested_quantity) <= 1" @decrease="decrease(item)" @increase="increase(item)" @update="updateQuantity(item, $event)" /></div>
+                <div><span class="mb-1 block text-xs opacity-55 lg:hidden">Ajustar cantidad</span><QuantityStepper :value="item.requested_quantity" :allow-decimal="itemUnit(item) === 'kg'" :aria-label="`Cantidad solicitada de ${item.product_name}`" :decrease-disabled="Number(item.requested_quantity) <= 1" @decrease="decrease(item)" @increase="increase(item)" @update="updateQuantity(item, $event)" /></div>
 
                 <ActionIconButton
                     icon="delete"

@@ -258,6 +258,7 @@ class ProductController extends Controller
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
         $canManagePricing = $this->canManagePricing($request);
+        $this->normalizeProductPayload($request);
 
         $data = $request->validate([
             'barcodes' => ['nullable', 'array'],
@@ -386,6 +387,7 @@ class ProductController extends Controller
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
         $canManagePricing = $this->canManagePricing($request);
+        $this->normalizeProductPayload($request);
 
         $data = $request->validate([
             'barcodes' => ['nullable', 'array'],
@@ -699,6 +701,30 @@ class ProductController extends Controller
         $branchProduct->save();
 
         return $branchProduct;
+    }
+
+    private function normalizeProductPayload(Request $request): void
+    {
+        $normalized = [];
+
+        if (! $request->filled('inventory_unit') && $request->filled('unit')) {
+            $normalized['inventory_unit'] = match (mb_strtolower((string) $request->input('unit'))) {
+                'kg', 'kilo', 'kilos', 'kilogramo', 'kilogramos' => 'kg',
+                default => 'pza',
+            };
+        }
+
+        if (! $request->filled('cost_per_piece') && $request->filled('cost')) {
+            $normalized['cost_per_piece'] = $request->input('cost');
+        }
+
+        if (! $request->filled('sale_price_per_piece') && $request->filled('sale_price')) {
+            $normalized['sale_price_per_piece'] = $request->input('sale_price');
+        }
+
+        if ($normalized !== []) {
+            $request->merge($normalized);
+        }
     }
 
     private function abortIfAnyBranchIsInaccessible(Request $request, $branchIds): void

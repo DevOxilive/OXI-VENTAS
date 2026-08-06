@@ -135,6 +135,9 @@ class PurchaseReportController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.branch_product_id' => ['required', 'exists:branch_products,id'],
             'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
+            'items.*.purchase_presentation' => ['nullable', 'in:Pieza,Caja,Kilo'],
+            'items.*.package_quantity' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
+            'items.*.units_per_package' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
         ]);
 
         $generateOrder = (bool) ($validated['generate_order'] ?? false);
@@ -162,8 +165,9 @@ class PurchaseReportController extends Controller
                     ->where('branch_id', $branch->id)
                     ->findOrFail($item['branch_product_id']);
 
+                $presentation = $this->normalizePurchasePresentation($product, $item);
                 $estimatedPrice = (float) ($product->product?->cost_per_piece ?? $product->product?->cost ?? 0);
-                $requestedQuantity = (float) $item['requested_quantity'];
+                $requestedQuantity = $presentation['requested_quantity'];
 
                 $report->items()->create([
                     'branch_product_id' => $product->id,
@@ -171,6 +175,9 @@ class PurchaseReportController extends Controller
                     'current_stock' => $product->stock,
                     'min_stock' => $product->min_stock,
                     'requested_quantity' => $requestedQuantity,
+                    'purchase_presentation' => $presentation['purchase_presentation'],
+                    'package_quantity' => $presentation['package_quantity'],
+                    'units_per_package' => $presentation['units_per_package'],
                     'estimated_price' => $estimatedPrice,
                     'estimated_total' => $estimatedPrice * $requestedQuantity,
                     'status' => PurchaseOrderItem::STATUS_REQUESTED,
@@ -396,6 +403,9 @@ class PurchaseReportController extends Controller
                 'category' => $item->product?->category?->name ?? 'Sin categoria',
                 'stock' => (float) $item->stock,
                 'min_stock' => (float) $item->min_stock,
+                'inventory_unit' => $item->product?->inventory_unit ?? $item->product?->unit ?? 'pza',
+                'has_box_presentation' => (bool) $item->product?->has_box_presentation,
+                'pieces_per_box' => $item->product?->pieces_per_box,
                 'label' => trim(($item->product?->name ?? 'Producto sin nombre')
                     .' - '
                     .($item->product?->barcodes?->first()?->code ?: ($item->barcode ?: 'Sin codigo'))),
@@ -432,7 +442,12 @@ class PurchaseReportController extends Controller
                         'code' => $product?->barcodes?->first()?->code ?: ($branchProduct?->barcode ?? ''),
                         'current_stock' => $item->current_stock,
                         'min_stock' => $item->min_stock,
+                        'base_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
+                        'inventory_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
                         'requested_quantity' => $item->requested_quantity,
+                        'purchase_presentation' => $item->purchase_presentation,
+                        'package_quantity' => $item->package_quantity,
+                        'units_per_package' => $item->units_per_package,
                         'purchased_quantity' => $item->purchased_quantity,
                         'status' => $item->status,
                         'branch_product' => [
@@ -443,6 +458,9 @@ class PurchaseReportController extends Controller
                             'product' => [
                                 'id' => $product?->id,
                                 'name' => $product?->name ?? 'Producto sin nombre',
+                                'inventory_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
+                                'has_box_presentation' => (bool) $product?->has_box_presentation,
+                                'pieces_per_box' => $product?->pieces_per_box,
                                 'barcodes' => $product?->barcodes?->map(fn ($barcode) => [
                                     'id' => $barcode->id,
                                     'code' => $barcode->code,
@@ -718,6 +736,9 @@ class PurchaseReportController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.branch_product_id' => ['required', 'exists:branch_products,id'],
             'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
+            'items.*.purchase_presentation' => ['nullable', 'in:Pieza,Caja,Kilo'],
+            'items.*.package_quantity' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
+            'items.*.units_per_package' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
         ];
 
         return $request->validate($rules);
@@ -740,7 +761,8 @@ class PurchaseReportController extends Controller
                 ->where('branch_id', $branch->id)
                 ->findOrFail($item['branch_product_id']);
 
-            $requestedQuantity = (float) $item['requested_quantity'];
+            $presentation = $this->normalizePurchasePresentation($branchProduct, $item);
+            $requestedQuantity = $presentation['requested_quantity'];
             $estimatedPrice = (float) ($branchProduct->product?->cost_per_piece ?? $branchProduct->product?->cost ?? 0);
             $purchasedQuantity = isset($item['purchased_quantity'])
                 ? (float) $item['purchased_quantity']
@@ -767,6 +789,9 @@ class PurchaseReportController extends Controller
                     'current_stock' => $branchProduct->stock,
                     'min_stock' => $branchProduct->min_stock,
                     'requested_quantity' => $requestedQuantity,
+                    'purchase_presentation' => $presentation['purchase_presentation'],
+                    'package_quantity' => $presentation['package_quantity'],
+                    'units_per_package' => $presentation['units_per_package'],
                     'purchased_quantity' => $unavailable ? 0 : $purchasedQuantity,
                     'estimated_price' => $estimatedPrice,
                     'estimated_total' => $estimatedPrice * $requestedQuantity,
@@ -787,6 +812,58 @@ class PurchaseReportController extends Controller
                 ]
             );
         }
+    }
+
+    private function normalizePurchasePresentation(BranchProduct $branchProduct, array $item): array
+    {
+        $product = $branchProduct->product;
+        $inventoryUnit = $product?->inventory_unit ?? $product?->unit ?? 'pza';
+        $presentation = $item['purchase_presentation'] ?? ($inventoryUnit === 'kg' ? 'Kilo' : 'Pieza');
+
+        if ($inventoryUnit === 'kg' && $presentation !== 'Kilo') {
+            throw ValidationException::withMessages([
+                'items' => "{$product?->name} debe solicitarse en kilogramos.",
+            ]);
+        }
+
+        if ($inventoryUnit !== 'kg' && ! in_array($presentation, ['Pieza', 'Caja'], true)) {
+            throw ValidationException::withMessages([
+                'items' => "{$product?->name} debe solicitarse en piezas o cajas.",
+            ]);
+        }
+
+        if ($presentation === 'Caja' && (! $product?->has_box_presentation || (int) $product?->pieces_per_box < 2)) {
+            throw ValidationException::withMessages([
+                'items' => "{$product?->name} no tiene compra/venta por caja configurada.",
+            ]);
+        }
+
+        $packageQuantity = (float) ($item['package_quantity'] ?? $item['requested_quantity'] ?? 0);
+        $unitsPerPackage = $presentation === 'Caja'
+            ? (int) $product?->pieces_per_box
+            : 1;
+
+        if ($presentation !== 'Kilo' && abs($packageQuantity - round($packageQuantity)) > 0.0000001) {
+            throw ValidationException::withMessages([
+                'items' => 'Las piezas y cajas deben solicitarse con números enteros.',
+            ]);
+        }
+
+        $requestedQuantity = $presentation === 'Caja'
+            ? $packageQuantity * $unitsPerPackage
+            : (float) ($item['requested_quantity'] ?? $packageQuantity);
+
+        if ($presentation === 'Kilo') {
+            $requestedQuantity = round($requestedQuantity, 3);
+            $packageQuantity = $requestedQuantity;
+        }
+
+        return [
+            'purchase_presentation' => $presentation,
+            'package_quantity' => $packageQuantity,
+            'units_per_package' => $unitsPerPackage,
+            'requested_quantity' => $requestedQuantity,
+        ];
     }
 
     private function resolveItemStatus(

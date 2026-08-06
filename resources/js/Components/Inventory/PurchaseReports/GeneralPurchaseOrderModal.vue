@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import PurchaseOrderModalLayout from '@/Components/Inventory/PurchaseReports/PurchaseOrderModalLayout.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
+import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 
 const props = defineProps({ order: { type: Object, required: true } })
 defineEmits(['close'])
@@ -14,18 +15,31 @@ const totalRequested = computed(() => (props.order.items ?? []).reduce(
     (total, item) => total + Number(item.requested_quantity || 0),
     0,
 ))
+const totalRequestedUnit = computed(() =>
+    (props.order.items ?? []).some((item) => normalizeInventoryUnit(item.base_unit ?? item.inventory_unit ?? item.unit) === 'kg')
+        ? 'kg'
+        : 'pza',
+)
 const summary = computed(() => [
     { label: 'Orden general', value: props.order.folio },
     { label: 'Generada', value: dateTime(props.order.created_at) },
     { label: 'Estado', value: props.order.status_label },
     { label: 'Responsable', value: props.order.created_by?.name },
     { label: 'Productos solicitados', value: `${props.order.items?.length || 0} productos` },
-    { label: 'Piezas solicitadas', value: `${quantity(totalRequested.value)} piezas` },
+    { label: 'Cantidad solicitada', value: `${quantity(totalRequested.value, totalRequestedUnit.value)} ${totalRequestedUnit.value === 'kg' ? 'kg' : 'piezas'}` },
     { label: 'Sucursales participantes', value: branchNames.value.join(', ') },
 ])
 
-function quantity(value) {
-    return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(Number(value || 0))
+function itemUnit(item) {
+    return normalizeInventoryUnit(item.base_unit ?? item.inventory_unit ?? item.unit ?? 'pza')
+}
+
+function unitLabel(item) {
+    return itemUnit(item) === 'kg' ? 'kg' : 'pzas.'
+}
+
+function quantity(value, unit = 'pza') {
+    return formatInventoryQuantity(value, unit)
 }
 
 function dateTime(value) {
@@ -51,7 +65,7 @@ function status(item) {
     >
         <template #products>
             <div class="space-y-2">
-                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_120px_150px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 md:grid">
+                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_120px_150px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 lg:grid">
                     <span>Producto</span>
                     <span>Solicitadas</span>
                     <span>Estado</span>
@@ -60,7 +74,7 @@ function status(item) {
                 <article
                     v-for="item in order.items"
                     :key="item.id"
-                    class="grid gap-3 rounded-xl border border-secondary bg-background px-3 py-3 md:grid-cols-[minmax(0,1fr)_120px_150px] md:items-center"
+                    class="grid gap-3 rounded-xl border border-secondary bg-background px-3 py-3 lg:grid-cols-[minmax(0,1fr)_120px_150px] lg:items-center"
                 >
                     <div class="flex min-w-0 items-start gap-3">
                         <div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-secondary">
@@ -82,13 +96,13 @@ function status(item) {
                                     :key="`${item.id}-${branch.branch_id}`"
                                     class="rounded-full bg-secondary px-2 py-1 text-[10px] font-semibold text-text"
                                 >
-                                    {{ branch.branch_name }}: {{ quantity(branch.requested_quantity) }} pzas.
+                                    {{ branch.branch_name }}: {{ quantity(branch.requested_quantity, itemUnit(item)) }} {{ unitLabel(item) }}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <strong class="text-sm text-text">{{ quantity(item.requested_quantity) }} pzas.</strong>
+                    <strong class="text-sm text-text">{{ quantity(item.requested_quantity, itemUnit(item)) }} {{ unitLabel(item) }}</strong>
                     <span class="w-fit rounded-full bg-secondary px-2 py-1 text-[11px] font-bold text-text">
                         {{ status(item) }}
                     </span>

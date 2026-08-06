@@ -243,9 +243,9 @@ async function deleteDraft() {
 
                     <div
                         v-else
-                        class="mt-4 grid gap-4 border-t border-secondary pt-4 xl:grid-cols-[minmax(0,1fr)_300px]"
+                        class="mt-4 grid gap-4 border-t border-secondary pt-4 2xl:grid-cols-[minmax(0,1fr)_320px]"
                     >
-                        <div class="grid gap-3 md:grid-cols-3">
+                        <div class="grid gap-3 lg:grid-cols-3">
                             <InputField
                                 v-model="item.purchased_quantity"
                                 :field="`purchase_order_${item.branch_product_id}_purchased_quantity`"

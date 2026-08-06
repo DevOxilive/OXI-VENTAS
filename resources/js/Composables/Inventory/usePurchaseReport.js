@@ -11,12 +11,47 @@ function resolveStockStatus(product) {
     return "Disponible";
 }
 
-function normalizeQuantity(value, minimum = 1) {
+function normalizeQuantity(value, minimum = 1, allowDecimal = false) {
     if (value === "") return "";
 
-    const quantity = Number(String(value ?? "").replace(/[^\d]/g, ""));
+    const rawValue = String(value ?? "").replace(",", ".");
+    const quantity = allowDecimal
+        ? Number(rawValue.replace(/[^\d.]/g, ""))
+        : Number(rawValue.replace(/[^\d]/g, ""));
 
-    return Math.max(minimum, Number.isFinite(quantity) ? quantity : minimum);
+    if (!Number.isFinite(quantity)) return minimum;
+
+    return allowDecimal
+        ? Math.max(minimum, Math.round(quantity * 1000) / 1000)
+        : Math.max(minimum, Math.floor(quantity));
+}
+
+function defaultPresentation(product) {
+    return product.inventory_unit === "kg" ? "kilo" : "piece";
+}
+
+function presentationToServer(value) {
+    return {
+        box: "Caja",
+        kilo: "Kilo",
+        piece: "Pieza",
+    }[value] || "Pieza";
+}
+
+function unitsPerPackage(item) {
+    return item.presentation === "box" ? Number(item.pieces_per_box || 1) : 1;
+}
+
+function baseQuantity(item) {
+    const quantity = Number(item.requested_quantity || 0);
+
+    return item.presentation === "box"
+        ? quantity * unitsPerPackage(item)
+        : quantity;
+}
+
+function quantityStep(item) {
+    return item.presentation === "kilo" ? 0.001 : 1;
 }
 
 export function usePurchaseReport(props) {
@@ -53,7 +88,7 @@ export function usePurchaseReport(props) {
 
     const selectedCount = computed(() => selectedProducts.value.length);
     const totalQuantity = computed(() => selectedProducts.value.reduce(
-        (total, item) => total + Number(item.requested_quantity || 0),
+        (total, item) => total + baseQuantity(item),
         0
     ));
 
@@ -75,6 +110,10 @@ export function usePurchaseReport(props) {
                 code: product.primary_code || product.main_barcode || product.code || "",
                 stock: Number(product.stock || 0),
                 min_stock: Number(product.min_stock || 0),
+                inventory_unit: product.inventory_unit ?? "pza",
+                has_box_presentation: Boolean(product.has_box_presentation),
+                pieces_per_box: Number(product.pieces_per_box || 0),
+                presentation: defaultPresentation(product),
                 requested_quantity: 1,
             },
         };
@@ -91,8 +130,9 @@ export function usePurchaseReport(props) {
 
     function updateItem(productId, field, value) {
         if (!selectedItems.value[productId]) return;
+        const currentItem = selectedItems.value[productId];
         const nextValue = field === "requested_quantity"
-            ? normalizeQuantity(value)
+            ? normalizeQuantity(value, currentItem.presentation === "kilo" ? 0.001 : 1, currentItem.presentation === "kilo")
             : value;
 
         selectedItems.value = {
@@ -108,21 +148,46 @@ export function usePurchaseReport(props) {
         const item = selectedItems.value[productId];
         if (!item) return;
 
-        updateItem(productId, "requested_quantity", Number(item.requested_quantity || 0) + 1);
+        updateItem(productId, "requested_quantity", Number(item.requested_quantity || 0) + quantityStep(item));
     }
 
     function decreaseQuantity(productId) {
         const item = selectedItems.value[productId];
         if (!item) return;
 
-        const nextQuantity = Number(item.requested_quantity || 0) - 1;
+        const step = quantityStep(item);
+        const nextQuantity = Number(item.requested_quantity || 0) - step;
 
-        if (nextQuantity <= 0) {
+        if (nextQuantity < step) {
             removeItem(productId);
             return;
         }
 
         updateItem(productId, "requested_quantity", nextQuantity);
+    }
+
+    function setPresentation(productId, presentation) {
+        const item = selectedItems.value[productId];
+        if (!item) return;
+        if (presentation === "box" && !item.has_box_presentation) return;
+        if (presentation === "kilo" && item.inventory_unit !== "kg") return;
+
+        selectedItems.value = {
+            ...selectedItems.value,
+            [productId]: {
+                ...item,
+                presentation,
+                requested_quantity: normalizeQuantity(
+                    item.requested_quantity,
+                    presentation === "kilo" ? 0.001 : 1,
+                    presentation === "kilo",
+                ),
+            },
+        };
+    }
+
+    function itemBaseQuantity(item) {
+        return baseQuantity(item);
     }
 
     function removeItem(productId) {
@@ -186,7 +251,13 @@ export function usePurchaseReport(props) {
                 code: product.barcodes?.[0]?.code || branchProduct.barcode || "",
                 stock: Number(item.current_stock || branchProduct.stock || 0),
                 min_stock: Number(item.min_stock || branchProduct.min_stock || 0),
-                requested_quantity: Number(item.requested_quantity || 1),
+                inventory_unit: product.inventory_unit ?? "pza",
+                has_box_presentation: Boolean(product.has_box_presentation),
+                pieces_per_box: Number(product.pieces_per_box || 0),
+                presentation: item.purchase_presentation === "Caja"
+                    ? "box"
+                    : ((product.inventory_unit ?? "pza") === "kg" ? "kilo" : "piece"),
+                requested_quantity: Number(item.package_quantity || item.requested_quantity || 1),
             };
         }
 
@@ -202,7 +273,10 @@ export function usePurchaseReport(props) {
             record_version: editingOrder.value?.record_version || null,
             items: selectedProducts.value.map((item) => ({
                 branch_product_id: item.branch_product_id,
-                requested_quantity: Number(item.requested_quantity || 0),
+                requested_quantity: baseQuantity(item),
+                purchase_presentation: presentationToServer(item.presentation),
+                package_quantity: Number(item.requested_quantity || 0),
+                units_per_package: unitsPerPackage(item),
             })),
         };
     }
@@ -290,6 +364,8 @@ export function usePurchaseReport(props) {
         updateItem,
         increaseQuantity,
         decreaseQuantity,
+        setPresentation,
+        itemBaseQuantity,
         removeItem,
         clearDraft,
         clearWorkspace,

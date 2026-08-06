@@ -201,8 +201,6 @@ class GeneralPurchaseOrderController extends Controller
         $payload = $request->validate([
             'order_ids' => ['required', 'array', 'min:1'],
             'order_ids.*' => ['required', 'integer', 'distinct'],
-            'draft_id' => ['nullable', 'integer', 'exists:general_purchase_orders,id'],
-            'record_version' => ['nullable', 'required_with:draft_id', 'date'],
         ]);
 
         $cycle = $this->cycles->currentOpenCycle($request->user());
@@ -210,8 +208,6 @@ class GeneralPurchaseOrderController extends Controller
             $cycle,
             $request->user(),
             $payload['order_ids'],
-            $payload['draft_id'] ?? null,
-            $payload['record_version'] ?? null,
         );
 
         return redirect()->back()->with(
@@ -220,29 +216,6 @@ class GeneralPurchaseOrderController extends Controller
                 ? 'Orden general generada correctamente.'
                 : 'El ciclo se cerró sin productos por comprar.'
         );
-    }
-
-    public function saveDraft(Request $request, Branch $branch)
-    {
-        $this->abortIfUserCannotAccessBranch($request, $branch);
-
-        $payload = $request->validate([
-            'order_ids' => ['required', 'array', 'min:1'],
-            'order_ids.*' => ['required', 'integer', 'distinct'],
-            'draft_id' => ['nullable', 'integer', 'exists:general_purchase_orders,id'],
-            'record_version' => ['nullable', 'required_with:draft_id', 'date'],
-        ]);
-
-        $cycle = $this->cycles->currentOpenCycle($request->user());
-        $this->cycles->saveGeneralDraft(
-            $cycle,
-            $request->user(),
-            $payload['order_ids'],
-            $payload['draft_id'] ?? null,
-            $payload['record_version'] ?? null,
-        );
-
-        return redirect()->back()->with('success', 'Borrador de orden general guardado correctamente.');
     }
 
     public function sourceOrder(Request $request, Branch $branch, PurchaseOrder $purchaseOrder)
@@ -556,12 +529,6 @@ class GeneralPurchaseOrderController extends Controller
     {
         $user = $request->user();
         $user->loadMissing('role');
-        $draft = GeneralPurchaseOrder::query()
-            ->with(['branchOrders.branch'])
-            ->where('created_by', $user->id)
-            ->where('status', GeneralPurchaseOrder::STATUS_DRAFT)
-            ->latest('id')
-            ->first();
         $accessibleBranchIds = $user->accessibleBranchIds();
         $isInventoryUser = $user->role?->name === 'Inventario';
 
@@ -574,13 +541,7 @@ class GeneralPurchaseOrderController extends Controller
             ->where('status', PurchaseOrder::STATUS_GENERATED)
             ->whereNotNull('assigned_to_user_id')
             ->when($isInventoryUser, fn ($query) => $query->where('assigned_to_user_id', $user->id))
-            ->where(function ($query) use ($draft) {
-                $query->whereNull('general_purchase_order_id');
-
-                if ($draft) {
-                    $query->orWhere('general_purchase_order_id', $draft->id);
-                }
-            })
+            ->whereNull('general_purchase_order_id')
             ->oldest('generated_at')
             ->oldest('id')
             ->get()
@@ -600,8 +561,6 @@ class GeneralPurchaseOrderController extends Controller
                 'items_count' => $order->items_count,
                 'requested_quantity' => (float) ($order->requested_quantity ?? 0),
                 'generated_at' => $order->generated_at ?? $order->created_at,
-                'in_draft' => $draft
-                    && (int) $order->general_purchase_order_id === (int) $draft->id,
             ]);
         $orderCounts = $orders->countBy(fn ($order) => (int) $order['branch_id']);
 
@@ -634,11 +593,7 @@ class GeneralPurchaseOrderController extends Controller
             'branches' => $branches,
             'orders' => $orders->values(),
             'inventory_users' => $inventoryUsers,
-            'draft' => $draft ? [
-                'id' => $draft->id,
-                'order_ids' => $draft->branchOrders->pluck('id')->map(fn ($id) => (int) $id)->values(),
-                'updated_at' => $draft->updated_at,
-            ] : null,
+            'draft' => null,
         ];
     }
 
@@ -689,6 +644,8 @@ class GeneralPurchaseOrderController extends Controller
                     'product_name' => $product?->name ?? 'Producto sin nombre',
                     'product_code' => $product?->barcodes?->first()?->code ?: ($branchProduct?->barcode ?? ''),
                     'category_name' => $product?->category?->name ?? 'Sin categoría',
+                    'base_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
+                    'inventory_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
                     'requested_quantity' => (float) $item->requested_quantity,
                     'received_quantity' => null,
                     'receipt_notes' => null,

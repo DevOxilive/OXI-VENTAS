@@ -19,12 +19,16 @@ return new class extends Migration
             'base_quantity' => DB::raw('quantity'),
         ]);
 
-        DB::statement('ALTER TABLE sale_details MODIFY quantity DECIMAL(12,3) NOT NULL');
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE sale_details MODIFY quantity DECIMAL(12,3) NOT NULL');
+        }
     }
 
     public function down(): void
     {
-        DB::statement('ALTER TABLE sale_details MODIFY quantity INT NOT NULL');
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE sale_details MODIFY quantity INT NOT NULL');
+        }
 
         Schema::table('sale_details', function (Blueprint $table) {
             $table->dropColumn(['sale_unit', 'base_quantity', 'pieces_per_box']);

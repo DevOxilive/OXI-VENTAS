@@ -13,6 +13,7 @@ import SelectField from '@/Components/Forms/SelectField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
+import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 
 defineOptions({ layout: AdminLayout })
 
@@ -54,6 +55,9 @@ const totalPurchased = computed(() => form.items.reduce(
     (total, item) => total + purchasedQuantity(item),
     0,
 ))
+const totalPurchasedUnit = computed(() =>
+    form.items.some((item) => normalizeInventoryUnit(item.base_unit) === 'kg') ? 'kg' : 'pza',
+)
 const branchSummary = computed(() => {
     const branches = new Map()
 
@@ -114,28 +118,38 @@ function number(value) {
     return Number(value || 0)
 }
 
-function quantityInput(value) {
+function quantityInput(value, allowDecimal = false) {
     if (value === '') return ''
 
-    const quantity = Number(String(value ?? '').replace(/[^\d]/g, ''))
+    const rawValue = String(value ?? '').replace(',', '.')
+    const sanitized = allowDecimal
+        ? rawValue.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1')
+        : rawValue.replace(/[^\d]/g, '')
+    const quantity = Number(sanitized)
 
     return Number.isFinite(quantity) ? quantity : 0
 }
 
 function updateItemQuantity(item, field, value, minimum = 1) {
-    item[field] = value === '' ? '' : Math.max(minimum, quantityInput(value))
+    item[field] = value === ''
+        ? ''
+        : Math.max(minimum, quantityInput(value, allowsDecimalQuantity(item, field)))
 }
 
 function increaseItemQuantity(item, field) {
-    item[field] = quantityInput(item[field]) + 1
+    item[field] = quantityInput(item[field], allowsDecimalQuantity(item, field)) + 1
 }
 
 function decreaseItemQuantity(item, field, minimum = 1) {
-    item[field] = Math.max(minimum, quantityInput(item[field]) - 1)
+    item[field] = Math.max(minimum, quantityInput(item[field], allowsDecimalQuantity(item, field)) - 1)
 }
 
-function quantity(value) {
-    return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 0 }).format(number(value))
+function quantity(value, unit = 'pza') {
+    return formatInventoryQuantity(value, unit)
+}
+
+function allowsDecimalQuantity(item, field = 'package_quantity') {
+    return field === 'package_quantity' && normalizeInventoryUnit(item.base_unit) === 'kg'
 }
 
 function currency(value) {
@@ -317,7 +331,7 @@ async function completeOrder() {
                                         </p>
                                         <p>
                                             <span class="opacity-60">Cantidad solicitada:</span>
-                                            <strong class="ml-1">{{ quantity(item.requested_quantity) }} {{ item.base_unit || 'pzas.' }}</strong>
+                                            <strong class="ml-1">{{ quantity(item.requested_quantity, item.base_unit) }} {{ item.base_unit || 'pzas.' }}</strong>
                                         </p>
                                     </div>
                                 </div>
@@ -331,7 +345,7 @@ async function completeOrder() {
                                         :key="`${item.id}_${branch.order_id || branch.branch_id}`"
                                         class="rounded-full border border-secondary bg-secondary px-3 py-1.5 text-xs font-semibold text-text"
                                     >
-                                        {{ branch.branch_name }} · {{ quantity(branch.requested_quantity) }}
+                                        {{ branch.branch_name }} · {{ quantity(branch.requested_quantity, item.base_unit) }}
                                     </span>
                                 </div>
                             </div>
@@ -357,8 +371,9 @@ async function completeOrder() {
                                         <QuantityStepper
                                             :value="item.package_quantity"
                                             :aria-label="quantityLabel(item)"
+                                            :allow-decimal="allowsDecimalQuantity(item)"
                                             :disabled="item.unavailable"
-                                            :decrease-disabled="quantityInput(item.package_quantity) <= 1"
+                                            :decrease-disabled="quantityInput(item.package_quantity, allowsDecimalQuantity(item)) <= 1"
                                             @decrease="decreaseItemQuantity(item, 'package_quantity')"
                                             @increase="increaseItemQuantity(item, 'package_quantity')"
                                             @update="updateItemQuantity(item, 'package_quantity', $event)"
@@ -431,7 +446,7 @@ async function completeOrder() {
                             <div class="mt-4 rounded-2xl bg-secondary p-3 text-sm text-text">
                                 <span class="block text-xs opacity-55">Cantidad total comprada</span>
                                 <strong class="text-base">
-                                    {{ quantity(purchasedQuantity(item)) }} {{ item.base_unit || 'pzas.' }}
+                                    {{ quantity(purchasedQuantity(item), item.base_unit) }} {{ item.base_unit || 'pzas.' }}
                                 </strong>
                             </div>
                         </section>
@@ -457,7 +472,7 @@ async function completeOrder() {
 
                     <div class="mt-4 border-t border-secondary pt-4 text-sm text-text">
                         <span class="block text-xs opacity-60">Cantidad total comprada</span>
-                        <strong class="mt-1 block text-xl">{{ quantity(totalPurchased) }}</strong>
+                        <strong class="mt-1 block text-xl">{{ quantity(totalPurchased, totalPurchasedUnit) }}</strong>
                     </div>
                 </FormPanel>
 

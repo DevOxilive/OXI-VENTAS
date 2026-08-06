@@ -1,6 +1,7 @@
 <script setup>
 import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
+import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 
 defineProps({
     notes: {
@@ -43,6 +44,18 @@ function decreaseQuantity(item) {
 
 function increaseQuantity(item) {
     emit('update-item', item.branch_product_id, 'requested_quantity', Number(item.requested_quantity || 0) + 1)
+}
+
+function itemUnit(item) {
+    return item.inventory_unit ?? item.base_unit ?? item.unit ?? 'pza'
+}
+
+function quantity(value, item = null) {
+    return formatInventoryQuantity(value, item ? itemUnit(item) : 'pza')
+}
+
+function allowsDecimalQuantity(item) {
+    return normalizeInventoryUnit(itemUnit(item)) === 'kg'
 }
 </script>
 
@@ -95,7 +108,7 @@ function increaseQuantity(item) {
                             {{ item.code || item.main_barcode || 'Sin código' }}
                         </p>
                         <p class="mt-1 text-xs text-text opacity-70">
-                            Stock: {{ item.stock }} · Mínimo: {{ item.min_stock }}
+                            Stock: {{ quantity(item.stock, item) }} · Mínimo: {{ quantity(item.min_stock, item) }}
                         </p>
                     </div>
 
@@ -110,6 +123,7 @@ function increaseQuantity(item) {
                     <QuantityStepper
                         :value="item.requested_quantity"
                         :aria-label="`Cantidad solicitada de ${item.name}`"
+                        :allow-decimal="allowsDecimalQuantity(item)"
                         :decrease-disabled="Number(item.requested_quantity || 0) <= 1"
                         @decrease="decreaseQuantity(item)"
                         @increase="increaseQuantity(item)"
@@ -123,7 +137,7 @@ function increaseQuantity(item) {
             <div class="flex justify-between text-sm">
                 <span class="text-text opacity-70">Cantidad total</span>
                 <span class="font-semibold text-text">
-                    {{ totalQuantity }}
+                    {{ quantity(totalQuantity, selectedProducts.find((item) => allowsDecimalQuantity(item)) || null) }}
                 </span>
             </div>
 

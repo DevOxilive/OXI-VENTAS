@@ -6,6 +6,7 @@ import InputField from "@/Components/Forms/InputField.vue";
 import SelectionCheckboxCard from "@/Components/Forms/SelectionCheckboxCard.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
 import ActionIconButton from "@/Components/Forms/ActionIconButton.vue";
+import ToggleSwitch from "@/Components/Forms/ToggleSwitch.vue";
 import { getProductModalConfig } from "@/config/ModalConfigs/productModalConfig";
 import {
   ToastAlert,
@@ -77,6 +78,12 @@ function formatDecimal(value) {
   const rounded = Math.round(value * 100) / 100;
 
   return rounded.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function displayDecimal(value) {
+  if (value === null || value === undefined || value === "") return "";
+
+  return String(value).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 }
 
 function syncSalePriceFromPercentage() {
@@ -170,7 +177,7 @@ watch(
       : [product.branch_id].filter(Boolean).map(Number);
     ensureCurrentBranchSelected();
 
-    form.min_stock = product.min_stock ?? 0;
+    form.min_stock = displayDecimal(product.min_stock ?? 0);
     form.category_id = product.category_id ?? "";
     form.category_name = "";
     form.cost_per_piece = product.cost_per_piece ?? product.cost ?? "";
@@ -811,18 +818,16 @@ function submit() {
 
             <label
               v-if="!isKilogramUnit"
-              class="flex min-h-[72px] items-center gap-3 rounded-xl border border-secondary bg-secondary px-4 py-3"
+              class="flex min-h-[72px] items-center justify-between gap-3 rounded-xl border border-secondary bg-secondary px-4 py-3"
             >
-              <input
+              <span>
+                <span class="block text-sm font-semibold text-text">Captura y vende por caja</span>
+                <span class="block text-xs text-text opacity-70">El inventario se sigue guardando en piezas.</span>
+              </span>
+              <ToggleSwitch
                 v-model="form.has_box_presentation"
-                type="checkbox"
-                class="h-5 w-5 accent-primary"
                 :disabled="mode === 'view'"
               />
-              <span>
-                <span class="block text-sm font-semibold text-text">Presentación por caja</span>
-                <span class="block text-xs text-text opacity-70">Permite capturar y vender por caja sin cambiar el inventario base.</span>
-              </span>
             </label>
 
             <InputField
@@ -841,7 +846,7 @@ function submit() {
             <InputField
               label="Stock mínimo"
               field="min_stock"
-              :validation-field="isKilogramUnit ? 'kilogram_quantity' : undefined"
+              :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'quantity'"
               v-model="form.min_stock"
               :error="form.errors.min_stock"
               type="text"

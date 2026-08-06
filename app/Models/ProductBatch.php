@@ -22,8 +22,11 @@ class ProductBatch extends Model
         'initial_quantity',
         'quantity',
         'supplier',
+        'notes',
         'received_at',
         'status',
+        'has_real_lot',
+        'entry_type',
         'season_start_date',
         'season_end_date',
     ];

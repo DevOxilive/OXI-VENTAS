@@ -11,6 +11,7 @@ import ActionIconButton from "@/Components/Forms/ActionIconButton.vue";
 import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
 import QuantityStepper from "@/Components/Forms/QuantityStepper.vue";
+import PresentationSwitch from "@/Components/Inventory/PresentationSwitch.vue";
 import EmptyStateCard from "@/Components/Cards/EmptyStateCard.vue";
 import GlobalCard from "@/Components/Cards/GlobalCard.vue";
 import SectionHeading from "@/Components/Cards/SectionHeading.vue";
@@ -109,6 +110,13 @@ const pagination = computed(() => report.paginator.value);
 const selectedProducts = computed(() => report.selectedProducts.value);
 const purchaseLists = computed(() => props.reportsDB?.data ?? []);
 let unsubscribeTrashRealtime = null
+
+function itemUnitLabel(item) {
+    if (item.presentation === "box") return "cajas";
+    if (item.presentation === "kilo") return "kg";
+
+    return "piezas";
+}
 
 onMounted(() => {
     unsubscribeTrashRealtime = subscribeRealtime(
@@ -401,16 +409,34 @@ function selectBranch(branchId) {
                                 </div>
 
                                 <div class="mt-2 flex items-center gap-3">
-                                    <span class="hidden text-[10px] font-semibold uppercase tracking-[0.1em] text-text opacity-50 sm:inline">Pzas.</span>
+                                    <PresentationSwitch
+                                        v-if="item.has_box_presentation"
+                                        :model-value="item.presentation"
+                                        @change="report.setPresentation(item.branch_product_id, $event)"
+                                    />
+                                    <span
+                                        v-else
+                                        class="hidden text-[10px] font-semibold uppercase tracking-[0.1em] text-text opacity-50 sm:inline"
+                                    >
+                                        {{ itemUnitLabel(item) }}
+                                    </span>
                                     <QuantityStepper
                                         :value="item.requested_quantity"
                                         :aria-label="`Cantidad solicitada de ${item.name}`"
-                                        :decrease-disabled="Number(item.requested_quantity || 0) <= 1"
+                                        :allow-decimal="item.presentation === 'kilo'"
+                                        :decrease-disabled="Number(item.requested_quantity || 0) <= (item.presentation === 'kilo' ? 0.001 : 1)"
                                         @decrease="report.decreaseQuantity(item.branch_product_id)"
                                         @increase="report.increaseQuantity(item.branch_product_id)"
                                         @update="report.updateItem(item.branch_product_id, 'requested_quantity', $event)"
                                     />
                                 </div>
+
+                                <p
+                                    v-if="item.presentation === 'box'"
+                                    class="mt-2 text-xs text-text opacity-65"
+                                >
+                                    {{ item.requested_quantity || 0 }} cajas = {{ report.itemBaseQuantity(item) }} piezas solicitadas.
+                                </p>
                             </article>
 
                             <EmptyStateCard

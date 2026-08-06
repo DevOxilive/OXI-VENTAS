@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, reactive } from "vue";
+import { formatInventoryQuantity } from "@/utils/quantityFormatter";
 
 function parseDateValue(value) {
     if (!value) return null;
@@ -92,9 +93,7 @@ export function useProductMovementsModal(props, emit) {
     });
 
     function formatNumber(value) {
-        return new Intl.NumberFormat("es-MX", {
-            maximumFractionDigits: 3,
-        }).format(Number(value ?? 0));
+        return formatInventoryQuantity(value, unit.value);
     }
 
     function formatDateTime(date) {

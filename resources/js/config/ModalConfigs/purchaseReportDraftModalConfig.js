@@ -21,8 +21,8 @@ export function getPurchaseReportDraftModalConfig({
         totalErrors: 0,
         processing: false,
         closeButtonText: 'Cerrar',
-        ...modalPresets.standard,
-        size: '2xl',
+        ...modalPresets.workspace,
+        size: 'full',
         showSave: false,
     }
 }

@@ -47,7 +47,7 @@ const transferOrder = ref(null)
 const transferHistoryOrder = ref(null)
 const editingSourceOrder = ref(null)
 const loadingSourceOrder = ref(false)
-const selectedOrderIds = ref((props.generation?.draft?.order_ids ?? []).map(Number))
+const selectedOrderIds = ref([])
 const initialSelectedOrder = (props.generation?.orders ?? []).find((order) => selectedOrderIds.value.includes(Number(order.id)))
 const initialBranch = initialSelectedOrder?.branch_id
     ?? (props.generation?.branches ?? []).find((branch) => Number(branch.orders_count) > 0)?.id
@@ -293,23 +293,21 @@ function handleGeneralTableAction({ action, row }) {
     }
 }
 
-function saveDraft() {
+function disabledGeneralDraftSave() {
     if (!canPrepareGeneralOrder.value) return
 
     router.post(
-        route('inventory.branches.reports.purchase-orders.draft', {
+        route('inventory.branches.reports.purchase-orders.consolidate', {
             branch: props.currentBranch.id,
         }),
         {
             order_ids: selectedOrderIds.value,
-            draft_id: props.generation?.draft?.id ?? null,
-            record_version: props.generation?.draft?.updated_at ?? null,
         },
         getModalRequestOptions({
             mode: 'create',
-            entityName: 'Borrador de Orden de compra general',
-            successTitle: 'Borrador de Orden de compra general guardado',
-            errorTitle: 'No se pudo guardar el borrador',
+            entityName: 'Orden de compra general',
+            successTitle: 'Orden de compra general generada correctamente',
+            errorTitle: 'No se pudo generar la Orden de compra general',
             errorMessage: 'Verifica que las órdenes continúen asignadas y disponibles.',
         }),
     )
@@ -334,8 +332,6 @@ async function generateGeneralOrder() {
         }),
         {
             order_ids: selectedOrderIds.value,
-            draft_id: props.generation?.draft?.id ?? null,
-            record_version: props.generation?.draft?.updated_at ?? null,
         },
         getModalRequestOptions({
             mode: 'create',
@@ -456,14 +452,6 @@ async function generateGeneralOrder() {
                     v-if="can('inventory.purchase-orders.general.create')"
                     class="mt-4 grid gap-2"
                 >
-                    <AppButton
-                        variant="secondary"
-                        block
-                        :disabled="!canPrepareGeneralOrder"
-                        @click="saveDraft"
-                    >
-                        Guardar borrador
-                    </AppButton>
                     <AppButton
                         variant="primary"
                         block

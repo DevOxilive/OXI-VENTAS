@@ -47,6 +47,12 @@ export function useEditBranchProductConfig(product) {
         );
     });
 
+    function displayDecimal(value) {
+        if (value === null || value === undefined || value === "") return "";
+
+        return String(value).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+    }
+
     const isSeasonal = computed(() => {
         return form.status === "seasonal";
     });
@@ -79,7 +85,7 @@ export function useEditBranchProductConfig(product) {
                 return;
             }
 
-            form.min_stock = currentProduct.minStock ?? 0;
+            form.min_stock = displayDecimal(currentProduct.minStock ?? 0);
             form.status = currentProduct.administrativeStatus ?? "active";
             form.season_start_date = currentProduct.seasonStartDate ?? "";
             form.season_end_date = currentProduct.seasonEndDate ?? "";

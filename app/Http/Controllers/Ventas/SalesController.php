@@ -357,12 +357,18 @@ class SalesController extends Controller
 
         $expirationAlerts = $this->buildRemainingNearExpirationAlertsAfterSale($sale);
 
-        return back()->with([
+        $responsePayload = [
             'success' => 'Venta registrada correctamente.',
             'sale_folio' => $sale->folio,
             'print_job' => $this->buildPrintJobPayload($sale),
             'expiration_alerts' => $expirationAlerts,
-        ]);
+        ];
+
+        if ($request->expectsJson()) {
+            return response()->json($responsePayload);
+        }
+
+        return back()->with($responsePayload);
     }
 
     private function nearExpirationProducts(Branch $branch, int $limit): Collection
@@ -450,9 +456,7 @@ class SalesController extends Controller
 
     private function shouldShowBranchSelector(Request $request, $user, $allowedBranches): bool
     {
-        return $user->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL)
-            && ! $request->filled('branch')
-            && $allowedBranches->isNotEmpty();
+        return ! $request->filled('branch') && $allowedBranches->count() > 1;
     }
 
     private function resolveBranch(Request $request, $user, $allowedBranches): ?Branch

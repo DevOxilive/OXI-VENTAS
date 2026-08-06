@@ -113,24 +113,12 @@ class PurchaseCycleService
         });
     }
 
-    public function saveGeneralDraft(
-        PurchaseCycle $cycle,
-        User $user,
-        array $orderIds,
-        ?int $draftId = null,
-        ?string $recordVersion = null
-    ): GeneralPurchaseOrder {
-        return $this->persistGeneralSelection($cycle, $user, $orderIds, $draftId, false, $recordVersion);
-    }
-
     public function consolidate(
         PurchaseCycle $cycle,
         User $user,
-        array $orderIds,
-        ?int $draftId = null,
-        ?string $recordVersion = null
+        array $orderIds
     ): GeneralPurchaseOrder {
-        return $this->persistGeneralSelection($cycle, $user, $orderIds, $draftId, true, $recordVersion);
+        return $this->persistGeneralSelection($cycle, $user, $orderIds);
     }
 
     public function saveCapture(GeneralPurchaseOrder $order, array $payload): GeneralPurchaseOrder
@@ -340,12 +328,9 @@ class PurchaseCycleService
     private function persistGeneralSelection(
         PurchaseCycle $cycle,
         User $user,
-        array $orderIds,
-        ?int $draftId,
-        bool $generate,
-        ?string $recordVersion = null
+        array $orderIds
     ): GeneralPurchaseOrder {
-        return DB::transaction(function () use ($cycle, $user, $orderIds, $draftId, $generate, $recordVersion) {
+        return DB::transaction(function () use ($cycle, $user, $orderIds) {
             $cycle = PurchaseCycle::query()->lockForUpdate()->findOrFail($cycle->id);
             $selectedOrderIds = collect($orderIds)
                 ->map(fn ($orderId) => (int) $orderId)
@@ -359,29 +344,9 @@ class PurchaseCycleService
                 ]);
             }
 
-            $draft = $draftId
-                ? GeneralPurchaseOrder::query()->lockForUpdate()->find($draftId)
-                : GeneralPurchaseOrder::query()
-                    ->where('created_by', $user->id)
-                    ->where('status', GeneralPurchaseOrder::STATUS_DRAFT)
-                    ->latest('id')
-                    ->lockForUpdate()
-                    ->first();
+            $draft = null;
 
-            if ($draft && (
-                $draft->status !== GeneralPurchaseOrder::STATUS_DRAFT
-                || (int) $draft->created_by !== (int) $user->id
-            )) {
-                throw ValidationException::withMessages([
-                    'draft_id' => 'El borrador seleccionado ya no está disponible.',
-                ]);
-            }
-
-            if ($draft) {
-                $this->assertRecordVersion($draft, $recordVersion);
-            }
-
-            $draft ??= GeneralPurchaseOrder::create([
+            $draft = GeneralPurchaseOrder::create([
                 'purchase_cycle_id' => $cycle->id,
                 'created_by' => $user->id,
                 'status' => GeneralPurchaseOrder::STATUS_DRAFT,
@@ -449,10 +414,6 @@ class PurchaseCycleService
                 'estimated_total' => 0,
             ]);
 
-            if (! $generate) {
-                return $draft->fresh(['items', 'branchOrders.branch']);
-            }
-
             $draft->update([
                 'folio' => $draft->folio ?: sprintf('OCG-%s-%04d', now()->format('Ymd'), $draft->id),
                 'status' => GeneralPurchaseOrder::STATUS_PURCHASING,
@@ -495,9 +456,20 @@ class PurchaseCycleService
         $estimatedTotal = (float) $items->sum('estimated_total');
         $estimatedUnitPrice = $requestedQuantity > 0 ? $estimatedTotal / $requestedQuantity : 0;
         $inventoryUnit = $product?->inventory_unit ?? $product?->unit ?? 'pza';
+        $presentations = $items
+            ->pluck('purchase_presentation')
+            ->filter()
+            ->unique()
+            ->values();
         $purchasePresentation = $inventoryUnit === 'kg'
             ? 'Kilo'
-            : 'Pieza';
+            : ($presentations->count() === 1 && $presentations->first() === 'Caja' ? 'Caja' : 'Pieza');
+        $unitsPerPackage = $purchasePresentation === 'Caja'
+            ? max(1, (int) $product?->pieces_per_box)
+            : 1;
+        $packageQuantity = $purchasePresentation === 'Caja'
+            ? (float) $items->sum('package_quantity')
+            : $requestedQuantity;
 
         $order->items()->create([
             'product_id' => $productId ?: null,
@@ -509,8 +481,8 @@ class PurchaseCycleService
             'estimated_unit_price' => round($estimatedUnitPrice, 2),
             'estimated_total' => 0,
             'purchase_presentation' => $purchasePresentation,
-            'package_quantity' => $requestedQuantity,
-            'units_per_package' => 1,
+            'package_quantity' => $packageQuantity,
+            'units_per_package' => $unitsPerPackage,
             'purchase_price' => round($estimatedUnitPrice, 2),
             'purchased_quantity' => $requestedQuantity,
             'gross_total' => 0,
