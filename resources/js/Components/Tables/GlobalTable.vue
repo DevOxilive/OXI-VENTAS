@@ -159,7 +159,7 @@ function normalizePaginationLabel(label) {
 onMounted(() => {
   if (typeof window === 'undefined') return
 
-  mobileMediaQuery = window.matchMedia('(max-width: 767px)')
+  mobileMediaQuery = window.matchMedia('(max-width: 1023px)')
   handleViewportChange = (event) => {
     isMobileViewport.value = event.matches
   }

@@ -64,8 +64,8 @@ function status(item) {
         @close="$emit('close')"
     >
         <template #products>
-            <div class="space-y-2">
-                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_120px_150px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 lg:grid">
+            <div class="space-y-3">
+                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_120px_150px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 xl:grid">
                     <span>Producto</span>
                     <span>Solicitadas</span>
                     <span>Estado</span>
@@ -74,7 +74,7 @@ function status(item) {
                 <article
                     v-for="item in order.items"
                     :key="item.id"
-                    class="grid gap-3 rounded-xl border border-secondary bg-background px-3 py-3 lg:grid-cols-[minmax(0,1fr)_120px_150px] lg:items-center"
+                    class="grid min-w-0 gap-3 rounded-xl border border-secondary bg-background px-3 py-3 xl:grid-cols-[minmax(0,1fr)_120px_150px] xl:items-center"
                 >
                     <div class="flex min-w-0 items-start gap-3">
                         <div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-secondary">
@@ -87,14 +87,14 @@ function status(item) {
                             <span v-else class="material-symbols-outlined text-lg opacity-40">inventory_2</span>
                         </div>
 
-                        <div class="min-w-0">
-                            <p class="truncate text-sm font-black text-text">{{ item.product_name }}</p>
-                            <p class="truncate text-xs text-text opacity-60">{{ item.product_code || 'Sin código' }}</p>
+                        <div class="min-w-0 flex-1">
+                            <p class="break-words text-sm font-black leading-snug text-text">{{ item.product_name }}</p>
+                            <p class="mt-0.5 break-all text-xs text-text opacity-60">{{ item.product_code || 'Sin codigo' }}</p>
                             <div v-if="item.branch_breakdown?.length" class="mt-2 flex flex-wrap gap-1.5">
                                 <span
                                     v-for="branch in item.branch_breakdown"
                                     :key="`${item.id}-${branch.branch_id}`"
-                                    class="rounded-full bg-secondary px-2 py-1 text-[10px] font-semibold text-text"
+                                    class="max-w-full rounded-full bg-secondary px-2 py-1 text-[10px] font-semibold leading-tight text-text"
                                 >
                                     {{ branch.branch_name }}: {{ quantity(branch.requested_quantity, itemUnit(item)) }} {{ unitLabel(item) }}
                                 </span>
@@ -102,7 +102,11 @@ function status(item) {
                         </div>
                     </div>
 
-                    <strong class="text-sm text-text">{{ quantity(item.requested_quantity, itemUnit(item)) }} {{ unitLabel(item) }}</strong>
+                    <div class="flex flex-wrap items-center gap-2 xl:block">
+                        <span class="text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-50 xl:hidden">Solicitadas</span>
+                        <strong class="text-sm text-text">{{ quantity(item.requested_quantity, itemUnit(item)) }} {{ unitLabel(item) }}</strong>
+                    </div>
+
                     <span class="w-fit rounded-full bg-secondary px-2 py-1 text-[11px] font-bold text-text">
                         {{ status(item) }}
                     </span>
