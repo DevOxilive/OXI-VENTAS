@@ -505,8 +505,36 @@ onBeforeUnmount(() => {
                           @pointerdown.prevent="startHorizontalAdjust($event, previewBlock.key)"
                         >
                           <template v-for="(row, rowIndex) in previewBlock.rows" :key="`${previewBlock.key}-${row.type}-${rowIndex}`">
+                            <div
+                              v-if="row.type === 'brand_header'"
+                              class="grid w-full items-center gap-2 py-1 font-black leading-none"
+                              :class="'grid-cols-[auto_1fr_auto]'"
+                              :style="{ fontSize: `${Math.max(10, Math.round((row.size_percent || 100) * 0.16))}px` }"
+                            >
+                              <img
+                                :src="row.src"
+                                :alt="row.alt || 'Logo'"
+                                class="h-auto shrink-0 object-contain"
+                                :style="{ width: `${Math.round(72 * Math.max(0.65, Math.min(1.35, Number(row.size_percent || 100) / 100)))}px` }"
+                              >
+                              <span class="whitespace-nowrap text-center">{{ row.title }}</span>
+                              <span class="whitespace-nowrap text-right text-[0.82em]">{{ row.cash_box }}</span>
+                            </div>
+
+                            <div
+                              v-else-if="row.type === 'image'"
+                              class="flex justify-center py-1"
+                            >
+                              <img
+                                :src="row.src"
+                                :alt="row.alt || 'Logo'"
+                                class="h-auto max-w-full object-contain"
+                                :style="{ width: `${Math.round(160 * Math.max(0.65, Math.min(1.35, Number(row.size_percent || 100) / 100)))}px` }"
+                              >
+                            </div>
+
                             <p
-                              v-if="row.type === 'text'"
+                              v-else-if="row.type === 'text'"
                               class="break-words font-semibold"
                               :class="row.bold ? 'font-black' : 'font-semibold'"
                               :style="textStyle(row)"

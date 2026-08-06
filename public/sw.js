@@ -1,10 +1,9 @@
-const VERSION = 'oxi-ventas-pwa-v8';
+const VERSION = 'oxi-ventas-pwa-v9';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
 const PRECACHE_URLS = [
     '/offline.html',
-    '/manifest.webmanifest',
     '/favicon.ico',
     '/icons/icon-192.png',
 ];

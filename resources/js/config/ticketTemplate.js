@@ -1,4 +1,5 @@
 const BLOCK_CATALOG = [
+  { key: "logo", label: "Logo" },
   { key: "cash_box", label: "Caja #" },
   { key: "brand_title", label: "Marca" },
   { key: "divider_header", label: "Linea despues de marca" },
@@ -17,6 +18,7 @@ const BLOCK_CATALOG = [
 ];
 
 const DEFAULT_POSITIONS = {
+  logo: 50,
   cash_box: 100,
   brand_title: 50,
   divider_header: 0,
@@ -35,6 +37,7 @@ const DEFAULT_POSITIONS = {
 };
 
 const DEFAULT_SIZES = {
+  logo: 100,
   cash_box: 104,
   brand_title: 118,
   divider_header: 90,
@@ -466,6 +469,7 @@ function isBlockEnabled(template, key) {
 function buildRowsForBlock(template, printJob, block) {
   const rows = [];
   const width = lineWidthForPaper(template.paper_width);
+  const logoEnabled = isBlockEnabled(template, "logo");
   const brandEnabled = isBlockEnabled(template, "brand_title");
   const cashBoxEnabled = isBlockEnabled(template, "cash_box");
   const folioEnabled = isBlockEnabled(template, "folio");
@@ -474,7 +478,24 @@ function buildRowsForBlock(template, printJob, block) {
   const dateBlock = normalizeTicketTemplate(template).blocks.find((candidate) => candidate.key === "date");
 
   switch (block.key) {
+    case "logo":
+      rows.push({
+        type: "brand_header",
+        src: printJob.ticket_header_data_url || printJob.ticket_logo_data_url || "/icons/super-kay-ticket-bw.png",
+        alt: "SUPER-KAY",
+        title: template.header_text || "SUPER KAY",
+        cash_box: cashBoxEnabled ? cashBoxText(template, printJob) : "",
+        composite: Boolean(printJob.ticket_header_data_url),
+        block_key: block.key,
+        position_percent: block.position_percent,
+        size_percent: block.size_percent,
+      });
+      break;
     case "brand_title":
+      if (logoEnabled) {
+        break;
+      }
+
       rows.push({
         type: "center_right",
         center: template.header_text,
@@ -508,7 +529,7 @@ function buildRowsForBlock(template, printJob, block) {
       break;
     }
     case "cash_box":
-      if (!brandEnabled) {
+      if (!brandEnabled && !logoEnabled) {
         rows.push({
           type: "center_right",
           center: "",
@@ -771,6 +792,14 @@ function visualFontSizePx(sizePercent = 100) {
 }
 
 function estimateRowHeightPx(row) {
+  if (row.type === "brand_header") {
+    return Math.round(64 * Math.max(0.65, Math.min(1.35, Number(row.size_percent || 100) / 100)));
+  }
+
+  if (row.type === "image") {
+    return Math.round(48 * Math.max(0.65, Math.min(1.35, Number(row.size_percent || 100) / 100)));
+  }
+
   const baseFont = row.type === "center_right"
     ? Math.max(visualFontSizePx(row.center_size_percent), visualFontSizePx(row.right_size_percent))
     : visualFontSizePx(row.size_percent);
@@ -837,6 +866,39 @@ export function buildTicketHtmlMarkup(template, printJob) {
           const fontSize = visualFontSizePx(row.size_percent);
           const color = "#000000";
           const leftPadding = printPaddingPercent(row.position_percent);
+
+          if (row.type === "brand_header") {
+            const scale = Math.max(0.65, Math.min(1.35, Number(row.size_percent || 100) / 100));
+            const imageWidth = Math.round((row.composite ? 192 : 72) * scale);
+            const titleFontSize = Math.round(18 * scale);
+            const cashFontSize = Math.round(15 * scale);
+
+            if (row.composite) {
+              return `
+                <div style="margin:0 0 4px 0; text-align:center;">
+                  <img src="${escapeHtml(row.src)}" alt="${escapeHtml(row.alt || "Logo")}" style="width:${imageWidth}px; max-width:100%; height:auto; image-rendering:pixelated;">
+                </div>
+              `;
+            }
+
+            return `
+              <div style="display:grid; grid-template-columns:${imageWidth}px 1fr minmax(72px, auto); align-items:center; column-gap:10px; margin:0 0 6px 0; color:${color}; white-space:nowrap;">
+                <img src="${escapeHtml(row.src)}" alt="${escapeHtml(row.alt || "Logo")}" style="width:${imageWidth}px; height:auto; flex-shrink:0; image-rendering:pixelated;">
+                <strong style="font-size:${titleFontSize}px; line-height:1; font-weight:800; text-align:center;">${escapeHtml(normalizePreviewText(row.title))}</strong>
+                <strong style="font-size:${cashFontSize}px; line-height:1; font-weight:800; text-align:right;">${escapeHtml(normalizePreviewText(row.cash_box))}</strong>
+              </div>
+            `;
+          }
+
+          if (row.type === "image") {
+            const imageWidth = Math.round(160 * Math.max(0.65, Math.min(1.35, Number(row.size_percent || 100) / 100)));
+
+            return `
+              <div style="margin:0 0 6px 0; text-align:center;">
+                <img src="${escapeHtml(row.src)}" alt="${escapeHtml(row.alt || "Logo")}" style="width:${imageWidth}px; max-width:100%; height:auto; image-rendering:pixelated;">
+              </div>
+            `;
+          }
 
           if (row.type === "divider") {
             return `<div style="margin:4px 0 6px 0; color:#94a3b8; font-size:10px; line-height:1;">${escapeHtml(row.text)}</div>`;
@@ -928,6 +990,22 @@ export function buildEscPosTicketData(template, printJob) {
     block.rows.forEach((row) => {
       const sizePercent = Number(row.size_percent || 100);
       const positionPercent = Number(row.position_percent || 0);
+
+      if ((row.type === "brand_header" || row.type === "image") && row.src) {
+        lines.push({
+          type: "raw",
+          format: "image",
+          flavor: "base64",
+          data: row.src,
+          options: {
+            language: "escpos",
+            dotDensity: "double",
+            imageEncoding: "esc_asterisk",
+          },
+        });
+        lines.push("\n");
+        return;
+      }
 
       if (row.type === "divider") {
         lines.push(sizePercentToEsc(100));

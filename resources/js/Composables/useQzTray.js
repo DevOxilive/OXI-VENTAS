@@ -160,18 +160,55 @@ function shouldRetryQzPrint(error) {
   return /sendData is not a function|connection attempt has not returned|open connection with QZ Tray already exists|websocket|closed|not connected|tiempo de espera/i.test(message);
 }
 
+function normalizeRawPrintPayload(printData) {
+  if (!Array.isArray(printData)) {
+    return [{
+      type: "raw",
+      format: "command",
+      flavor: "plain",
+      data: String(printData || "").replace(/\r?\n/g, "\r\n"),
+    }];
+  }
+
+  const payload = [];
+  let commandBuffer = "";
+
+  const flushCommandBuffer = () => {
+    if (!commandBuffer) {
+      return;
+    }
+
+    payload.push({
+      type: "raw",
+      format: "command",
+      flavor: "plain",
+      data: commandBuffer.replace(/\r?\n/g, "\r\n"),
+    });
+    commandBuffer = "";
+  };
+
+  printData.forEach((item) => {
+    if (typeof item === "string") {
+      commandBuffer += item;
+      return;
+    }
+
+    flushCommandBuffer();
+    payload.push(item);
+  });
+
+  flushCommandBuffer();
+
+  return payload;
+}
+
 async function sendRawPrint(printerName, payload) {
   const config = qz.configs.create(printerName, {
     encoding: "Cp1252",
     copies: 1,
   });
 
-  return qz.print(config, [{
-    type: "raw",
-    format: "command",
-    flavor: "plain",
-    data: payload,
-  }]);
+  return qz.print(config, payload);
 }
 
 export async function getQzPrinters() {
@@ -191,8 +228,7 @@ export async function printEscPosTicket(printerName, printData = [], options = {
     throw new Error("No hay una impresora seleccionada.");
   }
 
-  const payload = (Array.isArray(printData) ? printData.join("") : String(printData || ""))
-    .replace(/\r?\n/g, "\r\n");
+  const payload = normalizeRawPrintPayload(printData);
 
   const runPrint = async () => {
     if (options.freshConnection) {

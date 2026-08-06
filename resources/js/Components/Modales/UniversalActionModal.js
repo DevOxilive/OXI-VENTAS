@@ -18,12 +18,13 @@ function mergeAlertClasses(customClass = {}) {
 }
 
 function withAlertDefaults(options = {}) {
-    const { didOpen, customClass = {}, ...rest } = options;
+    const { didOpen, customClass = {}, toast = false, ...rest } = options;
 
     return {
         ...rest,
         target: "body",
-        heightAuto: false,
+        ...(toast ? {} : { heightAuto: false }),
+        toast,
         didOpen: (...args) => {
             raiseAlertContainer();
             didOpen?.(...args);

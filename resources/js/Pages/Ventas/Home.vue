@@ -84,6 +84,7 @@ const { can } = usePermissions();
 const CASH_BOX_STORAGE_KEY = "ventas_cash_box_by_branch";
 const PRODUCT_SEARCH_DEBOUNCE_MS = 300;
 const PRODUCT_SEARCH_CACHE_TTL_MS = 5000;
+const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
 
 const search = ref("");
 const searchInput = ref(null);
@@ -111,6 +112,8 @@ const productSearchRequests = new Map();
 let unsubscribeStockUpdated = null;
 let unsubscribeProductChanged = null;
 let realtimeMounted = false;
+let ticketLogoDataUrlPromise = null;
+const ticketHeaderDataUrlPromises = new Map();
 
 const saleForm = useForm({
   branch_id: props.currentBranch?.id ?? "",
@@ -119,6 +122,7 @@ const saleForm = useForm({
   cash_received: "",
   items: [],
 });
+const saleSubmitting = ref(false);
 
 function formatMoney(value) {
   return new Intl.NumberFormat("es-MX", {
@@ -179,14 +183,18 @@ function subscribeSalesBranchRealtime(branchId) {
 
 watch(
   () => props.currentBranch?.id,
-  (branchId) => {
+  (branchId, previousBranchId) => {
+    const branchChanged = String(branchId ?? "") !== String(previousBranchId ?? "");
+
     selectedBranchId.value = branchId ?? "";
     saleForm.branch_id = branchId ?? "";
     cart.value = [];
     search.value = "";
     saleForm.cash_received = "";
     cardPaymentConfirmed.value = false;
-    lastPrintJob.value = null;
+    if (branchChanged) {
+      lastPrintJob.value = null;
+    }
     expirationAlertPanelOpen.value = false;
     highlightedSuggestionIndex.value = 0;
     loadCashBoxForBranch(selectedBranchId.value);
@@ -208,6 +216,7 @@ onMounted(() => {
   if (!props.selectorMode) {
     focusSearch();
     subscribeSalesBranchRealtime(props.currentBranch?.id);
+    void initializePrinterBridge({ silent: true });
   }
 });
 
@@ -399,10 +408,9 @@ const selectedPaymentMethodType = computed(() => {
 });
 
 const isCashPayment = computed(() => selectedPaymentMethodType.value === "cash");
-const canAccessAllBranches = computed(() => can("branches.access-all"));
 const canCreateSale = computed(() => can("sales.create"));
 const canReturnToBranchSelector = computed(() =>
-  canAccessAllBranches.value && !props.selectorMode && props.branchesDB.length > 1
+  !props.selectorMode && props.branchesDB.length > 1
 );
 
 watch(cartTotal, (total) => {
@@ -488,6 +496,122 @@ const resolvedTicketTemplate = computed(() =>
   )
 );
 
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("No se pudo leer el logo del ticket."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function getTicketLogoDataUrl() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  if (!ticketLogoDataUrlPromise) {
+    ticketLogoDataUrlPromise = window.fetch(TICKET_LOGO_URL, {
+      cache: "force-cache",
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("No se encontro el logo del ticket.");
+        }
+
+        return response.blob();
+      })
+      .then(blobToDataUrl)
+      .catch(() => "");
+  }
+
+  return ticketLogoDataUrlPromise;
+}
+
+function imageFromDataUrl(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("No se pudo preparar el encabezado del ticket."));
+    image.src = dataUrl;
+  });
+}
+
+async function getTicketHeaderDataUrl(cashBoxText = "") {
+  const normalizedCashBoxText = String(cashBoxText || "").trim();
+  const cacheKey = normalizedCashBoxText || "__default__";
+
+  if (ticketHeaderDataUrlPromises.has(cacheKey)) {
+    return ticketHeaderDataUrlPromises.get(cacheKey);
+  }
+
+  const promise = getTicketLogoDataUrl()
+    .then(async (logoDataUrl) => {
+      if (!logoDataUrl || typeof document === "undefined") {
+        return logoDataUrl;
+      }
+
+      const logoImage = await imageFromDataUrl(logoDataUrl);
+      const canvas = document.createElement("canvas");
+      canvas.width = 576;
+      canvas.height = 92;
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        return logoDataUrl;
+      }
+
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(logoImage, 12, 5, 82, 82);
+
+      context.fillStyle = "#000000";
+      context.font = "700 27px Arial, sans-serif";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText("SUPER KAY", Math.round(canvas.width / 2), Math.round(canvas.height / 2));
+
+      if (normalizedCashBoxText) {
+        context.fillStyle = "#000000";
+        context.font = "700 21px Arial, sans-serif";
+        context.textAlign = "right";
+        context.textBaseline = "middle";
+        context.fillText(normalizedCashBoxText.toUpperCase(), canvas.width - 12, Math.round(canvas.height / 2));
+      }
+
+      return canvas.toDataURL("image/png");
+    })
+    .catch(() => "");
+
+  ticketHeaderDataUrlPromises.set(cacheKey, promise);
+
+  return promise;
+}
+
+function isPublicPwaOriginForQz() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const hostname = window.location.hostname || "";
+
+  return !["localhost", "127.0.0.1", "::1"].includes(hostname)
+    && !hostname.endsWith(".local");
+}
+
+function readablePrinterBridgeError(error) {
+  const message = String(error?.message || error || "");
+
+  if (
+    isPublicPwaOriginForQz()
+    && /unable to establish connection|qz tray no esta conectado|websocket|connection/i.test(message)
+  ) {
+    return "Chrome esta bloqueando la conexion local con QZ Tray porque la PWA se abrio desde una URL publica. Para imprimir tickets, abre el POS desde localhost/LAN o desactiva temporalmente la revision de acceso local del navegador.";
+  }
+
+  return message || "QZ Tray no esta conectado en esta computadora.";
+}
+
 function detectPreferredPrinter(printers = []) {
   const normalizedPreferred = printers.find((printerName) => {
     const text = String(printerName || "").toLowerCase();
@@ -542,15 +666,12 @@ async function initializePrinterBridge({ silent = true } = {}) {
   } catch (error) {
     printerBridgeReady.value = false;
     availablePrinters.value = [];
-    printerBridgeMessage.value =
-      error?.message || "QZ Tray no esta conectado en esta computadora.";
+    printerBridgeMessage.value = readablePrinterBridgeError(error);
 
     if (!silent) {
       ErrorAlert({
         title: "No se pudo conectar la impresora",
-        message:
-          error?.message ||
-          "QZ Tray no responde. Abre QZ Tray y vuelve a intentar imprimir.",
+        message: readablePrinterBridgeError(error),
       });
     }
   }
@@ -569,14 +690,12 @@ async function ensurePrinterReadyForPrint({ silent = true } = {}) {
   } catch (error) {
     printerBridgeReady.value = false;
     printerBridgeMessage.value =
-      error?.message || "QZ Tray no esta conectado en esta computadora.";
+      readablePrinterBridgeError(error);
 
     if (!silent) {
       ErrorAlert({
         title: "No se pudo conectar la impresora",
-        message:
-          error?.message ||
-          "QZ Tray no responde. Abre QZ Tray y vuelve a intentar imprimir.",
+        message: readablePrinterBridgeError(error),
       });
     }
     throw error;
@@ -598,6 +717,8 @@ function resolvePrintJob(printJob) {
 
   return {
     ...printJob,
+    ticket_header_data_url: printJob?.ticket_header_data_url || "",
+    ticket_logo_data_url: printJob?.ticket_logo_data_url || "",
     user_name: page.props.auth?.user?.name || printJob?.user_name || printJob?.employee_name || "",
     cash_box_number: cashBoxNumber,
     cash_box_text: `CAJA #${cashBoxNumber}`,
@@ -617,10 +738,14 @@ async function printTicket(printJob) {
     throw new Error("La impresora no esta verificada. Conectala y usa Reconectar antes de imprimir.");
   }
 
-  const printData = buildEscPosTicketData(resolvedTicketTemplate.value, resolvePrintJob(printJob));
+  const resolvedBasePrintJob = resolvePrintJob(printJob);
+  const resolvedPrintJob = {
+    ...resolvedBasePrintJob,
+    ticket_logo_data_url: printJob.ticket_logo_data_url || await getTicketLogoDataUrl(),
+    ticket_header_data_url: printJob.ticket_header_data_url || await getTicketHeaderDataUrl(resolvedBasePrintJob.cash_box_text),
+  };
+  const printData = buildEscPosTicketData(resolvedTicketTemplate.value, resolvedPrintJob);
   await printEscPosTicket(selectedPrinterName.value, printData, {
-    freshConnection: true,
-    disconnectAfterPrint: true,
     timeoutMs: 10000,
   });
   printerBridgeReady.value = true;
@@ -632,6 +757,8 @@ function queueTicketPrint(printJob) {
     try {
       await printTicket(printJob);
     } catch (error) {
+      printerBridgeReady.value = false;
+      printerBridgeMessage.value = error?.message || "La venta quedo registrada, pero el ticket no salio.";
       WarningAlert({
         title: "Venta guardada sin ticket",
         message: error?.message || "La venta se registro, pero no se pudo imprimir el ticket en la impresora.",
@@ -1233,7 +1360,55 @@ function showExpirationAlert(alerts) {
   });
 }
 
-function submitSale() {
+function handleSaleRegistered(payload = {}) {
+  const printJob = payload.print_job ? resolvePrintJob(payload.print_job) : null;
+
+  if (printJob) {
+    printJob.ticket_logo_data_url = "";
+    lastPrintJob.value = printJob;
+  }
+
+  ToastAlert({
+    title: payload.sale_folio
+      ? `Venta registrada: ${payload.sale_folio}`
+      : "Venta registrada correctamente",
+  });
+
+  replaceExpirationAlerts(payload.expiration_alerts || []);
+
+  if ((payload.expiration_alerts || []).length) {
+    expirationAlertPulse.value = true;
+    window.setTimeout(() => {
+      expirationAlertPulse.value = false;
+    }, 1600);
+  }
+
+  clearProductSearchCache();
+  clearCart();
+  saleForm.reset("items", "cash_received");
+  saleForm.payment_method_id = props.defaultPaymentMethodId ?? "";
+
+  if (printJob) {
+    if (printerBridgeReady.value && selectedPrinterName.value) {
+      queueTicketPrint(printJob);
+    } else {
+      printerBridgeMessage.value = "La venta quedo registrada. Reconecta la impresora y usa Reimprimir ticket.";
+      ToastAlert({
+        icon: "warning",
+        title: "Venta registrada sin ticket: impresora no verificada",
+      });
+    }
+    return;
+  }
+
+  printerBridgeMessage.value = "La venta se registro, pero el sistema no recibio el ticket para imprimir.";
+  WarningAlert({
+    title: "Venta registrada sin ticket",
+    message: "No se recibio la informacion del ticket desde el servidor. Revisa la venta en reportes antes de reimprimir.",
+  });
+}
+
+async function submitSale() {
   if (!canCreateSale.value) {
     WarningAlert({
       title: "Sin permiso para cobrar",
@@ -1293,50 +1468,29 @@ function submitSale() {
     unit_price: cartItemUnitPrice(item),
   }));
 
-  saleForm.post(route("ventas.store"), {
-    preserveScroll: true,
-    onSuccess: async (pageResponse) => {
-      const flash = pageResponse.props.flash || {};
-      lastPrintJob.value = flash.print_job ? resolvePrintJob(flash.print_job) : null;
+  saleSubmitting.value = true;
+  saleForm.clearErrors();
 
-      ToastAlert({
-        title: flash.sale_folio
-          ? `Venta registrada: ${flash.sale_folio}`
-          : "Venta registrada correctamente",
-      });
+  try {
+    const { data } = await window.axios.post(route("ventas.store"), saleForm.data(), {
+      headers: {
+        Accept: "application/json",
+      },
+    });
 
-      replaceExpirationAlerts(flash.expiration_alerts || []);
+    handleSaleRegistered(data || {});
+  } catch (error) {
+    if (error?.response?.status === 422 && error.response.data?.errors) {
+      saleForm.setError(error.response.data.errors);
+    }
 
-      if ((flash.expiration_alerts || []).length) {
-        expirationAlertPulse.value = true;
-        window.setTimeout(() => {
-          expirationAlertPulse.value = false;
-        }, 1600);
-      }
-
-      clearProductSearchCache();
-      clearCart();
-      saleForm.reset("items", "cash_received");
-      saleForm.payment_method_id = props.defaultPaymentMethodId ?? "";
-
-      if (lastPrintJob.value) {
-        if (printerBridgeReady.value && selectedPrinterName.value) {
-          queueTicketPrint(lastPrintJob.value);
-        } else {
-          ToastAlert({
-            icon: "warning",
-            title: "Venta registrada sin ticket: impresora no verificada",
-          });
-        }
-      }
-    },
-    onError: () => {
       ErrorAlert({
         title: "No se pudo guardar la venta",
         message: "Revisa el stock, el efectivo recibido o la sucursal seleccionada.",
       });
-    },
-  });
+  } finally {
+    saleSubmitting.value = false;
+  }
 }
 </script>
 
@@ -1880,10 +2034,10 @@ function submitSale() {
                 <button
                   type="button"
                   class="inline-flex w-full items-center justify-center rounded-2xl border border-primary bg-primary px-4 py-4 text-base font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="saleForm.processing || !canCharge"
+                  :disabled="saleSubmitting || !canCharge"
                   @click="submitSale"
                 >
-                  {{ !canCreateSale ? "Sin permiso para cobrar" : saleForm.processing ? "Guardando..." : "Cobrar venta" }}
+                  {{ !canCreateSale ? "Sin permiso para cobrar" : saleSubmitting ? "Guardando..." : "Cobrar venta" }}
                 </button>
               </div>
             </div>
