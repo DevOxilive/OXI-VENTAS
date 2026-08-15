@@ -3,6 +3,7 @@ import { computed, useSlots } from 'vue'
 import ToolbarMobile from './ToolbarMobile.vue'
 import ToolbarDesktop from './ToolbarDesktop.vue'
 
+const RECORDS_PER_PAGE_OPTIONS = [10, 25, 50, 100, 200]
 const slots = useSlots()
 const hasActionsSlot = computed(() => Boolean(slots.actions))
 
@@ -61,15 +62,11 @@ defineProps({
 
     recordsPerPage: {
         type: Number,
-        default: 50,
-    },
-    recordsPerPageOptions: {
-        type: Array,
-        default: () => [10, 25, 50, 100],
+        default: 25,
     },
     showRecordsPerPage: {
         type: Boolean,
-        default: true,
+        default: false,
     },
 
     totalRecords: {
@@ -102,7 +99,7 @@ defineEmits([
             :search="search" :search-placeholder="searchPlaceholder" :show-search="showSearch" :filters="filters"
             :actions="actions" :tabs="tabs" :active-tab="activeTab" :records-per-page="recordsPerPage"
             :compact-filters="compactFilters"
-            :records-per-page-options="recordsPerPageOptions" :show-records-per-page="showRecordsPerPage"
+            :records-per-page-options="RECORDS_PER_PAGE_OPTIONS" :show-records-per-page="showRecordsPerPage"
             :total-records="totalRecords" :filtered-records="filteredRecords" :show-counter="showCounter"
             @back="$emit('back')" @update:search="$emit('update:search', $event)"
             @update:filter="$emit('update:filter', $event)"
@@ -115,7 +112,7 @@ defineEmits([
             :search="search" :search-placeholder="searchPlaceholder" :show-search="showSearch" :filters="filters"
             :actions="actions" :tabs="tabs" :active-tab="activeTab" :records-per-page="recordsPerPage"
             :compact-filters="compactFilters"
-            :records-per-page-options="recordsPerPageOptions" :show-records-per-page="showRecordsPerPage"
+            :records-per-page-options="RECORDS_PER_PAGE_OPTIONS" :show-records-per-page="showRecordsPerPage"
             :total-records="totalRecords" :filtered-records="filteredRecords" :show-counter="showCounter"
             @back="$emit('back')" @update:search="$emit('update:search', $event)"
             @update:filter="$emit('update:filter', $event)"

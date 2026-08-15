@@ -74,6 +74,7 @@ class InventoryReportService
             ->join('branch_products', 'branch_products.id', '=', 'product_batches.branch_product_id')
             ->join('products', 'products.id', '=', 'branch_products.product_id')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('product_departments', 'product_departments.id', '=', 'categories.product_department_id')
             ->leftJoinSub($lastInSubquery, 'last_entries', function ($join) {
                 $join->on('last_entries.branch_product_id', '=', 'branch_products.id');
             })
@@ -89,6 +90,7 @@ class InventoryReportService
                 'products.name as product',
                 'products.inventory_unit',
                 'products.unit',
+                DB::raw('COALESCE(product_departments.name, "Sin departamento") as department'),
                 'categories.name as category',
                 'product_batches.lot_number',
                 'product_batches.initial_quantity',
@@ -124,6 +126,7 @@ class InventoryReportService
         $this->applyProductFilters($query, $filters);
         $this->applySearchFilter($query, $filters, [
             'products.name',
+            'product_departments.name',
             'categories.name',
             'product_batches.lot_number',
         ]);
@@ -175,6 +178,7 @@ class InventoryReportService
             ->join('branch_products', 'branch_products.id', '=', 'stock_movements.branch_product_id')
             ->join('products', 'products.id', '=', 'branch_products.product_id')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('product_departments', 'product_departments.id', '=', 'categories.product_department_id')
             ->leftJoin('users', 'users.id', '=', 'stock_movements.user_id')
             ->leftJoin('stock_movement_batches', 'stock_movement_batches.stock_movement_id', '=', 'stock_movements.id')
             ->leftJoin('product_batches', 'product_batches.id', '=', 'stock_movement_batches.product_batch_id')
@@ -185,6 +189,7 @@ class InventoryReportService
                 'products.name as product',
                 'products.inventory_unit',
                 'products.unit',
+                DB::raw('COALESCE(product_departments.name, "Sin departamento") as department'),
                 'categories.name as category',
                 DB::raw('GROUP_CONCAT(DISTINCT product_batches.lot_number ORDER BY product_batches.lot_number SEPARATOR ", ") as lot_number'),
                 DB::raw('NULL as initial_quantity'),
@@ -229,6 +234,7 @@ class InventoryReportService
                 'products.name',
                 'products.inventory_unit',
                 'products.unit',
+                'product_departments.name',
                 'categories.name',
                 'stock_movements.quantity',
                 'branch_products.stock',
@@ -248,6 +254,7 @@ class InventoryReportService
         $this->applyProductFilters($query, $filters);
         $this->applySearchFilter($query, $filters, [
             'products.name',
+            'product_departments.name',
             'categories.name',
             'product_batches.lot_number',
             'users.name',
@@ -297,6 +304,7 @@ class InventoryReportService
         $query = BranchProduct::query()
             ->join('products', 'products.id', '=', 'branch_products.product_id')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('product_departments', 'product_departments.id', '=', 'categories.product_department_id')
             ->leftJoinSub($periodMovementSubquery, 'period_movements', function ($join) {
                 $join->on('period_movements.branch_product_id', '=', 'branch_products.id');
             })
@@ -313,6 +321,7 @@ class InventoryReportService
                 'products.name as product',
                 'products.inventory_unit',
                 'products.unit',
+                DB::raw('COALESCE(product_departments.name, "Sin departamento") as department'),
                 'categories.name as category',
                 DB::raw('NULL as lot_number'),
                 DB::raw('NULL as initial_quantity'),
@@ -348,6 +357,7 @@ class InventoryReportService
         $this->applyProductFilters($query, $filters);
         $this->applySearchFilter($query, $filters, [
             'products.name',
+            'product_departments.name',
             'categories.name',
         ]);
 
@@ -382,6 +392,7 @@ class InventoryReportService
         $query = BranchProduct::query()
             ->join('products', 'products.id', '=', 'branch_products.product_id')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('product_departments', 'product_departments.id', '=', 'categories.product_department_id')
             ->leftJoinSub($lastMovementSubquery, 'last_movements', function ($join) {
                 $join->on('last_movements.branch_product_id', '=', 'branch_products.id');
             })
@@ -409,6 +420,7 @@ class InventoryReportService
                 'products.name as product',
                 'products.inventory_unit',
                 'products.unit',
+                DB::raw('COALESCE(product_departments.name, "Sin departamento") as department'),
                 'categories.name as category',
                 DB::raw('NULL as lot_number'),
                 DB::raw('NULL as initial_quantity'),
@@ -446,6 +458,7 @@ class InventoryReportService
         $this->applyProductFilters($query, $filters);
         $this->applySearchFilter($query, $filters, [
             'products.name',
+            'product_departments.name',
             'categories.name',
         ]);
 
@@ -468,7 +481,7 @@ class InventoryReportService
             return $query->get();
         }
 
-        $perPage = max(10, min(100, (int) ($filters['per_page'] ?? 25)));
+        $perPage = max(10, min(200, (int) ($filters['per_page'] ?? 25)));
 
         return $query
             ->paginate($perPage)

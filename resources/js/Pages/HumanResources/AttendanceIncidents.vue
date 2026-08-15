@@ -35,7 +35,7 @@ const filters = reactive({
   to: props.filters.to ?? '',
   search: props.filters.search ?? '',
   status: props.filters.status ?? '',
-  per_page: Number(props.filters.per_page ?? 30),
+  per_page: Number(props.filters.per_page ?? 25),
 })
 const form = useForm({
   employee_id: '',

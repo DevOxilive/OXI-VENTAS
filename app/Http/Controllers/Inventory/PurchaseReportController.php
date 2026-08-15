@@ -68,7 +68,7 @@ class PurchaseReportController extends Controller
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
-        $perPage = TablePagination::resolvePerPage($request, 25);
+        $perPage = TablePagination::resolvePerPage($request);
         $status = $request->input('status', PurchaseOrder::STATUS_GENERATED);
         $allowedStatuses = [
             PurchaseOrder::STATUS_GENERATED,
@@ -377,7 +377,7 @@ class PurchaseReportController extends Controller
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
-        $perPage = TablePagination::resolvePerPage($request, 50);
+        $perPage = TablePagination::resolvePerPage($request);
 
         $filters = [
             'search' => $request->input('search', ''),
@@ -399,6 +399,9 @@ class PurchaseReportController extends Controller
                 'main_barcode' => $item->product?->barcodes?->first()?->code ?? '',
                 'barcodes' => $item->product?->barcodes?->pluck('code')->values() ?? [],
                 'category_id' => $item->product?->category?->id,
+                'product_department_id' => $item->product?->category?->product_department_id,
+                'product_department_name' => $item->product?->category?->productDepartment?->name ?? 'Sin departamento',
+                'department' => $item->product?->category?->productDepartment?->name ?? 'Sin departamento',
                 'category_name' => $item->product?->category?->name ?? 'Sin categoria',
                 'category' => $item->product?->category?->name ?? 'Sin categoria',
                 'stock' => (float) $item->stock,
@@ -517,7 +520,7 @@ class PurchaseReportController extends Controller
             'branch:id,name',
             'user:id,name',
             'items.branchProduct.product.barcodes',
-            'items.branchProduct.product.category',
+            'items.branchProduct.product.category.productDepartment',
         ]);
 
         return response()->json([
@@ -539,6 +542,8 @@ class PurchaseReportController extends Controller
                     'branch_product_id' => $item->branch_product_id,
                     'product_name' => $product?->name ?? 'Producto sin nombre',
                     'product_code' => $product?->barcodes?->first()?->code ?: ($branchProduct?->barcode ?? ''),
+                    'product_department_name' => $product?->category?->productDepartment?->name ?? 'Sin departamento',
+                    'department' => $product?->category?->productDepartment?->name ?? 'Sin departamento',
                     'category_name' => $product?->category?->name ?? 'Sin categoria',
                     'requested_quantity' => (float) $item->requested_quantity,
                     'received_quantity' => $item->received_quantity === null
@@ -556,7 +561,7 @@ class PurchaseReportController extends Controller
     {
         return BranchProduct::query()
             ->with([
-                'product.category',
+                'product.category.productDepartment',
                 'product.barcodes',
             ])
             ->where('branch_id', $branch->id)
@@ -572,6 +577,10 @@ class PurchaseReportController extends Controller
 
                     FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
                         'code',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product.category.productDepartment', [
+                        'name',
                     ], $phrase, $terms);
                 });
             })
@@ -592,7 +601,7 @@ class PurchaseReportController extends Controller
     private function categoryOptions(Branch $branch)
     {
         return Category::query()
-            ->select(['categories.id', 'categories.name'])
+            ->select(['categories.id', 'categories.product_department_id', 'categories.name'])
             ->join('products', 'products.category_id', '=', 'categories.id')
             ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
             ->where('branch_products.branch_id', $branch->id)

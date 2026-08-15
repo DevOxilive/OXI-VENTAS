@@ -24,7 +24,7 @@ class AttendanceIncidentController extends Controller
             'status' => ['nullable', 'in:pending,approved,rejected'],
             'per_page' => ['nullable', 'integer'],
         ]);
-        $filters['per_page'] = TablePagination::resolvePerPage($request, 30, [10, 30, 50, 100]);
+        $filters['per_page'] = TablePagination::resolvePerPage($request);
 
         $incidents = AttendanceIncident::query()
             ->with([

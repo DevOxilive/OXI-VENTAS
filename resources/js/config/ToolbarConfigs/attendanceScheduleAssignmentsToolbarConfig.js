@@ -1,6 +1,6 @@
 export function getAttendanceScheduleAssignmentsToolbarConfig({
     canCreate = false,
-    perPage = 30,
+    perPage = 25,
     total = 0,
 } = {}) {
     return {
@@ -10,7 +10,6 @@ export function getAttendanceScheduleAssignmentsToolbarConfig({
         showSearch: false,
         showRecordsPerPage: true,
         recordsPerPage: Number(perPage),
-        recordsPerPageOptions: [10, 30, 50, 100],
         showCounter: true,
         filteredRecords: Number(total),
         totalRecords: Number(total),

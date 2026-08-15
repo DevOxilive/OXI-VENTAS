@@ -3,12 +3,17 @@
 namespace App\Http\Controllers\Ventas;
 
 use App\Exports\SalesReportExport;
+use App\Exports\SalesReplenishmentReportExport;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
+use App\Models\Category;
+use App\Models\BranchProduct;
 use App\Models\Product;
+use App\Models\ProductDepartment;
 use App\Models\Sale;
 use App\Models\SaleDetail;
+use App\Services\Reports\SalesReplenishmentReportService;
 use App\Support\TablePagination;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -24,6 +29,17 @@ class SalesReportController extends Controller
 
     private const TAB_PRODUCTS = 'products';
     private const TAB_SALES = 'sales';
+    private const TAB_ORDER = 'pedido';
+    private const TAB_TRANSFERS = 'transferencias';
+    private const TAB_NO_MOVEMENT = 'sin-movimiento';
+    private const TAB_STORE_ORDER = 'pedido-tiendas';
+
+    private const REPLENISHMENT_TABS = [
+        self::TAB_ORDER,
+        self::TAB_TRANSFERS,
+        self::TAB_NO_MOVEMENT,
+        self::TAB_STORE_ORDER,
+    ];
 
     public function global(Request $request)
     {
@@ -78,13 +94,17 @@ class SalesReportController extends Controller
         $branches = $this->reportBranches($request);
         $filters = $this->resolveFilters($request, $branch, $branches);
         $activeTab = $filters['tab'];
+        $reportBranches = $this->selectedReportBranches($branch, $branches, $filters);
+        $replenishmentReport = app(SalesReplenishmentReportService::class)->build($reportBranches, $filters);
 
         return Inertia::render('Inventory/Reports/SalesReports', [
             'currentBranch' => $branch ? $this->mapBranch($branch) : null,
             'reportScope' => $branch ? 'branch' : 'global',
             'branchesDB' => $branches->map(fn (Branch $availableBranch) => $this->mapBranch($availableBranch))->values(),
+            'selectionCatalogs' => $this->selectionCatalogs($branches),
             'filters' => $this->mapFilters($filters),
             'activeTab' => $activeTab,
+            'salesReplenishment' => $replenishmentReport,
             'productsSold' => $activeTab === self::TAB_PRODUCTS
                 ? $this->productsSoldQuery($filters)
                     ->paginate((int) $filters['per_page'])
@@ -102,11 +122,23 @@ class SalesReportController extends Controller
 
     private function downloadProductsExcel(Request $request, ?Branch $branch = null)
     {
-        $filters = $this->resolveFilters($request, $branch);
+        $branches = $this->reportBranches($request);
+        $filters = $this->resolveFilters($request, $branch, $branches);
+        $fileScope = $branch ? $this->safeSegment($branch->slug ?: $branch->name) : 'global';
+
+        if (in_array($filters['tab'], self::REPLENISHMENT_TABS, true)) {
+            $reportBranches = $this->selectedReportBranches($branch, $branches, $filters);
+            $report = app(SalesReplenishmentReportService::class)->build($reportBranches, $filters);
+
+            return Excel::download(
+                new SalesReplenishmentReportExport($report, $filters['tab']),
+                'reporte-ventas-'.$filters['tab'].'-'.$fileScope.'-'.now()->format('Y-m-d-H-i').'.xlsx'
+            );
+        }
+
         $rows = $this->productsSoldQuery($filters)
             ->get()
             ->map(fn ($row) => $this->mapProductSoldRow($row, $filters));
-        $fileScope = $branch ? $this->safeSegment($branch->slug ?: $branch->name) : 'global';
 
         return Excel::download(
             new SalesReportExport($rows, 'Productos vendidos', 'products'),
@@ -282,28 +314,56 @@ class SalesReportController extends Controller
     private function resolveFilters(Request $request, ?Branch $branch = null, $branches = null): array
     {
         $validated = $request->validate([
-            'tab' => ['nullable', 'in:products,sales'],
+            'tab' => ['nullable', 'in:products,sales,pedido,transferencias,sin-movimiento,pedido-tiendas'],
             'search' => ['nullable', 'string', 'max:120'],
             'folio' => ['nullable', 'string', 'max:80'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
-            'per_page' => ['nullable', 'integer', 'in:10,20,25,50,100,200'],
+            'coverage_months' => ['nullable', 'integer', 'in:1,2,3,6'],
+            'branch_ids' => ['nullable', 'array'],
+            'branch_ids.*' => ['integer'],
+            'department_ids' => ['nullable', 'array'],
+            'department_ids.*' => ['integer'],
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['integer'],
+            'product_ids' => ['nullable', 'array'],
+            'product_ids.*' => ['integer'],
+            'section_periods' => ['nullable', 'array'],
+            'section_periods.*' => ['nullable', 'date'],
+            'per_page' => ['nullable', 'integer', 'in:10,25,50,100,200'],
         ]);
         $branches ??= $this->reportBranches($request);
+        $accessibleBranchIds = $branches->pluck('id')->map(fn ($id) => (int) $id)->values();
+        $requestedBranchIds = collect($validated['branch_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->intersect($accessibleBranchIds)
+            ->values();
         $branchIds = $branch
             ? [(int) $branch->id]
-            : $branches->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+            : ($requestedBranchIds->isNotEmpty() ? $requestedBranchIds->all() : $accessibleBranchIds->all());
+
+        $tab = $validated['tab'] ?? self::TAB_ORDER;
+        $tab = $tab === self::TAB_PRODUCTS ? self::TAB_ORDER : $tab;
 
         return [
-            'tab' => $validated['tab'] ?? self::TAB_PRODUCTS,
+            'tab' => $tab,
             'search' => trim((string) ($validated['search'] ?? '')),
             'folio' => trim((string) ($validated['folio'] ?? '')),
             'date_from' => $validated['date_from'] ?? now()->startOfMonth()->toDateString(),
             'date_to' => $validated['date_to'] ?? now()->toDateString(),
+            'coverage_months' => (int) ($validated['coverage_months'] ?? 2),
+            'department_ids' => $this->integerFilterValues($validated['department_ids'] ?? []),
+            'category_ids' => $this->integerFilterValues($validated['category_ids'] ?? []),
+            'product_ids' => $this->integerFilterValues($validated['product_ids'] ?? []),
+            'section_periods' => collect($validated['section_periods'] ?? [])
+                ->filter(fn ($date) => filled($date))
+                ->map(fn ($date) => Carbon::parse($date)->toDateString())
+                ->all(),
             'branch_id' => $branch ? (int) $branch->id : null,
             'branch_ids' => $branchIds,
             'scope' => $branch ? 'branch' : 'global',
-            'per_page' => TablePagination::resolvePerPage($request, 25),
+            'per_page' => TablePagination::resolvePerPage($request),
         ];
     }
 
@@ -315,6 +375,12 @@ class SalesReportController extends Controller
             'folio' => $filters['folio'],
             'date_from' => $filters['date_from'],
             'date_to' => $filters['date_to'],
+            'coverage_months' => $filters['coverage_months'],
+            'branch_ids' => $filters['branch_ids'],
+            'department_ids' => $filters['department_ids'],
+            'category_ids' => $filters['category_ids'],
+            'product_ids' => $filters['product_ids'],
+            'section_periods' => $filters['section_periods'],
             'branch_id' => $filters['branch_id'],
             'scope' => $filters['scope'],
             'per_page' => $filters['per_page'],
@@ -463,6 +529,89 @@ class SalesReportController extends Controller
         abort_if($branches->isEmpty(), 403, 'No tienes sucursales habilitadas para consultar reportes.');
 
         return $branches;
+    }
+
+    private function selectionCatalogs($branches): array
+    {
+        $branchIds = $branches->pluck('id')->map(fn ($id) => (int) $id)->values();
+
+        $products = Product::query()
+            ->select([
+                'products.id',
+                'products.name',
+                'products.category_id',
+                'categories.product_department_id',
+            ])
+            ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
+            ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->whereIn('branch_products.branch_id', $branchIds)
+            ->where('branch_products.status', BranchProduct::STATUS_ACTIVE)
+            ->where('products.active', true)
+            ->whereNull('products.deleted_at')
+            ->whereNull('branch_products.deleted_at')
+            ->distinct()
+            ->orderBy('products.name')
+            ->get();
+
+        $categoryIds = $products->pluck('category_id')->filter()->unique()->values();
+        $departmentIds = $products->pluck('product_department_id')->filter()->unique()->values();
+
+        return [
+            'branches' => $branches->map(fn (Branch $branch) => $this->mapBranch($branch))->values()->all(),
+            'departments' => ProductDepartment::query()
+                ->where('active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->values()
+                ->all(),
+            'categories' => Category::query()
+                ->whereIn('id', $categoryIds)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'product_department_id'])
+                ->values()
+                ->all(),
+            'products' => $products
+                ->map(fn ($product) => [
+                    'id' => (int) $product->id,
+                    'name' => $product->name,
+                    'category_id' => (int) $product->category_id,
+                    'product_department_id' => (int) $product->product_department_id,
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function selectedReportBranches(?Branch $branch, $branches, array $filters)
+    {
+        if ($branch) {
+            return collect([$branch]);
+        }
+
+        $selectedBranchIds = collect($filters['branch_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values();
+
+        if ($selectedBranchIds->isEmpty()) {
+            return $branches;
+        }
+
+        return $branches
+            ->filter(fn (Branch $availableBranch) => $selectedBranchIds->contains((int) $availableBranch->id))
+            ->values();
+    }
+
+    private function integerFilterValues(array $values): array
+    {
+        return collect($values)
+            ->map(fn ($value) => (int) $value)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function emptyPaginator(): array

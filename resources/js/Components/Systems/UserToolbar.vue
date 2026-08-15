@@ -27,7 +27,7 @@ defineEmits([
 <template>
     <GlobalToolbar title="Registro de Usuarios" subtitle="Administra empleados disponibles y usuarios del sistema"
         v-bind="getUsersToolbarConfig({ roles, activeFilters })" :search="search" :records-per-page="recordsPerPage"
-        :records-per-page-options="[10, 25, 50, 100]" :filtered-records="filteredRecords" :total-records="totalRecords"
+        :filtered-records="filteredRecords" :total-records="totalRecords"
         @update:search="$emit('update:search', $event)" @update:filter="$emit('update:filter', $event)"
         @update:records-per-page="$emit('update:records-per-page', $event)" />
 </template>

@@ -15,6 +15,7 @@ export function getInventoryToolbarConfig({
         subtitle: "Consulta y movimientos por sucursal",
         searchPlaceholder: "Buscar producto, código, lote o barcode...",
 
+        showRecordsPerPage: true,
         filters: [
             {
                 key: "categoryFilter",

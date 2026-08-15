@@ -105,7 +105,7 @@ export function useBranchInventory(props) {
     const inactiveCandidateFilter = ref(
         props.filters?.inactive_candidate ?? "",
     );
-    const recordsToShow = ref(Number(props.filters?.per_page ?? 50));
+    const recordsToShow = ref(Number(props.filters?.per_page ?? 25));
 
     const branchProductsState = ref(cloneBranchProductsPayload(props.branchProductsDB));
     const inventoryStatsState = ref({ ...(props.inventoryStats ?? {}) });
@@ -207,6 +207,9 @@ export function useBranchInventory(props) {
                 barcodes: (item.product?.barcodes ?? [])
                     .map((barcode) => barcode?.code)
                     .filter(Boolean),
+                product_department_id: item.product?.category?.product_department_id ?? null,
+                product_department_name: item.product?.category?.product_department?.name ?? "Sin departamento",
+                department: item.product?.category?.product_department?.name ?? "Sin departamento",
                 category_name: item.product?.category?.name ?? "Sin categoría",
                 category: item.product?.category?.name ?? "Sin categoría",
                 branch:

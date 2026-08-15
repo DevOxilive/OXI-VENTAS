@@ -20,7 +20,7 @@ class AttendanceScheduleAssignmentController extends Controller
 
     public function index(Request $request)
     {
-        $perPage = TablePagination::resolvePerPage($request, 30, [10, 30, 50, 100]);
+        $perPage = TablePagination::resolvePerPage($request);
 
         return Inertia::render('HumanResources/AttendanceScheduleAssignments', [
             'assignments' => AttendanceScheduleAssignment::query()

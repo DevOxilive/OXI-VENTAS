@@ -40,7 +40,7 @@ const reportFilters = reactive({
   status: props.filters.status || "",
   date_from: props.filters.date_from || "",
   date_to: props.filters.date_to || "",
-  per_page: Number(props.filters.per_page || 20),
+  per_page: Number(props.filters.per_page || 25),
 });
 
 const toolbarActions = computed(() => can("reports.cash-closures.create")
@@ -264,7 +264,7 @@ function reportQuery(overrides = {}) {
     status: reportFilters.status || "",
     date_from: reportFilters.date_from || "",
     date_to: reportFilters.date_to || "",
-    per_page: reportFilters.per_page || 20,
+    per_page: reportFilters.per_page || 25,
     ...overrides,
   };
 }
@@ -403,7 +403,7 @@ watch(
     reportFilters.status = filters.status || "";
     reportFilters.date_from = filters.date_from || "";
     reportFilters.date_to = filters.date_to || "";
-    reportFilters.per_page = Number(filters.per_page || 20);
+    reportFilters.per_page = Number(filters.per_page || 25);
 
     setTimeout(() => {
       syncingFilters = false;

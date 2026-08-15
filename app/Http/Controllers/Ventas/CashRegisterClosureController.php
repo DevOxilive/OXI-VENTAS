@@ -11,6 +11,7 @@ use App\Models\Sale;
 use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Support\SystemPermission;
+use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -57,7 +58,7 @@ class CashRegisterClosureController extends Controller
             'status' => ['nullable', 'in:balanced,difference'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
-            'per_page' => ['nullable', 'integer', 'in:10,20,50,100,200'],
+            'per_page' => ['nullable', 'integer', 'in:10,25,50,100,200'],
         ]);
 
         if ($branch) {
@@ -91,7 +92,7 @@ class CashRegisterClosureController extends Controller
         $closures = $closureQuery
             ->with(['branch:id,name,slug', 'user:id,name'])
             ->latest('period_end')
-            ->paginate((int) ($filters['per_page'] ?? 20))
+            ->paginate(TablePagination::resolvePerPage($request))
             ->withQueryString()
             ->through(fn (CashRegisterClosure $closure) => $this->mapClosure($closure));
 
@@ -482,7 +483,7 @@ class CashRegisterClosureController extends Controller
             'status' => $filters['status'] ?? '',
             'date_from' => $filters['date_from'] ?? '',
             'date_to' => $filters['date_to'] ?? '',
-            'per_page' => (int) ($filters['per_page'] ?? 20),
+            'per_page' => (int) ($filters['per_page'] ?? 25),
         ];
     }
 
@@ -515,7 +516,7 @@ class CashRegisterClosureController extends Controller
             'current_page' => 1,
             'from' => null,
             'last_page' => 1,
-            'per_page' => 15,
+            'per_page' => 25,
             'to' => null,
             'total' => 0,
         ];

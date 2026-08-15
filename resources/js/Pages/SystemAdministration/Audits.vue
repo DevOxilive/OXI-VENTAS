@@ -17,7 +17,7 @@ const form = reactive({
     module: props.filters.module ?? '',
     from: props.filters.from ?? '',
     to: props.filters.to ?? '',
-    per_page: Number(props.filters.per_page ?? 50),
+    per_page: Number(props.filters.per_page ?? 25),
 })
 const filter = () => router.get(route('system-administration.audits.index'), form, { preserveState: true, replace: true })
 const moduleLabels = {
@@ -97,8 +97,8 @@ onBeforeUnmount(() => {
                 :back-button="true"
                 back-label="Centro de Administración"
                 :show-search="false"
+                :show-records-per-page="true"
                 :records-per-page="form.per_page"
-                :records-per-page-options="[10, 25, 50, 100]"
                 :filtered-records="Number(audits.total ?? 0)"
                 :total-records="Number(audits.total ?? 0)"
                 @back="router.get(route('system-administration.index'))"

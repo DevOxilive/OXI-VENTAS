@@ -237,7 +237,7 @@ class StockMovementController extends Controller
             'per_page' => ['nullable', 'integer'],
         ]);
         $filters['search'] = trim((string) ($filters['search'] ?? ''));
-        $filters['per_page'] = TablePagination::resolvePerPage($request, 50);
+        $filters['per_page'] = TablePagination::resolvePerPage($request);
 
         $user = $request->user()->loadMissing(['role', 'branches']);
         $accessibleBranches = $user->accessibleBranchesQuery()

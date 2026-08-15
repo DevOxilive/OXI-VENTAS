@@ -43,7 +43,7 @@ const props = defineProps({
 })
 
 const search = ref(props.filters.search || '')
-const recordsPerPage = ref(props.filters.perPage || 50)
+const recordsPerPage = ref(props.filters.perPage || 25)
 const { handlePageChange } = useGlobalTablePagination()
 
 const statusFilter = ref(props.filters.employmentStatus || '')

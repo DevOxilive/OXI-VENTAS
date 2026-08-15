@@ -766,7 +766,7 @@ class PhysicalCountReportController extends Controller
                 ->all(),
             'report_type' => 'summary',
             'page' => max(1, (int) $request->input('page', 1)),
-            'per_page' => TablePagination::resolvePerPage($request, 25),
+            'per_page' => TablePagination::resolvePerPage($request),
         ];
     }
 

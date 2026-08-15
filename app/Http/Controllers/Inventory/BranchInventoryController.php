@@ -52,7 +52,7 @@ class BranchInventoryController extends Controller
     {
         $today = now()->toDateString();
         $nearExpirationLimit = now()->addDays(30)->toDateString();
-        $perPage = TablePagination::resolvePerPage($request, 50);
+        $perPage = TablePagination::resolvePerPage($request);
 
         $query = BranchProduct::query()
             ->select([
@@ -83,6 +83,10 @@ class BranchInventoryController extends Controller
 
                     FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
                         'code',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product.category.productDepartment', [
+                        'name',
                     ], $phrase, $terms);
 
                     FlexibleSearch::orWhereHasColumns($searchQuery, 'activeBatches', [
@@ -131,7 +135,8 @@ class BranchInventoryController extends Controller
             ->with([
                 'branch:id,name',
                 'product:id,name,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
-                'product.category:id,name',
+                'product.category:id,product_department_id,name',
+                'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
             ])
             ->join('products', 'products.id', '=', 'branch_products.product_id')
@@ -322,7 +327,7 @@ class BranchInventoryController extends Controller
                 ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
                 ->when($branch, fn ($query) => $query->where('branch_products.branch_id', $branch->id))
                 ->where('products.active', true)
-                ->with(['category:id,name', 'barcodes:id,product_id,code'])
+                ->with(['category:id,product_department_id,name', 'category.productDepartment:id,name', 'barcodes:id,product_id,code'])
                 ->distinct()
                 ->orderBy('products.name')
                 ->limit(300)
@@ -333,6 +338,8 @@ class BranchInventoryController extends Controller
                     'sale_price' => $product->sale_price,
                     'cost' => $product->cost,
                     'unit' => $product->unit,
+                    'product_department_id' => $product->category?->product_department_id,
+                    'product_department_name' => $product->category?->productDepartment?->name ?? 'Sin departamento',
                     'category_id' => $product->category_id,
                     'category_name' => $product->category?->name,
                     'main_barcode' => $product->barcodes?->first()?->code,
@@ -363,7 +370,7 @@ class BranchInventoryController extends Controller
     private function categoryOptions(?Branch $branch)
     {
         return Category::query()
-            ->select(['categories.id', 'categories.name'])
+            ->select(['categories.id', 'categories.product_department_id', 'categories.name'])
             ->join('products', 'products.category_id', '=', 'categories.id')
             ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
             ->when($branch, fn ($query) => $query->where('branch_products.branch_id', $branch->id))
@@ -498,7 +505,8 @@ class BranchInventoryController extends Controller
         $branchProduct->loadMissing([
             'branch:id,name,slug',
             'product:id,name,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
-            'product.category:id,name',
+            'product.category:id,product_department_id,name',
+            'product.category.productDepartment:id,name',
             'product.barcodes:id,product_id,code',
         ]);
         $branchProduct->loadCount([
@@ -534,7 +542,8 @@ class BranchInventoryController extends Controller
         $branchProduct->load([
             'branch:id,name,slug',
             'product:id,name,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
-            'product.category:id,name',
+            'product.category:id,product_department_id,name',
+            'product.category.productDepartment:id,name',
             'product.barcodes:id,product_id,code',
             'batches' => fn($query) => $query
                 ->select([

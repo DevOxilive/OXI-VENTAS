@@ -79,7 +79,7 @@ class EmployeeController extends Controller
     public function index(Request $request)
     {
         $search = trim((string) $request->input('search', ''));
-        $perPage = TablePagination::resolvePerPage($request, 50);
+        $perPage = TablePagination::resolvePerPage($request);
 
         $employmentStatus = trim((string) $request->input('employmentStatus', ''));
         $department = $request->integer('department') ?: null;

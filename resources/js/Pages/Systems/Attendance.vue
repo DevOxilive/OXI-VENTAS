@@ -50,7 +50,7 @@ const attendanceRoutePrefix = computed(() => {
 const filters = reactive({
     from: props.filters.from || '', to: props.filters.to || '', branch: props.filters.branch || '',
     search: props.filters.search || '', type: props.filters.type || '',
-    per_page: Number(props.filters.per_page ?? 30),
+    per_page: Number(props.filters.per_page ?? 25),
 })
 const attendanceType = ref('check_in')
 const attendanceShiftId = ref('')

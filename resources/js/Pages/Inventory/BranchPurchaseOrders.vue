@@ -111,6 +111,11 @@ function updateStatus(status) {
     applyStatus(status)
 }
 
+function updatePerPage(perPage) {
+    localFilters.value.per_page = Number(perPage)
+    applyStatus(localFilters.value.status)
+}
+
 function selectBranch(branchId) {
     if (!branchId) return
 
@@ -169,6 +174,7 @@ function handleCompleted() {
             <GlobalToolbar
                 v-bind="toolbarConfig"
                 @update:active-tab="updateStatus"
+                @update:records-per-page="updatePerPage"
             />
         </template>
 

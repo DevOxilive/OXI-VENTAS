@@ -26,7 +26,7 @@ const days = [{ key: 'monday', label: 'Lunes' }, { key: 'tuesday', label: 'Marte
 const showModal = ref(false)
 const mode = ref('create')
 const selected = ref(null)
-const perPage = ref(Number(props.filters?.per_page ?? 30))
+const perPage = ref(Number(props.filters?.per_page ?? 25))
 const form = useForm({ employee_id: '', attendance_schedule_ids: [], effective_from: new Date().toISOString().slice(0, 10), effective_to: '', active: true, observations: '', working_days: [...defaultDays] })
 let unsubscribeAssignments = null
 

@@ -62,12 +62,6 @@ const stockOptions = [
     { label: "Stock bajo", value: "LOW" },
     { label: "Agotados", value: "OUT" },
 ];
-const perPageOptions = [
-    { label: "15 por pagina", value: 15 },
-    { label: "25 por pagina", value: 25 },
-    { label: "50 por pagina", value: 50 },
-];
-
 const branchLabel = computed(() => props.currentBranch?.name || "Sin sucursal");
 const cycleSubmitted = computed(() => Boolean(props.purchaseCycle?.submitted));
 const canCreatePurchaseReport = computed(() => can("sales.purchase-lists.create"));
@@ -104,6 +98,8 @@ const toolbarConfig = computed(() => props.selectorMode
         hasProducts: report.selectedCount.value > 0,
         canCreate: canCreatePurchaseReport.value,
         canClear: canWorkOnPurchaseList.value,
+        perPage: report.localFilters.value.per_page,
+        total: Number(pagination.value?.total ?? 0),
     }));
 const tableRows = computed(() => report.tableRows.value);
 const pagination = computed(() => report.paginator.value);
@@ -281,6 +277,7 @@ function selectBranch(branchId) {
                 <GlobalToolbar
                     v-bind="toolbarConfig"
                     @action="handleToolbarAction"
+                    @update:records-per-page="report.localFilters.value.per_page = $event"
                 />
             </template>
 
@@ -319,7 +316,7 @@ function selectBranch(branchId) {
                         v-if="canWorkOnPurchaseList"
                         class="min-w-0 rounded-[28px] border border-secondary bg-background p-5 shadow-sm"
                     >
-                        <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-[minmax(0,1.3fr)_180px_180px_150px]">
+                        <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-[minmax(0,1.3fr)_180px_180px]">
                             <InputField
                                 v-model="report.localFilters.value.search"
                                 label="Buscar productos"
@@ -344,13 +341,6 @@ function selectBranch(branchId) {
                                 placeholder="Todo"
                             />
 
-                            <SelectField
-                                v-model="report.localFilters.value.per_page"
-                                label="Registros"
-                                field="purchase_report_per_page"
-                                :options="perPageOptions"
-                                placeholder="25 por pagina"
-                            />
                         </div>
 
                         <div class="mt-4">

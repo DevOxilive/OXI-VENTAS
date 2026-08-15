@@ -42,7 +42,7 @@ class PhysicalCountController extends Controller
     {
         $branch = $this->resolveBranch($request->query('branch'));
         $user = $request->user();
-        $perPage = TablePagination::resolvePerPage($request, 25);
+        $perPage = TablePagination::resolvePerPage($request);
         $search = trim((string) $request->input('search', ''));
         $status = $request->input('status');
 

@@ -33,7 +33,7 @@ const filters = computed(() => page.props.filters || {})
 const userCapabilities = computed(() => page.props.capabilities || {})
 
 const search = ref(filters.value.search || '')
-const recordsPerPage = ref(filters.value.perPage || 50)
+const recordsPerPage = ref(filters.value.perPage || 25)
 const userStatusFilter = ref(filters.value.userStatus || '')
 const statusFilter = ref(filters.value.status || '')
 const roleFilter = ref(filters.value.role || '')

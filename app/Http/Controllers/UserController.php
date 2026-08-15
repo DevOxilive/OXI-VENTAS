@@ -233,7 +233,7 @@ class UserController extends Controller
         ]);
 
         $search = trim((string) $request->input('search', ''));
-        $perPage = TablePagination::resolvePerPage($request, 50);
+        $perPage = TablePagination::resolvePerPage($request);
         $userStatus = trim((string) $request->input('user_status', ''));
         $statusFilter = trim((string) $request->input('status', ''));
         $roleFilter = trim((string) $request->input('role', ''));

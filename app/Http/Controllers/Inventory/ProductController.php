@@ -12,6 +12,7 @@ use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductBatch;
+use App\Models\ProductDepartment;
 use App\Support\FlexibleSearch;
 use App\Support\SystemPermission;
 use App\Support\TablePagination;
@@ -119,13 +120,14 @@ class ProductController extends Controller
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
-        $perPage = TablePagination::resolvePerPage($request, 10);
+        $perPage = TablePagination::resolvePerPage($request);
 
         $query = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
                 'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at,updated_at',
-                'product.category:id,name',
+                'product.category:id,product_department_id,name',
+                'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
             ])
             ->where('branch_id', $branch->id)
@@ -135,6 +137,12 @@ class ProductController extends Controller
         if ($request->filled('category_id')) {
             $query->whereHas('product', function ($productQuery) use ($request) {
                 $productQuery->where('category_id', $request->category_id);
+            });
+        }
+
+        if ($request->filled('product_department_id')) {
+            $query->whereHas('product.category', function ($categoryQuery) use ($request) {
+                $categoryQuery->where('product_department_id', $request->product_department_id);
             });
         }
 
@@ -152,6 +160,10 @@ class ProductController extends Controller
 
                 FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
                     'code',
+                ], $phrase, $terms);
+
+                FlexibleSearch::orWhereHasColumns($searchQuery, 'product.category.productDepartment', [
+                    'name',
                 ], $phrase, $terms);
             });
         }
@@ -188,15 +200,15 @@ class ProductController extends Controller
                 'slug' => $branch->slug,
             ],
             'productsDB' => $productsDB,
-            'categoriesDB' => Category::select('id', 'name')
-                ->orderBy('name')
-                ->get(),
+            'productDepartmentsDB' => $this->productDepartmentOptions(),
+            'categoriesDB' => $this->categoryOptions(),
             'branchesDB' => Branch::select('id', 'name', 'slug')
                 ->where('active', true)
                 ->orderBy('name')
                 ->get(),
             'filters' => [
                 'search' => $request->search,
+                'product_department_id' => $request->product_department_id,
                 'category_id' => $request->category_id,
                 'per_page' => $perPage,
             ],
@@ -212,7 +224,8 @@ class ProductController extends Controller
             ->with([
                 'branch:id,name,slug',
                 'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at',
-                'product.category:id,name',
+                'product.category:id,product_department_id,name',
+                'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
             ])
             ->where('branch_id', $branch->id)
@@ -270,6 +283,7 @@ class ProductController extends Controller
             'image' => ['nullable', 'image', 'max:2048'],
 
             'min_stock' => $this->minimumStockRules((string) $request->input('inventory_unit')),
+            'product_department_id' => ['nullable', 'required_with:category_name', 'exists:product_departments,id'],
             'category_id' => ['nullable', 'required_without:category_name', 'exists:categories,id'],
             'category_name' => ['nullable', 'required_without:category_id', 'string', 'max:255'],
             'cost_per_piece' => ['required', 'numeric', 'min:0'],
@@ -297,15 +311,7 @@ class ProductController extends Controller
             ]);
         }
 
-        if (blank($data['category_id'] ?? null) && filled($data['category_name'] ?? null)) {
-            $categoryName = trim($data['category_name']);
-
-            $category = Category::firstOrCreate([
-                'name' => $categoryName,
-            ]);
-
-            $data['category_id'] = $category->id;
-        }
+        $data['category_id'] = $this->resolveCategoryId($data);
 
         $barcodes = collect($data['barcodes'] ?? [])
             ->filter(fn ($code) => filled($code))
@@ -398,6 +404,7 @@ class ProductController extends Controller
             'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\pN\s.,\/_-]+$/u'],
             'image' => ['nullable', 'image', 'max:2048'],
             'min_stock' => $this->minimumStockRules((string) $request->input('inventory_unit')),
+            'product_department_id' => ['nullable', 'required_with:category_name', 'exists:product_departments,id'],
             'category_id' => ['nullable', 'required_without:category_name', 'exists:categories,id'],
             'category_name' => ['nullable', 'required_without:category_id', 'string', 'max:255'],
             'cost_per_piece' => ['required', 'numeric', 'min:0'],
@@ -425,15 +432,7 @@ class ProductController extends Controller
             ]);
         }
 
-        if (blank($data['category_id'] ?? null) && filled($data['category_name'] ?? null)) {
-            $categoryName = trim($data['category_name']);
-
-            $category = Category::firstOrCreate([
-                'name' => $categoryName,
-            ]);
-
-            $data['category_id'] = $category->id;
-        }
+        $data['category_id'] = $this->resolveCategoryId($data);
 
         $barcodes = collect($data['barcodes'] ?? [])
             ->filter(fn ($code) => filled($code))
@@ -797,6 +796,73 @@ class ProductController extends Controller
         return ['nullable', 'integer', 'min:0', 'max:999'];
     }
 
+    private function productDepartmentOptions()
+    {
+        return ProductDepartment::query()
+            ->where('active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'icon']);
+    }
+
+    private function categoryOptions()
+    {
+        return Category::query()
+            ->with('productDepartment:id,name')
+            ->where('active', true)
+            ->orderBy('product_department_id')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'product_department_id', 'name', 'sort_order'])
+            ->map(fn (Category $category) => [
+                'id' => $category->id,
+                'product_department_id' => $category->product_department_id,
+                'name' => $category->name,
+                'department_name' => $category->productDepartment?->name,
+            ])
+            ->values();
+    }
+
+    private function resolveCategoryId(array $data): int
+    {
+        if (filled($data['category_id'] ?? null)) {
+            $category = Category::query()->findOrFail($data['category_id']);
+
+            if (
+                filled($data['product_department_id'] ?? null)
+                && (int) $category->product_department_id !== (int) $data['product_department_id']
+            ) {
+                throw ValidationException::withMessages([
+                    'category_id' => 'La categoria seleccionada no pertenece al departamento elegido.',
+                ]);
+            }
+
+            return (int) $category->id;
+        }
+
+        $departmentId = (int) ($data['product_department_id'] ?? 0);
+
+        if ($departmentId <= 0) {
+            throw ValidationException::withMessages([
+                'product_department_id' => 'Selecciona el departamento antes de crear una categoria.',
+            ]);
+        }
+
+        $categoryName = trim((string) ($data['category_name'] ?? ''));
+
+        $category = Category::firstOrCreate(
+            [
+                'product_department_id' => $departmentId,
+                'name' => $categoryName,
+            ],
+            [
+                'active' => true,
+            ],
+        );
+
+        return (int) $category->id;
+    }
+
     private function serializeProductRow(BranchProduct $branchProduct, array $branchIds = []): array
     {
         $product = $branchProduct->product;
@@ -820,6 +886,8 @@ class ProductController extends Controller
             'name' => $product?->name ?? 'Producto sin nombre',
             'image' => $imageUrl,
             'image_path' => $product?->image,
+            'product_department_id' => $product?->category?->product_department_id,
+            'product_department_name' => $product?->category?->productDepartment?->name ?? 'Sin departamento',
             'category_id' => $product?->category_id,
             'category_name' => $product?->category?->name ?? 'Sin categoría',
             'category' => $product?->category?->name ?? 'Sin categoría',

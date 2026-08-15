@@ -103,7 +103,7 @@ class GeneralPurchaseOrderController extends Controller
 
     private function generationListPayload(Request $request, Branch $branch): array
     {
-        $perPage = TablePagination::resolvePerPage($request, 25);
+        $perPage = TablePagination::resolvePerPage($request);
 
         return [
             'currentBranch' => $branch,
@@ -128,7 +128,7 @@ class GeneralPurchaseOrderController extends Controller
     private function listPayload(Request $request, Branch $branch, string $status): array
     {
 
-        $perPage = TablePagination::resolvePerPage($request, 25);
+        $perPage = TablePagination::resolvePerPage($request);
 
         $filters = [
             'search' => trim((string) $request->input('search', '')),

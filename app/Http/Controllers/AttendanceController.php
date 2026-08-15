@@ -42,7 +42,7 @@ class AttendanceController extends Controller
         $attendanceBranches = $this->attendanceBranchesForUser($request->user());
         $records = $canViewAttendance
             ? $this->recordsQuery($request, $canViewAttendance, $filters)
-                ->paginate(TablePagination::resolvePerPage($request, 30, [10, 30, 50, 100]))
+                ->paginate(TablePagination::resolvePerPage($request))
                 ->withQueryString()
             : null;
         $dashboard = $canViewAttendance

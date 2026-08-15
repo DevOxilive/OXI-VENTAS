@@ -25,7 +25,6 @@ export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, mode =
         ]) : [],
         activeTab: filters.status ?? 'GENERATE',
         recordsPerPage: Number(filters.per_page ?? 25),
-        recordsPerPageOptions: [15, 25, 50],
         showRecordsPerPage: mode !== 'view' || filters.status !== 'GENERATE',
         totalRecords: total,
         filteredRecords: total,

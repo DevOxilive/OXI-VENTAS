@@ -6,6 +6,8 @@ export function getPurchaseReportToolbarConfig({
     hasProducts = false,
     canCreate = false,
     canClear = false,
+    perPage = 25,
+    total = 0,
 } = {}) {
     return {
         icon: 'playlist_add',
@@ -17,8 +19,11 @@ export function getPurchaseReportToolbarConfig({
                 : `Solicitud de ${branchName || 'Sin sucursal'} para ${cycleFolio || 'el ciclo actual'}.`,
         backButton: false,
         showSearch: false,
-        showRecordsPerPage: false,
-        showCounter: false,
+        showRecordsPerPage: true,
+        recordsPerPage: Number(perPage),
+        showCounter: true,
+        filteredRecords: Number(total),
+        totalRecords: Number(total),
         filters: [],
         actions: [
             ...(canCreate ? [{

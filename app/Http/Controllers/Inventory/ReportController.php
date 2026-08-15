@@ -259,7 +259,7 @@ class ReportController extends Controller
             'movement_type' => $request->input('movement_type'),
             'movement_reason' => $request->input('movement_reason'),
             'search' => $request->input('search'),
-            'per_page' => TablePagination::resolvePerPage($request, 25),
+            'per_page' => TablePagination::resolvePerPage($request),
         ];
     }
 

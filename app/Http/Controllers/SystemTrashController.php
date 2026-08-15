@@ -119,14 +119,14 @@ class SystemTrashController extends SystemAdministrationController
     {
         return $this->applyFilters(TrashRegistry::query($resource), $resource, $search, $period, $from, $to)
             ->latest('deleted_at')
-            ->paginate(TablePagination::resolvePerPage($request, 50))
+            ->paginate(TablePagination::resolvePerPage($request))
             ->withQueryString()
             ->through(fn ($model) => $this->recordPayload($model, $resource));
     }
 
     private function allRecords(Request $request, string $search, string $period, $from, $to): LengthAwarePaginator
     {
-        $perPage = TablePagination::resolvePerPage($request, 50);
+        $perPage = TablePagination::resolvePerPage($request);
         $page = LengthAwarePaginator::resolveCurrentPage();
         $offset = max(0, ($page - 1) * $perPage);
         $windowSize = $offset + $perPage;
