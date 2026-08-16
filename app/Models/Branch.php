@@ -22,7 +22,6 @@ class Branch extends Model
         'municipality',
         'address_state',
         'maps_url',
-        'maps_url',
         'slug',
         'color',
         'active',
