@@ -29,7 +29,10 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
-  striped: Boolean,
+  striped: {
+    type: Boolean,
+    default: true,
+  },
   selectable: Boolean,
   selectedItems: Object,
   mobileCardHeaderField: {
@@ -176,7 +179,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
+  <section class="min-w-0 overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
     <TableDesktop
       v-if="!isMobileViewport"
       :items="items"

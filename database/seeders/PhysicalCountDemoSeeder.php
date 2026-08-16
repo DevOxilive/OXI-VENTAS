@@ -18,6 +18,8 @@ class PhysicalCountDemoSeeder extends Seeder
 {
     private const FOLIO_PREFIX = 'SEED-AUD-';
 
+    private const PRODUCTS_PER_AUDIT = 48;
+
     public function run(): void
     {
         DB::transaction(function () {
@@ -44,7 +46,7 @@ class PhysicalCountDemoSeeder extends Seeder
             ->where('branch_id', $branch->id)
             ->where('status', BranchProduct::STATUS_ACTIVE)
             ->orderBy('id')
-            ->take(6)
+            ->take(self::PRODUCTS_PER_AUDIT)
             ->get();
 
         if ($products->isEmpty()) {

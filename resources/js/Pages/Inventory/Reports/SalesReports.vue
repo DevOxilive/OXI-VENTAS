@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Head } from '@inertiajs/vue3'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -8,6 +8,7 @@ import { GlobalToolbar } from '@/Components/Toolbars'
 import { GlobalTable } from '@/Components/Tables'
 import { GlobalModal } from '@/Components/Modales'
 import MetricCard from '@/Components/Cards/MetricCard.vue'
+import SalesReplenishmentTable from '@/Components/Inventory/Reports/SalesReplenishmentTable.vue'
 import { getSalesReportToolbarConfig } from '@/config/ToolbarConfigs/salesReportToolbarConfig'
 import { salesProductsReportTableConfig } from '@/config/TableConfigs/salesProductsReportTableConfig'
 import { salesRegisteredReportTableConfig } from '@/config/TableConfigs/salesRegisteredReportTableConfig'
@@ -36,6 +37,15 @@ const props = defineProps({
         type: String,
         default: 'products',
     },
+    selectionCatalogs: {
+        type: Object,
+        default: () => ({
+            branches: [],
+            departments: [],
+            categories: [],
+            products: [],
+        }),
+    },
     productsSold: {
         type: Object,
         default: () => ({ data: [] }),
@@ -43,6 +53,10 @@ const props = defineProps({
     registeredSales: {
         type: Object,
         default: () => ({ data: [] }),
+    },
+    salesReplenishment: {
+        type: Object,
+        default: () => ({ branches: [], sections: {} }),
     },
 })
 
@@ -52,6 +66,7 @@ const {
     filtersState,
     activeTab,
     isSalesTab,
+    isReplenishmentTab,
     isGlobalReport,
     branchOptions,
     showBranchFilter,
@@ -65,15 +80,65 @@ const {
     handlePageChange,
     handleToolbarAction,
     downloadSale,
+    updateSectionPeriod,
 } = useSalesReport(props)
 
 const toolbarConfig = computed(() => getSalesReportToolbarConfig({
     filters: filtersState,
     branches: branchOptions.value,
+    departments: props.selectionCatalogs?.departments ?? [],
+    categories: filteredCategories.value,
+    products: filteredProducts.value,
     activeTab: activeTab.value,
     showBranchFilter: showBranchFilter.value,
     isGlobalReport: isGlobalReport.value,
 }))
+
+const selectedDepartmentIds = computed(() => new Set((filtersState.departmentIds || []).map(String)))
+const selectedCategoryIds = computed(() => new Set((filtersState.categoryIds || []).map(String)))
+
+const filteredCategories = computed(() => {
+    const categories = props.selectionCatalogs?.categories ?? []
+
+    if (!selectedDepartmentIds.value.size) {
+        return categories
+    }
+
+    return categories.filter((category) =>
+        selectedDepartmentIds.value.has(String(category.product_department_id))
+    )
+})
+
+const filteredProducts = computed(() => {
+    const products = props.selectionCatalogs?.products ?? []
+
+    return products.filter((product) => {
+        const matchesDepartment = !selectedDepartmentIds.value.size
+            || selectedDepartmentIds.value.has(String(product.product_department_id))
+        const matchesCategory = !selectedCategoryIds.value.size
+            || selectedCategoryIds.value.has(String(product.category_id))
+
+        return matchesDepartment && matchesCategory
+    })
+})
+
+watch(filteredCategories, (categories) => {
+    const validCategoryIds = new Set(categories.map((category) => String(category.id)))
+    const nextCategoryIds = (filtersState.categoryIds || []).filter((id) => validCategoryIds.has(String(id)))
+
+    if (nextCategoryIds.length !== (filtersState.categoryIds || []).length) {
+        filtersState.categoryIds = nextCategoryIds
+    }
+})
+
+watch(filteredProducts, (products) => {
+    const validProductIds = new Set(products.map((product) => String(product.id)))
+    const nextProductIds = (filtersState.productIds || []).filter((id) => validProductIds.has(String(id)))
+
+    if (nextProductIds.length !== (filtersState.productIds || []).length) {
+        filtersState.productIds = nextProductIds
+    }
+})
 
 const tableConfig = computed(() => (
     isSalesTab.value
@@ -151,7 +216,15 @@ function closeSaleModal() {
         </template>
 
         <section class="space-y-5">
+            <SalesReplenishmentTable
+                v-if="isReplenishmentTab"
+                :report="salesReplenishment"
+                :active-tab="activeTab"
+                @update-section-period="updateSectionPeriod"
+            />
+
             <GlobalTable
+                v-else
                 :items="tableRows"
                 v-bind="tableConfig"
                 :pagination="tablePagination"

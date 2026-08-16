@@ -22,6 +22,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  productDepartmentsDB: {
+    type: Array,
+    default: () => [],
+  },
   branchesDB: {
     type: Array,
     default: () => [],
@@ -41,6 +45,7 @@ const form = useForm({
   pieces_per_box: "",
   name: "",
   min_stock: 0,
+  product_department_id: "",
   category_id: "",
   category_name: "",
   cost_per_piece: "",
@@ -57,6 +62,7 @@ const form = useForm({
   record_version: "",
 });
 const categoryInputMode = ref("select");
+const syncingCategoryFields = ref(false);
 const marginPercentage = ref("");
 const pricingDriver = ref("percentage");
 const syncingPricing = ref(false);
@@ -178,6 +184,7 @@ watch(
     ensureCurrentBranchSelected();
 
     form.min_stock = displayDecimal(product.min_stock ?? 0);
+    form.product_department_id = product.product_department_id ?? "";
     form.category_id = product.category_id ?? "";
     form.category_name = "";
     form.cost_per_piece = product.cost_per_piece ?? product.cost ?? "";
@@ -205,6 +212,13 @@ const units = [
 
 const isKilogramUnit = computed(() => form.inventory_unit === "kg");
 const hasBoxPresentation = computed(() => Boolean(form.has_box_presentation));
+const categoriesForDepartment = computed(() => {
+  if (!form.product_department_id) return [];
+
+  return props.categoriesDB.filter((category) => {
+    return Number(category.product_department_id) === Number(form.product_department_id);
+  });
+});
 const marginBelowMinimum = computed(() => {
   const margin = parseDecimal(marginPercentage.value);
 
@@ -330,6 +344,7 @@ function setCreateDefaults() {
   form.pieces_per_box = "";
   form.name = "";
   form.min_stock = 0;
+  form.product_department_id = "";
   form.category_id = "";
   form.category_name = "";
   form.cost_per_piece = "";
@@ -421,6 +436,36 @@ watch(
     if (syncingPricing.value || pricingDriver.value !== "box_price") return;
     syncPercentageFromSalePrice(form.cost_per_box, form.sale_price_per_box);
     syncSalePriceFromPercentage();
+  }
+);
+
+watch(
+  () => form.product_department_id,
+  () => {
+    if (syncingCategoryFields.value) return;
+
+    const selectedCategoryBelongsToDepartment = categoriesForDepartment.value.some((category) => {
+      return Number(category.id) === Number(form.category_id);
+    });
+
+    if (!selectedCategoryBelongsToDepartment) {
+      form.category_id = "";
+    }
+  }
+);
+
+watch(
+  () => form.category_id,
+  (categoryId) => {
+    if (syncingCategoryFields.value || !categoryId) return;
+
+    const category = props.categoriesDB.find((item) => Number(item.id) === Number(categoryId));
+
+    if (category?.product_department_id) {
+      syncingCategoryFields.value = true;
+      form.product_department_id = category.product_department_id;
+      syncingCategoryFields.value = false;
+    }
   }
 );
 
@@ -561,6 +606,7 @@ function submit() {
               title: "Error al crear producto",
               message:
                 errors.name ||
+                errors.product_department_id ||
                 errors.category_id ||
                 errors.category_name ||
                 errors.inventory_unit ||
@@ -749,6 +795,16 @@ function submit() {
             />
 
             <template v-if="categoryInputMode === 'select'">
+              <SelectField
+                label="Departamento"
+                field="product_department_id"
+                v-model="form.product_department_id"
+                :options="productDepartmentsDB"
+                placeholder="Selecciona un departamento"
+                :disabled="mode === 'view'"
+                :error="form.errors.product_department_id"
+              />
+
               <div>
                 <div class="mb-1 flex items-center justify-between gap-2">
                   <label for="category_id" class="block text-sm font-semibold text-text">
@@ -769,9 +825,9 @@ function submit() {
                   label="Categoría"
                   field="category_id"
                   v-model="form.category_id"
-                  :options="categoriesDB"
+                  :options="categoriesForDepartment"
                   placeholder="Selecciona una categoría"
-                  :disabled="mode === 'view'"
+                  :disabled="mode === 'view' || !form.product_department_id"
                   :error="form.errors.category_id"
                   :hide-label="true"
                 />
@@ -779,6 +835,16 @@ function submit() {
             </template>
 
             <template v-else>
+              <SelectField
+                label="Departamento"
+                field="product_department_id"
+                v-model="form.product_department_id"
+                :options="productDepartmentsDB"
+                placeholder="Selecciona un departamento"
+                :disabled="mode === 'view'"
+                :error="form.errors.product_department_id"
+              />
+
               <div>
                 <div class="mb-1 flex items-center justify-between gap-2">
                   <label for="category_name" class="block text-sm font-semibold text-text">

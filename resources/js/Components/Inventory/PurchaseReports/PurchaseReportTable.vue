@@ -40,38 +40,41 @@ function stockTone(product) {
             </p>
         </div>
 
-        <table class="hidden min-w-full divide-y divide-secondary md:table">
-            <thead class="bg-secondary">
+        <table class="hidden w-full table-fixed border-collapse text-sm md:table">
+            <thead class="border-b border-secondary bg-secondary text-text">
                 <tr>
                     <th class="w-12 px-4 py-3"></th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-text opacity-70">
+                    <th class="px-4 py-3 text-left font-semibold">
                         Producto
                     </th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-text opacity-70">
-                        Código / Barcode
+                    <th class="px-4 py-3 text-left font-semibold">
+                        Codigo / Barcode
                     </th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-text opacity-70">
-                        Categoría
+                    <th class="px-4 py-3 text-left font-semibold">
+                        Departamento
                     </th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-text opacity-70">
+                    <th class="px-4 py-3 text-left font-semibold">
+                        Categoria
+                    </th>
+                    <th class="px-4 py-3 text-right font-semibold">
                         Stock
                     </th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase text-text opacity-70">
+                    <th class="px-4 py-3 text-right font-semibold">
                         Minimo
                     </th>
                 </tr>
             </thead>
 
             <tbody class="divide-y divide-secondary bg-background">
-                <tr v-for="product in products" :key="product.id" class="transition hover:bg-secondary">
+                <tr v-for="product in products" :key="product.id" class="odd:bg-secondary transition-colors hover:bg-primary/10">
                     <td class="px-4 py-3">
                         <input type="checkbox" :checked="isSelected(selectedItems, product.id)"
                             class="rounded border-secondary text-primary focus:ring-primary"
                             @change="$emit('toggle', product)">
                     </td>
 
-                    <td class="px-4 py-3">
-                        <p class="text-sm font-semibold text-text">
+                    <td class="min-w-0 px-4 py-3">
+                        <p class="truncate text-sm font-semibold text-text" :title="product.name">
                             {{ product.name }}
                         </p>
                         <p class="text-xs text-text opacity-70">
@@ -79,14 +82,20 @@ function stockTone(product) {
                         </p>
                     </td>
 
-                    <td class="px-4 py-3">
-                        <p class="text-sm font-medium text-text">
-                            {{ product.main_barcode || product.code || 'Sin código' }}
+                    <td class="min-w-0 px-4 py-3">
+                        <p class="truncate text-sm font-medium text-text" :title="product.main_barcode || product.code || 'Sin codigo'">
+                            {{ product.main_barcode || product.code || 'Sin codigo' }}
                         </p>
                     </td>
 
-                    <td class="px-4 py-3">
-                        <p class="text-sm text-text">
+                    <td class="min-w-0 px-4 py-3">
+                        <p class="truncate text-sm text-text" :title="product.department || product.product_department_name || 'Sin departamento'">
+                            {{ product.department || product.product_department_name || 'Sin departamento' }}
+                        </p>
+                    </td>
+
+                    <td class="min-w-0 px-4 py-3">
+                        <p class="truncate text-sm text-text" :title="product.category">
                             {{ product.category }}
                         </p>
                     </td>
@@ -118,7 +127,7 @@ function stockTone(product) {
                                 {{ product.name }}
                             </p>
                             <p class="text-xs text-text opacity-70">
-                                {{ product.category }}
+                                {{ product.department || product.product_department_name || 'Sin departamento' }} / {{ product.category }}
                             </p>
                         </div>
 
@@ -129,7 +138,7 @@ function stockTone(product) {
                     </div>
 
                     <p class="mt-2 text-xs text-text opacity-70">
-                        Código: {{ product.main_barcode || product.code || 'Sin código' }}
+                        Codigo: {{ product.main_barcode || product.code || 'Sin codigo' }}
                     </p>
 
                     <p class="mt-2 text-sm text-text opacity-80">
@@ -144,7 +153,7 @@ function stockTone(product) {
                 No se encontraron productos.
             </p>
             <p class="mt-1 text-xs text-text opacity-70">
-                Ajusta los filtros para ampliar la búsqueda.
+                Ajusta los filtros para ampliar la busqueda.
             </p>
         </div>
     </div>

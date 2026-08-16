@@ -19,7 +19,22 @@ export function getPurchaseReportProductsTableConfig({ canManage = false } = {})
                 formatOptions: {
                     multiline: true,
                 },
-                subKey: "category_name",
+            },
+            {
+                key: "product_department_name",
+                label: "Departamento",
+                format: "text",
+                fallback: "Sin departamento",
+                mobileLabel: "Departamento",
+                mobileDisplay: false,
+            },
+            {
+                key: "category_name",
+                label: "Categoria",
+                format: "text",
+                fallback: "Sin categoria",
+                mobileLabel: "Categoria",
+                mobileDisplay: false,
             },
             {
                 key: "stock",

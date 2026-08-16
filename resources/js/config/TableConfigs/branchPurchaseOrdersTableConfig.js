@@ -65,7 +65,6 @@ export function getBranchPurchaseOrdersTableConfig({ status = 'GENERATED' } = {}
             COMPLETED: 'Todavía no hay órdenes completadas de esta sucursal.',
         }[status] || 'No hay órdenes para mostrar.',
         rowKey: 'id',
-        striped: true,
         hoverEffect: true,
     }
 }

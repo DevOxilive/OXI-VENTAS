@@ -6,27 +6,34 @@ export function useSalesReport(props) {
     const { handlePageChange } = useGlobalTablePagination()
 
     const filtersState = reactive({
-        tab: props.activeTab ?? 'products',
+        tab: props.activeTab ?? 'pedido',
         search: props.filters?.search ?? '',
         folio: props.filters?.folio ?? '',
         dateFrom: props.filters?.date_from ?? '',
         dateTo: props.filters?.date_to ?? '',
+        coverageMonths: Number(props.filters?.coverage_months ?? 2),
         branchId: props.filters?.branch_id ? Number(props.filters.branch_id) : null,
+        branchIds: normalizeArray(props.filters?.branch_ids),
+        departmentIds: normalizeArray(props.filters?.department_ids),
+        categoryIds: normalizeArray(props.filters?.category_ids),
+        productIds: normalizeArray(props.filters?.product_ids),
+        sectionPeriods: props.filters?.section_periods ?? {},
         perPage: Number(props.filters?.per_page ?? 25),
     })
 
     let refreshTimeout = null
     let syncingFilters = false
 
-    const activeTab = computed(() => filtersState.tab || 'products')
+    const activeTab = computed(() => filtersState.tab || 'pedido')
     const isSalesTab = computed(() => activeTab.value === 'sales')
+    const isReplenishmentTab = computed(() => activeTab.value !== 'sales')
     const isGlobalReport = computed(() => (props.reportScope ?? props.filters?.scope) === 'global')
     const branchOptions = computed(() => props.branchesDB ?? [])
-    const showBranchFilter = computed(() => false)
+    const showBranchFilter = computed(() => isGlobalReport.value)
     const tableRows = computed(() => (
         isSalesTab.value
             ? (props.registeredSales?.data ?? [])
-            : (props.productsSold?.data ?? [])
+            : []
     ))
     const tablePagination = computed(() => (
         isSalesTab.value
@@ -67,7 +74,13 @@ export function useSalesReport(props) {
         filtersState.folio = ''
         filtersState.dateFrom = ''
         filtersState.dateTo = ''
+        filtersState.coverageMonths = 2
         filtersState.branchId = props.currentBranch?.id ? Number(props.currentBranch.id) : null
+        filtersState.branchIds = []
+        filtersState.departmentIds = []
+        filtersState.categoryIds = []
+        filtersState.productIds = []
+        filtersState.sectionPeriods = {}
         filtersState.perPage = 25
     }
 
@@ -80,7 +93,14 @@ export function useSalesReport(props) {
     }
 
     function updateFilter({ key, value }) {
-        filtersState[key] = key === 'branchId' ? Number(value) : value
+        filtersState[key] = ['branchId', 'coverageMonths'].includes(key) ? Number(value) : value
+    }
+
+    function updateSectionPeriod(sectionKey, dateFrom) {
+        filtersState.sectionPeriods = {
+            ...filtersState.sectionPeriods,
+            [sectionKey]: dateFrom,
+        }
     }
 
     function getRequestFilters(overrides = {}) {
@@ -90,6 +110,12 @@ export function useSalesReport(props) {
             folio: isSalesTab.value ? (filtersState.folio || undefined) : undefined,
             date_from: filtersState.dateFrom || undefined,
             date_to: filtersState.dateTo || undefined,
+            coverage_months: isReplenishmentTab.value ? filtersState.coverageMonths : undefined,
+            branch_ids: isReplenishmentTab.value ? filtersState.branchIds : undefined,
+            department_ids: isReplenishmentTab.value ? filtersState.departmentIds : undefined,
+            category_ids: isReplenishmentTab.value ? filtersState.categoryIds : undefined,
+            product_ids: isReplenishmentTab.value ? filtersState.productIds : undefined,
+            section_periods: isReplenishmentTab.value ? filtersState.sectionPeriods : undefined,
             per_page: filtersState.perPage || 25,
             ...overrides,
         }
@@ -171,12 +197,18 @@ export function useSalesReport(props) {
         () => props.filters,
         (filters) => {
             syncingFilters = true
-            filtersState.tab = props.activeTab ?? filters?.tab ?? 'products'
+            filtersState.tab = props.activeTab ?? filters?.tab ?? 'pedido'
             filtersState.search = filters?.search ?? ''
             filtersState.folio = filters?.folio ?? ''
             filtersState.dateFrom = filters?.date_from ?? ''
             filtersState.dateTo = filters?.date_to ?? ''
+            filtersState.coverageMonths = Number(filters?.coverage_months ?? 2)
             filtersState.branchId = filters?.branch_id ? Number(filters.branch_id) : (props.currentBranch?.id ? Number(props.currentBranch.id) : null)
+            filtersState.branchIds = normalizeArray(filters?.branch_ids)
+            filtersState.departmentIds = normalizeArray(filters?.department_ids)
+            filtersState.categoryIds = normalizeArray(filters?.category_ids)
+            filtersState.productIds = normalizeArray(filters?.product_ids)
+            filtersState.sectionPeriods = filters?.section_periods ?? {}
             filtersState.perPage = Number(filters?.per_page ?? 25)
 
             setTimeout(() => {
@@ -199,6 +231,7 @@ export function useSalesReport(props) {
         filtersState,
         activeTab,
         isSalesTab,
+        isReplenishmentTab,
         isGlobalReport,
         branchOptions,
         showBranchFilter,
@@ -212,5 +245,12 @@ export function useSalesReport(props) {
         handlePageChange,
         handleToolbarAction,
         downloadSale,
+        updateSectionPeriod,
     }
+}
+
+function normalizeArray(value) {
+    if (!Array.isArray(value)) return []
+
+    return value.map((item) => String(item))
 }

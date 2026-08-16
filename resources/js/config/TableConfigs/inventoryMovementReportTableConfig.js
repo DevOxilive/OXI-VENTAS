@@ -2,9 +2,9 @@ export const inventoryMovementReportTableConfig = {
     columns: [
         {
             key: 'code',
-            label: 'Código',
+            label: 'Codigo',
             format: 'text',
-            mobileLabel: 'Código',
+            mobileLabel: 'Codigo',
             mobileDisplay: true,
             width: '160px',
         },
@@ -17,11 +17,20 @@ export const inventoryMovementReportTableConfig = {
             width: '260px',
         },
         {
-            key: 'category',
-            label: 'Categoría',
+            key: 'department',
+            label: 'Departamento',
             format: 'text',
-            mobileLabel: 'Categoría',
+            mobileLabel: 'Departamento',
             mobileDisplay: true,
+            fallback: 'Sin departamento',
+        },
+        {
+            key: 'category',
+            label: 'Categoria',
+            format: 'text',
+            mobileLabel: 'Categoria',
+            mobileDisplay: true,
+            fallback: 'Sin categoria',
         },
         {
             key: 'lot_number',
@@ -90,6 +99,5 @@ export const inventoryMovementReportTableConfig = {
     mobileCardHeaderField: 'product',
     noDataMessage: 'No hay movimientos que coincidan con los filtros aplicados',
     rowKey: 'id',
-    striped: true,
     hoverEffect: true,
 }

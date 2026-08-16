@@ -10,6 +10,7 @@ function envNumber(value, fallback = null) {
     return Number.isFinite(parsed) ? parsed : fallback
 }
 
+const broadcaster = runtimeConfig.broadcaster ?? import.meta.env.VITE_BROADCAST_CONNECTION ?? 'reverb'
 const scheme = runtimeConfig.scheme ?? import.meta.env.VITE_REVERB_SCHEME ?? 'http'
 const port = envNumber(runtimeConfig.port ?? import.meta.env.VITE_REVERB_PORT, 8080)
 const isSecure = scheme === 'https'
@@ -48,8 +49,9 @@ export const REALTIME_BROWSER_EVENTS = Object.freeze({
  * Los timeouts nulos conservan los valores predeterminados de Pusher/Reverb.
  */
 export const REALTIME_CONFIG = Object.freeze({
-    broadcaster: 'reverb',
-    key: runtimeConfig.key ?? import.meta.env.VITE_REVERB_APP_KEY,
+    broadcaster,
+    key: runtimeConfig.key ?? import.meta.env.VITE_PUSHER_APP_KEY ?? import.meta.env.VITE_REVERB_APP_KEY,
+    cluster: runtimeConfig.cluster ?? import.meta.env.VITE_PUSHER_APP_CLUSTER,
     host: runtimeConfig.host ?? import.meta.env.VITE_REVERB_HOST,
     port,
     scheme,
@@ -73,11 +75,18 @@ function connectionOptions() {
     const options = {
         broadcaster: REALTIME_CONFIG.broadcaster,
         key: REALTIME_CONFIG.key,
-        wsHost: REALTIME_CONFIG.host,
-        wsPort: REALTIME_CONFIG.port,
-        wssPort: REALTIME_CONFIG.port,
         forceTLS: REALTIME_CONFIG.secure,
         enabledTransports: [...REALTIME_CONFIG.transports],
+    }
+
+    if (REALTIME_CONFIG.cluster) {
+        options.cluster = REALTIME_CONFIG.cluster
+    }
+
+    if (REALTIME_CONFIG.host) {
+        options.wsHost = REALTIME_CONFIG.host
+        options.wsPort = REALTIME_CONFIG.port
+        options.wssPort = REALTIME_CONFIG.port
     }
 
     const timeoutOptions = {

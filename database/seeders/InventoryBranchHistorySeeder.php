@@ -23,23 +23,25 @@ class InventoryBranchHistorySeeder extends Seeder
     private const BARCODE_PREFIX = 'RPTINV';
     private const EXTRA_HISTORY_ROUNDS = 10;
 
+    private $catalogCache = null;
+
     public function run(): void
     {
         Event::fakeFor(function () {
-            DB::transaction(function () {
-                $stockService = app(StockMovementService::class);
-                $categories = $this->categories();
+            $stockService = app(StockMovementService::class);
+            $categories = $this->categories();
 
-                Branch::query()
-                    ->where('active', true)
-                    ->orderBy('name')
-                    ->get()
-                    ->each(fn (Branch $branch) => $this->seedBranch(
-                        branch: $branch,
-                        stockService: $stockService,
-                        categories: $categories,
-                    ));
-            });
+            $this->deactivateProductsOutsideCatalog();
+
+            Branch::query()
+                ->where('active', true)
+                ->orderBy('name')
+                ->get()
+                ->each(fn (Branch $branch) => DB::transaction(fn () => $this->seedBranch(
+                    branch: $branch,
+                    stockService: $stockService,
+                    categories: $categories,
+                )));
         });
     }
 
@@ -139,8 +141,8 @@ class InventoryBranchHistorySeeder extends Seeder
             ->unique()
             ->values()
             ->mapWithKeys(fn (string $name) => [
-            $name => Category::firstOrCreate(['name' => $name]),
-        ]);
+                $name => ProductCategorySeeder::resolveLegacyCategory($name) ?? Category::firstOrCreate(['name' => $name]),
+            ]);
     }
 
     private function product(int $index, $categories): Product
@@ -177,33 +179,11 @@ class InventoryBranchHistorySeeder extends Seeder
 
     private function catalog()
     {
-        return collect([
-            ['category' => 'Bebidas', 'name' => 'Bonafont 400 ml', 'description' => 'Agua natural individual con presentación por caja para pruebas de ventas, auditorías y compras.', 'cost' => 10.00, 'sale_price' => 13.00, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 24, 'barcode' => '0987654321'],
-            ['category' => 'Bebidas', 'name' => 'Coca-Cola 600 ml', 'description' => 'Refresco Coca-Cola sabor original en presentación individual de 600 ml.', 'cost' => 13.50, 'sale_price' => 19.00, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 24, 'barcode' => '7501055300081'],
-            ['category' => 'Bebidas', 'name' => 'Pepsi 600 ml', 'description' => 'Refresco Pepsi cola en botella individual de 600 ml.', 'cost' => 12.80, 'sale_price' => 18.00, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 24],
-            ['category' => 'Bebidas', 'name' => 'Sprite 600 ml', 'description' => 'Refresco Sprite sabor lima-limón en botella de 600 ml.', 'cost' => 12.90, 'sale_price' => 18.50, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 12],
-            ['category' => 'Bebidas', 'name' => 'Fanta Naranja 600 ml', 'description' => 'Refresco Fanta de naranja en botella individual de 600 ml.', 'cost' => 12.90, 'sale_price' => 18.50, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 12],
-            ['category' => 'Vinos', 'name' => 'L.A. Cetto Cabernet Sauvignon 750 ml', 'description' => 'Vino tinto mexicano Cabernet Sauvignon en botella de 750 ml.', 'cost' => 168.00, 'sale_price' => 229.00, 'unit' => 'pieza', 'inventory_unit' => 'pza'],
-            ['category' => 'Vinos', 'name' => 'L.A. Cetto Blanc de Blancs 750 ml', 'description' => 'Vino blanco seco L.A. Cetto Blanc de Blancs en botella de 750 ml.', 'cost' => 155.00, 'sale_price' => 215.00, 'unit' => 'pieza', 'inventory_unit' => 'pza'],
-            ['category' => 'Vinos', 'name' => 'Mateus Rosé 750 ml', 'description' => 'Vino rosado Mateus en botella de 750 ml.', 'cost' => 149.00, 'sale_price' => 209.00, 'unit' => 'pieza', 'inventory_unit' => 'pza'],
-            ['category' => 'Vinos', 'name' => 'Casillero del Diablo Cabernet Sauvignon 750 ml', 'description' => 'Vino tinto chileno Casillero del Diablo Cabernet Sauvignon.', 'cost' => 198.00, 'sale_price' => 279.00, 'unit' => 'pieza', 'inventory_unit' => 'pza'],
-            ['category' => 'Vinos', 'name' => 'Freixenet Carta Nevada 750 ml', 'description' => 'Vino espumoso Freixenet Carta Nevada en botella de 750 ml.', 'cost' => 238.00, 'sale_price' => 329.00, 'unit' => 'pieza', 'inventory_unit' => 'pza'],
-            ['category' => 'Botanas', 'name' => 'Sabritas Original 45 g', 'description' => 'Papas fritas Sabritas clásicas en bolsa de 45 gramos.', 'cost' => 13.00, 'sale_price' => 18.00, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 42],
-            ['category' => 'Botanas', 'name' => 'Ruffles Queso 50 g', 'description' => 'Papas Ruffles sabor queso en presentación de 50 gramos.', 'cost' => 14.20, 'sale_price' => 20.00, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 40],
-            ['category' => 'Botanas', 'name' => 'Doritos Nacho 61 g', 'description' => 'Botana Doritos Nacho con queso en bolsa de 61 gramos.', 'cost' => 14.80, 'sale_price' => 21.00, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 36],
-            ['category' => 'Botanas', 'name' => 'Cheetos Torciditos 52 g', 'description' => 'Botana Cheetos Torciditos en presentación de 52 gramos.', 'cost' => 13.80, 'sale_price' => 19.50, 'unit' => 'pieza', 'inventory_unit' => 'pza'],
-            ['category' => 'Botanas', 'name' => 'Chips Jalapeño 42 g', 'description' => 'Papas Chips sabor jalapeño en bolsa de 42 gramos.', 'cost' => 15.20, 'sale_price' => 22.00, 'unit' => 'pieza', 'inventory_unit' => 'pza'],
-            ['category' => 'Lácteos', 'name' => 'Leche Lala Entera 1 L', 'description' => 'Leche entera Lala en envase de un litro.', 'cost' => 22.50, 'sale_price' => 29.50, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 12],
-            ['category' => 'Lácteos', 'name' => 'Leche Santa Clara Deslactosada 1 L', 'description' => 'Leche deslactosada Santa Clara en envase de un litro.', 'cost' => 24.50, 'sale_price' => 32.00, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 12],
-            ['category' => 'Lácteos', 'name' => 'Yogurt griego natural a granel', 'description' => 'Yogurt griego vendido por kilogramo; prueba cantidades decimales.', 'cost' => 39.00, 'sale_price' => 52.00, 'unit' => 'kg', 'inventory_unit' => 'kg'],
-            ['category' => 'Lácteos', 'name' => 'Queso panela a granel', 'description' => 'Queso panela vendido por kilogramo; stock mínimo decimal permitido.', 'cost' => 67.00, 'sale_price' => 89.00, 'unit' => 'kg', 'inventory_unit' => 'kg'],
-            ['category' => 'Lácteos', 'name' => 'Crema Alpura 426 ml', 'description' => 'Crema Alpura en envase de 426 mililitros.', 'cost' => 26.50, 'sale_price' => 36.00, 'unit' => 'pieza', 'inventory_unit' => 'pza'],
-            ['category' => 'Químicos', 'name' => 'Cloro Cloralex 950 ml', 'description' => 'Cloro Cloralex desinfectante en presentación de 950 mililitros.', 'cost' => 14.00, 'sale_price' => 21.00, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 12],
-            ['category' => 'Químicos', 'name' => 'Pinol Original 828 ml', 'description' => 'Limpiador Pinol original en botella de 828 mililitros.', 'cost' => 21.50, 'sale_price' => 31.00, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 12],
-            ['category' => 'Químicos', 'name' => 'Fabuloso Lavanda 1 L', 'description' => 'Limpiador multiusos Fabuloso aroma lavanda en presentación de un litro.', 'cost' => 19.50, 'sale_price' => 28.00, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 12],
-            ['category' => 'Químicos', 'name' => 'Suavitel Fresca Primavera 850 ml', 'description' => 'Suavizante Suavitel aroma fresca primavera en botella de 850 mililitros.', 'cost' => 17.50, 'sale_price' => 25.00, 'unit' => 'pieza', 'inventory_unit' => 'pza', 'pieces_per_box' => 12],
-            ['category' => 'Químicos', 'name' => 'Detergente Roma a granel', 'description' => 'Detergente en polvo vendido por kilogramo para validar captura decimal.', 'cost' => 36.00, 'sale_price' => 49.00, 'unit' => 'kg', 'inventory_unit' => 'kg'],
-        ])->values();
+        if ($this->catalogCache === null) {
+            $this->catalogCache = collect(require database_path('seeders/data/central_products.php'))->values();
+        }
+
+        return $this->catalogCache;
     }
 
     private function calculateMarginPercentage(float $cost, float $salePrice): ?float
@@ -229,6 +209,18 @@ class InventoryBranchHistorySeeder extends Seeder
                 'active' => true,
             ]
         );
+
+        foreach ($catalogItem['alternative_barcodes'] ?? [] as $alternativeBarcode) {
+            Barcode::updateOrCreate(
+                ['code' => $alternativeBarcode],
+                [
+                    'product_id' => $product->id,
+                    'type' => 'alterno',
+                    'base_quantity' => 1,
+                    'active' => true,
+                ]
+            );
+        }
 
         if ((bool) $product->has_box_presentation && (int) $product->pieces_per_box > 1) {
             Barcode::updateOrCreate(
@@ -737,6 +729,21 @@ class InventoryBranchHistorySeeder extends Seeder
                 $product->delete();
             }
         }
+    }
+
+    private function deactivateProductsOutsideCatalog(): void
+    {
+        $catalogNames = $this->catalog()
+            ->pluck('name')
+            ->values();
+
+        Product::query()
+            ->whereNotIn('name', $catalogNames)
+            ->update(['active' => false]);
+
+        BranchProduct::query()
+            ->whereHas('product', fn ($query) => $query->whereNotIn('name', $catalogNames))
+            ->update(['status' => BranchProduct::STATUS_INACTIVE]);
     }
 
     private function syncBranchInventory(Branch $branch): void

@@ -49,6 +49,5 @@ export const salesProductsReportTableConfig = {
     mobileCardHeaderField: 'product',
     noDataMessage: 'No hay productos vendidos que coincidan con los filtros.',
     rowKey: 'id',
-    striped: true,
     hoverEffect: true,
 }

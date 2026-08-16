@@ -1,5 +1,6 @@
 <script setup>
 import { nextTick } from 'vue'
+import MultiSelectDropdown from '@/Components/Forms/MultiSelectDropdown.vue'
 import { useToolbarConfig } from './useToolbarConfig'
 import { getToolbarActionClasses } from './toolbarClasses'
 import { sanitizeToolbarFilterWithCursor, sanitizeToolbarSearchWithCursor } from './toolbarInputSanitizer'
@@ -110,50 +111,11 @@ function handleTextFilterInput(event, filter) {
     return result.value
 }
 
-function normalizeMultiValue(value) {
-    return Array.isArray(value) ? value.map((item) => String(item)) : []
-}
-
-function isMultiSelected(filter, option) {
-    return normalizeMultiValue(filter.value).includes(String(getOptionValue(option, filter)))
-}
-
-function toggleMultiFilter(filter, option) {
-    const optionValue = String(getOptionValue(option, filter))
-    const current = normalizeMultiValue(filter.value)
-    const next = current.includes(optionValue)
-        ? current.filter((value) => value !== optionValue)
-        : [...current, optionValue]
-
+function updateMultiFilter(filter, value) {
     emit('update:filter', {
         key: filter.key,
-        value: next,
+        value,
     })
-}
-
-function clearMultiFilter(filter) {
-    emit('update:filter', {
-        key: filter.key,
-        value: [],
-    })
-}
-
-function multiFilterLabel(filter) {
-    const selected = normalizeMultiValue(filter.value)
-
-    if (selected.length === 0) {
-        return filter.placeholder || filter.label
-    }
-
-    if (selected.length === 1) {
-        const selectedOption = (filter.options || []).find((option) =>
-            String(getOptionValue(option, filter)) === selected[0]
-        )
-
-        return selectedOption ? getOptionLabel(selectedOption, filter) : '1 seleccionado'
-    }
-
-    return `${selected.length} seleccionados`
 }
 </script>
 
@@ -296,50 +258,16 @@ function multiFilterLabel(filter) {
                             value: handleTextFilterInput($event, filter)
                         })" />
 
-                    <details v-else-if="filter.type === 'multiselect'" class="group relative">
-                        <summary
-                            class="flex h-11 cursor-pointer list-none items-center justify-between rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-                        >
-                            <span class="truncate">
-                                {{ multiFilterLabel(filter) }}
-                            </span>
-
-                            <span class="material-symbols-outlined text-[20px] text-text opacity-50 transition group-open:rotate-180">
-                                expand_more
-                            </span>
-                        </summary>
-
-                        <div class="absolute z-40 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-secondary bg-background p-2 shadow-xl">
-                            <button
-                                type="button"
-                                class="mb-2 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-text opacity-70 hover:bg-secondary"
-                                @click="clearMultiFilter(filter)"
-                            >
-                                Todos
-                            </button>
-
-                            <button
-                                v-for="option in filter.options || []"
-                                :key="getOptionValue(option, filter)"
-                                type="button"
-                                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-secondary"
-                                @click="toggleMultiFilter(filter, option)"
-                            >
-                                <span
-                                    class="flex h-4 w-4 items-center justify-center rounded border"
-                                    :class="isMultiSelected(filter, option) ? 'border-primary bg-primary text-white' : 'border-secondary bg-background'"
-                                >
-                                    <span v-if="isMultiSelected(filter, option)" class="material-symbols-outlined text-[13px]">
-                                        check
-                                    </span>
-                                </span>
-
-                                <span class="truncate text-text">
-                                    {{ getOptionLabel(option, filter) }}
-                                </span>
-                            </button>
-                        </div>
-                    </details>
+                    <MultiSelectDropdown
+                        v-else-if="filter.type === 'multiselect'"
+                        :model-value="filter.value ?? []"
+                        :options="filter.options || []"
+                        :label="filter.label"
+                        :placeholder="filter.placeholder || filter.label"
+                        :option-label="filter.optionLabel || 'label'"
+                        :option-value="filter.optionValue || 'value'"
+                        @update:model-value="updateMultiFilter(filter, $event)"
+                    />
 
                     <select v-else :value="filter.value ?? ''"
                         class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"

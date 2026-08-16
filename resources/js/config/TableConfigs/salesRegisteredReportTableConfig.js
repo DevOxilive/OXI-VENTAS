@@ -42,6 +42,5 @@ export const salesRegisteredReportTableConfig = {
     mobileCardHeaderField: 'folio',
     noDataMessage: 'No hay ventas registradas que coincidan con los filtros.',
     rowKey: 'id',
-    striped: true,
     hoverEffect: true,
 }

@@ -27,6 +27,8 @@ class DashboardMetricsDemoSeeder extends Seeder
 
     private const NOTE_PREFIX = 'Demo dashboard: ';
 
+    private const PRODUCTS_PER_BRANCH = 12;
+
     public function run(): void
     {
         DB::transaction(function () {
@@ -51,7 +53,7 @@ class DashboardMetricsDemoSeeder extends Seeder
                     ->with('product:id,name,cost,sale_price')
                     ->where('branch_id', $branch->id)
                     ->where('status', BranchProduct::STATUS_ACTIVE)
-                    ->take(4)
+                    ->take(self::PRODUCTS_PER_BRANCH)
                     ->get();
 
                 if ($products->count() < 2) {

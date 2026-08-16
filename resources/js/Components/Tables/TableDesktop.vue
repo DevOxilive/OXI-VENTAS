@@ -136,9 +136,9 @@ function renderCellContentFromValue(value, column, row) {
 </script>
 
 <template>
-  <div class="hidden max-h-[560px] overflow-auto md:block">
-      <table class="w-full border-collapse text-sm">
-        <thead class="border-b border-secondary text-text">
+  <div class="hidden max-h-[560px] min-w-0 overflow-x-hidden overflow-y-auto md:block">
+      <table class="w-full table-fixed border-collapse text-sm">
+        <thead class="border-b border-secondary bg-secondary text-text">
           <tr>
             <th v-if="selectable" class="sticky top-0 z-20 w-10 bg-secondary px-4 py-3">
               <button
@@ -157,12 +157,8 @@ function renderCellContentFromValue(value, column, row) {
             </th>
 
             <th v-for="column in visibleColumns" :key="column.key"
-              class="sticky top-0 z-20 whitespace-nowrap bg-secondary px-4 py-3 text-left font-semibold"
-              :style="{
-                ...(column.width ? { width: column.width } : {}),
-                ...(column.minWidth ? { minWidth: column.minWidth } : {}),
-              }">
-              {{ column.label }}
+              class="sticky top-0 z-20 min-w-0 bg-secondary px-4 py-3 text-left font-semibold">
+              <span class="block truncate" :title="column.label">{{ column.label }}</span>
             </th>
 
             <th v-if="canViewActions" class="sticky top-0 z-20 whitespace-nowrap bg-secondary px-4 py-3 text-center font-semibold">
@@ -174,9 +170,9 @@ function renderCellContentFromValue(value, column, row) {
         <tbody class="divide-y divide-secondary bg-background">
           <tr v-for="tableRow in tableRows" :key="tableRow.key" :class="[
             'transition-colors',
-            hoverEffect ? 'hover:bg-secondary' : '',
+            hoverEffect ? 'hover:bg-primary/10' : '',
             striped && tableRow.index % 2 === 1 ? 'bg-secondary' : '',
-            selectable && isRowSelected(tableRow.row) ? 'bg-secondary' : '',
+            selectable && isRowSelected(tableRow.row) ? 'bg-primary/15' : '',
           ]" @click="handleRowClick(tableRow.row)">
             <td v-if="selectable" class="px-4 py-3 w-10">
               <button
@@ -194,7 +190,7 @@ function renderCellContentFromValue(value, column, row) {
               </button>
             </td>
 
-            <td v-for="cell in tableRow.cells" :key="cell.key" class="px-4 py-3 align-middle"
+            <td v-for="cell in tableRow.cells" :key="cell.key" class="min-w-0 overflow-hidden px-4 py-3 align-middle"
               :class="cell.column.cellClass || ''">
               <slot
                 :name="`cell-${cell.column.key}`"
@@ -250,7 +246,7 @@ function renderCellContentFromValue(value, column, row) {
                   </div>
                 </div>
 
-                <span v-else class="block truncate" :class="cell.column.textClass || 'text-text opacity-80'">
+                <span v-else class="block truncate" :title="String(cell.content.content ?? '')" :class="cell.column.textClass || 'text-text opacity-80'">
                   {{ cell.content.content }}
                 </span>
               </template>
