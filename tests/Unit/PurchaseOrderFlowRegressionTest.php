@@ -30,4 +30,25 @@ class PurchaseOrderFlowRegressionTest extends TestCase
         $this->assertStringContainsString('if (completing.value) return', $capturePage);
         $this->assertStringContainsString(':disabled="completing"', $capturePage);
     }
+
+    public function test_purchase_order_back_action_returns_to_branch_inventory(): void
+    {
+        $composable = file_get_contents(resource_path('js/Composables/Inventory/usePurchaseOrders.js'));
+        $toolbar = file_get_contents(resource_path('js/config/ToolbarConfigs/purchaseOrdersToolbarConfig.js'));
+
+        $this->assertStringContainsString("route('inventory.branches.inventory'", $composable);
+        $this->assertStringNotContainsString("route('inventory.branches.reports'", $composable);
+        $this->assertStringContainsString("backLabel: 'Inventario'", $toolbar);
+    }
+
+    public function test_legacy_purchase_list_detail_does_not_render_a_missing_page(): void
+    {
+        $controller = file_get_contents(app_path('Http/Controllers/Inventory/PurchaseReportController.php'));
+
+        $this->assertStringNotContainsString("Inertia::render('Inventory/PurchaseReportShow'", $controller);
+        $this->assertStringContainsString(
+            "redirect()->route('inventory.branches.purchase-reports.index'",
+            $controller
+        );
+    }
 }

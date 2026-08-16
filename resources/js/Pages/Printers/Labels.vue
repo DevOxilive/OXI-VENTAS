@@ -81,6 +81,7 @@ const form = useForm({
   name: props.template?.name || "Etiqueta de producto",
   is_active: props.template?.is_active ?? true,
   settings: withoutCustomTextBlock(props.template?.settings || createDefaultLabelTemplate()),
+  record_version: props.template?.updated_at || "",
 });
 
 const previewTemplate = computed(() => normalizeLabelTemplate({ ...form.settings }));
@@ -193,6 +194,7 @@ function resetTemplate() {
     name: "Etiqueta de producto",
     is_active: true,
     settings: nextSettings,
+    record_version: props.template?.updated_at || "",
   });
 
   form.reset();

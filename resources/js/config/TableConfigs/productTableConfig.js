@@ -1,5 +1,5 @@
 /**
- * Configuración para ProductTable
+ * Configuracion para ProductTable.
  * Usada en: Components/Inventory/ProductTable.vue
  */
 
@@ -7,12 +7,12 @@ export const productTableConfig = {
     columns: [
         {
             key: "barcode",
-            label: "Código barras",
+            label: "Codigo barras",
             format: "text",
             width: "140px",
-            mobileLabel: "Código",
+            mobileLabel: "Codigo",
             mobileDisplay: true,
-            fallback: "Sin código",
+            fallback: "Sin codigo",
         },
         {
             key: "name",
@@ -27,12 +27,20 @@ export const productTableConfig = {
             fallback: "Producto sin nombre",
         },
         {
+            key: "product_department_name",
+            label: "Departamento",
+            format: "badge",
+            mobileLabel: "Depto.",
+            mobileDisplay: false,
+            fallback: "Sin departamento",
+        },
+        {
             key: "category",
-            label: "Categoría",
+            label: "Categoria",
             format: "badge",
             mobileLabel: "Cat.",
             mobileDisplay: false,
-            fallback: "Sin categoría",
+            fallback: "Sin categoria",
         },
         {
             key: "unit",

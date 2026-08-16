@@ -8,10 +8,12 @@ import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import FormPanel from '@/Components/Cards/FormPanel.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import InputField from '@/Components/Forms/InputField.vue'
+import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
+import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 
 defineOptions({ layout: AdminLayout })
 
@@ -20,22 +22,26 @@ const props = defineProps({
     orderDB: { type: Object, required: true },
 })
 
-const presentationOptions = [
-    { label: 'Pieza', value: 'Pieza' },
-    { label: 'Caja', value: 'Caja' },
-    { label: 'Kilo', value: 'Kilo' },
-    { label: 'Costal', value: 'Costal' },
-    { label: 'Bolsa', value: 'Bolsa' },
-    { label: 'Paquete', value: 'Paquete' },
-]
+function presentationOptions(item) {
+    if (item.base_unit === 'kg') {
+        return [{ label: 'Kilogramo', value: 'Kilo' }]
+    }
+
+    return [
+        { label: 'Pieza', value: 'Pieza' },
+        ...(item.has_box_presentation ? [{ label: 'Caja', value: 'Caja' }] : []),
+    ]
+}
 const form = reactive({
     purchased_at: props.orderDB.purchased_at || new Date().toISOString().slice(0, 10),
     items: (props.orderDB.items || []).map((item) => ({
         ...item,
-        purchase_presentation: item.purchase_presentation || 'Pieza',
+        purchase_presentation: item.base_unit === 'kg'
+            ? 'Kilo'
+            : (item.purchase_presentation === 'Caja' && item.has_box_presentation ? 'Caja' : 'Pieza'),
         package_quantity: number(item.package_quantity ?? item.requested_quantity),
         units_per_package: item.purchase_presentation === 'Caja'
-            ? number(item.units_per_package) || 1
+            ? number(item.product_pieces_per_box ?? item.units_per_package) || 1
             : 1,
         purchase_price: number(item.purchase_price ?? item.previous_cost),
         promotion_status: item.purchase_notes ? 'YES' : 'NO',
@@ -49,6 +55,9 @@ const totalPurchased = computed(() => form.items.reduce(
     (total, item) => total + purchasedQuantity(item),
     0,
 ))
+const totalPurchasedUnit = computed(() =>
+    form.items.some((item) => normalizeInventoryUnit(item.base_unit) === 'kg') ? 'kg' : 'pza',
+)
 const branchSummary = computed(() => {
     const branches = new Map()
 
@@ -109,8 +118,38 @@ function number(value) {
     return Number(value || 0)
 }
 
-function quantity(value) {
-    return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(number(value))
+function quantityInput(value, allowDecimal = false) {
+    if (value === '') return ''
+
+    const rawValue = String(value ?? '').replace(',', '.')
+    const sanitized = allowDecimal
+        ? rawValue.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1')
+        : rawValue.replace(/[^\d]/g, '')
+    const quantity = Number(sanitized)
+
+    return Number.isFinite(quantity) ? quantity : 0
+}
+
+function updateItemQuantity(item, field, value, minimum = 1) {
+    item[field] = value === ''
+        ? ''
+        : Math.max(minimum, quantityInput(value, allowsDecimalQuantity(item, field)))
+}
+
+function increaseItemQuantity(item, field) {
+    item[field] = quantityInput(item[field], allowsDecimalQuantity(item, field)) + 1
+}
+
+function decreaseItemQuantity(item, field, minimum = 1) {
+    item[field] = Math.max(minimum, quantityInput(item[field], allowsDecimalQuantity(item, field)) - 1)
+}
+
+function quantity(value, unit = 'pza') {
+    return formatInventoryQuantity(value, unit)
+}
+
+function allowsDecimalQuantity(item, field = 'package_quantity') {
+    return field === 'package_quantity' && normalizeInventoryUnit(item.base_unit) === 'kg'
 }
 
 function currency(value) {
@@ -121,7 +160,7 @@ function currency(value) {
 }
 
 function requiresBoxContent(item) {
-    return item.purchase_presentation === 'Caja'
+    return item.purchase_presentation === 'Caja' && Boolean(item.has_box_presentation)
 }
 
 function presentationName(item) {
@@ -169,6 +208,7 @@ function togglePromotion(item) {
 function payload() {
     return {
         purchased_at: form.purchased_at,
+        record_version: props.orderDB.record_version || props.orderDB.updated_at || null,
         items: form.items.map((item) => ({
             id: item.id,
             purchase_presentation: presentationName(item),
@@ -291,7 +331,7 @@ async function completeOrder() {
                                         </p>
                                         <p>
                                             <span class="opacity-60">Cantidad solicitada:</span>
-                                            <strong class="ml-1">{{ quantity(item.requested_quantity) }} {{ item.base_unit || 'pzas.' }}</strong>
+                                            <strong class="ml-1">{{ quantity(item.requested_quantity, item.base_unit) }} {{ item.base_unit || 'pzas.' }}</strong>
                                         </p>
                                     </div>
                                 </div>
@@ -305,7 +345,7 @@ async function completeOrder() {
                                         :key="`${item.id}_${branch.order_id || branch.branch_id}`"
                                         class="rounded-full border border-secondary bg-secondary px-3 py-1.5 text-xs font-semibold text-text"
                                     >
-                                        {{ branch.branch_name }} · {{ quantity(branch.requested_quantity) }}
+                                        {{ branch.branch_name }} · {{ quantity(branch.requested_quantity, item.base_unit) }}
                                     </span>
                                 </div>
                             </div>
@@ -320,32 +360,48 @@ async function completeOrder() {
                                     v-model="item.purchase_presentation"
                                     :field="`general_order_${item.id}_presentation`"
                                     label="Presentación"
-                                    :options="presentationOptions"
+                                    :options="presentationOptions(item)"
                                     :disabled="item.unavailable"
                                 />
-                                <InputField
-                                    v-model="item.package_quantity"
-                                    :field="`general_order_${item.id}_quantity`"
-                                    validation-field="purchase_order_quantity"
-                                    :label="quantityLabel(item)"
-                                    type="text"
-                                    inputmode="decimal"
-                                    :suffix="quantitySuffix(item)"
-                                    :show-counter="false"
-                                    :disabled="item.unavailable"
-                                />
-                                <InputField
-                                    v-if="requiresBoxContent(item)"
-                                    v-model="item.units_per_package"
-                                    :field="`general_order_${item.id}_box_content`"
-                                    validation-field="purchase_order_quantity"
-                                    label="Contenido por caja"
-                                    type="text"
-                                    inputmode="decimal"
-                                    :suffix="item.base_unit || 'pzas.'"
-                                    :show-counter="false"
-                                    :disabled="item.unavailable"
-                                />
+                                <div>
+                                    <label class="mb-1 block text-sm font-semibold text-text">
+                                        {{ quantityLabel(item) }}
+                                    </label>
+                                    <div class="flex items-center gap-2">
+                                        <QuantityStepper
+                                            :value="item.package_quantity"
+                                            :aria-label="quantityLabel(item)"
+                                            :allow-decimal="allowsDecimalQuantity(item)"
+                                            :disabled="item.unavailable"
+                                            :decrease-disabled="quantityInput(item.package_quantity, allowsDecimalQuantity(item)) <= 1"
+                                            @decrease="decreaseItemQuantity(item, 'package_quantity')"
+                                            @increase="increaseItemQuantity(item, 'package_quantity')"
+                                            @update="updateItemQuantity(item, 'package_quantity', $event)"
+                                        />
+                                        <span v-if="quantitySuffix(item)" class="text-xs font-semibold text-text opacity-60">
+                                            {{ quantitySuffix(item) }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div v-if="requiresBoxContent(item)">
+                                    <label class="mb-1 block text-sm font-semibold text-text">
+                                        Contenido por caja
+                                    </label>
+                                    <div class="flex items-center gap-2">
+                                        <QuantityStepper
+                                            :value="item.units_per_package"
+                                            :aria-label="`Contenido por caja de ${item.product_name}`"
+                                            :disabled="item.unavailable"
+                                            :decrease-disabled="quantityInput(item.units_per_package) <= 1"
+                                            @decrease="decreaseItemQuantity(item, 'units_per_package')"
+                                            @increase="increaseItemQuantity(item, 'units_per_package')"
+                                            @update="updateItemQuantity(item, 'units_per_package', $event)"
+                                        />
+                                        <span class="text-xs font-semibold text-text opacity-60">
+                                            {{ item.base_unit || 'pzas.' }}
+                                        </span>
+                                    </div>
+                                </div>
                                 <InputField
                                     v-model="item.purchase_price"
                                     :field="`general_order_${item.id}_purchase_price`"
@@ -390,7 +446,7 @@ async function completeOrder() {
                             <div class="mt-4 rounded-2xl bg-secondary p-3 text-sm text-text">
                                 <span class="block text-xs opacity-55">Cantidad total comprada</span>
                                 <strong class="text-base">
-                                    {{ quantity(purchasedQuantity(item)) }} {{ item.base_unit || 'pzas.' }}
+                                    {{ quantity(purchasedQuantity(item), item.base_unit) }} {{ item.base_unit || 'pzas.' }}
                                 </strong>
                             </div>
                         </section>
@@ -416,7 +472,7 @@ async function completeOrder() {
 
                     <div class="mt-4 border-t border-secondary pt-4 text-sm text-text">
                         <span class="block text-xs opacity-60">Cantidad total comprada</span>
-                        <strong class="mt-1 block text-xl">{{ quantity(totalPurchased) }}</strong>
+                        <strong class="mt-1 block text-xl">{{ quantity(totalPurchased, totalPurchasedUnit) }}</strong>
                     </div>
                 </FormPanel>
 

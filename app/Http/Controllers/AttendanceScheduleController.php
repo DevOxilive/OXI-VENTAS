@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Events\AttendanceChanged;
+use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Models\AttendanceSchedule;
 use App\Services\SystemAuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class AttendanceScheduleController extends Controller
 {
+    use ValidatesRecordVersion;
+
     public function __construct(private readonly SystemAuditService $audit) {}
 
     public function index()
@@ -30,8 +34,14 @@ class AttendanceScheduleController extends Controller
 
     public function update(Request $request, AttendanceSchedule $attendanceSchedule)
     {
-        $before = $attendanceSchedule->getOriginal();
-        $attendanceSchedule->update($this->validated($request));
+        $data = $this->validated($request);
+        [$attendanceSchedule, $before] = DB::transaction(function () use ($request, $attendanceSchedule, $data) {
+            $attendanceSchedule = $this->lockCurrentVersion($request, $attendanceSchedule);
+            $before = $attendanceSchedule->getOriginal();
+            $attendanceSchedule->update($data);
+
+            return [$attendanceSchedule, $before];
+        });
         $this->audit->record('attendance_schedule', 'update', 'success', $request, ['record_type' => AttendanceSchedule::class, 'record_id' => $attendanceSchedule->id, 'record_label' => $attendanceSchedule->name, 'old_values' => $before, 'new_values' => $attendanceSchedule->getChanges()]);
         broadcast(new AttendanceChanged($attendanceSchedule->id, 'schedule_updated', $request->user()->id));
         return back()->with('success', 'Horario actualizado correctamente.');
@@ -45,7 +55,17 @@ class AttendanceScheduleController extends Controller
 
         $label = $attendanceSchedule->name;
         $id = $attendanceSchedule->id;
-        $attendanceSchedule->delete();
+        DB::transaction(function () use ($request, $attendanceSchedule) {
+            $attendanceSchedule = $this->lockCurrentVersion($request, $attendanceSchedule);
+
+            if ($attendanceSchedule->assignments()->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'schedule' => 'No se puede eliminar un horario que ya tiene asignaciones. Desactivalo o reasigna primero al personal.',
+                ]);
+            }
+
+            $attendanceSchedule->delete();
+        });
 
         $this->audit->record('attendance_schedule', 'delete', 'success', $request, [
             'record_type' => AttendanceSchedule::class,

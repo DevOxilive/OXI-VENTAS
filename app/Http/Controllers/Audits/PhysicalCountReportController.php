@@ -14,6 +14,7 @@ use App\Models\PhysicalCountEntry;
 use App\Models\User;
 use App\Services\PhysicalCountSnapshotService;
 use App\Support\TablePagination;
+use App\Support\QuantityFormatter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -248,10 +249,21 @@ class PhysicalCountReportController extends Controller
                     $row['branch_product_id'] ?? null,
                     $row['product_codes'] ?? []
                 );
+                $unit = QuantityFormatter::normalizeUnit($row['inventory_unit'] ?? $row['unit'] ?? 'pza');
                 $row['product_codes'] = collect([
                     $row['scanned_code'] ?? null,
                     ...$codes,
                 ])->filter()->unique()->values()->all();
+                $row['inventory_unit'] = $unit;
+                $row['system_stock_display'] = QuantityFormatter::format($row['system_stock'] ?? 0, $unit);
+                $row['counted_stock_display'] = QuantityFormatter::format($row['counted_stock'] ?? 0, $unit);
+                $row['damaged_stock_display'] = QuantityFormatter::format($row['damaged_stock'] ?? 0, $unit);
+                $row['expired_stock_display'] = QuantityFormatter::format($row['expired_stock'] ?? 0, $unit);
+                $row['difference_label'] = ($row['difference'] ?? null) === null
+                    ? '-'
+                    : ((float) $row['difference'] > 0 ? '+' : '').QuantityFormatter::format($row['difference'], $unit);
+                $row['differenceLabel'] = $row['difference_label'];
+                $row['participantsLabel'] = implode(', ', $row['participants'] ?? []) ?: 'Sin captura';
 
                 return $row;
             });
@@ -477,6 +489,7 @@ class PhysicalCountReportController extends Controller
                     'subcategory_name' => $snapshot['subcategory_name'] ?? $first->branchProduct?->product?->subcategory?->name ?? 'Sin subcategoria',
                     'scanned_code' => $first->scanned_code ?: ($snapshot['scanned_code'] ?? $first->branchProduct?->barcode ?? '-'),
                     'product_codes' => $first->branchProduct?->product?->barcodes?->pluck('code')->values()->all() ?? [],
+                    'inventory_unit' => QuantityFormatter::normalizeUnit($first->branchProduct?->product?->inventory_unit ?? $first->branchProduct?->product?->unit ?? 'pza'),
                     'system_stock' => $systemStock,
                     'counted_stock' => $countedStock,
                     'damaged_stock' => $damagedStock,
@@ -501,32 +514,38 @@ class PhysicalCountReportController extends Controller
             $countedKeys = collect($comparisonRows)
                 ->map(fn ($row) => $row['physical_count_id'] . ':' . $row['branch_product_id'])
                 ->unique();
+            $activeById = ($activeBranchProducts ?? collect())->keyBy('id');
 
             return $snapshotRows
                 ->reject(fn ($row) => $countedKeys->contains($row['physical_count_id'] . ':' . $row['branch_product_id']))
-                ->map(fn ($row) => [
-                    'id' => 'pending-' . $row['physical_count_id'] . '-' . $row['branch_product_id'],
-                    'row_type' => 'pending',
-                    'status' => 'pending',
-                    'physical_count_id' => $row['physical_count_id'],
-                    'audit_name' => $row['audit_name'],
-                    'folio' => $row['folio'],
-                    'audit_date' => $row['audit_date'],
-                    'branch_name' => $row['branch_name'] ?? 'Sin sucursal',
-                    'branch_product_id' => $row['branch_product_id'],
-                    'product_name' => $row['product_name'],
-                    'category_name' => $row['category_name'],
-                    'subcategory_name' => $row['subcategory_name'],
-                    'scanned_code' => $row['scanned_code'],
-                    'product_codes' => $row['product_codes'] ?? [],
-                    'system_stock' => (float) $row['system_stock'],
-                    'counted_stock' => 0,
-                    'damaged_stock' => 0,
-                    'expired_stock' => 0,
-                    'difference' => null,
-                    'participants' => [],
-                    'last_entry_at' => null,
-                ])
+                ->map(function ($row) use ($activeById) {
+                    $branchProduct = $activeById->get($row['branch_product_id'] ?? null);
+
+                    return [
+                        'id' => 'pending-' . $row['physical_count_id'] . '-' . $row['branch_product_id'],
+                        'row_type' => 'pending',
+                        'status' => 'pending',
+                        'physical_count_id' => $row['physical_count_id'],
+                        'audit_name' => $row['audit_name'],
+                        'folio' => $row['folio'],
+                        'audit_date' => $row['audit_date'],
+                        'branch_name' => $row['branch_name'] ?? 'Sin sucursal',
+                        'branch_product_id' => $row['branch_product_id'],
+                        'product_name' => $row['product_name'],
+                        'category_name' => $row['category_name'],
+                        'subcategory_name' => $row['subcategory_name'],
+                        'scanned_code' => $row['scanned_code'],
+                        'product_codes' => $row['product_codes'] ?? [],
+                        'inventory_unit' => QuantityFormatter::normalizeUnit($row['inventory_unit'] ?? $branchProduct?->product?->inventory_unit ?? $branchProduct?->product?->unit ?? 'pza'),
+                        'system_stock' => (float) $row['system_stock'],
+                        'counted_stock' => 0,
+                        'damaged_stock' => 0,
+                        'expired_stock' => 0,
+                        'difference' => null,
+                        'participants' => [],
+                        'last_entry_at' => null,
+                    ];
+                })
                 ->values()
                 ->all();
         }
@@ -552,6 +571,7 @@ class PhysicalCountReportController extends Controller
                     'subcategory_name' => $branchProduct->product?->subcategory?->name ?? 'Sin subcategoria',
                     'scanned_code' => $branchProduct->barcode ?? '-',
                     'product_codes' => $branchProduct->product?->barcodes?->pluck('code')->values()->all() ?? [],
+                    'inventory_unit' => QuantityFormatter::normalizeUnit($branchProduct->product?->inventory_unit ?? $branchProduct->product?->unit ?? 'pza'),
                     'system_stock' => (float) ($branchProduct->stock ?? 0),
                     'counted_stock' => 0,
                     'damaged_stock' => 0,
@@ -662,9 +682,9 @@ class PhysicalCountReportController extends Controller
                     $row['product_name'],
                     $row['category_name'],
                     $row['scanned_code'],
-                    $row['system_stock'],
-                    $row['counted_stock'],
-                    $row['difference'],
+                    $row['system_stock_display'] ?? $row['system_stock'],
+                    $row['counted_stock_display'] ?? $row['counted_stock'],
+                    $row['difference_label'] ?? $row['difference'],
                     $row['status_label'],
                 ])->all(),
             ],
@@ -713,12 +733,12 @@ class PhysicalCountReportController extends Controller
                     $row['category_name'],
                     $row['subcategory_name'],
                     $row['scanned_code'],
-                    $row['system_stock'],
-                    $row['counted_stock'],
-                    $row['damaged_stock'],
-                    $row['expired_stock'],
-                    $row['difference'] ?? '-',
-                    implode(', ', $row['participants'] ?? []),
+                    $row['system_stock_display'] ?? $row['system_stock'],
+                    $row['counted_stock_display'] ?? $row['counted_stock'],
+                    $row['damaged_stock_display'] ?? $row['damaged_stock'],
+                    $row['expired_stock_display'] ?? $row['expired_stock'],
+                    $row['difference_label'] ?? $row['difference'] ?? '-',
+                    $row['participantsLabel'] ?? implode(', ', $row['participants'] ?? []),
                 ])->all(),
             ],
         };
@@ -746,7 +766,7 @@ class PhysicalCountReportController extends Controller
                 ->all(),
             'report_type' => 'summary',
             'page' => max(1, (int) $request->input('page', 1)),
-            'per_page' => TablePagination::resolvePerPage($request, 25),
+            'per_page' => TablePagination::resolvePerPage($request),
         ];
     }
 

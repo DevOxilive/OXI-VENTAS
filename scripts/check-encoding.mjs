@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { extname } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { extname, join, relative } from 'node:path'
 
 const binaryExtensions = new Set([
     '.dll',
@@ -22,16 +22,55 @@ const binaryExtensions = new Set([
 ])
 
 const decoder = new TextDecoder('utf-8', { fatal: true })
-const projectFiles = execFileSync('git', [
-    'ls-files',
-    '--cached',
-    '--others',
-    '--exclude-standard',
-    '-z',
+const ignoredDirectories = new Set([
+    '.git',
+    'node_modules',
+    'vendor',
+    'storage',
+    'bootstrap/cache',
+    'public/build',
 ])
-    .toString('utf8')
-    .split('\0')
-    .filter(Boolean)
+
+function listFilesWithoutGit(directory = process.cwd()) {
+    const files = []
+
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const entryPath = join(directory, entry.name)
+        const relativePath = relative(process.cwd(), entryPath).replace(/\\/g, '/')
+
+        if (entry.isDirectory()) {
+            if ([...ignoredDirectories].some((ignored) => relativePath === ignored || relativePath.startsWith(`${ignored}/`))) {
+                continue
+            }
+
+            files.push(...listFilesWithoutGit(entryPath))
+            continue
+        }
+
+        files.push(relativePath)
+    }
+
+    return files
+}
+
+function listProjectFiles() {
+    try {
+        return execFileSync('git', [
+            'ls-files',
+            '--cached',
+            '--others',
+            '--exclude-standard',
+            '-z',
+        ])
+            .toString('utf8')
+            .split('\0')
+            .filter(Boolean)
+    } catch {
+        return listFilesWithoutGit()
+    }
+}
+
+const projectFiles = listProjectFiles()
 
 const problems = []
 

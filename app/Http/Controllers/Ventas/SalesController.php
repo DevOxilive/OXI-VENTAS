@@ -82,13 +82,15 @@ class SalesController extends Controller
 
         $products = BranchProduct::query()
             ->with([
-                'product:id,name,image,category_id,cost,sale_price,margin_percentage,active',
+                'product:id,name,image,category_id,cost,sale_price,margin_percentage,active,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
                 'product.category:id,name',
                 'product.barcodes:id,product_id,code',
             ])
             ->where('branch_id', $branch->id)
             ->where('status', BranchProduct::STATUS_ACTIVE)
-            ->whereHas('product', fn ($query) => $query->where('active', true))
+            ->whereHas('product', fn ($query) => $query
+                ->where('active', true)
+                ->where('inventory_quantity_mode', '!=', 'legacy_presentation'))
             ->where(function ($query) use ($term, $pattern) {
                 $query->where('branch_products.barcode', 'like', $pattern)
                     ->orWhereHas('product', function ($productQuery) use ($term, $pattern) {
@@ -139,7 +141,8 @@ class SalesController extends Controller
             'items.*.branch_product_id' => ['required', 'exists:branch_products,id'],
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.barcode_id' => ['nullable', 'exists:barcodes,id'],
-            'items.*.quantity' => ['required', 'numeric', 'min:1'],
+            'items.*.quantity' => ['required', 'numeric', 'min:0.001'],
+            'items.*.presentation' => ['nullable', 'in:piece,box'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.original_unit_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -162,6 +165,11 @@ class SalesController extends Controller
                 'employee_id' => 'Tu usuario no tiene un empleado asociado para registrar la venta.',
             ]);
         }
+
+        $data['items'] = collect($data['items'])
+            ->sortBy(fn (array $item) => (int) $item['branch_product_id'])
+            ->values()
+            ->all();
 
         $sale = DB::transaction(function () use ($data, $user, $branch, $paymentMethod, $stockService) {
             $sale = Sale::create([
@@ -195,12 +203,43 @@ class SalesController extends Controller
                 }
 
                 $quantity = (float) $item['quantity'];
-                $originalUnitPrice = isset($item['original_unit_price'])
-                    ? (float) $item['original_unit_price']
-                    : (float) $item['unit_price'];
+                $product = $branchProduct->product;
+                if ($product?->inventory_quantity_mode === 'legacy_presentation') {
+                    throw ValidationException::withMessages([
+                        'items' => 'El producto '.$product->name.' conserva existencias históricas por conciliar antes de venderse.',
+                    ]);
+                }
+
+                $presentation = $item['presentation'] ?? 'piece';
+                $isKilogram = ($product?->inventory_unit ?? $product?->unit) === 'kg';
+                $piecesPerBox = (int) ($product?->pieces_per_box ?? 0);
+                if ($presentation === 'box' && (! $product?->has_box_presentation || $piecesPerBox < 2)) {
+                    throw ValidationException::withMessages([
+                        'items' => 'El producto '.($product?->name ?? 'seleccionado').' no tiene una presentación por caja configurada.',
+                    ]);
+                }
+
+                if (($presentation === 'box' || ! $isKilogram) && abs($quantity - round($quantity)) > 0.0000001) {
+                    throw ValidationException::withMessages([
+                        'items' => 'Las piezas y cajas deben venderse en cantidades enteras.',
+                    ]);
+                }
+
+                if ($isKilogram && $quantity > 999.999) {
+                    throw ValidationException::withMessages([
+                        'items' => 'Los kilogramos permiten hasta 999.999 por renglón.',
+                    ]);
+                }
+
+                $baseQuantity = $presentation === 'box'
+                    ? $quantity * $piecesPerBox
+                    : $quantity;
+                $originalUnitPrice = $presentation === 'box'
+                    ? (float) ($product?->sale_price_per_box ?? 0)
+                    : (float) ($product?->sale_price_per_piece ?? $product?->sale_price ?? 0);
                 $discountPercentage = round((float) ($item['discount_percentage'] ?? 0), 2);
-                $discountAmount = round((float) ($item['discount_amount'] ?? 0), 2);
-                $unitPrice = round((float) $item['unit_price'], 2);
+                $unitPrice = round($originalUnitPrice * (1 - ($discountPercentage / 100)), 2);
+                $discountAmount = round(($originalUnitPrice - $unitPrice) * $quantity, 2);
                 $availableStock = (float) $branchProduct->stock;
 
                 if ($discountPercentage < 0 || $discountPercentage > 100) {
@@ -215,7 +254,7 @@ class SalesController extends Controller
                     ]);
                 }
 
-                if ($availableStock < $quantity) {
+                if ($availableStock < $baseQuantity) {
                     throw ValidationException::withMessages([
                         'items' => sprintf(
                             'No hay stock suficiente para %s. Disponible: %s',
@@ -235,13 +274,13 @@ class SalesController extends Controller
                         ->exists();
 
                 if ($useBatches) {
-                    $manualBatches = $this->allocateBatchesForSale($branchProduct, $quantity);
+                    $manualBatches = $this->allocateBatchesForSale($branchProduct, $baseQuantity);
 
                     $stockService->move(
                         branchProduct: $branchProduct,
                         type: StockMovement::TYPE_OUT,
                         reason: StockMovement::REASON_SALE,
-                        quantity: $quantity,
+                        quantity: $baseQuantity,
                         notes: 'Venta generada desde punto de venta',
                         userId: $user->id,
                         batches: [],
@@ -250,7 +289,7 @@ class SalesController extends Controller
                     );
                 } else {
                     $previousStock = (float) $branchProduct->stock;
-                    $newStock = $previousStock - $quantity;
+                    $newStock = $previousStock - $baseQuantity;
 
                     $branchProduct->update([
                         'stock' => $newStock,
@@ -260,8 +299,10 @@ class SalesController extends Controller
                         'branch_product_id' => $branchProduct->id,
                         'type' => StockMovement::TYPE_OUT,
                         'reason' => StockMovement::REASON_SALE,
-                        'quantity' => $quantity,
-                        'unit_cost' => $branchProduct->product?->cost ?? 0,
+                        'quantity' => $baseQuantity,
+                        'unit_cost' => $presentation === 'box'
+                            ? ($product?->cost_per_box ?? 0)
+                            : ($product?->cost_per_piece ?? $product?->cost ?? 0),
                         'previous_stock' => $previousStock,
                         'new_stock' => $newStock,
                         'user_id' => $user->id,
@@ -278,11 +319,16 @@ class SalesController extends Controller
                     'barcode_id' => $item['barcode_id'] ?? null,
                     'lot_id' => null,
                     'quantity' => $quantity,
+                    'sale_unit' => $presentation,
+                    'base_quantity' => $baseQuantity,
+                    'pieces_per_box' => $presentation === 'box' ? $piecesPerBox : null,
                     'original_unit_price' => $originalUnitPrice,
                     'discount_percentage' => $discountPercentage,
                     'discount_amount' => $discountAmount,
                     'unit_price' => $unitPrice,
-                    'unit_cost' => $branchProduct->product?->cost ?? 0,
+                    'unit_cost' => $presentation === 'box'
+                        ? ($product?->cost_per_box ?? 0)
+                        : ($product?->cost_per_piece ?? $product?->cost ?? 0),
                     'subtotal' => $subtotal,
                 ]);
             }
@@ -307,16 +353,22 @@ class SalesController extends Controller
             ]);
 
             return $sale;
-        });
+        }, 3);
 
         $expirationAlerts = $this->buildRemainingNearExpirationAlertsAfterSale($sale);
 
-        return back()->with([
+        $responsePayload = [
             'success' => 'Venta registrada correctamente.',
             'sale_folio' => $sale->folio,
             'print_job' => $this->buildPrintJobPayload($sale),
             'expiration_alerts' => $expirationAlerts,
-        ]);
+        ];
+
+        if ($request->expectsJson()) {
+            return response()->json($responsePayload);
+        }
+
+        return back()->with($responsePayload);
     }
 
     private function nearExpirationProducts(Branch $branch, int $limit): Collection
@@ -370,7 +422,13 @@ class SalesController extends Controller
             'image' => $product?->image
                 ? route('inventory.products.image', ['product' => $product->id])
                 : null,
-            'price' => (float) ($product?->sale_price ?? 0),
+            'price' => (float) ($product?->sale_price_per_piece ?? $product?->sale_price ?? 0),
+            'sale_price_per_piece' => (float) ($product?->sale_price_per_piece ?? $product?->sale_price ?? 0),
+            'sale_price_per_box' => (float) ($product?->sale_price_per_box ?? 0),
+            'has_box_presentation' => (bool) $product?->has_box_presentation,
+            'pieces_per_box' => (int) ($product?->pieces_per_box ?? 0),
+            'inventory_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
+            'inventory_quantity_mode' => $product?->inventory_quantity_mode ?? 'base',
             'cost' => (float) ($product?->cost ?? 0),
             'margin_percentage' => (float) ($product?->margin_percentage ?? 0),
             'stock' => (float) ($branchProduct->stock ?? 0),
@@ -398,9 +456,7 @@ class SalesController extends Controller
 
     private function shouldShowBranchSelector(Request $request, $user, $allowedBranches): bool
     {
-        return $user->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL)
-            && ! $request->filled('branch')
-            && $allowedBranches->isNotEmpty();
+        return ! $request->filled('branch') && $allowedBranches->count() > 1;
     }
 
     private function resolveBranch(Request $request, $user, $allowedBranches): ?Branch
@@ -642,6 +698,8 @@ class SalesController extends Controller
                 return [
                     'product_name' => $detail->product?->name ?? 'Producto',
                     'quantity' => (float) $detail->quantity,
+                    'sale_unit' => $detail->sale_unit ?? 'piece',
+                    'pieces_per_box' => $detail->pieces_per_box,
                     'unit_price' => (float) $detail->unit_price,
                     'subtotal' => (float) $detail->subtotal,
                     'discount_percentage' => (float) ($detail->discount_percentage ?? 0),

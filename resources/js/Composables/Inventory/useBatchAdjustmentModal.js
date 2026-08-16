@@ -74,18 +74,36 @@ export function useBatchAdjustmentModal(products) {
         return form.status === "SEASONAL";
     });
 
+    const selectedProduct = computed(() => {
+        return products.value.find((product) => (
+            (product.batches ?? []).some((batch) => batch.id === selectedBatchId.value)
+        )) ?? null;
+    });
+
+    const isKilogramUnit = computed(() => {
+        return String(selectedProduct.value?.inventory_unit ?? selectedProduct.value?.unit ?? "").toLowerCase() === "kg";
+    });
+
+    function normalizeQuantity(value) {
+        const quantity = Number(String(value ?? "").replace(',', '.'));
+
+        if (!Number.isFinite(quantity)) return 0;
+
+        return Math.round(quantity * 1000) / 1000;
+    }
+
     const signedAdjustmentQuantity = computed(() => {
-        const amount = Number(form.adjustment_amount || 0);
+        const amount = normalizeQuantity(form.adjustment_amount);
 
         return form.adjustment_type === "ADD" ? amount : amount * -1;
     });
 
     const calculatedQuantity = computed(() => {
-        return Number(form.original_quantity || 0) + signedAdjustmentQuantity.value;
+        return Math.round((Number(form.original_quantity || 0) + signedAdjustmentQuantity.value) * 1000) / 1000;
     });
 
     const adjustmentText = computed(() => {
-        const amount = Number(form.adjustment_amount || 0);
+        const amount = normalizeQuantity(form.adjustment_amount);
 
         if (!amount) {
             return "No se aplicara ajuste de cantidad.";
@@ -200,10 +218,22 @@ export function useBatchAdjustmentModal(products) {
                 return;
             }
 
-            const amount = Number(form.adjustment_amount);
+            const rawAmount = String(form.adjustment_amount).replace(',', '.');
+            const amount = normalizeQuantity(rawAmount);
 
-            if (Number.isNaN(amount)) {
+            if (!Number.isFinite(Number(rawAmount))) {
                 frontendErrors.adjustment_amount = "La cantidad debe ser un numero.";
+                return;
+            }
+
+            const validPrecision = isKilogramUnit.value
+                ? /^\d{1,3}(\.\d{1,3})?$/.test(rawAmount)
+                : /^\d{1,3}$/.test(rawAmount);
+
+            if (!validPrecision) {
+                frontendErrors.adjustment_amount = isKilogramUnit.value
+                    ? "Los kilogramos permiten hasta 999.999 con un máximo de tres decimales."
+                    : "La cantidad debe ser un número entero entre 1 y 999.";
                 return;
             }
 

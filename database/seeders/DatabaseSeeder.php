@@ -15,9 +15,10 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
             PositionSeeder::class,
             EmployeeSeeder::class,
-            UsersSeeder::class,
-
             BranchSeeder::class,
+            ProductDepartmentSeeder::class,
+            ProductCategorySeeder::class,
+            UsersSeeder::class,
 
             SupplierSeeder::class,
             CustomerSeeder::class,
@@ -28,6 +29,8 @@ class DatabaseSeeder extends Seeder
             TripDetailSeeder::class,
             IncidentSeeder::class,
             InventoryReportSeeder::class,
+            SalesOperationsSeeder::class,
+            PhysicalCountDemoSeeder::class,
         ]);
     }
 }

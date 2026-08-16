@@ -90,7 +90,7 @@ class GeneralPurchaseOrderController extends Controller
 
         $generalPurchaseOrder->load([
             'creator',
-            'items.product:id,image,cost,description',
+            'items.product:id,image,cost,description,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,cost_per_box',
             'branchOrders.branch',
             'branchOrders.items',
         ]);
@@ -103,7 +103,7 @@ class GeneralPurchaseOrderController extends Controller
 
     private function generationListPayload(Request $request, Branch $branch): array
     {
-        $perPage = TablePagination::resolvePerPage($request, 25);
+        $perPage = TablePagination::resolvePerPage($request);
 
         return [
             'currentBranch' => $branch,
@@ -128,7 +128,7 @@ class GeneralPurchaseOrderController extends Controller
     private function listPayload(Request $request, Branch $branch, string $status): array
     {
 
-        $perPage = TablePagination::resolvePerPage($request, 25);
+        $perPage = TablePagination::resolvePerPage($request);
 
         $filters = [
             'search' => trim((string) $request->input('search', '')),
@@ -181,7 +181,7 @@ class GeneralPurchaseOrderController extends Controller
 
         $generalPurchaseOrder->load([
             'creator',
-            'items.product:id,image,cost,description',
+            'items.product:id,image,cost,description,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,cost_per_box',
             'branchOrders.branch',
             'branchOrders.items',
         ]);
@@ -201,7 +201,6 @@ class GeneralPurchaseOrderController extends Controller
         $payload = $request->validate([
             'order_ids' => ['required', 'array', 'min:1'],
             'order_ids.*' => ['required', 'integer', 'distinct'],
-            'draft_id' => ['nullable', 'integer', 'exists:general_purchase_orders,id'],
         ]);
 
         $cycle = $this->cycles->currentOpenCycle($request->user());
@@ -209,7 +208,6 @@ class GeneralPurchaseOrderController extends Controller
             $cycle,
             $request->user(),
             $payload['order_ids'],
-            $payload['draft_id'] ?? null,
         );
 
         return redirect()->back()->with(
@@ -218,27 +216,6 @@ class GeneralPurchaseOrderController extends Controller
                 ? 'Orden general generada correctamente.'
                 : 'El ciclo se cerró sin productos por comprar.'
         );
-    }
-
-    public function saveDraft(Request $request, Branch $branch)
-    {
-        $this->abortIfUserCannotAccessBranch($request, $branch);
-
-        $payload = $request->validate([
-            'order_ids' => ['required', 'array', 'min:1'],
-            'order_ids.*' => ['required', 'integer', 'distinct'],
-            'draft_id' => ['nullable', 'integer', 'exists:general_purchase_orders,id'],
-        ]);
-
-        $cycle = $this->cycles->currentOpenCycle($request->user());
-        $this->cycles->saveGeneralDraft(
-            $cycle,
-            $request->user(),
-            $payload['order_ids'],
-            $payload['draft_id'] ?? null,
-        );
-
-        return redirect()->back()->with('success', 'Borrador de orden general guardado correctamente.');
     }
 
     public function sourceOrder(Request $request, Branch $branch, PurchaseOrder $purchaseOrder)
@@ -344,11 +321,16 @@ class GeneralPurchaseOrderController extends Controller
             ],
         ]);
 
-        $purchaseOrder->update([
-            'review_status' => $payload['review_status'],
-            'reviewed_by' => $request->user()?->id,
-            'reviewed_at' => now(),
-        ]);
+        DB::transaction(function () use ($purchaseOrder, $payload, $request) {
+            $lockedOrder = PurchaseOrder::query()->lockForUpdate()->findOrFail($purchaseOrder->id);
+            abort_if($lockedOrder->general_purchase_order_id, 422, 'La orden ya forma parte de una Orden de compra general.');
+            $lockedOrder->update([
+                'review_status' => $payload['review_status'],
+                'reviewed_by' => $request->user()?->id,
+                'reviewed_at' => now(),
+            ]);
+        }, 3);
+        $purchaseOrder->refresh();
 
         $label = $payload['review_status'] === PurchaseOrder::REVIEW_APPROVED
             ? 'aprobada'
@@ -383,12 +365,14 @@ class GeneralPurchaseOrderController extends Controller
 
         $purchaseOrder->loadMissing('branch');
         $editor = app(PendingPurchaseOrderEditor::class);
+        $validated = $request->validate($editor->rules());
         $updatedOrder = $editor->update(
             $purchaseOrder,
             $purchaseOrder->branch,
-            $request->validate($editor->rules())['items'],
+            $validated['items'],
             $request->user(),
             true,
+            $validated['record_version'],
         );
 
         app(SystemAuditService::class)->record('purchase-orders', 'inventory_edit', 'success', $request, [
@@ -529,11 +513,12 @@ class GeneralPurchaseOrderController extends Controller
     {
         return $request->validate([
             'purchased_at' => ['required', 'date'],
+            'record_version' => ['required', 'date'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'integer', 'exists:general_purchase_order_items,id'],
-            'items.*.purchase_presentation' => ['required', 'string', 'max:30'],
-            'items.*.package_quantity' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
-            'items.*.units_per_package' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
+            'items.*.purchase_presentation' => ['required', 'in:Pieza,Caja,Kilo'],
+            'items.*.package_quantity' => ['nullable', 'numeric', 'decimal:0,3', 'min:0', 'max:9999.999'],
+            'items.*.units_per_package' => ['nullable', 'integer', 'min:0', 'max:9999'],
             'items.*.purchase_price' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:999999.99'],
             'items.*.purchase_notes' => ['nullable', 'string', 'max:1000'],
             'items.*.unavailable' => ['nullable', 'boolean'],
@@ -544,12 +529,6 @@ class GeneralPurchaseOrderController extends Controller
     {
         $user = $request->user();
         $user->loadMissing('role');
-        $draft = GeneralPurchaseOrder::query()
-            ->with(['branchOrders.branch'])
-            ->where('created_by', $user->id)
-            ->where('status', GeneralPurchaseOrder::STATUS_DRAFT)
-            ->latest('id')
-            ->first();
         $accessibleBranchIds = $user->accessibleBranchIds();
         $isInventoryUser = $user->role?->name === 'Inventario';
 
@@ -562,13 +541,7 @@ class GeneralPurchaseOrderController extends Controller
             ->where('status', PurchaseOrder::STATUS_GENERATED)
             ->whereNotNull('assigned_to_user_id')
             ->when($isInventoryUser, fn ($query) => $query->where('assigned_to_user_id', $user->id))
-            ->where(function ($query) use ($draft) {
-                $query->whereNull('general_purchase_order_id');
-
-                if ($draft) {
-                    $query->orWhere('general_purchase_order_id', $draft->id);
-                }
-            })
+            ->whereNull('general_purchase_order_id')
             ->oldest('generated_at')
             ->oldest('id')
             ->get()
@@ -588,8 +561,6 @@ class GeneralPurchaseOrderController extends Controller
                 'items_count' => $order->items_count,
                 'requested_quantity' => (float) ($order->requested_quantity ?? 0),
                 'generated_at' => $order->generated_at ?? $order->created_at,
-                'in_draft' => $draft
-                    && (int) $order->general_purchase_order_id === (int) $draft->id,
             ]);
         $orderCounts = $orders->countBy(fn ($order) => (int) $order['branch_id']);
 
@@ -622,11 +593,7 @@ class GeneralPurchaseOrderController extends Controller
             'branches' => $branches,
             'orders' => $orders->values(),
             'inventory_users' => $inventoryUsers,
-            'draft' => $draft ? [
-                'id' => $draft->id,
-                'order_ids' => $draft->branchOrders->pluck('id')->map(fn ($id) => (int) $id)->values(),
-                'updated_at' => $draft->updated_at,
-            ] : null,
+            'draft' => null,
         ];
     }
 
@@ -636,6 +603,7 @@ class GeneralPurchaseOrderController extends Controller
             'id' => $purchaseOrder->id,
             'folio' => $purchaseOrder->folio,
             'status' => $purchaseOrder->status,
+            'record_version' => $purchaseOrder->updated_at?->toJSON(),
             'status_label' => $this->reviewStatusLabel($purchaseOrder->review_status),
             'review_status' => $purchaseOrder->review_status,
             'review_status_label' => $this->reviewStatusLabel($purchaseOrder->review_status),
@@ -676,6 +644,8 @@ class GeneralPurchaseOrderController extends Controller
                     'product_name' => $product?->name ?? 'Producto sin nombre',
                     'product_code' => $product?->barcodes?->first()?->code ?: ($branchProduct?->barcode ?? ''),
                     'category_name' => $product?->category?->name ?? 'Sin categoría',
+                    'base_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
+                    'inventory_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
                     'requested_quantity' => (float) $item->requested_quantity,
                     'received_quantity' => null,
                     'receipt_notes' => null,
@@ -711,6 +681,7 @@ class GeneralPurchaseOrderController extends Controller
                 : ($order->status === GeneralPurchaseOrder::STATUS_PURCHASING ? 'En compra' : 'Borrador'),
             'created_at' => $order->created_at,
             'completed_at' => $order->completed_at,
+            'record_version' => $order->updated_at?->toJSON(),
             'created_by' => [
                 'id' => $order->created_by,
                 'name' => $order->creator?->name ?? 'Sin información',
@@ -759,13 +730,18 @@ class GeneralPurchaseOrderController extends Controller
                     ]);
 
                 return array_merge($itemPayload, [
+                    'base_unit' => $item->product?->inventory_unit
+                        ?? $item->product?->unit
+                        ?? $item->base_unit,
+                    'has_box_presentation' => (bool) $item->product?->has_box_presentation,
+                    'product_pieces_per_box' => (int) ($item->product?->pieces_per_box ?? 0),
                     'branch_breakdown' => $breakdown,
                     'image_url' => $item->product?->image
                         ? route('inventory.products.image', ['product' => $item->product_id])
                         : null,
                     'product_description' => $item->product_description
                         ?: $item->product?->description,
-                    'previous_cost' => (float) ($item->estimated_unit_price ?? $item->product?->cost ?? 0),
+                    'previous_cost' => (float) ($item->estimated_unit_price ?? $item->product?->cost_per_piece ?? $item->product?->cost ?? 0),
                 ]);
             })->values(),
         ];

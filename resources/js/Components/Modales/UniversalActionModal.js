@@ -1,11 +1,41 @@
 import Swal from "sweetalert2";
 
-/* ===========================
-   ALERTA DE CONFIRMACIÓN
-=========================== */
+const ALERT_Z_INDEX = 2147483647;
+
+function raiseAlertContainer() {
+    document.querySelectorAll(".swal2-container").forEach((container) => {
+        container.style.zIndex = String(ALERT_Z_INDEX);
+    });
+}
+
+function mergeAlertClasses(customClass = {}) {
+    return {
+        ...customClass,
+        popup: ["oxi-swal-popup rounded-2xl", customClass.popup].filter(Boolean).join(" "),
+        confirmButton: ["oxi-swal-confirm px-5 py-2 rounded-full", customClass.confirmButton].filter(Boolean).join(" "),
+        cancelButton: ["oxi-swal-cancel px-5 py-2 rounded-full", customClass.cancelButton].filter(Boolean).join(" "),
+    };
+}
+
+function withAlertDefaults(options = {}) {
+    const { didOpen, customClass = {}, toast = false, ...rest } = options;
+
+    return {
+        ...rest,
+        target: "body",
+        ...(toast ? {} : { heightAuto: false }),
+        toast,
+        didOpen: (...args) => {
+            raiseAlertContainer();
+            didOpen?.(...args);
+        },
+        customClass: mergeAlertClasses(customClass),
+    };
+}
+
 export function UniversalActionModal({
-    title = "Confirmar acción",
-    message = "¿Deseas continuar con esta acción sobre",
+    title = "Confirmar accion",
+    message = "Deseas continuar con esta accion sobre",
     itemName = "",
     html = null,
     confirmText = "Confirmar",
@@ -16,123 +46,73 @@ export function UniversalActionModal({
     customClass = {},
     ...options
 } = {}) {
-    return Swal.fire({
-        title: title,
+    return Swal.fire(withAlertDefaults({
+        title,
         ...(html
             ? { html }
             : { text: itemName ? `${message} ${itemName}?` : message }),
-        icon: icon,
+        icon,
         showCancelButton: true,
         confirmButtonText: confirmText,
         cancelButtonText: cancelText,
-        confirmButtonColor: confirmButtonColor,
-        cancelButtonColor: cancelButtonColor,
+        confirmButtonColor,
+        cancelButtonColor,
         reverseButtons: true,
         focusCancel: true,
         ...options,
-        didOpen: (...args) => {
-            const container = document.querySelector(".swal2-container")
-
-            if (container) {
-                container.style.zIndex = "999999"
-            }
-
-            options.didOpen?.(...args)
-        },
-        customClass: {
-            popup: "rounded-2xl",
-            confirmButton: "px-5 py-2 rounded-full",
-            cancelButton: "px-5 py-2 rounded-full",
-            ...customClass,
-        },
-    });
+        customClass,
+    }));
 }
 
-/* ===========================
-   ALERTA DE ÉXITO
-=========================== */
 export function SuccessAlert({
-    title = "Operación realizada",
-    message = "La acción se ejecutó correctamente",
+    title = "Operacion realizada",
+    message = "La accion se ejecuto correctamente",
 } = {}) {
-    return Swal.fire({
+    return Swal.fire(withAlertDefaults({
         toast: true,
         position: "top-start",
         icon: "success",
-        title: title,
+        title,
         text: message,
         showConfirmButton: false,
         timer: 2500,
         timerProgressBar: true,
-        didOpen: () => {
-            const container = document.querySelector(".swal2-container")
-
-            if (container) {
-                container.style.zIndex = "999999"
-            }
-        },
-    });
+    }));
 }
 
-/* ===========================
-   ALERTA DE ERROR
-=========================== */
-/* ===========================
-   ALERTA INFORMATIVA
-=========================== */
 export function ErrorAlert({
-    title = "Ocurrió un error",
-    message = "No fue posible completar la operación",
+    title = "Ocurrio un error",
+    message = "No fue posible completar la operacion",
 } = {}) {
-    return Swal.fire({
+    return Swal.fire(withAlertDefaults({
         icon: "error",
-        title: title,
+        title,
         html: message,
         confirmButtonColor: "#ef4444",
-        customClass: {
-            popup: "rounded-2xl",
-            confirmButton: "px-5 py-2 rounded-full",
-        },
-        didOpen: () => {
-            const container = document.querySelector(".swal2-container")
-
-            if (container) {
-                container.style.zIndex = "999999"
-            }
-        },
-    });
+    }));
 }
-/* ===========================
-   ALERTA WARNING SIMPLE
-=========================== */
+
 export function WarningAlert({
     title = "Advertencia",
-    message = "Revisa esta acción antes de continuar",
+    message = "Revisa esta accion antes de continuar",
 } = {}) {
-    return Swal.fire({
+    return Swal.fire(withAlertDefaults({
         icon: "warning",
-        title: title,
+        title,
         text: message,
         confirmButtonColor: "#f59e0b",
-        customClass: {
-            popup: "rounded-2xl",
-            confirmButton: "px-5 py-2 rounded-full",
-        },
-    });
+    }));
 }
 
-/* ===========================
-   TOAST FLOTANTE
-=========================== */
 export function BlockingWarningAlert({
     title = "Advertencia",
-    message = "Revisa esta acción antes de continuar",
+    message = "Revisa esta accion antes de continuar",
     confirmText = "OK",
     confirmButtonColor = "#e60012",
 } = {}) {
-    return Swal.fire({
+    return Swal.fire(withAlertDefaults({
         icon: "warning",
-        title: title,
+        title,
         html: message,
         confirmButtonText: confirmText,
         confirmButtonColor,
@@ -140,31 +120,20 @@ export function BlockingWarningAlert({
         allowEscapeKey: false,
         allowEnterKey: true,
         showCloseButton: false,
-        customClass: {
-            popup: "rounded-2xl",
-            confirmButton: "px-5 py-2 rounded-full",
-        },
-        didOpen: () => {
-            const container = document.querySelector(".swal2-container")
-
-            if (container) {
-                container.style.zIndex = "999999"
-            }
-        },
-    });
+    }));
 }
 
 export function ToastAlert({
     icon = "success",
-    title = "Operación realizada",
+    title = "Operacion realizada",
 } = {}) {
-    return Swal.fire({
+    return Swal.fire(withAlertDefaults({
         toast: true,
         position: "top-start",
-        icon: icon,
-        title: title,
+        icon,
+        title,
         showConfirmButton: false,
         timer: 2500,
         timerProgressBar: true,
-    });
+    }));
 }

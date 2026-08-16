@@ -143,12 +143,12 @@
                         </span>
                     </td>
                     <td>{{ $row['category_name'] ?? 'Sin categoría' }}</td>
-                    <td class="text-center">{{ number_format((float) ($row['system_stock'] ?? 0), 2) }}</td>
-                    <td class="text-center">{{ number_format((float) ($row['counted_stock'] ?? 0), 2) }}</td>
-                    <td class="text-center">{{ number_format((float) ($row['damaged_stock'] ?? 0), 2) }}</td>
-                    <td class="text-center">{{ number_format((float) ($row['expired_stock'] ?? 0), 2) }}</td>
+                    <td class="text-center">{{ $row['system_stock_display'] ?? \App\Support\QuantityFormatter::format($row['system_stock'] ?? 0, $row['inventory_unit'] ?? 'pza') }}</td>
+                    <td class="text-center">{{ $row['counted_stock_display'] ?? \App\Support\QuantityFormatter::format($row['counted_stock'] ?? 0, $row['inventory_unit'] ?? 'pza') }}</td>
+                    <td class="text-center">{{ $row['damaged_stock_display'] ?? \App\Support\QuantityFormatter::format($row['damaged_stock'] ?? 0, $row['inventory_unit'] ?? 'pza') }}</td>
+                    <td class="text-center">{{ $row['expired_stock_display'] ?? \App\Support\QuantityFormatter::format($row['expired_stock'] ?? 0, $row['inventory_unit'] ?? 'pza') }}</td>
                     <td class="text-center">
-                        {{ ($row['difference'] ?? null) === null ? '-' : number_format((float) $row['difference'], 2) }}
+                        {{ $row['difference_label'] ?? (($row['difference'] ?? null) === null ? '-' : \App\Support\QuantityFormatter::format($row['difference'], $row['inventory_unit'] ?? 'pza')) }}
                     </td>
                     <td class="result result-{{ $result }}">{{ $row['status_label'] ?? 'Pendiente' }}</td>
                 </tr>

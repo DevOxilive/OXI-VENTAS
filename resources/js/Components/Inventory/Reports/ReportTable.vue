@@ -1,8 +1,10 @@
 <script setup>
+import { computed } from 'vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import { inventoryReportTableConfig } from '@/config/TableConfigs/inventoryReportTableConfig'
+import { inventoryMovementReportTableConfig } from '@/config/TableConfigs/inventoryMovementReportTableConfig'
 
-defineProps({
+const props = defineProps({
     rows: {
         type: Array,
         default: () => [],
@@ -17,6 +19,11 @@ defineProps({
         type: Boolean,
         default: false,
     },
+
+    reportType: {
+        type: String,
+        default: 'dashboard',
+    },
 })
 
 defineEmits([
@@ -24,10 +31,16 @@ defineEmits([
     'action',
     'row-click',
 ])
+
+const tableConfig = computed(() => (
+    props.reportType === 'movements'
+        ? inventoryMovementReportTableConfig
+        : inventoryReportTableConfig
+))
 </script>
 
 <template>
-    <GlobalTable :items="rows" v-bind="inventoryReportTableConfig" :pagination="pagination" :loading="loading"
+    <GlobalTable :items="rows" v-bind="tableConfig" :pagination="pagination" :loading="loading"
         @page-change="$emit('page-change', $event)" @action="$emit('action', $event)"
         @row-click="$emit('row-click', $event)" />
 </template>

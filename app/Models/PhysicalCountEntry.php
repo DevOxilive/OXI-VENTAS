@@ -24,6 +24,13 @@ class PhysicalCountEntry extends Model
     'notes',
 ];
 
+    protected $casts = [
+        'counted_quantity' => 'decimal:3',
+        'damaged_quantity' => 'decimal:3',
+        'expired_quantity' => 'decimal:3',
+        'expiration_date' => 'date',
+    ];
+
     public function physicalCount()
     {
         return $this->belongsTo(PhysicalCount::class);

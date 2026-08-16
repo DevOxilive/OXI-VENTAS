@@ -20,7 +20,7 @@ class SupplierSeeder extends Seeder
             ],
             [
                 'id' => 2,
-                'name' => 'PepsiCo Alimentos Mexico',
+                'name' => 'PepsiCo Alimentos México',
                 'phone' => '5587654321',
                 'email' => 'mayoreo@pepsico.mx',
                 'address' => 'Cedis Tlalnepantla, Estado de Mexico',
@@ -28,10 +28,10 @@ class SupplierSeeder extends Seeder
             ],
             [
                 'id' => 3,
-                'name' => 'Grupo Lala Distribucion',
+                'name' => 'Grupo Lala Distribución',
                 'phone' => '5555012233',
                 'email' => 'ventas.cdmx@lala.mx',
-                'address' => 'Cedis Iztapalapa, Ciudad de Mexico',
+                'address' => 'Cedis Iztapalapa, Ciudad de México',
                 'active' => true,
             ],
             [
@@ -55,7 +55,7 @@ class SupplierSeeder extends Seeder
                 'name' => 'Abarrotera Central',
                 'phone' => '5522110099',
                 'email' => 'pedidos@abarroteracentral.mx',
-                'address' => 'Central de Abasto, Ciudad de Mexico',
+                'address' => 'Central de Abasto, Ciudad de México',
                 'active' => true,
             ],
         ];

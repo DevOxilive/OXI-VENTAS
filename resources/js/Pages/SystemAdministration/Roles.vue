@@ -13,7 +13,10 @@ const { permissionLabel } = usePermissionLabels(toRef(props, 'permissions'))
 const selectedRole = ref(null)
 const selectedPermissions = ref([])
 const edit = (role) => { selectedRole.value = role; selectedPermissions.value = role.permissions.map((permission) => permission.id) }
-const save = () => router.put(route('system-administration.roles.update', selectedRole.value.id), { permission_ids: selectedPermissions.value }, { preserveScroll: true })
+const save = () => router.put(route('system-administration.roles.update', selectedRole.value.id), {
+    permission_ids: selectedPermissions.value,
+    record_version: selectedRole.value.updated_at,
+}, { preserveScroll: true })
 </script>
 
 <template>

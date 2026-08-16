@@ -101,6 +101,10 @@ class StockMovementController extends Controller
                 'numeric',
                 'min:0.001',
             ],
+        ], [
+            'batches.*.lot_number.required_with' => 'El número de lote es obligatorio para registrar una entrada.',
+            'batches.*.expiration_date.required_with' => 'La caducidad es obligatoria para registrar una entrada.',
+            'batches.*.received_at.required_with' => 'La fecha de ingreso es obligatoria para registrar una entrada.',
         ]);
 
         /*
@@ -116,9 +120,45 @@ class StockMovementController extends Controller
 
         $this->authorizeMovement($request, $validated['type']);
 
-        $branchProduct = BranchProduct::findOrFail($validated['branch_product_id']);
+        $branchProduct = BranchProduct::with('product:id,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode')->findOrFail($validated['branch_product_id']);
         if (! $request->user()->hasBranchAccess((int) $branchProduct->branch_id)) {
             throw new AuthorizationException('No tienes acceso al inventario de esta sucursal.');
+        }
+
+        if ($branchProduct->product?->inventory_quantity_mode === 'legacy_presentation') {
+            throw ValidationException::withMessages([
+                'branch_product_id' => 'Este producto conserva existencias históricas en cajas. Debe conciliarse antes de registrar nuevos movimientos en piezas.',
+            ]);
+        }
+
+        $this->validateQuantitiesForUnit(
+            $validated,
+            (string) ($branchProduct->product?->inventory_unit ?? $branchProduct->product?->unit ?? 'pza'),
+        );
+
+        $destinationBranchIds = collect($validated['branch_allocations'] ?? [])
+            ->pluck('branch_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+
+        if ($destinationBranchIds->contains(
+            fn (int $branchId) => ! $request->user()->hasBranchAccess($branchId)
+        )) {
+            throw new AuthorizationException('No tienes acceso a una de las sucursales destino.');
+        }
+
+        $assignedDestinationBranchIds = BranchProduct::query()
+            ->where('product_id', $branchProduct->product_id)
+            ->where('status', BranchProduct::STATUS_ACTIVE)
+            ->whereIn('branch_id', $destinationBranchIds)
+            ->pluck('branch_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if ($destinationBranchIds->diff($assignedDestinationBranchIds)->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'branch_allocations' => 'Solo puedes distribuir stock a sucursales donde el producto esté habilitado.',
+            ]);
         }
 
         try {
@@ -197,7 +237,7 @@ class StockMovementController extends Controller
             'per_page' => ['nullable', 'integer'],
         ]);
         $filters['search'] = trim((string) ($filters['search'] ?? ''));
-        $filters['per_page'] = TablePagination::resolvePerPage($request, 50);
+        $filters['per_page'] = TablePagination::resolvePerPage($request);
 
         $user = $request->user()->loadMissing(['role', 'branches']);
         $accessibleBranches = $user->accessibleBranchesQuery()
@@ -365,6 +405,46 @@ class StockMovementController extends Controller
             throw ValidationException::withMessages([
                 'branch_allocations' => 'La suma asignada a sucursales debe coincidir con la cantidad total.',
             ]);
+        }
+    }
+
+    private function validateQuantitiesForUnit(array $data, string $unit): void
+    {
+        $quantities = [
+            'quantity' => $data['quantity'] ?? null,
+        ];
+
+        foreach ($data['batches'] ?? [] as $index => $batch) {
+            $quantities["batches.{$index}.quantity"] = $batch['quantity'] ?? null;
+        }
+
+        foreach ($data['branch_allocations'] ?? [] as $index => $allocation) {
+            $quantities["branch_allocations.{$index}.quantity"] = $allocation['quantity'] ?? null;
+        }
+
+        foreach ($data['manual_batches'] ?? [] as $index => $batch) {
+            $quantities["manual_batches.{$index}.quantity"] = $batch['quantity'] ?? null;
+        }
+
+        $errors = [];
+        foreach ($quantities as $field => $quantity) {
+            $value = (float) $quantity;
+
+            if ($unit === 'kg') {
+                if ($value > 999.999 || abs($value - round($value, 3)) > 0.0000001) {
+                    $errors[$field] = 'Los kilogramos permiten hasta 999.999 con un máximo de tres decimales.';
+                }
+
+                continue;
+            }
+
+            if ($value > 999 || abs($value - round($value)) > 0.0000001) {
+                $errors[$field] = 'La cantidad debe ser un número entero entre 1 y 999.';
+            }
+        }
+
+        if ($errors) {
+            throw ValidationException::withMessages($errors);
         }
     }
 }

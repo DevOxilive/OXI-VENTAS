@@ -67,7 +67,6 @@ export function getPurchaseOrdersTableConfig({ mode = 'view', viewPermission = n
             ? 'Todavia no hay compras generales completadas.'
             : 'Todavia no hay ordenes generales de compra.',
         rowKey: 'id',
-        striped: true,
         hoverEffect: true,
     }
 }

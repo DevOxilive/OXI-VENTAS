@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Ventas;
 
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
+use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\CashRegisterClosure;
@@ -10,14 +11,16 @@ use App\Models\Sale;
 use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Support\SystemPermission;
+use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class CashRegisterClosureController extends Controller
 {
-    use AuthorizesBranchAccess;
+    use AuthorizesBranchAccess, ValidatesRecordVersion;
 
     public function index(Request $request)
     {
@@ -55,7 +58,7 @@ class CashRegisterClosureController extends Controller
             'status' => ['nullable', 'in:balanced,difference'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
-            'per_page' => ['nullable', 'integer', 'in:10,20,50,100,200'],
+            'per_page' => ['nullable', 'integer', 'in:10,25,50,100,200'],
         ]);
 
         if ($branch) {
@@ -89,7 +92,7 @@ class CashRegisterClosureController extends Controller
         $closures = $closureQuery
             ->with(['branch:id,name,slug', 'user:id,name'])
             ->latest('period_end')
-            ->paginate((int) ($filters['per_page'] ?? 20))
+            ->paginate(TablePagination::resolvePerPage($request))
             ->withQueryString()
             ->through(fn (CashRegisterClosure $closure) => $this->mapClosure($closure));
 
@@ -148,14 +151,16 @@ class CashRegisterClosureController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         $closure = DB::transaction(function () use ($request, $branch, $data) {
-            $current = $this->buildCurrentCut($branch, now(), $data['cash_box_number']);
+            $branch = Branch::query()->lockForUpdate()->findOrFail($branch->id);
+            $periodEnd = now();
+            $current = $this->buildCurrentCut($branch, $periodEnd, $data['cash_box_number']);
             $denominations = $this->normalizeDenominations($data['denomination_breakdown'] ?? []);
             $countedCash = $this->sumDenominations($denominations);
             $countedCard = round((float) $data['counted_card'], 2);
             $expectedDrawerCash = round((float) $current['expected_cash'], 2);
 
-            return CashRegisterClosure::create([
-                'folio' => $this->nextAnnualFolio(now()->year),
+            $closure = CashRegisterClosure::create([
+                'folio' => 'CORTE-PENDING-'.Str::uuid(),
                 'branch_id' => $branch->id,
                 'user_id' => $request->user()->id,
                 'cash_box_number' => $data['cash_box_number'],
@@ -177,7 +182,13 @@ class CashRegisterClosureController extends Controller
                 'denomination_breakdown' => $denominations,
                 'notes' => $data['notes'] ?? null,
             ]);
-        });
+
+            $closure->update([
+                'folio' => $closure->id.'-'.$periodEnd->year,
+            ]);
+
+            return $closure;
+        }, 3);
 
         $closure->load(['branch:id,name,slug', 'user:id,name']);
 
@@ -203,14 +214,19 @@ class CashRegisterClosureController extends Controller
         $cashLeft = round((float) $data['cash_left'], 2);
         $countedCard = round((float) $data['counted_card'], 2);
 
-        $closure->update([
-            'counted_cash' => $countedCash,
-            'cash_left' => $cashLeft,
-            'counted_card' => $countedCard,
-            'cash_difference' => round($countedCash - (float) $closure->expected_drawer_cash, 2),
-            'card_difference' => round($countedCard - (float) $closure->card_total, 2),
-            'notes' => $data['notes'] ?? null,
-        ]);
+        $closure = DB::transaction(function () use ($request, $closure, $countedCash, $cashLeft, $countedCard, $data) {
+            $closure = $this->lockCurrentVersion($request, $closure);
+            $closure->update([
+                'counted_cash' => $countedCash,
+                'cash_left' => $cashLeft,
+                'counted_card' => $countedCard,
+                'cash_difference' => round($countedCash - (float) $closure->expected_drawer_cash, 2),
+                'card_difference' => round($countedCard - (float) $closure->card_total, 2),
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            return $closure;
+        });
 
         return back()->with('success', "Corte {$closure->folio} actualizado correctamente.");
     }
@@ -221,7 +237,9 @@ class CashRegisterClosureController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $closure->branch);
 
         $folio = $closure->folio;
-        $closure->delete();
+        DB::transaction(function () use ($request, $closure) {
+            $this->lockCurrentVersion($request, $closure)->delete();
+        });
 
         return back()->with('success', "Corte {$folio} eliminado correctamente.");
     }
@@ -420,6 +438,7 @@ class CashRegisterClosureController extends Controller
             'card_difference' => (float) $closure->card_difference,
             'status' => abs((float) $closure->cash_difference) < 0.01 && abs((float) $closure->card_difference) < 0.01 ? 'Cuadrado' : 'Diferencia',
             'notes' => $closure->notes,
+            'record_version' => $closure->updated_at?->toJSON(),
         ];
     }
 
@@ -464,7 +483,7 @@ class CashRegisterClosureController extends Controller
             'status' => $filters['status'] ?? '',
             'date_from' => $filters['date_from'] ?? '',
             'date_to' => $filters['date_to'] ?? '',
-            'per_page' => (int) ($filters['per_page'] ?? 20),
+            'per_page' => (int) ($filters['per_page'] ?? 25),
         ];
     }
 
@@ -497,7 +516,7 @@ class CashRegisterClosureController extends Controller
             'current_page' => 1,
             'from' => null,
             'last_page' => 1,
-            'per_page' => 15,
+            'per_page' => 25,
             'to' => null,
             'total' => 0,
         ];

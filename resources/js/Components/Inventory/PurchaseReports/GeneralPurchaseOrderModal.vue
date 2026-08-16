@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import PurchaseOrderModalLayout from '@/Components/Inventory/PurchaseReports/PurchaseOrderModalLayout.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
+import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 
 const props = defineProps({ order: { type: Object, required: true } })
 defineEmits(['close'])
@@ -14,18 +15,31 @@ const totalRequested = computed(() => (props.order.items ?? []).reduce(
     (total, item) => total + Number(item.requested_quantity || 0),
     0,
 ))
+const totalRequestedUnit = computed(() =>
+    (props.order.items ?? []).some((item) => normalizeInventoryUnit(item.base_unit ?? item.inventory_unit ?? item.unit) === 'kg')
+        ? 'kg'
+        : 'pza',
+)
 const summary = computed(() => [
     { label: 'Orden general', value: props.order.folio },
     { label: 'Generada', value: dateTime(props.order.created_at) },
     { label: 'Estado', value: props.order.status_label },
     { label: 'Responsable', value: props.order.created_by?.name },
     { label: 'Productos solicitados', value: `${props.order.items?.length || 0} productos` },
-    { label: 'Piezas solicitadas', value: `${quantity(totalRequested.value)} piezas` },
+    { label: 'Cantidad solicitada', value: `${quantity(totalRequested.value, totalRequestedUnit.value)} ${totalRequestedUnit.value === 'kg' ? 'kg' : 'piezas'}` },
     { label: 'Sucursales participantes', value: branchNames.value.join(', ') },
 ])
 
-function quantity(value) {
-    return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(Number(value || 0))
+function itemUnit(item) {
+    return normalizeInventoryUnit(item.base_unit ?? item.inventory_unit ?? item.unit ?? 'pza')
+}
+
+function unitLabel(item) {
+    return itemUnit(item) === 'kg' ? 'kg' : 'pzas.'
+}
+
+function quantity(value, unit = 'pza') {
+    return formatInventoryQuantity(value, unit)
 }
 
 function dateTime(value) {
@@ -50,8 +64,8 @@ function status(item) {
         @close="$emit('close')"
     >
         <template #products>
-            <div class="space-y-2">
-                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_120px_150px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 md:grid">
+            <div class="space-y-3">
+                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_120px_150px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 xl:grid">
                     <span>Producto</span>
                     <span>Solicitadas</span>
                     <span>Estado</span>
@@ -60,7 +74,7 @@ function status(item) {
                 <article
                     v-for="item in order.items"
                     :key="item.id"
-                    class="grid gap-3 rounded-xl border border-secondary bg-background px-3 py-3 md:grid-cols-[minmax(0,1fr)_120px_150px] md:items-center"
+                    class="grid min-w-0 gap-3 rounded-xl border border-secondary bg-background px-3 py-3 xl:grid-cols-[minmax(0,1fr)_120px_150px] xl:items-center"
                 >
                     <div class="flex min-w-0 items-start gap-3">
                         <div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-secondary">
@@ -73,22 +87,26 @@ function status(item) {
                             <span v-else class="material-symbols-outlined text-lg opacity-40">inventory_2</span>
                         </div>
 
-                        <div class="min-w-0">
-                            <p class="truncate text-sm font-black text-text">{{ item.product_name }}</p>
-                            <p class="truncate text-xs text-text opacity-60">{{ item.product_code || 'Sin código' }}</p>
+                        <div class="min-w-0 flex-1">
+                            <p class="break-words text-sm font-black leading-snug text-text">{{ item.product_name }}</p>
+                            <p class="mt-0.5 break-all text-xs text-text opacity-60">{{ item.product_code || 'Sin codigo' }}</p>
                             <div v-if="item.branch_breakdown?.length" class="mt-2 flex flex-wrap gap-1.5">
                                 <span
                                     v-for="branch in item.branch_breakdown"
                                     :key="`${item.id}-${branch.branch_id}`"
-                                    class="rounded-full bg-secondary px-2 py-1 text-[10px] font-semibold text-text"
+                                    class="max-w-full rounded-full bg-secondary px-2 py-1 text-[10px] font-semibold leading-tight text-text"
                                 >
-                                    {{ branch.branch_name }}: {{ quantity(branch.requested_quantity) }} pzas.
+                                    {{ branch.branch_name }}: {{ quantity(branch.requested_quantity, itemUnit(item)) }} {{ unitLabel(item) }}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <strong class="text-sm text-text">{{ quantity(item.requested_quantity) }} pzas.</strong>
+                    <div class="flex flex-wrap items-center gap-2 xl:block">
+                        <span class="text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-50 xl:hidden">Solicitadas</span>
+                        <strong class="text-sm text-text">{{ quantity(item.requested_quantity, itemUnit(item)) }} {{ unitLabel(item) }}</strong>
+                    </div>
+
                     <span class="w-fit rounded-full bg-secondary px-2 py-1 text-[11px] font-bold text-text">
                         {{ status(item) }}
                     </span>

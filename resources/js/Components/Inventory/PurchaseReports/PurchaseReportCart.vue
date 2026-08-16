@@ -1,5 +1,7 @@
 <script setup>
+import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
+import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 
 defineProps({
     notes: {
@@ -24,12 +26,37 @@ defineProps({
     },
 })
 
-defineEmits([
+const emit = defineEmits([
     'update-notes',
     'update-item',
     'remove',
     'save',
 ])
+
+function updateQuantity(item, value) {
+    emit('update-item', item.branch_product_id, 'requested_quantity', value === '' ? '' : Math.max(1, Number(value || 1)))
+}
+
+function decreaseQuantity(item) {
+    const next = Number(item.requested_quantity || 0) - 1
+    emit('update-item', item.branch_product_id, 'requested_quantity', Math.max(1, next))
+}
+
+function increaseQuantity(item) {
+    emit('update-item', item.branch_product_id, 'requested_quantity', Number(item.requested_quantity || 0) + 1)
+}
+
+function itemUnit(item) {
+    return item.inventory_unit ?? item.base_unit ?? item.unit ?? 'pza'
+}
+
+function quantity(value, item = null) {
+    return formatInventoryQuantity(value, item ? itemUnit(item) : 'pza')
+}
+
+function allowsDecimalQuantity(item) {
+    return normalizeInventoryUnit(itemUnit(item)) === 'kg'
+}
 </script>
 
 <template>
@@ -81,7 +108,7 @@ defineEmits([
                             {{ item.code || item.main_barcode || 'Sin código' }}
                         </p>
                         <p class="mt-1 text-xs text-text opacity-70">
-                            Stock: {{ item.stock }} · Mínimo: {{ item.min_stock }}
+                            Stock: {{ quantity(item.stock, item) }} · Mínimo: {{ quantity(item.min_stock, item) }}
                         </p>
                     </div>
 
@@ -93,11 +120,15 @@ defineEmits([
                 </div>
 
                 <div class="mt-3">
-                    <input :value="item.requested_quantity" type="number" min="0" step="0.01"
-                        placeholder="Cantidad manual"
-                        class="rounded-xl border border-secondary bg-background px-4 py-3 text-sm text-text focus:border-primary focus:ring-primary"
-                        @input="$emit('update-item', item.branch_product_id, 'requested_quantity', $event.target.value)">
-
+                    <QuantityStepper
+                        :value="item.requested_quantity"
+                        :aria-label="`Cantidad solicitada de ${item.name}`"
+                        :allow-decimal="allowsDecimalQuantity(item)"
+                        :decrease-disabled="Number(item.requested_quantity || 0) <= 1"
+                        @decrease="decreaseQuantity(item)"
+                        @increase="increaseQuantity(item)"
+                        @update="updateQuantity(item, $event)"
+                    />
                 </div>
             </div>
         </div>
@@ -106,7 +137,7 @@ defineEmits([
             <div class="flex justify-between text-sm">
                 <span class="text-text opacity-70">Cantidad total</span>
                 <span class="font-semibold text-text">
-                    {{ totalQuantity }}
+                    {{ quantity(totalQuantity, selectedProducts.find((item) => allowsDecimalQuantity(item)) || null) }}
                 </span>
             </div>
 

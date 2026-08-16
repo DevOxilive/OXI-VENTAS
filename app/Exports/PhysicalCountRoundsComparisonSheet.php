@@ -108,7 +108,7 @@ class PhysicalCountRoundsComparisonSheet implements FromArray, WithEvents, WithS
                     in_array($column, [2, 5], true) ? 34 : 18
                 );
             }
-            $sheet->getStyle("G2:{$highestColumn}{$highestRow}")->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle("G2:{$highestColumn}{$highestRow}")->getNumberFormat()->setFormatCode('#,##0.###');
             $sheet->getPageSetup()->setOrientation('landscape')->setFitToWidth(1)->setFitToHeight(0);
         }];
     }

@@ -64,7 +64,7 @@ const props = defineProps({
             status: '',
             expiration_status: '',
             inactive_candidate: '',
-            per_page: 50,
+            per_page: 25,
         }),
     },
     inventoryAlerts: {

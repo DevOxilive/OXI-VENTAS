@@ -113,7 +113,7 @@ class PhysicalCountUserSheet implements FromArray, WithColumnFormatting, WithEve
     {
         return [
             'A' => NumberFormat::FORMAT_TEXT,
-            'D:G' => '#,##0.00',
+            'D:G' => '#,##0.###',
         ];
     }
 

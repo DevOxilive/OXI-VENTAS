@@ -120,8 +120,8 @@ class PhysicalCountBranchSummarySheet implements FromArray, ShouldAutoSize, With
     {
         return [
             'I' => NumberFormat::FORMAT_PERCENTAGE_00,
-            'J' => '#,##0.00',
-            'K' => '#,##0.00',
+            'J' => '#,##0.###',
+            'K' => '#,##0.###',
         ];
     }
 

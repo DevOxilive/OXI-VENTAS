@@ -5,6 +5,7 @@ import {
     watch,
 } from "vue";
 import { useAdjustStockForm } from "@/Composables/Inventory/useAdjustStockForm";
+import { formatInventoryQuantity } from "@/utils/quantityFormatter";
 
 export function useStockExitModal(props, emit) {
     const {
@@ -26,7 +27,7 @@ export function useStockExitModal(props, emit) {
         );
     });
 
-    const unit = computed(() => props.product?.unit ?? "pieza");
+    const unit = computed(() => props.product?.inventory_unit ?? props.product?.unit ?? "pza");
 
     const reasonOptions = [
         { label: "Producto dañado", value: "DAMAGED" },
@@ -227,11 +228,7 @@ export function useStockExitModal(props, emit) {
     }
 
     function formatNumber(value) {
-        const number = Number(value ?? 0);
-
-        return new Intl.NumberFormat("es-MX", {
-            maximumFractionDigits: 3,
-        }).format(number);
+        return formatInventoryQuantity(value, unit.value);
     }
 
     function closeModal() {

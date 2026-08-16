@@ -54,7 +54,7 @@ const tableRows = computed(() =>
         column,
         value,
         subValue: column.subKey ? getNestedValue(row, column.subKey) : null,
-        content: renderCellContentFromValue(value, column),
+        content: renderCellContentFromValue(value, column, row),
       })
     })
 
@@ -107,8 +107,8 @@ function isRowSelected(row) {
   return props.selectedItems?.[row[props.rowKey]] || false
 }
 
-function renderCellContentFromValue(value, column) {
-  const formatted = formatCellValue(value, column)
+function renderCellContentFromValue(value, column, row) {
+  const formatted = formatCellValue(value, column, row)
 
   if (column.format === 'badge') {
     const statusMap = column.formatOptions?.statusMap || {}
@@ -189,7 +189,7 @@ function getActionButtonClasses(action) {
 
           <template v-for="cell in tableRow.secondaryCells" :key="cell.key">
             <p class="mt-0.5 truncate text-xs text-text opacity-70">
-              {{ cell.value }}
+              {{ cell.content.content ?? cell.value }}
             </p>
             <span
               v-if="cell.column.subKeyBadge && cell.subValue"
@@ -210,7 +210,7 @@ function getActionButtonClasses(action) {
             {{
               cell.column.format === 'badge'
                 ? cell.content.label
-                : cell.value
+                : (cell.content.content ?? cell.value)
             }}
           </span>
         </template>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Events\InventoryStockUpdated;
 use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Models\BranchProduct;
 use App\Models\ProductBatch;
 use App\Models\StockMovement;
@@ -12,11 +13,17 @@ use App\Models\StockMovementBatch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ProductBatchController extends Controller
 {
+    use AuthorizesBranchAccess;
+
     public function update(Request $request, ProductBatch $productBatch)
     {
+        $productBatch->loadMissing('branchProduct.branch', 'branchProduct.product');
+        $this->abortIfUserCannotAccessBranch($request, $productBatch->branchProduct->branch);
+
         $validated = $request->validate([
             'lot_number' => ['nullable', 'string', 'max:255'],
             'expiration_date' => ['nullable', 'date'],
@@ -42,8 +49,20 @@ class ProductBatchController extends Controller
                 ->firstOrFail();
 
             $branchProduct = $productBatch->branchProduct()
+                ->with('product:id,unit,inventory_unit,inventory_quantity_mode')
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            if ($branchProduct->product?->inventory_quantity_mode === 'legacy_presentation') {
+                throw ValidationException::withMessages([
+                    'quantity' => 'Este producto conserva existencias históricas por conciliar antes de modificar lotes.',
+                ]);
+            }
+
+            $this->validateQuantityForUnit(
+                $validated['quantity'],
+                (string) ($branchProduct->product?->inventory_unit ?? $branchProduct->product?->unit ?? 'pza'),
+            );
 
             $previousData = [
                 'lot_number' => $productBatch->lot_number,
@@ -116,24 +135,11 @@ class ProductBatchController extends Controller
                 'type' => StockMovement::TYPE_ADJUSTMENT,
                 'reason' => StockMovement::REASON_INVENTORY_DIFFERENCE,
                 'quantity' => abs($difference),
-                'unit_cost' => $branchProduct->product?->cost ?? 0,
+                'unit_cost' => $branchProduct->product?->cost_per_piece ?? $branchProduct->product?->cost ?? 0,
                 'previous_stock' => $previousStock,
                 'new_stock' => $newStock,
                 'notes' => $movementNotes,
             ]);
-
-            $isQuantityAdjustment = abs($difference) > 0;
-
-            if ($isQuantityAdjustment) {
-                StockMovementBatch::create([
-                    'stock_movement_id' => $movement->id,
-                    'product_batch_id' => $productBatch->id,
-                    'quantity' => abs($difference),
-                    'previous_batch_quantity' => $previousQuantity,
-                    'new_batch_quantity' => $newQuantity,
-                    'allocation_method' => StockMovementBatch::ALLOCATION_MANUAL,
-                ]);
-            }
 
             if (abs($difference) > 0) {
                 StockMovementBatch::create([
@@ -165,7 +171,7 @@ class ProductBatchController extends Controller
     {
         return $branchProduct->fresh([
             'branch:id,name',
-            'product:id,name,category_id,sale_price,cost,unit',
+            'product:id,name,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode',
             'product.category:id,name',
             'product.barcodes:id,product_id,code',
 
@@ -221,5 +227,28 @@ class ProductBatchController extends Controller
         }
 
         return $baseNote;
+    }
+
+    private function validateQuantityForUnit(mixed $quantity, string $unit): void
+    {
+        $value = (float) $quantity;
+
+        if ($unit === 'kg') {
+            if ($value <= 999.999 && abs($value - round($value, 3)) <= 0.0000001) {
+                return;
+            }
+
+            throw ValidationException::withMessages([
+                'quantity' => 'Los kilogramos permiten hasta 999.999 con un máximo de tres decimales.',
+            ]);
+        }
+
+        if ($value <= 999 && abs($value - round($value)) <= 0.0000001) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'quantity' => 'La cantidad debe ser un número entero entre 0 y 999.',
+        ]);
     }
 }

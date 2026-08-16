@@ -1,7 +1,7 @@
 <script setup>
-import { computed, ref, useAttrs } from 'vue'
+import { computed, nextTick, ref, useAttrs } from 'vue'
 import { fieldRegistry } from '@/Validation/fieldRegistry'
-import { sanitizeField } from '@/Validation/sanitizers'
+import { sanitizeField, sanitizeFieldWithCursor } from '@/Validation/sanitizers'
 
 defineOptions({
     inheritAttrs: false,
@@ -87,11 +87,38 @@ function handleInput(e) {
         return
     }
 
-    const value = sanitizeField(e.target.value, config)
+    const sanitized = sanitizeFieldWithCursor(
+        e.target.value,
+        config,
+        e.target.selectionStart ?? 0,
+        e.target.selectionEnd ?? 0,
+    )
 
-    e.target.value = value
+    if (e.target.value !== sanitized.value) {
+        e.target.value = sanitized.value
+    }
 
-    emit('update:modelValue', value)
+    emit('update:modelValue', sanitized.value)
+    emit('validate', props.field)
+
+    nextTick(() => {
+        // Los campos numericos no permiten mover el cursor con setSelectionRange.
+        if (e.target.type !== 'number') {
+            e.target.setSelectionRange?.(sanitized.selectionStart, sanitized.selectionEnd)
+        }
+    })
+}
+
+function handleBlur(e) {
+    if (!isDateField.value) {
+        const value = sanitizeField(e.target.value, normalizedFieldConfig.value)
+
+        if (value !== e.target.value) {
+            e.target.value = value
+            emit('update:modelValue', value)
+        }
+    }
+
     emit('validate', props.field)
 }
 
@@ -99,36 +126,6 @@ defineExpose({
     focus: () => inputEl.value?.focus(),
 })
 
-function blockExtraInput(e) {
-    if (isDateField.value) {
-        return
-    }
-
-    const config = normalizedFieldConfig.value
-    if (!config) return
-
-    const allowedKeys = [
-        'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight',
-        'ArrowUp', 'ArrowDown', 'Tab', 'Home', 'End'
-    ]
-
-    if (e.ctrlKey || e.metaKey) return
-    if (allowedKeys.includes(e.key)) return
-
-    const currentLength = (props.modelValue || '').toString().length
-
-    if (config.type === 'decimal' && e.key === '.') {
-        if ((props.modelValue || '').toString().includes('.')) {
-            e.preventDefault()
-        }
-
-        return
-    }
-
-    if (config.max && currentLength >= config.max) {
-        e.preventDefault()
-    }
-}
 </script>
 
 <template>
@@ -148,8 +145,9 @@ function blockExtraInput(e) {
                 </span>
             </span>
             <textarea v-if="isTextarea" ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :placeholder="placeholder" :value="modelValue"
-                :readonly="readonly" @keydown="(e) => { blockExtraInput(e); emit('keydown', e) }"
-                @input="handleInput" @blur="emit('validate', field)" :class="[
+                :maxlength="normalizedFieldConfig?.max || undefined"
+                :readonly="readonly" @keydown="emit('keydown', $event)"
+                @input="handleInput" @blur="handleBlur" :class="[
                     'min-h-28 w-full resize-y rounded-xl border py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
                     hasLeftAddon ? 'pl-11 pr-4' : 'px-4',
                     hasRightAddon ? 'pr-12' : '',
@@ -157,8 +155,9 @@ function blockExtraInput(e) {
                     error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'
                 ]" />
             <input v-else ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
-                :readonly="readonly" @keydown="(e) => { blockExtraInput(e); emit('keydown', e) }"
-                @wheel="preventNumberWheel" @input="handleInput" @blur="emit('validate', field)" :class="[
+                :maxlength="isDateField ? undefined : (normalizedFieldConfig?.max || undefined)"
+                :readonly="readonly" @keydown="emit('keydown', $event)"
+                @wheel="preventNumberWheel" @input="handleInput" @blur="handleBlur" :class="[
                     'w-full rounded-xl border py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
                     hasLeftAddon ? 'pl-11 pr-4' : 'px-4',
                     hasRightAddon ? 'pr-12' : '',

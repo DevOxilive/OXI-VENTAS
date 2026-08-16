@@ -262,7 +262,7 @@ class PhysicalCountAuditWorkbookTest extends TestCase
         $this->assertSame('LOT-001', $rows[1][3]);
         $this->assertSame(12.0, $rows[1][6]);
         $this->assertSame(10.0, $rows[1][9]);
-        $this->assertSame('Ana (8.00), Blanca (4.00)', $rows[1][11]);
+        $this->assertSame('Ana (8), Blanca (4)', $rows[1][11]);
     }
 
     public function test_round_comparison_keeps_original_values_and_uses_latest_recapture_as_final(): void

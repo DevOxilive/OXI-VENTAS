@@ -17,11 +17,20 @@ export const inventoryReportTableConfig = {
             width: '260px',
         },
         {
+            key: 'department',
+            label: 'Departamento',
+            format: 'text',
+            mobileLabel: 'Departamento',
+            mobileDisplay: true,
+            fallback: 'Sin departamento',
+        },
+        {
             key: 'category',
             label: 'Categoria',
             format: 'text',
             mobileLabel: 'Categoria',
             mobileDisplay: true,
+            fallback: 'Sin categoria',
         },
         {
             key: 'status_label',
@@ -80,6 +89,5 @@ export const inventoryReportTableConfig = {
     mobileCardHeaderField: 'product',
     noDataMessage: 'No hay lotes que coincidan con los filtros aplicados',
     rowKey: 'id',
-    striped: true,
     hoverEffect: true,
 }

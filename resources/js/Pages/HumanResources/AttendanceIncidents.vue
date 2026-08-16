@@ -35,7 +35,7 @@ const filters = reactive({
   to: props.filters.to ?? '',
   search: props.filters.search ?? '',
   status: props.filters.status ?? '',
-  per_page: Number(props.filters.per_page ?? 30),
+  per_page: Number(props.filters.per_page ?? 25),
 })
 const form = useForm({
   employee_id: '',
@@ -51,6 +51,7 @@ const modalOpen = ref(false)
 const modalMode = ref('create')
 const selectedIncident = ref(null)
 const notificationPanelOpen = ref(false)
+const dismissedNotificationKeys = ref(new Set())
 let filterTimer = null
 let unsubscribeIncidents = null
 
@@ -99,8 +100,11 @@ const modalTitle = computed(() => ({
 const modalSaveText = computed(() => modalMode.value === 'edit' ? 'Guardar cambios' : 'Enviar incidencia')
 const totalErrors = computed(() => Object.keys(form.errors || {}).length)
 const isReadonly = computed(() => modalMode.value === 'view')
-const notificationItems = computed(() => props.notificationSummary.items || [])
-const notificationCount = computed(() => Number(props.notificationSummary.count || 0))
+const notificationStorageKey = computed(() => `attendance-incidents:dismissed:${page.props.auth.user.id}`)
+const notificationItems = computed(() => (props.notificationSummary.items || []).filter((item) => {
+  return !dismissedNotificationKeys.value.has(notificationItemKey(item))
+}))
+const notificationCount = computed(() => notificationItems.value.length)
 const notificationMode = computed(() => props.notificationSummary.mode || 'submitted')
 const notificationPanelTitle = computed(() => notificationMode.value === 'review'
   ? 'Incidencias pendientes'
@@ -147,7 +151,27 @@ function closeNotificationPanel() {
   notificationPanelOpen.value = false
 }
 
+function notificationItemKey(item) {
+  return `${item.id}:${item.status}:${item.updated_at || ''}`
+}
+
+function loadDismissedNotifications() {
+  try {
+    dismissedNotificationKeys.value = new Set(JSON.parse(localStorage.getItem(notificationStorageKey.value) || '[]'))
+  } catch {
+    dismissedNotificationKeys.value = new Set()
+  }
+}
+
+function dismissNotification(item) {
+  const next = new Set(dismissedNotificationKeys.value)
+  next.add(notificationItemKey(item))
+  dismissedNotificationKeys.value = next
+  localStorage.setItem(notificationStorageKey.value, JSON.stringify([...next].slice(-80)))
+}
+
 function openNotificationIncident(item) {
+  dismissNotification(item)
   const row = (props.incidents.data || []).find((incident) => Number(incident.id) === Number(item.id))
 
   if (row) {
@@ -314,6 +338,7 @@ function refreshIncidents(event) {
 }
 
 onMounted(() => {
+  loadDismissedNotifications()
   unsubscribeIncidents = subscribePrivateRealtime(
     REALTIME_CHANNELS.user(page.props.auth.user.id),
     REALTIME_EVENTS.attendanceChanged,

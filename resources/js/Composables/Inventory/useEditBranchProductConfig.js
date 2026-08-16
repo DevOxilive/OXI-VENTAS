@@ -37,7 +37,7 @@ export function useEditBranchProductConfig(product) {
     });
 
     const unit = computed(() => {
-        return product.value?.unit ?? "pieza";
+        return product.value?.inventory_unit ?? product.value?.unit ?? "pza";
     });
 
     const stockLabel = computed(() => {
@@ -46,6 +46,12 @@ export function useEditBranchProductConfig(product) {
             `${product.value?.stock ?? 0} ${unit.value}`
         );
     });
+
+    function displayDecimal(value) {
+        if (value === null || value === undefined || value === "") return "";
+
+        return String(value).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+    }
 
     const isSeasonal = computed(() => {
         return form.status === "seasonal";
@@ -79,7 +85,7 @@ export function useEditBranchProductConfig(product) {
                 return;
             }
 
-            form.min_stock = currentProduct.minStock ?? 0;
+            form.min_stock = displayDecimal(currentProduct.minStock ?? 0);
             form.status = currentProduct.administrativeStatus ?? "active";
             form.season_start_date = currentProduct.seasonStartDate ?? "";
             form.season_end_date = currentProduct.seasonEndDate ?? "";

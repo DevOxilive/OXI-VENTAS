@@ -12,7 +12,8 @@ class PaymentMethodSeeder extends Seeder
         $methods = [
             ['id' => 1, 'name' => 'Efectivo', 'active' => true],
             ['id' => 2, 'name' => 'Tarjeta', 'active' => true],
-            ['id' => 3, 'name' => 'Transferencia', 'active' => false],
+            ['id' => 3, 'name' => 'Transferencia', 'active' => true],
+            ['id' => 4, 'name' => 'Mixto', 'active' => true],
         ];
 
         foreach ($methods as $method) {

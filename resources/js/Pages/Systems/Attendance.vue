@@ -28,7 +28,8 @@ const props = defineProps({
     canRequestCorrection: Boolean,
     canReviewCorrections: Boolean,
     passkeyEnabled: Boolean,
-    registeredTypesToday: { type: Array, default: () => [] },
+    attendanceShifts: { type: Array, default: () => [] },
+    attendanceBranches: { type: Array, default: () => [] },
 })
 
 const page = usePage()
@@ -48,11 +49,19 @@ const attendanceRoutePrefix = computed(() => {
 })
 const filters = reactive({
     from: props.filters.from || '', to: props.filters.to || '', branch: props.filters.branch || '',
-    department: props.filters.department || '', search: props.filters.search || '', type: props.filters.type || '',
-    per_page: Number(props.filters.per_page ?? 30),
+    search: props.filters.search || '', type: props.filters.type || '',
+    per_page: Number(props.filters.per_page ?? 25),
 })
 const attendanceType = ref('check_in')
-const registeredTypesTodaySet = computed(() => new Set(props.registeredTypesToday || []))
+const attendanceShiftId = ref('')
+const attendanceBranchId = ref('')
+const attendanceShifts = computed(() => props.attendanceShifts || [])
+const attendanceBranches = computed(() => props.attendanceBranches || [])
+const showAttendanceBranchSelector = computed(() => attendanceBranches.value.length > 1)
+const selectedAttendanceShift = computed(() => attendanceShifts.value.find((shift) => (
+    String(shift.id ?? '') === String(attendanceShiftId.value)
+)) || null)
+const registeredTypesTodaySet = computed(() => new Set(selectedAttendanceShift.value?.registered_types || []))
 const attendanceTypeOptions = computed(() => (props.options.types || []).map((option) => {
     const alreadyRegistered = registeredTypesTodaySet.value.has(option.value)
 
@@ -76,13 +85,13 @@ const attendanceRegistrationToolbarConfig = computed(() => getAttendanceRegistra
     filters,
     types: props.options.types || [],
     branches: props.options.branches || [],
-    departments: props.options.departments || [],
-    canManage: props.canManage,
+    canViewAttendance: props.canViewAttendance,
     total: Number(props.records?.total ?? 0),
 }))
 
 const columns = [
     { key: 'employee', label: 'Empleado' }, { key: 'role', label: 'Rol' }, { key: 'branch', label: 'Sucursal' },
+    { key: 'shift', label: 'Turno' },
     { key: 'date', label: 'Fecha' }, { key: 'time', label: 'Hora' }, { key: 'type', label: 'Tipo' },
     { key: 'status', label: 'Estado' }, { key: 'authentication', label: 'Autenticación' },
 ]
@@ -102,6 +111,8 @@ const attendanceActions = [
 ]
 
 watch(filters, () => {
+    if (!props.canViewAttendance) return
+
     clearTimeout(filterTimer)
     filterTimer = setTimeout(() => {
         router.get(
@@ -118,6 +129,20 @@ watch(availableAttendanceTypeOptions, (options) => {
     }
 
     attendanceType.value = options[0]?.value || ''
+}, { immediate: true })
+
+watch(attendanceShifts, (shifts) => {
+    const activeShift = shifts.find((shift) => String(shift.id ?? '') === String(attendanceShiftId.value))
+    if (activeShift) return
+
+    const pendingShift = shifts.find((shift) => (shift.registered_types || []).length < 4) || shifts[0]
+    attendanceShiftId.value = String(pendingShift?.id ?? '')
+}, { immediate: true })
+
+watch(attendanceBranches, (branches) => {
+    if (branches.some((branch) => String(branch.value) === String(attendanceBranchId.value))) return
+
+    attendanceBranchId.value = String(branches[0]?.value ?? '')
 }, { immediate: true })
 
 function pageChange(url) { router.visit(url, { preserveScroll: true, preserveState: true }) }
@@ -146,6 +171,8 @@ async function registerAttendance() {
         if (!location) throw new Error('Activa y permite la ubicación precisa para registrar asistencia dentro del perímetro de tu sucursal.')
         router.post(route(`${attendanceRoutePrefix.value}.store`), {
             type: attendanceType.value,
+            attendance_schedule_assignment_id: attendanceShiftId.value || null,
+            attendance_branch_id: attendanceBranchId.value || null,
             latitude: location?.latitude ?? null,
             longitude: location?.longitude ?? null,
             accuracy: location?.accuracy ?? null,
@@ -162,7 +189,11 @@ async function registerAttendance() {
             onError: (errors) => ErrorAlert({ title: 'No fue posible registrar la asistencia', message: Object.values(errors || {})[0] || 'Revisa los datos e inténtalo nuevamente.' }),
         })
     } catch (error) {
-        ErrorAlert({ title: 'Validación del dispositivo requerida', message: error?.message || 'No fue posible validar la autenticación del dispositivo.' })
+        await showBiometricError({
+            title: 'Validacion del dispositivo requerida',
+            error,
+            fallbackMessage: 'No fue posible validar la autenticacion del dispositivo.',
+        })
     } finally {
         registering.value = false
     }
@@ -191,11 +222,19 @@ async function registerPasskey() {
         passkeyReady.value = true
         ToastAlert({ title: 'Huella o rostro configurado correctamente' })
     } catch (error) {
-        ErrorAlert({ title: 'No fue posible configurar la biometría', message: error?.response?.data?.message || error?.message || 'Inténtalo nuevamente.' })
+        await showBiometricError({
+            title: 'No fue posible configurar la biometria',
+            error,
+            fallbackMessage: 'Intentalo nuevamente.',
+        })
     } finally { registering.value = false }
 }
 
 async function assertPlatformBiometricsAvailable() {
+    if (!window.isSecureContext || window.location.protocol !== 'https:') {
+        throw new Error('La biometría requiere una conexión HTTPS válida. Abre la URL actual del túnel sin aceptar advertencias de certificado y vuelve a intentarlo.')
+    }
+
     if (!window.PublicKeyCredential || !navigator.credentials?.create || !navigator.credentials?.get) {
         throw new Error('Este navegador no permite autenticación segura. En iPhone abre la aplicación desde Safari; en Android usa Chrome.')
     }
@@ -205,6 +244,58 @@ async function assertPlatformBiometricsAvailable() {
         if (!available) {
             throw new Error('Configura primero una huella, Face ID o bloqueo seguro en este dispositivo.')
         }
+    }
+}
+
+async function showBiometricError({ title, error, fallbackMessage }) {
+    const message = error?.response?.data?.message || error?.message || fallbackMessage
+
+    if (isAndroidTryCloudflareStandalone() && isTlsCertificateError(message)) {
+        await clearPwaRuntime()
+
+        ErrorAlert({
+            title,
+            message: [
+                'Android marco esta PWA instalada con un certificado TLS invalido.',
+                'Ya limpie el service worker y cache local de esta instalacion.',
+                'Cierra esta app instalada, abre la URL actual desde Chrome normal y vuelve a instalar Super-Kay desde ese mismo enlace.',
+                `<a href="${window.location.href}" target="_blank" rel="noopener" class="font-semibold text-primary underline">Abrir esta URL en Chrome</a>`,
+            ].join('<br><br>'),
+        })
+
+        return
+    }
+
+    ErrorAlert({ title, message })
+}
+
+function isTlsCertificateError(message) {
+    return /tls|certificate|certificado|secure connection|conexion segura|conexión segura/i.test(String(message || ''))
+}
+
+function isAndroidTryCloudflareStandalone() {
+    if (typeof window === 'undefined') return false
+
+    const isAndroid = /Android/i.test(window.navigator.userAgent || '')
+    const isTryCloudflare = window.location.hostname === 'trycloudflare.com'
+        || window.location.hostname.endsWith('.trycloudflare.com')
+    const isStandalone = window.matchMedia?.('(display-mode: standalone)')?.matches
+        || window.navigator.standalone === true
+
+    return isAndroid && isTryCloudflare && isStandalone
+}
+
+async function clearPwaRuntime() {
+    if (typeof window === 'undefined') return
+
+    if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(registrations.map((registration) => registration.unregister()))
+    }
+
+    if ('caches' in window) {
+        const cacheNames = await window.caches.keys()
+        await Promise.all(cacheNames.map((cacheName) => window.caches.delete(cacheName)))
     }
 }
 
@@ -263,7 +354,7 @@ onMounted(() => {
     unsubscribeAttendance = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.attendanceChanged,
-        () => refreshRealtimeProps(page, ['records', 'dashboard', 'registeredTypesToday']),
+        () => refreshRealtimeProps(page, ['records', 'dashboard', 'attendanceShifts', 'attendanceBranches']),
     )
     unsubscribeUserChanged = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
@@ -274,7 +365,7 @@ onMounted(() => {
             refreshRealtimeProps(page, [
                     'records', 'dashboard', 'options', 'canViewAttendance',
                     'canManage', 'canViewEvidence', 'canRegister', 'canRequestCorrection',
-                    'canReviewCorrections', 'passkeyEnabled', 'registeredTypesToday',
+                    'canReviewCorrections', 'passkeyEnabled', 'attendanceShifts', 'attendanceBranches',
             ])
         },
     )
@@ -297,6 +388,13 @@ onBeforeUnmount(() => {
         >
             <template #actions>
                 <div v-if="canRegister || canExportExcel || canExportPdf" class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
+                    <div v-if="canRegister && showAttendanceBranchSelector" class="min-w-56">
+                        <SelectField v-model="attendanceBranchId" hide-label field="attendance-branch" :options="attendanceBranches" :disabled="registering" />
+                    </div>
+                    <div v-if="canRegister" class="min-w-56 rounded-xl border border-secondary bg-secondary px-4 py-2.5">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-text opacity-60">Horario actual</p>
+                        <p class="mt-0.5 text-sm font-semibold text-text">{{ selectedAttendanceShift?.label || 'Sin horario pendiente' }}</p>
+                    </div>
                     <div v-if="canRegister" class="min-w-48">
                         <SelectField v-model="attendanceType" hide-label field="attendance-type" :options="attendanceTypeOptions" :disabled="!hasAvailableAttendanceTypes" />
                     </div>

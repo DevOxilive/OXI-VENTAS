@@ -6,20 +6,21 @@
 </head>
 <body>
 @php
-    $typeLabels = ['check_in' => 'Entrada', 'meal_start' => 'Inicio de comida', 'meal_end' => 'Fin de comida', 'check_out' => 'Salida'];
+    $typeLabels = ['check_in' => 'Entrada', 'meal_start' => 'Salida a comida', 'meal_end' => 'Entrada de comida', 'check_out' => 'Salida general'];
     $statusLabels = ['on_time' => 'Puntual', 'late' => 'Retardo', 'absent' => 'Falta', 'justified' => 'Justificada', 'outside_zone' => 'Fuera de zona', 'pending' => 'Pendiente', 'corrected' => 'Corregida'];
 @endphp
 <h1>Reporte de asistencias</h1>
 <p>Generado: {{ $generatedAt->format('d/m/Y H:i') }}</p>
 <table>
     <thead>
-        <tr><th>Empleado</th><th>Sucursal</th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Estado</th></tr>
+        <tr><th>Empleado</th><th>Sucursal</th><th>Turno</th><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Estado</th></tr>
     </thead>
     <tbody>
         @foreach($records as $record)
             <tr>
                 <td>{{ $record->employee ? trim($record->employee->first_name.' '.$record->employee->last_name) : $record->user?->name }}</td>
                 <td>{{ $record->branch?->name }}</td>
+                <td>{{ $record->shift_label ?? $record->scheduleAssignment?->schedule?->name ?? 'Turno general' }}</td>
                 <td>{{ optional($record->attendance_date)->format('d/m/Y') }}</td>
                 <td>{{ optional($record->recorded_at)->format('H:i') }}</td>
                 <td>{{ $typeLabels[$record->type] ?? $record->type }}</td>

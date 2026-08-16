@@ -95,12 +95,12 @@ class PhysicalCountDifferencesSheet implements FromArray, WithCharts, WithColumn
     {
         return [
             'F' => NumberFormat::FORMAT_TEXT,
-            'G' => '#,##0.00',
-            'H' => '#,##0.00',
-            'I' => '#,##0.00',
-            'J' => '#,##0.00',
-            'K' => '#,##0.00',
-            'L' => '#,##0.00',
+            'G' => '#,##0.###',
+            'H' => '#,##0.###',
+            'I' => '#,##0.###',
+            'J' => '#,##0.###',
+            'K' => '#,##0.###',
+            'L' => '#,##0.###',
             'M' => '0.00%',
         ];
     }

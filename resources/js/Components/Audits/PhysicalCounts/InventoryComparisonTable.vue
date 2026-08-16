@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { formatInventoryQuantity } from '@/utils/quantityFormatter'
 
 const props = defineProps({
   comparison: {
@@ -30,11 +31,25 @@ const statusLabel = (status) => {
 }
 
 const statusClass = (status) => {
-  if (status === 'missing') return 'bg-red-100 text-red-700'
-  if (status === 'surplus') return 'bg-amber-100 text-amber-700'
-  return 'bg-green-100 text-green-700'
+  if (status === 'missing') return 'bg-secondary text-primary'
+  if (status === 'surplus') return 'bg-secondary text-accent'
+  return 'bg-secondary text-accent'
 }
 
+function unit(item) {
+  return item.inventory_unit ?? item.base_unit ?? 'pza'
+}
+
+function quantity(item, key) {
+  return formatInventoryQuantity(item[key] ?? 0, unit(item))
+}
+
+function difference(item) {
+  if (item.difference === null || item.difference === undefined) return '-'
+
+  const formatted = quantity(item, 'difference')
+  return Number(item.difference) > 0 ? `+${formatted}` : formatted
+}
 
 </script>
 
@@ -46,21 +61,21 @@ const statusClass = (status) => {
     type="button"
     class="rounded-full border px-3 py-1.5 text-xs font-semibold"
     :class="activeFilter === filter.key
-      ? 'border-slate-900 bg-slate-900 text-white'
-      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
+      ? 'border-primary bg-primary text-white'
+      : 'border-secondary bg-background text-text hover:bg-secondary'"
     @click="activeFilter = filter.key"
   >
     {{ filter.label }}
   </button>
 </div>
-  <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-    <h2 class="text-lg font-semibold text-gray-900">
+  <div class="min-w-0 rounded-xl border border-secondary bg-background p-4 shadow-sm">
+    <h2 class="text-lg font-semibold text-text">
       Comparativo de inventario
     </h2>
 
-    <div class="mt-4 overflow-x-auto">
-      <table class="w-full text-left text-sm">
-        <thead class="border-b text-gray-500">
+    <div class="mt-4 min-w-0 overflow-hidden rounded-xl border border-secondary">
+      <table class="w-full table-fixed border-collapse text-left text-sm">
+        <thead class="border-b border-secondary bg-secondary text-text">
           <tr>
             <th class="py-2">Producto</th>
             <th class="py-2">Sistema</th>
@@ -73,9 +88,9 @@ const statusClass = (status) => {
           </tr>
         </thead>
 
-        <tbody>
+        <tbody class="divide-y divide-secondary bg-background">
      <tr v-if="filteredComparison.length === 0">
-            <td colspan="8" class="py-6 text-center text-gray-500">
+            <td colspan="8" class="py-6 text-center text-text opacity-70">
               Todavía no hay productos comparados.
             </td>
           </tr>
@@ -83,42 +98,40 @@ const statusClass = (status) => {
          <tr
   v-for="item in filteredComparison"
   :key="item.branch_product_id"
-  class="border-b last:border-b-0"
+  class="odd:bg-secondary transition-colors hover:bg-primary/10"
 >
-            <td class="py-3">
+            <td class="truncate py-3 pr-3 text-text" :title="item.product_name">
               {{ item.product_name }}
             </td>
 
             <td class="py-3">
-              {{ item.system_stock }}
+              {{ quantity(item, 'system_stock') }}
             </td>
 
             <td class="py-3">
-              {{ item.counted_stock }}
+              {{ quantity(item, 'counted_stock') }}
             </td>
 
             <td class="py-3">
-              {{ item.damaged_stock }}
+              {{ quantity(item, 'damaged_stock') }}
             </td>
 
             <td class="py-3">
-              {{ item.expired_stock }}
+              {{ quantity(item, 'expired_stock') }}
             </td>
-            <td class="py-3 font-semibold text-slate-900">
-{{ item.sellable_stock }}
+            <td class="py-3 font-semibold text-text">
+{{ quantity(item, 'sellable_stock') }}
 </td>
 
             <td
               class="py-3 font-semibold"
               :class="{
-                'text-red-600': item.difference < 0,
-                'text-green-600': item.difference === 0,
-                'text-yellow-600': item.difference > 0,
+                'text-primary': item.difference < 0,
+                'text-accent': item.difference === 0,
+                'text-accent': item.difference > 0,
               }"
             >
-              {{
-                item.difference > 0 ? `+${item.difference}` : item.difference
-              }}
+              {{ difference(item) }}
             </td>
 
             <td class="py-3">

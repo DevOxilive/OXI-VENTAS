@@ -52,13 +52,14 @@ export function generateMenu(role, permissions = [], branches = []) {
             "audits.physical-counts.apply",
             "audits.physical-counts.delete",
         ],
-        sales: ["sales.view", "sales.create", "sales.update", "sales.delete", "sales.reports"],
+        sales: ["sales.view", "sales.create", "sales.update", "sales.delete"],
         cashClosures: [
             "sales.cash-closures.view",
             "sales.cash-closures.create",
             "sales.cash-closures.update",
             "sales.cash-closures.delete",
         ],
+        salesReports: ["reports.sales.view"],
         auditReports: ["reports.audits.view"],
         cashClosureReports: ["reports.cash-closures.view"],
         inventoryReports: ["reports.inventory.view"],
@@ -112,17 +113,6 @@ export function generateMenu(role, permissions = [], branches = []) {
                         url: route("human-resources.employees.index"),
                     }]
                     : []),
-                ...(can("attendance.view") || can("attendance.export.excel") || can("attendance.export.pdf")
-                    ? [{
-                        text: "Asistencias",
-                        key: "human-resources.attendance",
-                        icon: "fact_check",
-                        url: route("human-resources.attendance.index"),
-                    }]
-                    : []),
-                ...(canUse("attendanceSchedules") ? [{ text: "Horarios", key: "human-resources.attendance-schedules", icon: "schedule", url: route("human-resources.attendance-schedules.index") }] : []),
-                ...(canUse("attendanceScheduleAssignments") ? [{ text: "Asignación de horarios", key: "human-resources.attendance-schedule-assignments", icon: "assignment_ind", url: route("human-resources.attendance-schedule-assignments.index") }] : []),
-                ...(canUse("attendanceIncidents") ? [{ text: "Incidencias", key: "human-resources.attendance-incidents", icon: "event_note", url: route("human-resources.attendance-incidents.index") }] : []),
                 ...(canUse("organizationStructure")
                     ? [{
                         text: "Registro de Departamentos",
@@ -131,6 +121,17 @@ export function generateMenu(role, permissions = [], branches = []) {
                         url: route("human-resources.departments.index"),
                     }]
                     : []),
+                ...(canUse("attendanceSchedules") ? [{ text: "Horarios", key: "human-resources.attendance-schedules", icon: "schedule", url: route("human-resources.attendance-schedules.index") }] : []),
+                ...(canUse("attendanceScheduleAssignments") ? [{ text: "Asignación de horarios", key: "human-resources.attendance-schedule-assignments", icon: "assignment_ind", url: route("human-resources.attendance-schedule-assignments.index") }] : []),
+                ...(can("attendance.view") || can("attendance.export.excel") || can("attendance.export.pdf")
+                    ? [{
+                        text: "Asistencias",
+                        key: "human-resources.attendance",
+                        icon: "fact_check",
+                        url: route("human-resources.attendance.index"),
+                    }]
+                    : []),
+                ...(canUse("attendanceIncidents") ? [{ text: "Incidencias", key: "human-resources.attendance-incidents", icon: "event_note", url: route("human-resources.attendance-incidents.index") }] : []),
             ],
         });
     }
@@ -355,12 +356,12 @@ export function generateMenu(role, permissions = [], branches = []) {
     }
 
     const reportMenuItems = [
-        ...(canUse("auditReports")
+        ...(canUse("salesReports")
             ? [{
-                text: "Reportes de auditoría",
-                key: "reports.audits",
-                icon: "fact_check",
-                url: route("inventory.reports.select", { report: "audits" }),
+                text: "Reportes de ventas",
+                key: "reports.sales",
+                icon: "monitoring",
+                url: route("inventory.reports.sales"),
             }]
             : []),
         ...(canUse("cashClosureReports")
@@ -369,6 +370,14 @@ export function generateMenu(role, permissions = [], branches = []) {
                 key: "reports.cash-closures",
                 icon: "summarize",
                 url: route("inventory.reports.select", { report: "cash-closures" }),
+            }]
+            : []),
+        ...(canUse("auditReports")
+            ? [{
+                text: "Reportes de auditoría",
+                key: "reports.audits",
+                icon: "fact_check",
+                url: route("inventory.reports.select", { report: "audits" }),
             }]
             : []),
         ...(canUse("inventoryReports")

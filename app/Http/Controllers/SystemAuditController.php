@@ -47,7 +47,7 @@ class SystemAuditController extends SystemAdministrationController
             ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('occurred_at', '>=', $from))
             ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('occurred_at', '<=', $to))
             ->latest('occurred_at')
-            ->paginate(TablePagination::resolvePerPage($request, 50))
+            ->paginate(TablePagination::resolvePerPage($request))
             ->withQueryString();
 
         return Inertia::render('SystemAdministration/Audits', [

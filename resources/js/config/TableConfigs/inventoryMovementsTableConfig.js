@@ -86,6 +86,5 @@ export const inventoryMovementsTableConfig = {
     mobileCardHeaderField: "branch_product.product.name",
     noDataMessage: "No hay movimientos registrados.",
     rowKey: "id",
-    striped: true,
     hoverEffect: true,
 }

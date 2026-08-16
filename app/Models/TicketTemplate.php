@@ -42,6 +42,7 @@ class TicketTemplate extends Model
             'footer_text' => 'Gracias por tu compra',
             'show_dividers' => true,
             'blocks' => [
+                ['key' => 'logo', 'enabled' => true, 'position_percent' => 50, 'size_percent' => 100],
                 ['key' => 'cash_box', 'enabled' => true, 'position_percent' => 100, 'size_percent' => 104],
                 ['key' => 'brand_title', 'enabled' => true, 'position_percent' => 50, 'size_percent' => 118],
                 ['key' => 'divider_header', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 90],
@@ -142,6 +143,7 @@ class TicketTemplate extends Model
             'subheader_text' => 'CORTE DE CAJA',
             'footer_text' => 'Corte realizado correctamente',
             'blocks' => [
+                ['key' => 'logo', 'enabled' => true, 'position_percent' => 50, 'size_percent' => 100],
                 ['key' => 'cash_box', 'enabled' => true, 'position_percent' => 100, 'size_percent' => 104],
                 ['key' => 'brand_title', 'enabled' => true, 'position_percent' => 50, 'size_percent' => 118],
                 ['key' => 'divider_header', 'enabled' => true, 'position_percent' => 0, 'size_percent' => 90],

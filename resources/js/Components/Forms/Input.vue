@@ -1,8 +1,8 @@
 <script setup>
-import { computed, ref, watch, defineProps, defineEmits, onMounted } from 'vue';
+import { computed, nextTick, ref, watch, defineProps, defineEmits, onMounted } from 'vue';
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue';
 import { fieldRegistry } from '@/Validation/fieldRegistry';
-import { sanitizeField } from '@/Validation/sanitizers';
+import { sanitizeField, sanitizeFieldWithCursor } from '@/Validation/sanitizers';
 
 const props = defineProps({
     modelValue: {
@@ -86,29 +86,46 @@ const onlyNumbers = '^[0-9]+$';
 const lettersAndNumbers = '^[A-Za-zÀ-ÿ0-9]+$';
 const lettersNumbersAndSpace = '^[A-Za-zÀ-ÿ0-9\\s]+$';
 const email = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$';
-watch(inputValue, (newValue) => {
-    if (['date', 'file', 'number', 'password', 'email', 'checkbox'].includes(props.type)) {
-        emits('update:modelValue', newValue);
-        return;
-    }
-
-    if (props.type === 'text' && typeof newValue === 'string') {
-        const sanitized = sanitizeField(newValue, normalizedFieldConfig.value);
-
-        if (sanitized !== newValue) {
-            inputValue.value = sanitized;
-            return;
-        }
-
-        emits('update:modelValue', sanitized);
-    } else {
-        emits('update:modelValue', newValue);
-    }
-});
-
 watch(() => props.modelValue, (newValue) => {
-    inputValue.value = newValue;
+    if (inputValue.value !== newValue) {
+        inputValue.value = newValue;
+    }
 });
+
+function handleTextInput(event) {
+    const sanitized = sanitizeFieldWithCursor(
+        event.target.value,
+        normalizedFieldConfig.value,
+        event.target.selectionStart ?? 0,
+        event.target.selectionEnd ?? 0,
+    );
+
+    if (event.target.value !== sanitized.value) {
+        event.target.value = sanitized.value;
+    }
+
+    inputValue.value = sanitized.value;
+    emits('update:modelValue', sanitized.value);
+
+    nextTick(() => {
+        event.target.setSelectionRange?.(sanitized.selectionStart, sanitized.selectionEnd);
+    });
+}
+
+function handleTextBlur(event) {
+    const value = sanitizeField(event.target.value, normalizedFieldConfig.value);
+
+    if (value !== event.target.value) {
+        event.target.value = value;
+        inputValue.value = value;
+        emits('update:modelValue', value);
+    }
+}
+
+function handleValueUpdate(value) {
+    inputValue.value = value;
+    emits('update:modelValue', value);
+}
 
 const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -223,12 +240,13 @@ onMounted(() => {
                 v-if="type === 'date'"
                 :id="id"
                 :type="type"
-                v-model="inputValue"
+                :value="inputValue"
                 :min="min"
                 :max="max"
                 :required="required"
                 :disabled="disabled"
                 :autocomplete="autocomplete"
+                @input="handleValueUpdate($event.target.value)"
                 class="w-full rounded-md border border-secondary bg-background px-3 py-2 text-text shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 :class="className"
             />
@@ -237,12 +255,14 @@ onMounted(() => {
                 :id="id"
                 :type="type"
                 :placeholder="placeholder"
-                v-model="inputValue"
+                :value="inputValue"
                 :minlength="min"
                 :maxlength="max"
                 :required="required"
                 :disabled="disabled"
                 :autocomplete="autocomplete"
+                @input="handleTextInput"
+                @blur="handleTextBlur"
                 :class="className"
                 class="w-full rounded-md border border-secondary bg-background px-3 py-2 text-text shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 @keypress="(event) => validateRegex(event, pattern)"

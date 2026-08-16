@@ -101,7 +101,7 @@ class PhysicalCountRoundSheet implements FromArray, WithEvents, WithStyles, With
                     $sheet->getColumnDimension($columns)->setWidth($width);
                 }
             }
-            $sheet->getStyle("K2:P{$highestRow}")->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle("K2:P{$highestRow}")->getNumberFormat()->setFormatCode('#,##0.###');
             $sheet->getStyle("R2:S{$highestRow}")->getAlignment()->setWrapText(true);
             $sheet->getPageSetup()->setOrientation('landscape')->setFitToWidth(1)->setFitToHeight(0);
         }];

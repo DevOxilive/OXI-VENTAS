@@ -40,7 +40,7 @@ const reportFilters = reactive({
   status: props.filters.status || "",
   date_from: props.filters.date_from || "",
   date_to: props.filters.date_to || "",
-  per_page: Number(props.filters.per_page || 20),
+  per_page: Number(props.filters.per_page || 25),
 });
 
 const toolbarActions = computed(() => can("reports.cash-closures.create")
@@ -71,6 +71,7 @@ const form = useForm({
   cash_left: 0,
   counted_card: 0,
   notes: "",
+  record_version: "",
 });
 
 const isSelectedBalanced = computed(() => {
@@ -263,7 +264,7 @@ function reportQuery(overrides = {}) {
     status: reportFilters.status || "",
     date_from: reportFilters.date_from || "",
     date_to: reportFilters.date_to || "",
-    per_page: reportFilters.per_page || 20,
+    per_page: reportFilters.per_page || 25,
     ...overrides,
   };
 }
@@ -298,6 +299,7 @@ function openClosure(row, mode = "view") {
   form.cash_left = Number(row.cash_left || 0);
   form.counted_card = Number(row.counted_card || 0);
   form.notes = row.notes || "";
+  form.record_version = row.record_version || "";
   form.clearErrors();
   showClosureModal.value = true;
 }
@@ -372,6 +374,7 @@ async function deleteClosure(row) {
 
   if (!result.isConfirmed) return;
 
+  form.record_version = row.record_version || "";
   form.delete(route("ventas.cash-closures.destroy", row.id), {
     preserveScroll: true,
     onSuccess: () => {
@@ -400,7 +403,7 @@ watch(
     reportFilters.status = filters.status || "";
     reportFilters.date_from = filters.date_from || "";
     reportFilters.date_to = filters.date_to || "";
-    reportFilters.per_page = Number(filters.per_page || 20);
+    reportFilters.per_page = Number(filters.per_page || 25);
 
     setTimeout(() => {
       syncingFilters = false;

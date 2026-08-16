@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 
 import { auditPermissionCatalog } from "../resources/js/Composables/usePermissionLabels.js";
 
@@ -10,7 +11,28 @@ const phpCode = [
   "echo json_encode(App\\Models\\Permission::query()->orderBy('name')->pluck('name')->all());",
 ].join(" ");
 
-const databaseResult = spawnSync("php", ["-r", phpCode], {
+function resolvePhpCommand() {
+  if (process.env.PHP_BINARY && existsSync(process.env.PHP_BINARY)) {
+    return process.env.PHP_BINARY;
+  }
+
+  if (process.platform === "win32") {
+    const laragonIni = "C:\\laragon\\usr\\laragon.ini";
+
+    if (existsSync(laragonIni)) {
+      const phpVersion = readFileSync(laragonIni, "utf8").match(/^\[php\][\s\S]*?^Version=(.+)$/m)?.[1]?.trim();
+      const laragonPhp = phpVersion && join("C:\\laragon\\bin\\php", phpVersion, "php.exe");
+
+      if (laragonPhp && existsSync(laragonPhp)) {
+        return laragonPhp;
+      }
+    }
+  }
+
+  return "php";
+}
+
+const databaseResult = spawnSync(resolvePhpCommand(), ["-r", phpCode], {
   cwd: process.cwd(),
   encoding: "utf8",
 });

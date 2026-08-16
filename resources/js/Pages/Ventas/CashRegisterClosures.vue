@@ -49,6 +49,9 @@ const availablePrinters = ref([]);
 const selectedPrinterName = ref(getStoredPrinterName());
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para imprimir tickets.");
+const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
+let ticketLogoDataUrlPromise = null;
+const ticketHeaderDataUrlPromises = new Map();
 
 const denominations = [
   { key: "1000", label: "$1000", value: 1000, group: "Billetes" },
@@ -154,6 +157,98 @@ function money(value) {
     style: "currency",
     currency: "MXN",
   }).format(Number(value || 0));
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("No se pudo leer el logo del ticket."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function getTicketLogoDataUrl() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  if (!ticketLogoDataUrlPromise) {
+    ticketLogoDataUrlPromise = window.fetch(TICKET_LOGO_URL, {
+      cache: "force-cache",
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("No se encontro el logo del ticket.");
+        }
+
+        return response.blob();
+      })
+      .then(blobToDataUrl)
+      .catch(() => "");
+  }
+
+  return ticketLogoDataUrlPromise;
+}
+
+function imageFromDataUrl(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("No se pudo preparar el encabezado del ticket."));
+    image.src = dataUrl;
+  });
+}
+
+async function getTicketHeaderDataUrl(cashBoxText = "") {
+  const normalizedCashBoxText = String(cashBoxText || "").trim();
+  const cacheKey = normalizedCashBoxText || "__default__";
+
+  if (ticketHeaderDataUrlPromises.has(cacheKey)) {
+    return ticketHeaderDataUrlPromises.get(cacheKey);
+  }
+
+  const promise = getTicketLogoDataUrl()
+    .then(async (logoDataUrl) => {
+      if (!logoDataUrl || typeof document === "undefined") {
+        return logoDataUrl;
+      }
+
+      const logoImage = await imageFromDataUrl(logoDataUrl);
+      const canvas = document.createElement("canvas");
+      canvas.width = 576;
+      canvas.height = 92;
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        return logoDataUrl;
+      }
+
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(logoImage, 12, 5, 82, 82);
+
+      context.fillStyle = "#000000";
+      context.font = "700 27px Arial, sans-serif";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText("SUPER KAY", Math.round(canvas.width / 2), Math.round(canvas.height / 2));
+
+      if (normalizedCashBoxText) {
+        context.fillStyle = "#000000";
+        context.font = "700 21px Arial, sans-serif";
+        context.textAlign = "right";
+        context.textBaseline = "middle";
+        context.fillText(normalizedCashBoxText.toUpperCase(), canvas.width - 12, Math.round(canvas.height / 2));
+      }
+
+      return canvas.toDataURL("image/png");
+    })
+    .catch(() => "");
+
+  ticketHeaderDataUrlPromises.set(cacheKey, promise);
+
+  return promise;
 }
 
 function denominationTotal(item) {
@@ -267,9 +362,16 @@ async function printClosureJobs(jobs = []) {
   }
 
   for (const job of jobs) {
+    const cashBoxNumber = String(job.cash_box_number || form.cash_box_number || "1");
+    const cashBoxText = job.cash_box_text || `CAJA #${cashBoxNumber}`;
+
     await printEscPosTicket(selectedPrinterName.value, buildEscPosTicketData(resolvedTicketTemplate.value, {
       ...job,
       type: "cash_closure",
+      cash_box_number: cashBoxNumber,
+      cash_box_text: cashBoxText,
+      ticket_logo_data_url: await getTicketLogoDataUrl(),
+      ticket_header_data_url: await getTicketHeaderDataUrl(cashBoxText),
     }), {
       connectIfNeeded: false,
     });

@@ -28,6 +28,7 @@ use App\Http\Controllers\TicketTemplateController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Ventas\CashRegisterClosureController;
 use App\Http\Controllers\Ventas\SalesController;
+use App\Http\Controllers\Ventas\SalesReportController;
 use App\Models\Branch;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -42,6 +43,52 @@ require base_path('vendor/laravel/passkeys/routes/routes.php');
 | PÚBLICO
 |--------------------------------------------------------------------------
 */
+
+Route::get('/pwa/manifest.webmanifest', function () {
+    $manifest = [
+        'id' => '/',
+        'name' => 'Super-Kay',
+        'short_name' => 'Super-Kay',
+        'start_url' => '/',
+        'scope' => '/',
+        'display' => 'standalone',
+        'background_color' => '#ffffff',
+        'theme_color' => '#e0000f',
+        'description' => 'Sistema Super-Kay instalado como app.',
+        'icons' => [
+            [
+                'src' => '/icons/icon-192.png',
+                'sizes' => '192x192',
+                'type' => 'image/png',
+                'purpose' => 'any',
+            ],
+            [
+                'src' => '/icons/icon-512.png',
+                'sizes' => '512x512',
+                'type' => 'image/png',
+                'purpose' => 'any',
+            ],
+            [
+                'src' => '/icons/maskable-512.png',
+                'sizes' => '512x512',
+                'type' => 'image/png',
+                'purpose' => 'maskable',
+            ],
+            [
+                'src' => '/icons/maskable-192.png',
+                'sizes' => '192x192',
+                'type' => 'image/png',
+                'purpose' => 'maskable',
+            ],
+        ],
+    ];
+
+    return response()->json($manifest, 200, [
+        'Content-Type' => 'application/manifest+json',
+        'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma' => 'no-cache',
+    ]);
+})->name('pwa.manifest');
 
 Route::get('/', function () {
     return redirect('/login');
@@ -82,13 +129,14 @@ Route::middleware([
     $cashClosureTicketsAccess = 'permission:systems.cash-closure-tickets.view,systems.cash-closure-tickets.update';
     $labelsAccess = 'permission:systems.labels.view,systems.labels.update,systems.labels.print';
     $productsAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete';
+    $productImagesAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete,sales.view,sales.create,sales.purchase-lists.view,sales.purchase-lists.create,sales.purchase-orders.view,sales.purchase-orders.receive,inventory.purchase-orders.general.view,inventory.purchase-orders.general.create,inventory.purchase-orders.general.update,inventory.purchase-orders.general.complete';
     $branchInventoryAccess = 'permission:inventory.branches.view,inventory.branches.stock-in,inventory.branches.stock-out,inventory.branches.stock-adjust,inventory.branches.batches.update,inventory.branches.config.update';
     $purchaseReportsAccess = 'permission:sales.purchase-lists.view,sales.purchase-lists.create,sales.purchase-lists.update,sales.purchase-lists.delete,sales.purchase-orders.view,sales.purchase-orders.receive';
     $generalPurchaseOrdersAccess = 'permission:inventory.purchase-orders.general.view,inventory.purchase-orders.general.create,inventory.purchase-orders.general.update,inventory.purchase-orders.general.complete';
     $auditsAccess = 'permission:audits.physical-counts.count,audits.physical-counts.view-stock,audits.physical-counts.create,audits.physical-counts.close,audits.physical-counts.reopen,audits.physical-counts.finalize,audits.physical-counts.participants,audits.physical-counts.apply,audits.physical-counts.delete';
     $inventoryReportsAccess = 'permission:reports.inventory.view';
     $movementReportsAccess = 'permission:reports.movements.view';
-    $reportsAccess = 'permission:reports.audits.view,reports.cash-closures.view,reports.inventory.view,reports.movements.view';
+    $reportsAccess = 'permission:reports.sales.view,reports.audits.view,reports.cash-closures.view,reports.inventory.view,reports.movements.view';
 
     /*
     |--------------------------------------------------------------------------
@@ -113,10 +161,10 @@ Route::middleware([
             ->name('audits.export');
 
         Route::get('/roles', [SystemRoleController::class, 'index'])
-            ->middleware('permission:system.roles.manage')
+            ->middleware('permission:system.roles.manage,system.permissions.manage')
             ->name('roles.index');
         Route::put('/roles/{role}', [SystemRoleController::class, 'update'])
-            ->middleware('permission:system.roles.manage')
+            ->middleware('permission:system.permissions.manage')
             ->name('roles.update');
 
         Route::get('/trash', [SystemTrashController::class, 'index'])
@@ -143,9 +191,11 @@ Route::middleware([
     });
 
     Route::get('/qz/certificate', [QzTrayController::class, 'certificate'])
+        ->middleware('permission:systems.qz.sign')
         ->name('qz.certificate');
 
     Route::post('/qz/sign', [QzTrayController::class, 'sign'])
+        ->middleware(['permission:systems.qz.sign', 'idempotent'])
         ->name('qz.sign');
 
     /*
@@ -168,19 +218,19 @@ Route::middleware([
             ->middleware('permission:attendance.view,attendance.register')
             ->name('attendance.index');
         Route::post('/attendance', [AttendanceController::class, 'store'])
-            ->middleware(['permission:attendance.register', 'password.confirm'])
+            ->middleware(['permission:attendance.register', 'password.confirm', 'idempotent'])
             ->name('attendance.store');
         Route::post('/attendance/{attendanceRecord}/corrections', [AttendanceController::class, 'requestCorrection'])
-            ->middleware('permission:attendance.corrections.request,attendance.corrections.review')
+            ->middleware(['permission:attendance.corrections.request,attendance.corrections.review', 'idempotent'])
             ->name('attendance.corrections.store');
         Route::patch('/attendance/corrections/{attendanceCorrectionRequest}', [AttendanceController::class, 'reviewCorrection'])
-            ->middleware('permission:attendance.corrections.review')
+            ->middleware(['permission:attendance.corrections.review', 'idempotent'])
             ->name('attendance.corrections.review');
         Route::get('/attendance/export/excel', [AttendanceController::class, 'exportExcel'])
-            ->middleware(['permission:attendance.reports', 'permission:files.export'])
+            ->middleware(['permission:attendance.export.excel', 'permission:files.export'])
             ->name('attendance.export-excel');
         Route::get('/attendance/export/pdf', [AttendanceController::class, 'exportPdf'])
-            ->middleware(['permission:attendance.reports', 'permission:files.export'])
+            ->middleware(['permission:attendance.export.pdf', 'permission:files.export'])
             ->name('attendance.export-pdf');
 
         Route::post('/users', [UserController::class, 'store'])
@@ -229,6 +279,10 @@ Route::middleware([
     Route::get('/branches', [BranchController::class, 'index'])
         ->middleware($branchesAccess)
         ->name('branches.index');
+
+    Route::post('/branches/geocode', [BranchController::class, 'geocode'])
+        ->middleware('permission:branches.create,branches.update')
+        ->name('branches.geocode');
 
     Route::post('/branches', [BranchController::class, 'store'])
         ->middleware('permission:branches.create')
@@ -301,16 +355,16 @@ Route::middleware([
             ->middleware('permission:attendance.view,attendance.register,attendance.export.excel,attendance.export.pdf')
             ->name('attendance.index');
         Route::post('/attendance', [AttendanceController::class, 'store'])
-            ->middleware('permission:attendance.register')
+            ->middleware(['permission:attendance.register', 'idempotent'])
             ->name('attendance.store');
         Route::get('/attendance/{attendanceRecord}/evidence-photo', [AttendanceController::class, 'evidencePhoto'])
             ->middleware('permission:attendance.manage')
             ->name('attendance.evidence-photo');
         Route::post('/attendance/{attendanceRecord}/corrections', [AttendanceController::class, 'requestCorrection'])
-            ->middleware('permission:attendance.corrections.request,attendance.corrections.review')
+            ->middleware(['permission:attendance.corrections.request,attendance.corrections.review', 'idempotent'])
             ->name('attendance.corrections.store');
         Route::patch('/attendance/corrections/{attendanceCorrectionRequest}', [AttendanceController::class, 'reviewCorrection'])
-            ->middleware('permission:attendance.corrections.review')
+            ->middleware(['permission:attendance.corrections.review', 'idempotent'])
             ->name('attendance.corrections.review');
         Route::get('/attendance/export/excel', [AttendanceController::class, 'exportExcel'])
             ->middleware('permission:attendance.export.excel')
@@ -355,7 +409,7 @@ Route::middleware([
                 ->name('products.search');
 
             Route::post('/', [SalesController::class, 'store'])
-                ->middleware('permission:sales.create')
+                ->middleware(['permission:sales.create', 'idempotent'])
                 ->name('store');
 
             Route::get('/cortes', [CashRegisterClosureController::class, 'index'])
@@ -363,7 +417,7 @@ Route::middleware([
                 ->name('cash-closures.index');
 
             Route::post('/cortes', [CashRegisterClosureController::class, 'store'])
-                ->middleware('permission:sales.cash-closures.create,reports.cash-closures.create')
+                ->middleware(['permission:sales.cash-closures.create,reports.cash-closures.create', 'idempotent'])
                 ->name('cash-closures.store');
 
             Route::put('/cortes/{closure}', [CashRegisterClosureController::class, 'update'])
@@ -391,7 +445,7 @@ Route::middleware([
                 ->name('attendance.index');
 
             Route::post('/asistencia', [AttendanceController::class, 'store'])
-                ->middleware(['permission:attendance.register', 'role:Ventas,Vendedor'])
+                ->middleware(['permission:attendance.register', 'role:Ventas,Vendedor', 'idempotent'])
                 ->name('attendance.store');
         });
 
@@ -440,6 +494,7 @@ Route::middleware([
     Route::prefix('inventory')->name('inventory.')->group(function () use (
         $reportsAccess,
         $productsAccess,
+        $productImagesAccess,
         $branchInventoryAccess,
         $inventoryReportsAccess,
         $movementReportsAccess,
@@ -447,7 +502,7 @@ Route::middleware([
         $generalPurchaseOrdersAccess,
         $cashClosureReportsAccess
     ) {
-        Route::get('/dashboard', fn () => Inertia::render('Inventory/Dashboard'))
+        Route::get('/dashboard', fn () => redirect()->route('dashboard'))
             ->middleware($reportsAccess)
             ->name('dashboard');
 
@@ -460,7 +515,7 @@ Route::middleware([
             ->name('branches.products.snapshot');
 
         Route::get('/products/{product}/image', [ProductController::class, 'image'])
-            ->middleware($productsAccess)
+            ->middleware($productImagesAccess)
             ->name('products.image');
 
         Route::post('/branches/{branch:slug}/products', [ProductController::class, 'store'])
@@ -518,22 +573,24 @@ Route::middleware([
             ->name('stock-movements.products.search');
 
         Route::post('/stock-movements', [StockMovementController::class, 'store'])
-            ->middleware('permission:inventory.branches.stock-in,inventory.branches.stock-out,inventory.branches.stock-adjust')
+            ->middleware(['permission:inventory.branches.stock-in,inventory.branches.stock-out,inventory.branches.stock-adjust', 'idempotent'])
             ->name('stock-movements.store');
 
         Route::get('/movements', [StockMovementController::class, 'index'])
             ->middleware($branchInventoryAccess)
             ->name('movements');
 
-        Route::get('/expirations', fn () => Inertia::render('Inventory/Expirations'))
+        Route::get('/expirations', fn () => redirect()->route('inventory.reports.select', [
+            'report' => 'inventory',
+        ]))
             ->middleware($inventoryReportsAccess)
             ->name('expirations');
 
-        Route::get('/transfers', fn () => Inertia::render('Inventory/Transfers'))
+        Route::get('/transfers', [BranchInventoryController::class, 'landing'])
             ->middleware('permission:inventory.branches.stock-out')
             ->name('transfers');
 
-        Route::get('/adjustments', fn () => Inertia::render('Inventory/Adjustments'))
+        Route::get('/adjustments', [BranchInventoryController::class, 'landing'])
             ->middleware('permission:inventory.branches.stock-adjust')
             ->name('adjustments');
 
@@ -552,11 +609,11 @@ Route::middleware([
             ->name('branches.purchase-reports.create');
 
         Route::post('/branches/{branch}/purchase-reports', [PurchaseReportController::class, 'store'])
-            ->middleware('permission:sales.purchase-lists.create')
+            ->middleware(['permission:sales.purchase-lists.create', 'idempotent'])
             ->name('branches.purchase-reports.store');
 
         Route::post('/branches/{branch}/purchase-reports/submit-empty', [PurchaseReportController::class, 'submitEmpty'])
-            ->middleware('permission:sales.purchase-lists.create')
+            ->middleware(['permission:sales.purchase-lists.create', 'idempotent'])
             ->name('branches.purchase-reports.submit-empty');
 
         Route::get('/branches/{branch}/purchase-reports/{purchaseReport}', [PurchaseReportController::class, 'show'])
@@ -568,11 +625,11 @@ Route::middleware([
             ->name('branches.purchase-reports.update');
 
         Route::post('/branches/{branch}/purchase-reports/{purchaseReport}/generate', [PurchaseReportController::class, 'generate'])
-            ->middleware('permission:sales.purchase-lists.update')
+            ->middleware(['permission:sales.purchase-lists.update', 'idempotent'])
             ->name('branches.purchase-reports.generate');
 
         Route::post('/branches/{branch}/purchase-reports/{purchaseReport}/complete', [PurchaseReportController::class, 'complete'])
-            ->middleware('permission:sales.purchase-orders.receive')
+            ->middleware(['permission:sales.purchase-orders.receive', 'idempotent'])
             ->name('branches.purchase-reports.complete');
 
         Route::delete('/branches/{branch}/purchase-reports/{purchaseReport}', [PurchaseReportController::class, 'destroy'])
@@ -589,9 +646,25 @@ Route::middleware([
             ->middleware($reportsAccess)
             ->name('reports');
 
+        Route::get('/reports/sales', [SalesReportController::class, 'global'])
+            ->middleware('permission:reports.sales.view')
+            ->name('reports.sales');
+
+        Route::get('/reports/sales/products/excel', [SalesReportController::class, 'exportGlobalProductsExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('reports.sales.products.excel');
+
+        Route::get('/reports/sales/registered/excel', [SalesReportController::class, 'exportGlobalSalesExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('reports.sales.registered.excel');
+
+        Route::get('/reports/sales/registered/pdf', [SalesReportController::class, 'exportGlobalSalesPdf'])
+            ->middleware('permission:reports.sales.export.pdf')
+            ->name('reports.sales.registered.pdf');
+
         Route::get('/reports/{report}', [ReportController::class, 'select'])
             ->middleware($reportsAccess)
-            ->whereIn('report', ['audits', 'cash-closures', 'inventory', 'movements'])
+            ->whereIn('report', ['sales', 'audits', 'cash-closures', 'inventory', 'movements'])
             ->name('reports.select');
 
         Route::get('/branches/{branch}/reports', [ReportController::class, 'index'])
@@ -611,19 +684,15 @@ Route::middleware([
             ->name('branches.reports.purchase-orders');
 
         Route::post('/branches/{branch}/reports/purchase-orders/consolidate', [GeneralPurchaseOrderController::class, 'consolidate'])
-            ->middleware('permission:inventory.purchase-orders.general.create')
+            ->middleware(['permission:inventory.purchase-orders.general.create', 'idempotent'])
             ->name('branches.reports.purchase-orders.consolidate');
-
-        Route::post('/branches/{branch}/reports/purchase-orders/draft', [GeneralPurchaseOrderController::class, 'saveDraft'])
-            ->middleware('permission:inventory.purchase-orders.general.create')
-            ->name('branches.reports.purchase-orders.draft');
 
         Route::get('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}', [GeneralPurchaseOrderController::class, 'sourceOrder'])
             ->middleware('permission:inventory.purchase-orders.source.view')
             ->name('branches.reports.purchase-orders.source-orders.show');
 
         Route::post('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}/transfer', [GeneralPurchaseOrderController::class, 'transferSourceOrder'])
-            ->middleware('permission:inventory.purchase-orders.source.transfer')
+            ->middleware(['permission:inventory.purchase-orders.source.transfer', 'idempotent'])
             ->name('branches.reports.purchase-orders.source-orders.transfer');
 
         Route::put('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}/review', [GeneralPurchaseOrderController::class, 'reviewSourceOrder'])
@@ -655,7 +724,7 @@ Route::middleware([
             ->name('branches.reports.purchase-orders.update');
 
         Route::post('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}/complete', [GeneralPurchaseOrderController::class, 'complete'])
-            ->middleware('permission:inventory.purchase-orders.general.complete')
+            ->middleware(['permission:inventory.purchase-orders.general.complete', 'idempotent'])
             ->name('branches.reports.purchase-orders.complete');
 
         Route::get('/branches/{branch}/reports/audits', function (Branch $branch) {
@@ -669,6 +738,30 @@ Route::middleware([
         Route::get('/branches/{branch}/reports/cash-closures', [CashRegisterClosureController::class, 'reports'])
             ->middleware($cashClosureReportsAccess)
             ->name('branches.reports.cash-closures');
+
+        Route::get('/branches/{branch}/reports/sales', [SalesReportController::class, 'index'])
+            ->middleware('permission:reports.sales.view')
+            ->name('branches.reports.sales');
+
+        Route::get('/branches/{branch}/reports/sales/products/excel', [SalesReportController::class, 'exportProductsExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('branches.reports.sales.products.excel');
+
+        Route::get('/branches/{branch}/reports/sales/registered/excel', [SalesReportController::class, 'exportSalesExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('branches.reports.sales.registered.excel');
+
+        Route::get('/branches/{branch}/reports/sales/registered/pdf', [SalesReportController::class, 'exportSalesPdf'])
+            ->middleware('permission:reports.sales.export.pdf')
+            ->name('branches.reports.sales.registered.pdf');
+
+        Route::get('/reports/sales/{sale}/excel', [SalesReportController::class, 'exportSaleExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('reports.sales.sale.excel');
+
+        Route::get('/reports/sales/{sale}/pdf', [SalesReportController::class, 'exportSalePdf'])
+            ->middleware('permission:reports.sales.export.pdf')
+            ->name('reports.sales.sale.pdf');
 
         Route::get('/branches/{branch}/reports/inventory', [ReportController::class, 'inventory'])
             ->middleware($inventoryReportsAccess)
@@ -752,7 +845,7 @@ Route::middleware([
             ->name('physical-counts.show');
 
         Route::post('/physical-counts', [PhysicalCountController::class, 'store'])
-            ->middleware('permission:audits.physical-counts.create')
+            ->middleware(['permission:audits.physical-counts.create', 'idempotent'])
             ->name('physical-counts.store');
 
         Route::put('/physical-counts/{physicalCount}', [PhysicalCountController::class, 'update'])
@@ -768,11 +861,11 @@ Route::middleware([
             ->name('physical-counts.scan');
 
         Route::post('/physical-counts/{physicalCount}/entries', [PhysicalCountController::class, 'storeEntry'])
-            ->middleware('permission:audits.physical-counts.count')
+            ->middleware(['permission:audits.physical-counts.count', 'idempotent'])
             ->name('physical-counts.entries.store');
 
         Route::post('/physical-counts/{physicalCount}/batches', [PhysicalCountController::class, 'storeBatch'])
-            ->middleware('permission:audits.physical-counts.count')
+            ->middleware(['permission:audits.physical-counts.count', 'idempotent'])
             ->name('physical-counts.batches.store');
 
         Route::patch('/physical-counts/{physicalCount}/close', [PhysicalCountController::class, 'close'])
@@ -788,7 +881,7 @@ Route::middleware([
             ->name('physical-counts.finalize');
 
         Route::patch('/physical-counts/{physicalCount}/apply-adjustments', [PhysicalCountController::class, 'applyAdjustments'])
-            ->middleware('permission:audits.physical-counts.apply')
+            ->middleware(['permission:audits.physical-counts.apply', 'idempotent'])
             ->name('physical-counts.apply-adjustments');
 
         Route::get('/physical-counts/{physicalCount}/export-excel', [PhysicalCountController::class, 'exportExcel'])

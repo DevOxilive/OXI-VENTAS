@@ -1,11 +1,12 @@
 <script setup>
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useAdjustStockForm } from '@/Composables/Inventory/useAdjustStockForm'
 import FormPanel from '@/Components/Cards/FormPanel.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { getStockEntryModalConfig } from '@/config/ModalConfigs/stockEntryModalConfig'
 
 import InputField from '@/Components/Forms/InputField.vue'
+import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 
@@ -38,7 +39,33 @@ const productName = computed(() => {
     return props.product?.name ?? props.product?.product?.name ?? 'Producto'
 })
 
-const unit = computed(() => props.product?.unit ?? 'pieza')
+const inventoryQuantityMode = computed(() => props.product?.inventory_quantity_mode ?? 'base')
+const unit = computed(() => props.product?.inventory_unit ?? props.product?.unit ?? 'pza')
+const isKilogramUnit = computed(() => ['kg', 'kilo', 'kilogramo'].includes(
+    String(unit.value).trim().toLowerCase(),
+))
+const isBoxUnit = computed(() => Boolean(props.product?.has_box_presentation)
+    && inventoryQuantityMode.value === 'base')
+const isLegacyPresentation = computed(() => inventoryQuantityMode.value === 'legacy_presentation')
+const piecesPerBox = computed(() => {
+    const pieces = Number(props.product?.pieces_per_box ?? 1)
+
+    return Number.isInteger(pieces) && pieces > 0 ? pieces : 1
+})
+const distributionUnit = ref(isBoxUnit.value ? 'boxes' : 'pieces')
+const entryQuantityLabel = computed(() => {
+    if (isBoxUnit.value) return 'cajas'
+    if (isKilogramUnit.value) return 'kilogramos'
+
+    return 'piezas'
+})
+const distributionQuantityLabel = computed(() => {
+    if (!isBoxUnit.value) return entryQuantityLabel.value
+
+    return distributionUnit.value === 'boxes' ? 'cajas' : 'piezas'
+})
+const quantityLimit = computed(() => isKilogramUnit.value ? 999.999 : 999)
+const quantityStep = computed(() => isKilogramUnit.value ? 0.001 : 1)
 
 const entry = computed(() => form.batches?.[0] ?? null)
 
@@ -60,7 +87,15 @@ const modalConfig = computed(() => getStockEntryModalConfig({
 }))
 
 const branchOptions = computed(() => {
-    return (props.branches ?? []).filter((branch) => branch?.id)
+    const assignedBranchIds = new Set(
+        (props.product?.assigned_branch_ids ?? []).map(Number),
+    )
+
+    return (props.branches ?? []).filter((branch) => {
+        if (!branch?.id) return false
+
+        return assignedBranchIds.has(Number(branch.id))
+    })
 })
 
 const currentBranchId = computed(() => props.currentBranch?.id ?? null)
@@ -71,17 +106,80 @@ const selectedBranches = computed(() => {
     })
 })
 
-const totalAllocated = computed(() => {
+function quantityNumber(value) {
+    const quantity = Number(String(value ?? '').replace(',', '.'))
+
+    if (!Number.isFinite(quantity)) return 0
+
+    return Math.min(quantityLimit.value, Math.max(0, Math.round(quantity * 1000) / 1000))
+}
+
+function storedQuantityNumber(value) {
+    const quantity = Number(String(value ?? '').replace(',', '.'))
+
+    if (!Number.isFinite(quantity)) return 0
+
+    return Math.max(0, Math.round(quantity * 1000) / 1000)
+}
+
+function quantityText(value) {
+    const rawValue = String(value ?? '').replace(',', '.')
+
+    if (!isKilogramUnit.value) {
+        return rawValue.replace(/[^\d]/g, '').slice(0, 3)
+    }
+
+    const cleanValue = rawValue.replace(/[^\d.]/g, '')
+    const [integerPart = '', ...decimalParts] = cleanValue.split('.')
+    const integer = integerPart.slice(0, 3)
+    const decimal = decimalParts.join('').slice(0, 3)
+
+    return cleanValue.includes('.')
+        ? `${integer || '0'}.${decimal}`
+        : integer
+}
+
+function formattedQuantity(value) {
+    return String(Math.round(quantityNumber(value) * 1000) / 1000)
+}
+
+function entryQuantityInPieces(value = entry.value?.quantity) {
+    const quantity = quantityNumber(value)
+
+    return isBoxUnit.value ? quantity * piecesPerBox.value : quantity
+}
+
+function allocationQuantityInPieces(value) {
+    const quantity = quantityNumber(value)
+
+    return isBoxUnit.value && distributionUnit.value === 'boxes'
+        ? quantity * piecesPerBox.value
+        : quantity
+}
+
+function allocationQuantityFromPieces(value) {
+    if (!isBoxUnit.value || distributionUnit.value === 'pieces') {
+        return String(storedQuantityNumber(value))
+    }
+
+    return String(storedQuantityNumber(value) / piecesPerBox.value)
+}
+
+const totalAllocatedInPieces = computed(() => {
     return form.branch_allocations.reduce((sum, allocation) => {
-        return sum + Number(allocation.quantity || 0)
+        return sum + allocationQuantityInPieces(allocation.quantity)
     }, 0)
 })
 
-const totalQuantity = computed(() => Number(entry.value?.quantity || 0))
+const totalQuantity = computed(() => quantityNumber(entry.value?.quantity))
+const totalPieces = computed(() => entryQuantityInPieces())
+const totalDistributionQuantity = computed(() => allocationQuantityFromPieces(totalPieces.value))
+const totalAllocatedDistributionQuantity = computed(() => allocationQuantityFromPieces(totalAllocatedInPieces.value))
 
 const remainingQuantity = computed(() => {
-    return totalQuantity.value - totalAllocated.value
+    return Math.round((totalPieces.value - totalAllocatedInPieces.value) * 1000) / 1000
 })
+const remainingDistributionQuantity = computed(() => allocationQuantityFromPieces(remainingQuantity.value))
 
 const branchDistributionEnabled = computed(() => {
     return selectedBranches.value.length > 1
@@ -91,6 +189,8 @@ function normalizeLotNumber(value = entry.value?.lot_number) {
     if (value === null || value === undefined) return
 
     entry.value.lot_number = value.toString().toUpperCase()
+    form.clearErrors('batches.0.lot_number')
+    frontendErrors.lot_number = ''
 }
 
 function buildAllocation(branchId, quantity = '') {
@@ -113,13 +213,13 @@ function ensureCurrentBranchAllocation(forceQuantity = false) {
 
     if (!existingAllocation) {
         form.branch_allocations.unshift(
-            buildAllocation(currentBranchId.value, entry.value?.quantity || ''),
+            buildAllocation(currentBranchId.value, totalDistributionQuantity.value || ''),
         )
         return
     }
 
     if (forceQuantity) {
-        existingAllocation.quantity = entry.value?.quantity || ''
+        existingAllocation.quantity = totalDistributionQuantity.value || ''
     }
 }
 
@@ -181,15 +281,53 @@ function toggleBranch(branch) {
     }
 
     ensureCurrentBranchAllocation(!branchDistributionEnabled.value)
-    frontendErrors.branch_allocations = ''
 }
 
 function updateBranchAllocation(branchId, value) {
     const allocation = findAllocation(branchId)
     if (!allocation) return
 
-    allocation.quantity = value
-    frontendErrors.branch_allocations = ''
+    allocation.quantity = value === '' ? '' : quantityText(value)
+}
+
+function increaseBranchAllocation(branchId) {
+    const allocation = findAllocation(branchId)
+    if (!allocation) return
+
+    allocation.quantity = formattedQuantity(quantityNumber(allocation.quantity) + quantityStep.value)
+}
+
+function decreaseBranchAllocation(branchId) {
+    const allocation = findAllocation(branchId)
+    if (!allocation) return
+
+    allocation.quantity = formattedQuantity(Math.max(0, quantityNumber(allocation.quantity) - quantityStep.value))
+}
+
+function updateEntryQuantity(value) {
+    if (!entry.value) return
+
+    entry.value.quantity = value === '' ? '' : quantityText(value)
+    syncQuantity()
+}
+
+function clearBatchFieldError(field) {
+    frontendErrors[field] = ''
+    form.clearErrors(`batches.0.${field}`)
+}
+
+function increaseEntryQuantity() {
+    if (!entry.value) return
+
+    entry.value.quantity = formattedQuantity(quantityNumber(entry.value.quantity) + quantityStep.value)
+    syncQuantity()
+}
+
+function decreaseEntryQuantity() {
+    if (!entry.value) return
+
+    entry.value.quantity = formattedQuantity(Math.max(quantityStep.value, quantityNumber(entry.value.quantity) - quantityStep.value))
+    syncQuantity()
 }
 
 function allocationPayload() {
@@ -200,91 +338,48 @@ function allocationPayload() {
     return form.branch_allocations
         .map((allocation) => ({
             branch_id: Number(allocation.branch_id),
-            quantity: Number(allocation.quantity || 0),
+            quantity: allocationQuantityInPieces(allocation.quantity),
         }))
         .filter((allocation) => allocation.quantity > 0)
 }
 
-function validateBranchDistribution() {
-    frontendErrors.branch_allocations = ''
+function setDistributionUnit(nextUnit) {
+    if (!isBoxUnit.value || nextUnit === distributionUnit.value) return
 
-    if (!branchDistributionEnabled.value) {
-        return true
-    }
+    const currentUnit = distributionUnit.value
 
-    const allocations = allocationPayload()
+    form.branch_allocations.forEach((allocation) => {
+        const currentQuantity = quantityNumber(allocation.quantity)
+        const pieces = currentUnit === 'boxes'
+            ? currentQuantity * piecesPerBox.value
+            : currentQuantity
 
-    if (allocations.length !== selectedBranches.value.length) {
-        frontendErrors.branch_allocations =
-            'Define cuantas piezas recibe cada sucursal seleccionada.'
-        return false
-    }
+        distributionUnit.value = nextUnit
+        allocation.quantity = allocationQuantityFromPieces(pieces)
+        distributionUnit.value = currentUnit
+    })
 
-    if (totalAllocated.value !== totalQuantity.value) {
-        frontendErrors.branch_allocations =
-            'La suma por sucursal debe coincidir con la cantidad total.'
-        return false
-    }
-
-    return true
-}
-
-function validateEntry() {
-    syncQuantity()
-
-    frontendErrors.quantity = ''
-    frontendErrors.received_at = ''
-    frontendErrors.expiration_date = ''
-    frontendErrors.lot_number = ''
-    frontendErrors.batches = ''
-
-    if (!entry.value?.quantity || Number(entry.value.quantity) <= 0) {
-        frontendErrors.quantity = 'La cantidad debe ser mayor a cero.'
-    }
-
-    if (!entry.value?.received_at) {
-        frontendErrors.received_at = 'La fecha de entrada es obligatoria.'
-    }
-
-    if (entry.value?.received_at !== today.value) {
-        frontendErrors.received_at = 'La fecha de entrada debe ser el dia de hoy.'
-    }
-
-    if (!entry.value?.expiration_date) {
-        frontendErrors.expiration_date = 'La caducidad es obligatoria.'
-    }
-
-    if (
-        entry.value?.expiration_date &&
-        entry.value.expiration_date <= entry.value.received_at
-    ) {
-        frontendErrors.expiration_date = 'La caducidad debe ser mayor a la fecha de entrada.'
-    }
-
-    if (!entry.value?.lot_number?.trim()) {
-        frontendErrors.lot_number = 'El numero de lote es obligatorio.'
-    }
-
-    const validDistribution = validateBranchDistribution()
-
-    return !frontendErrors.quantity
-        && !frontendErrors.received_at
-        && !frontendErrors.expiration_date
-        && !frontendErrors.lot_number
-        && !frontendErrors.batches
-        && validDistribution
+    distributionUnit.value = nextUnit
 }
 
 function saveEntry() {
+    if (isLegacyPresentation.value) {
+        form.setError('branch_product_id', 'Este producto conserva existencias históricas por conciliar antes de recibir nuevas piezas.')
+        return
+    }
+
     syncQuantity()
     normalizeLotNumber()
-
-    if (!validateEntry()) return
 
     const payloadAllocations = allocationPayload()
 
     saveAdjustment((data) => ({
         ...data,
+        quantity: entryQuantityInPieces(data.quantity),
+        batches: (data.batches ?? []).map((batch) => ({
+            ...batch,
+            quantity: entryQuantityInPieces(batch.quantity),
+        })),
         branch_allocations: payloadAllocations,
     }))
 }
@@ -298,6 +393,16 @@ function closeModal() {
 watch(
     () => entry.value?.quantity,
     () => syncQuantity(),
+)
+
+watch(
+    () => entry.value?.expiration_date,
+    () => clearBatchFieldError('expiration_date'),
+)
+
+watch(
+    () => entry.value?.received_at,
+    () => clearBatchFieldError('received_at'),
 )
 
 watch(
@@ -330,15 +435,30 @@ onMounted(() => {
                         body-class="space-y-4"
                     >
                         <div class="grid grid-cols-1 gap-4">
-                            <InputField
-                                v-model="entry.quantity"
-                                :label="`Cantidad total (${unit})`"
-                                type="number"
-                                field="quantity"
-                                :readonly="form.processing"
-                                @input="syncQuantity"
-                                @blur="validateEntry"
-                            />
+                            <div>
+                                <label class="mb-1 block text-sm font-semibold text-text">
+                                    Cantidad total ({{ entryQuantityLabel }})
+                                </label>
+                                <QuantityStepper
+                                    :value="entry.quantity"
+                                    :aria-label="`Cantidad total en ${entryQuantityLabel}`"
+                                    :disabled="form.processing"
+                                    :allow-decimal="isKilogramUnit"
+                                    :max-integer-digits="3"
+                                    :max-decimal-digits="3"
+                                    :decrease-disabled="quantityNumber(entry.quantity) <= quantityStep"
+                                    @decrease="decreaseEntryQuantity"
+                                    @increase="increaseEntryQuantity"
+                                    @update="updateEntryQuantity"
+                                />
+
+                                <p
+                                    v-if="isBoxUnit"
+                                    class="mt-2 text-xs text-text opacity-70"
+                                >
+                                    Cada caja contiene {{ piecesPerBox }} piezas. Esta entrada registrará {{ totalPieces }} piezas.
+                                </p>
+                            </div>
 
                             <InputField
                                 v-model="entry.lot_number"
@@ -346,8 +466,8 @@ onMounted(() => {
                                 placeholder="Ej. AIHK-342"
                                 field="lot_number"
                                 :readonly="form.processing"
+                                :error="frontendErrors.lot_number || form.errors['batches.0.lot_number']"
                                 @update:model-value="normalizeLotNumber"
-                                @blur="validateEntry"
                             />
 
                             <InputField
@@ -357,7 +477,7 @@ onMounted(() => {
                                 field="expiration_date"
                                 :readonly="form.processing"
                                 :min="minExpirationDate"
-                                @blur="validateEntry"
+                                :error="frontendErrors.expiration_date || form.errors['batches.0.expiration_date']"
                             />
 
                             <InputField
@@ -375,11 +495,45 @@ onMounted(() => {
                         description="Selecciona las sucursales y define sus cantidades."
                         panel-class="border-y shadow-none"
                     >
+                        <div
+                            v-if="isBoxUnit"
+                            class="mb-4 flex items-center justify-between gap-3"
+                        >
+                            <p class="text-xs font-semibold text-text">
+                                Distribuir por
+                            </p>
+
+                            <div class="inline-flex rounded-xl border border-secondary bg-background p-1">
+                                <button
+                                    type="button"
+                                    class="rounded-lg px-3 py-1.5 text-xs font-semibold transition"
+                                    :class="distributionUnit === 'boxes'
+                                        ? 'bg-primary text-white'
+                                        : 'text-text hover:text-primary'"
+                                    :disabled="form.processing"
+                                    @click="setDistributionUnit('boxes')"
+                                >
+                                    Cajas
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-lg px-3 py-1.5 text-xs font-semibold transition"
+                                    :class="distributionUnit === 'pieces'
+                                        ? 'bg-primary text-white'
+                                        : 'text-text hover:text-primary'"
+                                    :disabled="form.processing"
+                                    @click="setDistributionUnit('pieces')"
+                                >
+                                    Piezas
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="max-h-[320px] space-y-2 overflow-y-auto overscroll-contain pr-2">
                             <div
                                 v-for="branch in branchOptions"
                                 :key="branch.id"
-                                class="grid grid-cols-[minmax(0,1fr)_88px] items-center gap-2"
+                                class="grid grid-cols-[minmax(0,1fr)_132px] items-center gap-2"
                             >
                                 <SelectionCheckboxCard
                                     :checked="branchSelected(branch.id)"
@@ -393,25 +547,25 @@ onMounted(() => {
                                     @toggle="toggleBranch(branch)"
                                 />
 
-                                <div>
-                                    <input
-                                        :value="findAllocation(branch.id)?.quantity ?? ''"
-                                        type="number"
-                                        min="0"
-                                        step="0.001"
-                                        :aria-label="`Cantidad para ${branch.name}`"
-                                        class="w-full rounded-lg border border-secondary bg-background px-2.5 py-2 text-right text-sm text-text outline-none transition focus:border-primary focus:ring-primary disabled:cursor-not-allowed disabled:bg-secondary"
-                                        :disabled="form.processing || !branchSelected(branch.id)"
-                                        @input="updateBranchAllocation(branch.id, $event.target.value)"
-                                        @blur="validateEntry"
-                                    >
-                                </div>
+                                <QuantityStepper
+                                    class="justify-self-end"
+                                    :value="findAllocation(branch.id)?.quantity ?? ''"
+                                    :aria-label="`Cantidad de ${distributionQuantityLabel} para ${branch.name}`"
+                                    :disabled="form.processing || !branchSelected(branch.id)"
+                                    :allow-decimal="isKilogramUnit"
+                                    :max-integer-digits="3"
+                                    :max-decimal-digits="3"
+                                    :decrease-disabled="quantityNumber(findAllocation(branch.id)?.quantity) <= 0"
+                                    @decrease="decreaseBranchAllocation(branch.id)"
+                                    @increase="increaseBranchAllocation(branch.id)"
+                                    @update="updateBranchAllocation(branch.id, $event)"
+                                />
                             </div>
                         </div>
 
                         <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
                             <span class="rounded-full border border-secondary bg-background px-3 py-1 text-text opacity-80">
-                                Asignado: {{ totalAllocated }} / {{ totalQuantity || 0 }} {{ unit }}
+                                Asignado: {{ totalAllocatedDistributionQuantity }} / {{ totalDistributionQuantity || 0 }} {{ distributionQuantityLabel }}
                             </span>
 
                             <span
@@ -420,7 +574,7 @@ onMounted(() => {
                                     ? 'border-accent bg-secondary text-accent'
                                     : 'border-primary bg-secondary text-primary'"
                             >
-                                Pendiente: {{ remainingQuantity }} {{ unit }}
+                                Pendiente: {{ remainingDistributionQuantity }} {{ distributionQuantityLabel }}
                             </span>
                         </div>
                     </FormPanel>
@@ -451,55 +605,7 @@ onMounted(() => {
                         :readonly="true"
                         :min="today"
                         :max="today"
-                        @blur="validateEntry"
                     />
-                </div>
-
-                <div
-                    v-if="frontendErrors.quantity || frontendErrors.received_at || frontendErrors.expiration_date || frontendErrors.lot_number || frontendErrors.batches || frontendErrors.branch_allocations"
-                    class="rounded-2xl border border-primary bg-secondary px-4 py-3 space-y-1"
-                >
-                    <p
-                        v-if="frontendErrors.quantity"
-                        class="text-sm font-semibold text-primary"
-                    >
-                        {{ frontendErrors.quantity }}
-                    </p>
-
-                    <p
-                        v-if="frontendErrors.received_at"
-                        class="text-sm font-semibold text-primary"
-                    >
-                        {{ frontendErrors.received_at }}
-                    </p>
-
-                    <p
-                        v-if="frontendErrors.expiration_date"
-                        class="text-sm font-semibold text-primary"
-                    >
-                        {{ frontendErrors.expiration_date }}
-                    </p>
-
-                    <p
-                        v-if="frontendErrors.lot_number"
-                        class="text-sm font-semibold text-primary"
-                    >
-                        {{ frontendErrors.lot_number }}
-                    </p>
-
-                    <p
-                        v-if="frontendErrors.branch_allocations"
-                        class="text-sm font-semibold text-primary"
-                    >
-                        {{ frontendErrors.branch_allocations }}
-                    </p>
-
-                    <p
-                        v-if="frontendErrors.batches"
-                        class="text-sm font-semibold text-primary"
-                    >
-                        {{ frontendErrors.batches }}
-                    </p>
                 </div>
             </div>
         </section>

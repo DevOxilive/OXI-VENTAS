@@ -117,7 +117,6 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
         mobileCardHeaderField: 'folio',
         noDataMessage: 'Esta sucursal no tiene órdenes pendientes asignadas.',
         rowKey: 'id',
-        striped: true,
         hoverEffect: true,
     }
 }

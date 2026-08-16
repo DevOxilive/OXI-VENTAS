@@ -14,7 +14,6 @@ export function getPhysicalCountReportsToolbarConfig({
         showSearch: true,
         searchPlaceholder: 'Buscar auditoría por nombre o folio...',
         recordsPerPage: Number(form?.per_page || 25),
-        recordsPerPageOptions: [10, 25, 50, 100],
         showRecordsPerPage: true,
         totalRecords: Number(pagination?.total || 0),
         filteredRecords: Number(pagination?.total || 0),

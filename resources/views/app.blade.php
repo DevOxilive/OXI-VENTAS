@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
-    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="manifest" href="/pwa/manifest.webmanifest">
     <link rel="icon" href="/favicon.ico">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -33,6 +33,8 @@
     </script>
 
     @php
+        $broadcastConnection = config('broadcasting.default');
+        $broadcastConfig = config("broadcasting.connections.{$broadcastConnection}", []);
         $realtimeTunnelConfig = null;
         $realtimeTunnelPath = storage_path('framework/realtime-tunnel.json');
 
@@ -48,8 +50,20 @@
             }
         }
 
-        if ($realtimeTunnelConfig) {
+        if ($broadcastConnection === 'pusher') {
+            $pusherOptions = $broadcastConfig['options'] ?? [];
+
             $realtimeConfig = [
+                'broadcaster' => 'pusher',
+                'key' => $broadcastConfig['key'] ?? null,
+                'cluster' => $pusherOptions['cluster'] ?? null,
+                'host' => filled(env('PUSHER_HOST')) ? ($pusherOptions['host'] ?? null) : null,
+                'port' => $pusherOptions['port'] ?? 443,
+                'scheme' => $pusherOptions['scheme'] ?? 'https',
+            ];
+        } elseif ($realtimeTunnelConfig) {
+            $realtimeConfig = [
+                'broadcaster' => 'reverb',
                 'key' => config('broadcasting.connections.reverb.key'),
                 'host' => $realtimeTunnelConfig['host'],
                 'port' => $realtimeTunnelConfig['port'] ?? 443,
@@ -57,6 +71,7 @@
             ];
         } elseif (app()->environment('production')) {
             $realtimeConfig = [
+                'broadcaster' => 'reverb',
                 'key' => config('broadcasting.connections.reverb.key'),
                 'host' => request()->getHost(),
                 'port' => request()->isSecure() ? 443 : request()->getPort(),
@@ -64,6 +79,7 @@
             ];
         } else {
             $realtimeConfig = [
+                'broadcaster' => 'reverb',
                 'key' => config('broadcasting.connections.reverb.key'),
                 'host' => config('broadcasting.connections.reverb.options.host'),
                 'port' => config('broadcasting.connections.reverb.options.port'),

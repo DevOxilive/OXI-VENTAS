@@ -10,7 +10,20 @@ class PermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        $permissions = [
+        foreach (self::catalog() as $permission) {
+            DB::table('permissions')->updateOrInsert(
+                ['name' => $permission],
+                [
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+    }
+
+    public static function catalog(): array
+    {
+        return array_values(array_unique([
             // Inicio
             'dashboard.executive.view',
 
@@ -59,6 +72,14 @@ class PermissionSeeder extends Seeder
             // Administración global
             SystemPermission::BRANCHES_ACCESS_ALL,
             ...SystemPermission::exclusive(),
+            SystemPermission::SETTINGS_MANAGE,
+            SystemPermission::INTEGRATIONS_MANAGE,
+            SystemPermission::TOOLS_ACCESS,
+            SystemPermission::MONITORING_VIEW,
+            SystemPermission::STATISTICS_VIEW,
+            SystemPermission::LOGS_VIEW,
+            SystemPermission::MAINTENANCE_MANAGE,
+            SystemPermission::RECORDS_VIEW_ALL,
 
             'branches.view',
             'branches.create',
@@ -113,6 +134,9 @@ class PermissionSeeder extends Seeder
             'sales.purchase-orders.receive',
 
             // Reportes
+            'reports.sales.view',
+            'reports.sales.export.excel',
+            'reports.sales.export.pdf',
             'reports.audits.view',
             'reports.audits.export.excel',
             'reports.audits.export.pdf',
@@ -135,16 +159,7 @@ class PermissionSeeder extends Seeder
             'systems.labels.view',
             'systems.labels.update',
             'systems.labels.print',
-        ];
-
-        foreach (array_unique($permissions) as $permission) {
-            DB::table('permissions')->updateOrInsert(
-                ['name' => $permission],
-                [
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]
-            );
-        }
+            'systems.qz.sign',
+        ]));
     }
 }

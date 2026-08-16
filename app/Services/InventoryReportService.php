@@ -41,6 +41,11 @@ class InventoryReportService
         $batchSummary = ProductBatch::query()
             ->join('branch_products', 'branch_products.id', '=', 'product_batches.branch_product_id')
             ->where('branch_products.branch_id', $branch->id)
+            ->whereIn('product_batches.status', [
+                ProductBatch::STATUS_ACTIVE,
+                ProductBatch::STATUS_SEASONAL,
+            ])
+            ->where('product_batches.quantity', '>', 0)
             ->selectRaw('
                 SUM(CASE WHEN product_batches.expiration_date IS NOT NULL AND product_batches.expiration_date < CURDATE() THEN 1 ELSE 0 END) as expired_batches,
                 SUM(CASE WHEN product_batches.expiration_date IS NOT NULL AND product_batches.expiration_date >= CURDATE() AND product_batches.expiration_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as near_expiration_batches
@@ -69,14 +74,23 @@ class InventoryReportService
             ->join('branch_products', 'branch_products.id', '=', 'product_batches.branch_product_id')
             ->join('products', 'products.id', '=', 'branch_products.product_id')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('product_departments', 'product_departments.id', '=', 'categories.product_department_id')
             ->leftJoinSub($lastInSubquery, 'last_entries', function ($join) {
                 $join->on('last_entries.branch_product_id', '=', 'branch_products.id');
             })
             ->where('branch_products.branch_id', $branch->id)
+            ->whereIn('product_batches.status', [
+                ProductBatch::STATUS_ACTIVE,
+                ProductBatch::STATUS_SEASONAL,
+            ])
+            ->where('product_batches.quantity', '>', 0)
             ->select([
                 'product_batches.id',
                 DB::raw($this->productCodeExpression().' as code'),
                 'products.name as product',
+                'products.inventory_unit',
+                'products.unit',
+                DB::raw('COALESCE(product_departments.name, "Sin departamento") as department'),
                 'categories.name as category',
                 'product_batches.lot_number',
                 'product_batches.initial_quantity',
@@ -87,8 +101,8 @@ class InventoryReportService
                 DB::raw('branch_products.stock as current_stock'),
                 'branch_products.min_stock',
                 DB::raw('DATEDIFF(product_batches.expiration_date, CURDATE()) as days'),
-                'products.cost as unit_cost',
-                DB::raw('(product_batches.quantity * products.cost) as estimated_loss'),
+                DB::raw('COALESCE(products.cost_per_piece, products.cost) as unit_cost'),
+                DB::raw('(product_batches.quantity * COALESCE(products.cost_per_piece, products.cost)) as estimated_loss'),
                 DB::raw('NULL as movement_date'),
                 DB::raw('NULL as user'),
                 DB::raw('NULL as movement_type'),
@@ -112,6 +126,7 @@ class InventoryReportService
         $this->applyProductFilters($query, $filters);
         $this->applySearchFilter($query, $filters, [
             'products.name',
+            'product_departments.name',
             'categories.name',
             'product_batches.lot_number',
         ]);
@@ -126,12 +141,44 @@ class InventoryReportService
         return $this->resolveTableResult($query, $filters, $paginate);
     }
 
+    public function summaryForRows($rows): array
+    {
+        $rows = collect($rows);
+        $today = today();
+        $nearLimit = now()->addDays(30);
+
+        return [
+            'total_products' => $rows->pluck('product')->filter()->unique()->count(),
+            'total_stock' => (float) $rows->sum(fn ($row) => (float) ($row->quantity ?? 0)),
+            'low_stock' => $rows
+                ->filter(fn ($row) => (float) ($row->current_stock ?? 0) > 0
+                    && (float) ($row->current_stock ?? 0) <= (float) ($row->min_stock ?? 0))
+                ->pluck('product')
+                ->unique()
+                ->count(),
+            'out_of_stock' => $rows
+                ->filter(fn ($row) => (float) ($row->current_stock ?? 0) <= 0)
+                ->pluck('product')
+                ->unique()
+                ->count(),
+            'expired_batches' => $rows
+                ->filter(fn ($row) => $row->expiration_date && \Carbon\Carbon::parse($row->expiration_date)->lt($today))
+                ->count(),
+            'near_expiration_batches' => $rows
+                ->filter(fn ($row) => $row->expiration_date
+                    && \Carbon\Carbon::parse($row->expiration_date)->betweenIncluded($today, $nearLimit))
+                ->count(),
+            'attention_products' => 0,
+        ];
+    }
+
     public function movements(Branch $branch, array $filters, bool $paginate = false)
     {
         $query = StockMovement::query()
             ->join('branch_products', 'branch_products.id', '=', 'stock_movements.branch_product_id')
             ->join('products', 'products.id', '=', 'branch_products.product_id')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('product_departments', 'product_departments.id', '=', 'categories.product_department_id')
             ->leftJoin('users', 'users.id', '=', 'stock_movements.user_id')
             ->leftJoin('stock_movement_batches', 'stock_movement_batches.stock_movement_id', '=', 'stock_movements.id')
             ->leftJoin('product_batches', 'product_batches.id', '=', 'stock_movement_batches.product_batch_id')
@@ -140,6 +187,9 @@ class InventoryReportService
                 'stock_movements.id',
                 DB::raw('MAX('.$this->productCodeExpression().') as code'),
                 'products.name as product',
+                'products.inventory_unit',
+                'products.unit',
+                DB::raw('COALESCE(product_departments.name, "Sin departamento") as department'),
                 'categories.name as category',
                 DB::raw('GROUP_CONCAT(DISTINCT product_batches.lot_number ORDER BY product_batches.lot_number SEPARATOR ", ") as lot_number'),
                 DB::raw('NULL as initial_quantity'),
@@ -151,8 +201,8 @@ class InventoryReportService
                 'branch_products.min_stock',
                 DB::raw('DATE(stock_movements.created_at) as movement_date'),
                 DB::raw('NULL as days'),
-                'products.cost as unit_cost',
-                DB::raw('(stock_movements.quantity * products.cost) as estimated_loss'),
+                DB::raw('COALESCE(stock_movements.unit_cost, products.cost_per_piece, products.cost) as unit_cost'),
+                DB::raw('(stock_movements.quantity * COALESCE(stock_movements.unit_cost, products.cost_per_piece, products.cost)) as estimated_loss'),
                 DB::raw('
                     CASE stock_movements.type
                         WHEN "IN" THEN "Entrada"
@@ -182,6 +232,9 @@ class InventoryReportService
             ->groupBy([
                 'stock_movements.id',
                 'products.name',
+                'products.inventory_unit',
+                'products.unit',
+                'product_departments.name',
                 'categories.name',
                 'stock_movements.quantity',
                 'branch_products.stock',
@@ -201,6 +254,7 @@ class InventoryReportService
         $this->applyProductFilters($query, $filters);
         $this->applySearchFilter($query, $filters, [
             'products.name',
+            'product_departments.name',
             'categories.name',
             'product_batches.lot_number',
             'users.name',
@@ -250,6 +304,7 @@ class InventoryReportService
         $query = BranchProduct::query()
             ->join('products', 'products.id', '=', 'branch_products.product_id')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('product_departments', 'product_departments.id', '=', 'categories.product_department_id')
             ->leftJoinSub($periodMovementSubquery, 'period_movements', function ($join) {
                 $join->on('period_movements.branch_product_id', '=', 'branch_products.id');
             })
@@ -264,6 +319,9 @@ class InventoryReportService
                 'branch_products.id',
                 DB::raw($this->productCodeExpression().' as code'),
                 'products.name as product',
+                'products.inventory_unit',
+                'products.unit',
+                DB::raw('COALESCE(product_departments.name, "Sin departamento") as department'),
                 'categories.name as category',
                 DB::raw('NULL as lot_number'),
                 DB::raw('NULL as initial_quantity'),
@@ -274,8 +332,8 @@ class InventoryReportService
                 DB::raw('branch_products.stock as current_stock'),
                 'branch_products.min_stock',
                 DB::raw('DATEDIFF(CURDATE(), last_movements.last_out_at) as days'),
-                'products.cost as unit_cost',
-                DB::raw('(branch_products.stock * products.cost) as estimated_loss'),
+                DB::raw('COALESCE(products.cost_per_piece, products.cost) as unit_cost'),
+                DB::raw('(branch_products.stock * COALESCE(products.cost_per_piece, products.cost)) as estimated_loss'),
                 DB::raw('COALESCE(period_movements.total_out, 0) as total_out'),
                 DB::raw('NULL as movement_date'),
                 DB::raw('NULL as user'),
@@ -299,6 +357,7 @@ class InventoryReportService
         $this->applyProductFilters($query, $filters);
         $this->applySearchFilter($query, $filters, [
             'products.name',
+            'product_departments.name',
             'categories.name',
         ]);
 
@@ -333,6 +392,7 @@ class InventoryReportService
         $query = BranchProduct::query()
             ->join('products', 'products.id', '=', 'branch_products.product_id')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('product_departments', 'product_departments.id', '=', 'categories.product_department_id')
             ->leftJoinSub($lastMovementSubquery, 'last_movements', function ($join) {
                 $join->on('last_movements.branch_product_id', '=', 'branch_products.id');
             })
@@ -358,6 +418,9 @@ class InventoryReportService
                 'branch_products.id',
                 DB::raw($this->productCodeExpression().' as code'),
                 'products.name as product',
+                'products.inventory_unit',
+                'products.unit',
+                DB::raw('COALESCE(product_departments.name, "Sin departamento") as department'),
                 'categories.name as category',
                 DB::raw('NULL as lot_number'),
                 DB::raw('NULL as initial_quantity'),
@@ -368,8 +431,8 @@ class InventoryReportService
                 DB::raw('branch_products.stock as current_stock'),
                 'branch_products.min_stock',
                 DB::raw('DATEDIFF(CURDATE(), last_movements.last_out_at) as days'),
-                'products.cost as unit_cost',
-                DB::raw('(branch_products.stock * products.cost) as estimated_loss'),
+                DB::raw('COALESCE(products.cost_per_piece, products.cost) as unit_cost'),
+                DB::raw('(branch_products.stock * COALESCE(products.cost_per_piece, products.cost)) as estimated_loss'),
                 DB::raw('COALESCE(expired_batches.expired_batches, 0) as expired_batches'),
                 DB::raw('COALESCE(near_expiration_batches.near_expiration_batches, 0) as near_expiration_batches'),
                 DB::raw('NULL as movement_date'),
@@ -395,6 +458,7 @@ class InventoryReportService
         $this->applyProductFilters($query, $filters);
         $this->applySearchFilter($query, $filters, [
             'products.name',
+            'product_departments.name',
             'categories.name',
         ]);
 
@@ -417,7 +481,7 @@ class InventoryReportService
             return $query->get();
         }
 
-        $perPage = max(10, min(100, (int) ($filters['per_page'] ?? 25)));
+        $perPage = max(10, min(200, (int) ($filters['per_page'] ?? 25)));
 
         return $query
             ->paginate($perPage)

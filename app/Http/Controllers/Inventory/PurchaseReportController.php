@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Inventory;
 
 use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
+use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
@@ -21,7 +22,7 @@ use Inertia\Inertia;
 
 class PurchaseReportController extends Controller
 {
-    use AuthorizesBranchAccess;
+    use AuthorizesBranchAccess, ValidatesRecordVersion;
 
     public function salesPurchaseLists(Request $request)
     {
@@ -67,7 +68,7 @@ class PurchaseReportController extends Controller
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
-        $perPage = TablePagination::resolvePerPage($request, 25);
+        $perPage = TablePagination::resolvePerPage($request);
         $status = $request->input('status', PurchaseOrder::STATUS_GENERATED);
         $allowedStatuses = [
             PurchaseOrder::STATUS_GENERATED,
@@ -133,7 +134,10 @@ class PurchaseReportController extends Controller
             ],
             'items' => ['required', 'array', 'min:1'],
             'items.*.branch_product_id' => ['required', 'exists:branch_products,id'],
-            'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:9999.99'],
+            'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
+            'items.*.purchase_presentation' => ['nullable', 'in:Pieza,Caja,Kilo'],
+            'items.*.package_quantity' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
+            'items.*.units_per_package' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
         ]);
 
         $generateOrder = (bool) ($validated['generate_order'] ?? false);
@@ -161,8 +165,9 @@ class PurchaseReportController extends Controller
                     ->where('branch_id', $branch->id)
                     ->findOrFail($item['branch_product_id']);
 
-                $estimatedPrice = (float) ($product->product?->cost ?? 0);
-                $requestedQuantity = (float) $item['requested_quantity'];
+                $presentation = $this->normalizePurchasePresentation($product, $item);
+                $estimatedPrice = (float) ($product->product?->cost_per_piece ?? $product->product?->cost ?? 0);
+                $requestedQuantity = $presentation['requested_quantity'];
 
                 $report->items()->create([
                     'branch_product_id' => $product->id,
@@ -170,6 +175,9 @@ class PurchaseReportController extends Controller
                     'current_stock' => $product->stock,
                     'min_stock' => $product->min_stock,
                     'requested_quantity' => $requestedQuantity,
+                    'purchase_presentation' => $presentation['purchase_presentation'],
+                    'package_quantity' => $presentation['package_quantity'],
+                    'units_per_package' => $presentation['units_per_package'],
                     'estimated_price' => $estimatedPrice,
                     'estimated_total' => $estimatedPrice * $requestedQuantity,
                     'status' => PurchaseOrderItem::STATUS_REQUESTED,
@@ -209,10 +217,6 @@ class PurchaseReportController extends Controller
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
 
-        abort_unless($purchaseReport->status === PurchaseOrder::STATUS_DRAFT, 422, 'Solo se pueden modificar listas en borrador.');
-        abort_if($purchaseReport->general_purchase_order_id, 422, 'La solicitud ya forma parte de una orden general.');
-        $this->abortIfDraftDoesNotBelongToUser($request, $purchaseReport);
-
         $validated = $this->validateOrderPayload($request);
         $assignedUser = $this->assignedInventoryUser(
             $branch,
@@ -220,12 +224,15 @@ class PurchaseReportController extends Controller
             false,
         );
 
-        $purchaseReport->update([
-            'assigned_to_user_id' => $assignedUser?->id,
-        ]);
-
-        $this->syncItems($purchaseReport, $branch, $validated['items']);
-        $this->refreshTotals($purchaseReport);
+        DB::transaction(function () use ($purchaseReport, $request, $assignedUser, $branch, $validated) {
+            $lockedOrder = $this->lockCurrentVersion($request, $purchaseReport);
+            abort_unless($lockedOrder->status === PurchaseOrder::STATUS_DRAFT, 422, 'Solo se pueden modificar listas en borrador.');
+            abort_if($lockedOrder->general_purchase_order_id, 422, 'La solicitud ya forma parte de una orden general.');
+            $this->abortIfDraftDoesNotBelongToUser($request, $lockedOrder);
+            $lockedOrder->update(['assigned_to_user_id' => $assignedUser?->id]);
+            $this->syncItems($lockedOrder, $branch, $validated['items']);
+            $this->refreshTotals($lockedOrder);
+        }, 3);
 
         return redirect()->back()->with('success', 'Orden actualizada correctamente.');
     }
@@ -238,9 +245,6 @@ class PurchaseReportController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
-        abort_unless($purchaseReport->status === PurchaseOrder::STATUS_DRAFT, 422);
-        $this->abortIfDraftDoesNotBelongToUser($request, $purchaseReport);
-
         $validated = $this->validateOrderPayload($request, true);
         $assignedUser = $this->assignedInventoryUser(
             $branch,
@@ -249,20 +253,24 @@ class PurchaseReportController extends Controller
         );
 
         DB::transaction(function () use ($assignedUser, $branch, $purchaseReport, $request, $validated) {
-            $purchaseReport->update([
+            $lockedOrder = $this->lockCurrentVersion($request, $purchaseReport);
+            abort_unless($lockedOrder->status === PurchaseOrder::STATUS_DRAFT, 422);
+            abort_if($lockedOrder->general_purchase_order_id, 422, 'La solicitud ya forma parte de una orden general.');
+            $this->abortIfDraftDoesNotBelongToUser($request, $lockedOrder);
+            $lockedOrder->update([
                 'assigned_to_user_id' => $assignedUser->id,
             ]);
 
-            $this->syncItems($purchaseReport, $branch, $validated['items']);
-            $this->refreshTotals($purchaseReport);
+            $this->syncItems($lockedOrder, $branch, $validated['items']);
+            $this->refreshTotals($lockedOrder);
 
-            $purchaseReport->update([
+            $lockedOrder->update([
                 'status' => PurchaseOrder::STATUS_GENERATED,
                 'generated_at' => now(),
             ]);
 
-            app(PurchaseCycleService::class)->registerOrder($purchaseReport, $request->user());
-        });
+            app(PurchaseCycleService::class)->registerOrder($lockedOrder, $request->user());
+        }, 3);
 
         $this->notifyInventoryAssignment($purchaseReport, $assignedUser, $branch);
 
@@ -283,12 +291,6 @@ class PurchaseReportController extends Controller
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
         abort_unless((int) $purchaseReport->user_id === (int) $request->user()?->id, 403);
-        abort_unless(
-            $purchaseReport->status === PurchaseOrder::STATUS_REVIEW,
-            422,
-            'La orden debe estar por revisar antes de confirmar la recepcion.'
-        );
-
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'integer'],
@@ -296,17 +298,20 @@ class PurchaseReportController extends Controller
             'items.*.receipt_notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $purchaseReport->load('items');
         $receivedItems = collect($validated['items'])->keyBy(fn ($item) => (int) $item['id']);
 
-        if ($receivedItems->keys()->sort()->values()->all() !== $purchaseReport->items->pluck('id')->sort()->values()->all()) {
-            throw ValidationException::withMessages([
-                'items' => 'Debes confirmar la recepcion de todos los productos de la orden.',
-            ]);
-        }
-
         DB::transaction(function () use ($purchaseReport, $receivedItems, $request) {
-            foreach ($purchaseReport->items as $item) {
+            $lockedOrder = $this->lockCurrentVersion($request, $purchaseReport);
+            abort_unless($lockedOrder->status === PurchaseOrder::STATUS_REVIEW, 422, 'La orden debe estar por revisar antes de confirmar la recepcion.');
+            $items = $lockedOrder->items()->lockForUpdate()->get();
+
+            if ($receivedItems->keys()->sort()->values()->all() !== $items->pluck('id')->sort()->values()->all()) {
+                throw ValidationException::withMessages([
+                    'items' => 'Debes confirmar la recepcion de todos los productos de la orden.',
+                ]);
+            }
+
+            foreach ($items as $item) {
                 $received = $receivedItems->get((int) $item->id);
                 $receivedQuantity = (float) $received['received_quantity'];
                 $requestedQuantity = (float) $item->requested_quantity;
@@ -323,14 +328,14 @@ class PurchaseReportController extends Controller
                 ]);
             }
 
-            $this->refreshTotals($purchaseReport);
+            $this->refreshTotals($lockedOrder);
 
-            $purchaseReport->update([
+            $lockedOrder->update([
                 'status' => PurchaseOrder::STATUS_COMPLETED,
                 'completed_by' => $request->user()?->id,
                 'completed_at' => now(),
             ]);
-        });
+        }, 3);
 
         return redirect()->back()->with('success', 'Orden completada correctamente.');
     }
@@ -343,10 +348,12 @@ class PurchaseReportController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
-        abort_unless($purchaseReport->status === PurchaseOrder::STATUS_DRAFT, 422);
-        $this->abortIfDraftDoesNotBelongToUser($request, $purchaseReport);
-
-        $purchaseReport->delete();
+        DB::transaction(function () use ($purchaseReport, $request) {
+            $lockedOrder = $this->lockCurrentVersion($request, $purchaseReport);
+            abort_unless($lockedOrder->status === PurchaseOrder::STATUS_DRAFT, 422);
+            $this->abortIfDraftDoesNotBelongToUser($request, $lockedOrder);
+            $lockedOrder->delete();
+        });
 
         return redirect()->back()->with('success', 'Borrador eliminado correctamente.');
     }
@@ -370,7 +377,7 @@ class PurchaseReportController extends Controller
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
-        $perPage = TablePagination::resolvePerPage($request, 50);
+        $perPage = TablePagination::resolvePerPage($request);
 
         $filters = [
             'search' => $request->input('search', ''),
@@ -392,10 +399,16 @@ class PurchaseReportController extends Controller
                 'main_barcode' => $item->product?->barcodes?->first()?->code ?? '',
                 'barcodes' => $item->product?->barcodes?->pluck('code')->values() ?? [],
                 'category_id' => $item->product?->category?->id,
+                'product_department_id' => $item->product?->category?->product_department_id,
+                'product_department_name' => $item->product?->category?->productDepartment?->name ?? 'Sin departamento',
+                'department' => $item->product?->category?->productDepartment?->name ?? 'Sin departamento',
                 'category_name' => $item->product?->category?->name ?? 'Sin categoria',
                 'category' => $item->product?->category?->name ?? 'Sin categoria',
                 'stock' => (float) $item->stock,
                 'min_stock' => (float) $item->min_stock,
+                'inventory_unit' => $item->product?->inventory_unit ?? $item->product?->unit ?? 'pza',
+                'has_box_presentation' => (bool) $item->product?->has_box_presentation,
+                'pieces_per_box' => $item->product?->pieces_per_box,
                 'label' => trim(($item->product?->name ?? 'Producto sin nombre')
                     .' - '
                     .($item->product?->barcodes?->first()?->code ?: ($item->barcode ?: 'Sin codigo'))),
@@ -420,6 +433,7 @@ class PurchaseReportController extends Controller
                 'assigned_to_user_id' => $order->assigned_to_user_id,
                 'items_count' => $order->items_count,
                 'created_at' => $order->created_at,
+                'record_version' => $order->updated_at?->toJSON(),
                 'display_date' => $order->completed_at ?? $order->generated_at ?? $order->created_at,
                 'items' => $order->items->map(function (PurchaseOrderItem $item) {
                     $branchProduct = $item->branchProduct;
@@ -431,7 +445,12 @@ class PurchaseReportController extends Controller
                         'code' => $product?->barcodes?->first()?->code ?: ($branchProduct?->barcode ?? ''),
                         'current_stock' => $item->current_stock,
                         'min_stock' => $item->min_stock,
+                        'base_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
+                        'inventory_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
                         'requested_quantity' => $item->requested_quantity,
+                        'purchase_presentation' => $item->purchase_presentation,
+                        'package_quantity' => $item->package_quantity,
+                        'units_per_package' => $item->units_per_package,
                         'purchased_quantity' => $item->purchased_quantity,
                         'status' => $item->status,
                         'branch_product' => [
@@ -442,6 +461,9 @@ class PurchaseReportController extends Controller
                             'product' => [
                                 'id' => $product?->id,
                                 'name' => $product?->name ?? 'Producto sin nombre',
+                                'inventory_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
+                                'has_box_presentation' => (bool) $product?->has_box_presentation,
+                                'pieces_per_box' => $product?->pieces_per_box,
                                 'barcodes' => $product?->barcodes?->map(fn ($barcode) => [
                                     'id' => $barcode->id,
                                     'code' => $barcode->code,
@@ -482,15 +504,8 @@ class PurchaseReportController extends Controller
         abort_unless($purchaseReport->branch_id === $branch->id, 404);
         abort_unless((int) $purchaseReport->user_id === (int) $request->user()?->id, 403);
 
-        $purchaseReport->load([
-            'user',
-            'items.branchProduct.product.barcodes',
-            'items.branchProduct.product.category',
-        ]);
-
-        return Inertia::render('Inventory/PurchaseReportShow', [
-            'currentBranch' => $branch,
-            'reportDB' => $purchaseReport,
+        return redirect()->route('inventory.branches.purchase-reports.index', [
+            'branch' => $branch->id,
         ]);
     }
 
@@ -505,7 +520,7 @@ class PurchaseReportController extends Controller
             'branch:id,name',
             'user:id,name',
             'items.branchProduct.product.barcodes',
-            'items.branchProduct.product.category',
+            'items.branchProduct.product.category.productDepartment',
         ]);
 
         return response()->json([
@@ -513,6 +528,7 @@ class PurchaseReportController extends Controller
             'folio' => $purchaseReport->folio,
             'status' => $purchaseReport->status,
             'status_label' => $this->statusLabel($purchaseReport->status, $purchaseReport->review_status),
+            'record_version' => $purchaseReport->updated_at?->toJSON(),
             'requested_at' => $purchaseReport->generated_at ?? $purchaseReport->created_at,
             'items_count' => $purchaseReport->items->count(),
             'branch' => $purchaseReport->branch ? ['id' => $purchaseReport->branch->id, 'name' => $purchaseReport->branch->name] : null,
@@ -526,6 +542,8 @@ class PurchaseReportController extends Controller
                     'branch_product_id' => $item->branch_product_id,
                     'product_name' => $product?->name ?? 'Producto sin nombre',
                     'product_code' => $product?->barcodes?->first()?->code ?: ($branchProduct?->barcode ?? ''),
+                    'product_department_name' => $product?->category?->productDepartment?->name ?? 'Sin departamento',
+                    'department' => $product?->category?->productDepartment?->name ?? 'Sin departamento',
                     'category_name' => $product?->category?->name ?? 'Sin categoria',
                     'requested_quantity' => (float) $item->requested_quantity,
                     'received_quantity' => $item->received_quantity === null
@@ -543,7 +561,7 @@ class PurchaseReportController extends Controller
     {
         return BranchProduct::query()
             ->with([
-                'product.category',
+                'product.category.productDepartment',
                 'product.barcodes',
             ])
             ->where('branch_id', $branch->id)
@@ -559,6 +577,10 @@ class PurchaseReportController extends Controller
 
                     FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
                         'code',
+                    ], $phrase, $terms);
+
+                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product.category.productDepartment', [
+                        'name',
                     ], $phrase, $terms);
                 });
             })
@@ -579,7 +601,7 @@ class PurchaseReportController extends Controller
     private function categoryOptions(Branch $branch)
     {
         return Category::query()
-            ->select(['categories.id', 'categories.name'])
+            ->select(['categories.id', 'categories.product_department_id', 'categories.name'])
             ->join('products', 'products.category_id', '=', 'categories.id')
             ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
             ->where('branch_products.branch_id', $branch->id)
@@ -722,7 +744,10 @@ class PurchaseReportController extends Controller
             ],
             'items' => ['required', 'array', 'min:1'],
             'items.*.branch_product_id' => ['required', 'exists:branch_products,id'],
-            'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:9999.99'],
+            'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
+            'items.*.purchase_presentation' => ['nullable', 'in:Pieza,Caja,Kilo'],
+            'items.*.package_quantity' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
+            'items.*.units_per_package' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
         ];
 
         return $request->validate($rules);
@@ -745,8 +770,9 @@ class PurchaseReportController extends Controller
                 ->where('branch_id', $branch->id)
                 ->findOrFail($item['branch_product_id']);
 
-            $requestedQuantity = (float) $item['requested_quantity'];
-            $estimatedPrice = (float) ($branchProduct->product?->cost ?? 0);
+            $presentation = $this->normalizePurchasePresentation($branchProduct, $item);
+            $requestedQuantity = $presentation['requested_quantity'];
+            $estimatedPrice = (float) ($branchProduct->product?->cost_per_piece ?? $branchProduct->product?->cost ?? 0);
             $purchasedQuantity = isset($item['purchased_quantity'])
                 ? (float) $item['purchased_quantity']
                 : null;
@@ -772,6 +798,9 @@ class PurchaseReportController extends Controller
                     'current_stock' => $branchProduct->stock,
                     'min_stock' => $branchProduct->min_stock,
                     'requested_quantity' => $requestedQuantity,
+                    'purchase_presentation' => $presentation['purchase_presentation'],
+                    'package_quantity' => $presentation['package_quantity'],
+                    'units_per_package' => $presentation['units_per_package'],
                     'purchased_quantity' => $unavailable ? 0 : $purchasedQuantity,
                     'estimated_price' => $estimatedPrice,
                     'estimated_total' => $estimatedPrice * $requestedQuantity,
@@ -792,6 +821,58 @@ class PurchaseReportController extends Controller
                 ]
             );
         }
+    }
+
+    private function normalizePurchasePresentation(BranchProduct $branchProduct, array $item): array
+    {
+        $product = $branchProduct->product;
+        $inventoryUnit = $product?->inventory_unit ?? $product?->unit ?? 'pza';
+        $presentation = $item['purchase_presentation'] ?? ($inventoryUnit === 'kg' ? 'Kilo' : 'Pieza');
+
+        if ($inventoryUnit === 'kg' && $presentation !== 'Kilo') {
+            throw ValidationException::withMessages([
+                'items' => "{$product?->name} debe solicitarse en kilogramos.",
+            ]);
+        }
+
+        if ($inventoryUnit !== 'kg' && ! in_array($presentation, ['Pieza', 'Caja'], true)) {
+            throw ValidationException::withMessages([
+                'items' => "{$product?->name} debe solicitarse en piezas o cajas.",
+            ]);
+        }
+
+        if ($presentation === 'Caja' && (! $product?->has_box_presentation || (int) $product?->pieces_per_box < 2)) {
+            throw ValidationException::withMessages([
+                'items' => "{$product?->name} no tiene compra/venta por caja configurada.",
+            ]);
+        }
+
+        $packageQuantity = (float) ($item['package_quantity'] ?? $item['requested_quantity'] ?? 0);
+        $unitsPerPackage = $presentation === 'Caja'
+            ? (int) $product?->pieces_per_box
+            : 1;
+
+        if ($presentation !== 'Kilo' && abs($packageQuantity - round($packageQuantity)) > 0.0000001) {
+            throw ValidationException::withMessages([
+                'items' => 'Las piezas y cajas deben solicitarse con números enteros.',
+            ]);
+        }
+
+        $requestedQuantity = $presentation === 'Caja'
+            ? $packageQuantity * $unitsPerPackage
+            : (float) ($item['requested_quantity'] ?? $packageQuantity);
+
+        if ($presentation === 'Kilo') {
+            $requestedQuantity = round($requestedQuantity, 3);
+            $packageQuantity = $requestedQuantity;
+        }
+
+        return [
+            'purchase_presentation' => $presentation,
+            'package_quantity' => $packageQuantity,
+            'units_per_package' => $unitsPerPackage,
+            'requested_quantity' => $requestedQuantity,
+        ];
     }
 
     private function resolveItemStatus(

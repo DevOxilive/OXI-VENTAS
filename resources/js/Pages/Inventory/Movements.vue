@@ -35,7 +35,7 @@ const localFilters = ref({
     branch_id: props.filters?.branch_id ?? '',
     type: props.filters?.type ?? '',
     reason: props.filters?.reason ?? '',
-    per_page: Number(props.filters?.per_page ?? 50),
+    per_page: Number(props.filters?.per_page ?? 25),
 })
 let filterTimer = null
 let productSearchTimer = null
@@ -206,8 +206,8 @@ function selectProduct(product) {
             :search="localFilters.search"
             search-placeholder="Buscar producto, código o sucursal..."
             :filters="toolbarFilters"
+            :show-records-per-page="true"
             :records-per-page="localFilters.per_page"
-            :records-per-page-options="[10, 25, 50, 100]"
             :filtered-records="Number(movementsDB?.total ?? 0)"
             :total-records="Number(movementsDB?.total ?? 0)"
             :actions="[{ id: 'create', label: 'Nuevo movimiento', icon: 'add', variant: 'primary' }]"

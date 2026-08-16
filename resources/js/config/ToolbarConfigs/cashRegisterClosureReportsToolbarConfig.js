@@ -14,7 +14,6 @@ export function getCashRegisterClosureReportsToolbarConfig({
         showSearch: !selectorMode,
         showRecordsPerPage: !selectorMode,
         recordsPerPage: form.per_page,
-        recordsPerPageOptions: [10, 20, 50, 100, 200],
         showCounter: false,
         filters: selectorMode
             ? []

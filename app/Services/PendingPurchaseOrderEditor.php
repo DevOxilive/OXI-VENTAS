@@ -9,6 +9,7 @@ use App\Models\PurchaseOrderItem;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Carbon\Carbon;
 
 class PendingPurchaseOrderEditor
 {
@@ -18,6 +19,7 @@ class PendingPurchaseOrderEditor
             'items' => ['required', 'array', 'min:1'],
             'items.*.branch_product_id' => ['required', 'integer', 'distinct', 'exists:branch_products,id'],
             'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:9999.99'],
+            'record_version' => ['required', 'date'],
         ];
     }
 
@@ -27,11 +29,18 @@ class PendingPurchaseOrderEditor
         array $items,
         User $editor,
         bool $editedByInventory,
+        ?string $recordVersion = null,
     ): PurchaseOrder {
-        return DB::transaction(function () use ($purchaseOrder, $branch, $items, $editor, $editedByInventory) {
+        return DB::transaction(function () use ($purchaseOrder, $branch, $items, $editor, $editedByInventory, $recordVersion) {
             $purchaseOrder = PurchaseOrder::query()
                 ->lockForUpdate()
                 ->findOrFail($purchaseOrder->id);
+
+            if (!$recordVersion || !$purchaseOrder->updated_at?->equalTo(Carbon::parse($recordVersion))) {
+                throw ValidationException::withMessages([
+                    'record_version' => 'Otra persona modifico esta orden. Revisa la informacion actual antes de guardar nuevamente.',
+                ]);
+            }
 
             abort_unless($purchaseOrder->branch_id === $branch->id, 404);
             abort_unless(
@@ -71,7 +80,7 @@ class PendingPurchaseOrderEditor
             foreach ($items as $item) {
                 $branchProduct = $branchProducts->get((int) $item['branch_product_id']);
                 $requestedQuantity = (float) $item['requested_quantity'];
-                $estimatedPrice = (float) ($branchProduct->product?->cost ?? 0);
+                $estimatedPrice = (float) ($branchProduct->product?->cost_per_piece ?? $branchProduct->product?->cost ?? 0);
 
                 $purchaseOrder->items()->updateOrCreate(
                     ['branch_product_id' => $branchProduct->id],

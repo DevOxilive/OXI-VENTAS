@@ -33,7 +33,7 @@ const filters = computed(() => page.props.filters || {})
 const userCapabilities = computed(() => page.props.capabilities || {})
 
 const search = ref(filters.value.search || '')
-const recordsPerPage = ref(filters.value.perPage || 50)
+const recordsPerPage = ref(filters.value.perPage || 25)
 const userStatusFilter = ref(filters.value.userStatus || '')
 const statusFilter = ref(filters.value.status || '')
 const roleFilter = ref(filters.value.role || '')
@@ -68,6 +68,7 @@ const form = useForm({
   role_id: '',
   branch_ids: [],
   permissions: [],
+  record_version: '',
 })
 
 let unsubscribeEmployeeChanged = null
@@ -376,6 +377,7 @@ function openModal(item = null) {
     form.name = item.name || ''
     form.email = item.email || ''
     form.role_id = item.role_id || ''
+    form.record_version = item.updated_at || ''
 
     form.permissions = getEffectivePermissionIds(item)
 
@@ -486,6 +488,8 @@ function deleteUser(id) {
   }).then((result) => {
     if (!result.isConfirmed) return
 
+    const user = records.value.find((item) => Number(item.id) === Number(id))
+    form.record_version = user?.updated_at || ''
     form.delete(route('systems.users.destroy', id), getModalRequestOptions({
       mode: 'delete',
       entityName: 'Usuario',

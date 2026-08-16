@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\UserChanged;
 use App\Events\RealtimeActivityLogged;
+use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Permission;
@@ -16,10 +17,13 @@ use App\Support\SystemPermission;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class UserController extends Controller
 {
+    use ValidatesRecordVersion;
+
     private function resolveUserActiveState(?int $employeeId, bool $default = true): bool
     {
         if (!$employeeId) {
@@ -229,7 +233,7 @@ class UserController extends Controller
         ]);
 
         $search = trim((string) $request->input('search', ''));
-        $perPage = TablePagination::resolvePerPage($request, 50);
+        $perPage = TablePagination::resolvePerPage($request);
         $userStatus = trim((string) $request->input('user_status', ''));
         $statusFilter = trim((string) $request->input('status', ''));
         $roleFilter = trim((string) $request->input('role', ''));
@@ -248,6 +252,7 @@ class UserController extends Controller
                 'users.email',
                 'users.role_id',
                 'users.is_active',
+                'users.updated_at',
             ])
             ->when(!$canManageExistingUsers, function ($query) {
                 $query->whereRaw('1 = 0');
@@ -535,19 +540,18 @@ class UserController extends Controller
             $userData['password'] = Hash::make($validated['password']);
         }
 
-        $user->update($userData);
+        $user = DB::transaction(function () use ($request, $user, $userData, $role, $finalPermissionIds, $validated) {
+            $user = $this->lockCurrentVersion($request, $user);
+            $user->update($userData);
+            $this->syncUserPermissionOverrides($user, $role, $finalPermissionIds);
+            $user->branches()->sync(
+                $this->shouldPersistBranchAssignments($role)
+                    ? ($validated['branch_ids'] ?? [])
+                    : []
+            );
 
-        $this->syncUserPermissionOverrides(
-            $user,
-            $role,
-            $finalPermissionIds,
-        );
-
-        $user->branches()->sync(
-            $this->shouldPersistBranchAssignments($role)
-                ? ($validated['branch_ids'] ?? [])
-                : []
-        );
+            return $user;
+        });
 
         $this->refreshAuthenticatedSession($request, $user);
 
@@ -565,7 +569,7 @@ class UserController extends Controller
             ->with('success', 'Usuario actualizado correctamente');
     }
 
-    public function destroy(User $user)
+    public function destroy(Request $request, User $user)
     {
         $this->checkPermission('users.delete');
         $this->ensureCanManageUser($user);
@@ -580,7 +584,9 @@ class UserController extends Controller
             report($e);
         }
 
-        $user->delete();
+        DB::transaction(function () use ($request, $user) {
+            $this->lockCurrentVersion($request, $user)->delete();
+        });
 
         return redirect()
             ->route('systems.users.index')

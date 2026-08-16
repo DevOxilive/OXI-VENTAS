@@ -73,7 +73,7 @@ class PhysicalCountConsolidatedCountsSheet implements FromArray, WithColumnForma
 
     public function columnFormats(): array
     {
-        return ['D' => 'yyyy-mm-dd', 'F' => '@', 'I:N' => '#,##0.00'];
+        return ['D' => 'yyyy-mm-dd', 'F' => '@', 'I:N' => '#,##0.###'];
     }
 
     public function styles(Worksheet $sheet): array

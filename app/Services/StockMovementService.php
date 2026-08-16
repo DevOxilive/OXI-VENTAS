@@ -436,7 +436,7 @@ class StockMovementService
             'type' => $type,
             'reason' => $reason,
             'quantity' => $quantity,
-            'unit_cost' => $branchProduct->product?->cost ?? 0,
+            'unit_cost' => $branchProduct->product?->cost_per_piece ?? $branchProduct->product?->cost ?? 0,
             'previous_stock' => $previousStock,
             'new_stock' => $projectedStock,
             'user_id' => $userId ?? Auth::id(),
@@ -514,25 +514,9 @@ class StockMovementService
         BranchProduct $sourceBranchProduct,
         int $targetBranchId
     ): BranchProduct {
-        BranchProduct::updateOrCreate(
-            [
-                'branch_id' => $targetBranchId,
-                'product_id' => $sourceBranchProduct->product_id,
-            ],
-            [
-                'stock' => 0,
-                'min_stock' => $sourceBranchProduct->min_stock ?? 0,
-                'status' => $sourceBranchProduct->status ?? BranchProduct::STATUS_ACTIVE,
-                'tracks_batches' => (bool) $sourceBranchProduct->tracks_batches,
-                'tracks_expiration' => (bool) $sourceBranchProduct->tracks_expiration,
-                'season_start_date' => $sourceBranchProduct->season_start_date,
-                'season_end_date' => $sourceBranchProduct->season_end_date,
-                'inactive_candidate_after_days' => $sourceBranchProduct->inactive_candidate_after_days ?? 90,
-            ]
-        );
-
         return BranchProduct::where('branch_id', $targetBranchId)
             ->where('product_id', $sourceBranchProduct->product_id)
+            ->where('status', BranchProduct::STATUS_ACTIVE)
             ->lockForUpdate()
             ->firstOrFail();
     }

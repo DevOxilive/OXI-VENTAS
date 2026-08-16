@@ -35,6 +35,10 @@ const form = useForm({
 const isReadOnly = computed(() => props.mode === 'view')
 const isDeleteMode = computed(() => props.mode === 'delete')
 const totalErrors = computed(() => Object.keys(form.errors || {}).length)
+const inventoryUnit = computed(() => props.entry?.branch_product?.product?.inventory_unit
+    ?? props.entry?.branch_product?.product?.unit
+    ?? 'pza')
+const isKilogram = computed(() => inventoryUnit.value === 'kg')
 
 const modalConfig = computed(() => getPhysicalCountEntryModalConfig({
     mode: props.mode,
@@ -195,7 +199,9 @@ watch(
                         v-model="form.counted_quantity"
                         label="Cantidad contada"
                         field="quantity"
-                        type="number"
+                        type="text"
+                        :inputmode="isKilogram ? 'decimal' : 'numeric'"
+                        :validation-field="isKilogram ? 'kilogram_quantity' : 'quantity'"
                         :readonly="isReadOnly || isDeleteMode"
                         :error="form.errors.counted_quantity"
                     />
@@ -204,7 +210,9 @@ watch(
                         v-model="form.damaged_quantity"
                         label="Cantidad dañada"
                         field="quantity"
-                        type="number"
+                        type="text"
+                        :inputmode="isKilogram ? 'decimal' : 'numeric'"
+                        :validation-field="isKilogram ? 'kilogram_quantity' : 'quantity'"
                         :readonly="isReadOnly || isDeleteMode"
                         :error="form.errors.damaged_quantity"
                     />
@@ -213,7 +221,9 @@ watch(
                         v-model="form.expired_quantity"
                         label="Cantidad caducada"
                         field="quantity"
-                        type="number"
+                        type="text"
+                        :inputmode="isKilogram ? 'decimal' : 'numeric'"
+                        :validation-field="isKilogram ? 'kilogram_quantity' : 'quantity'"
                         :readonly="isReadOnly || isDeleteMode"
                         :error="form.errors.expired_quantity"
                     />

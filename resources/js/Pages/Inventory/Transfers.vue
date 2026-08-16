@@ -106,9 +106,9 @@ function statusClass(status) {
                 </select>
             </div>
 
-            <div class="hidden md:block overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="border-b border-secondary bg-secondary text-text opacity-80">
+            <div class="hidden min-w-0 overflow-hidden md:block">
+                <table class="w-full table-fixed border-collapse text-sm">
+                    <thead class="border-b border-secondary bg-secondary text-text">
                         <tr>
                             <th class="px-4 py-3 text-left font-semibold">Folio</th>
                             <th class="px-4 py-3 text-left font-semibold">Producto</th>
@@ -121,9 +121,9 @@ function statusClass(status) {
                         </tr>
                     </thead>
 
-                    <tbody>
+                    <tbody class="divide-y divide-secondary bg-background">
                         <tr v-for="item in filteredTransfers" :key="item.id"
-                            class="border-b border-secondary hover:bg-secondary">
+                            class="odd:bg-secondary transition-colors hover:bg-primary/10">
                             <td class="px-4 py-4 font-bold text-text">{{ item.folio }}</td>
                             <td class="px-4 py-4 text-text">{{ item.product }}</td>
                             <td class="px-4 py-4 font-bold text-text">{{ item.quantity }}</td>

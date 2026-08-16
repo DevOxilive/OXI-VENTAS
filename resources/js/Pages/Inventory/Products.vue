@@ -31,7 +31,7 @@ const props = defineProps({
     type: Object,
     default: () => ({
       search: "",
-      per_page: 50,
+      per_page: 25,
     }),
   },
   categoriesDB: {
@@ -68,7 +68,7 @@ onBeforeUnmount(() => {
 })
 const categoryFilter = ref("");
 const stockFilter = ref("");
-const recordsToShow = ref(Number(props.filters?.per_page ?? 50));
+const recordsToShow = ref(Number(props.filters?.per_page ?? 25));
 const { handlePageChange } = useGlobalTablePagination()
 const branches = computed(() => page.props.branches || [])
 

@@ -28,8 +28,10 @@ const permissionModuleOrder = [
     "inventory.general-purchase-orders",
     "audits",
     "sales",
+    "sales.attendance",
     "sales.purchase-lists",
     "sales.purchase-orders",
+    "reports.sales",
     "reports.audits",
     "reports.cash-closures",
     "reports.inventory",
@@ -122,6 +124,10 @@ const permissionModules = {
         label: "Ventas",
         section: "sales",
     },
+    "sales.attendance": {
+        label: "Asistencia",
+        section: "sales",
+    },
     "sales.purchase-lists": {
         label: "Listas de compra",
         section: "sales",
@@ -129,6 +135,10 @@ const permissionModules = {
     "sales.purchase-orders": {
         label: "Seguimiento de Órdenes de compra",
         section: "sales",
+    },
+    "reports.sales": {
+        label: "Reportes de ventas",
+        section: "reports",
     },
     "reports.audits": {
         label: "Reportes de auditoría",
@@ -242,6 +252,9 @@ const permissionLabels = {
     "sales.update": "Editar ventas",
     "sales.delete": "Eliminar ventas",
     "sales.reports": "Ver reportes de ventas",
+    "reports.sales.view": "Ver reportes de ventas",
+    "reports.sales.export.excel": "Exportar reportes de ventas en Excel",
+    "reports.sales.export.pdf": "Exportar reportes de ventas en PDF",
     "sales.cash-closures.view": "Ver cortes de caja registrados",
     "sales.cash-closures.create": "Crear cortes de caja",
     "sales.cash-closures.update": "Editar cortes de caja",
@@ -305,6 +318,7 @@ const permissionLabels = {
     "systems.labels.view": "Ver configuración actual de etiquetas",
     "systems.labels.update": "Editar configuracion de etiquetas",
     "systems.labels.print": "Imprimir etiquetas de productos",
+    "systems.qz.sign": "Firmar trabajos de impresion local",
 
     "system.center.access": "Acceder al Centro de Administración",
     "system.audit.view": "Consultar Auditoría del Sistema",
@@ -341,7 +355,7 @@ export function getPermissionModule(permissionName = "") {
         return "systems.cash-closure-tickets";
     }
 
-    if (permissionName.startsWith("systems.labels.")) {
+    if (permissionName.startsWith("systems.labels.") || permissionName === "systems.qz.sign") {
         return "systems.labels";
     }
 
@@ -394,7 +408,11 @@ export function getPermissionModule(permissionName = "") {
         return "sales.purchase-lists";
     }
 
-    if (permissionName === "attendance.view" || permissionName === "attendance.register" || permissionName === "attendance.manage" || permissionName.startsWith("attendance.export.") || permissionName.startsWith("attendance.corrections.")) {
+    if (permissionName === "attendance.register") {
+        return "sales.attendance";
+    }
+
+    if (permissionName === "attendance.view" || permissionName === "attendance.manage" || permissionName.startsWith("attendance.export.") || permissionName.startsWith("attendance.corrections.")) {
         return "attendance";
     }
 

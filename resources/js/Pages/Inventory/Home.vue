@@ -44,6 +44,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  productDepartmentsDB: {
+    type: Array,
+    default: () => [],
+  },
   branchesDB: {
     type: Array,
     default: () => [],
@@ -56,11 +60,16 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  canManagePricing: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const productsState = ref(cloneProductsPayload(props.productsDB))
 const branch = computed(() => props.branch ?? {})
 const categoriesDB = computed(() => props.categoriesDB ?? [])
+const productDepartmentsDB = computed(() => props.productDepartmentsDB ?? [])
 const branchesDB = computed(() => props.branchesDB ?? [])
 
 watch(
@@ -72,26 +81,43 @@ watch(
 )
 
 const search = ref(props.filters.search ?? '')
-const categoryFilter = ref(props.filters.category_id ?? 'Todas')
-const recordsToShow = ref(Number(props.filters.per_page ?? 50))
+const productDepartmentFilter = ref(props.filters.product_department_id ?? '')
+const categoryFilter = ref(props.filters.category_id ?? '')
+const recordsToShow = ref(Number(props.filters.per_page ?? 25))
 const { handlePageChange } = useGlobalTablePagination({
-  only: ['productsDB', 'filters', 'categoriesDB'],
+  only: ['productsDB', 'filters', 'categoriesDB', 'productDepartmentsDB'],
 })
 
 const products = computed(() => productsState.value?.data ?? [])
 const currentPage = computed(() => productsState.value?.current_page ?? 1)
 const totalProducts = computed(() => productsState.value?.total ?? products.value.length)
+const toolbarCategories = computed(() => {
+  if (!productDepartmentFilter.value) {
+    return categoriesDB.value
+  }
+
+  return categoriesDB.value.filter((category) => {
+    return Number(category.product_department_id) === Number(productDepartmentFilter.value)
+  })
+})
 
 const productToolbarConfig = computed(() =>
   getProductToolbarConfig({
     branch: branch.value,
-    categories: categoriesDB.value,
+    productDepartments: productDepartmentsDB.value,
+    productDepartmentFilter: productDepartmentFilter.value,
+    categories: toolbarCategories.value,
     categoryFilter: categoryFilter.value,
     canCreate: can('inventory.products.create'),
   })
 )
 
 function handleProductToolbarFilter({ key, value }) {
+  if (key === 'productDepartmentFilter') {
+    productDepartmentFilter.value = value
+    categoryFilter.value = ''
+  }
+
   if (key === 'categoryFilter') {
     categoryFilter.value = value
   }
@@ -128,7 +154,8 @@ function reloadProducts(pageOrUrl = 1) {
     ? {}
     : {
       search: search.value,
-      category_id: categoryFilter.value === 'Todas' ? null : categoryFilter.value,
+      product_department_id: productDepartmentFilter.value || undefined,
+      category_id: categoryFilter.value || undefined,
       per_page: recordsToShow.value,
       page: pageOrUrl,
     }
@@ -140,7 +167,7 @@ function reloadProducts(pageOrUrl = 1) {
       preserveState: true,
       preserveScroll: true,
       replace: true,
-      only: ['productsDB', 'filters', 'categoriesDB'],
+      only: ['productsDB', 'filters', 'categoriesDB', 'productDepartmentsDB'],
     }
   )
 }
@@ -215,7 +242,7 @@ watch(search, () => {
   }, 400)
 })
 
-watch([categoryFilter, recordsToShow], () => {
+watch([productDepartmentFilter, categoryFilter, recordsToShow], () => {
   reloadProducts(1)
 })
 
@@ -298,6 +325,7 @@ onBeforeUnmount(() => {
         (modalMode === 'view' && can('inventory.products.view'))
       )
     " :mode="modalMode" :product="selectedProduct" :categoriesDB="categoriesDB"
-      :branchesDB="branchesDB" :branch="branch" @close="closeModal" />
+      :productDepartmentsDB="productDepartmentsDB"
+      :branchesDB="branchesDB" :branch="branch" :can-manage-pricing="canManagePricing" @close="closeModal" />
   </PageLayout>
 </template>
