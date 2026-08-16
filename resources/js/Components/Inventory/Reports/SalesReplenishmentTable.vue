@@ -22,6 +22,12 @@ const hasRows = computed(() => sections.value.some((section) => (section.rows ??
 const isTransferTab = computed(() => props.activeTab === 'transferencias')
 const isStoreOrderTab = computed(() => props.activeTab === 'pedido-tiendas')
 const showBranchActionColumn = computed(() => !isStoreOrderTab.value)
+const tableMinWidth = computed(() => {
+    const baseWidth = isTransferTab.value ? 680 : 744
+    const branchWidth = branches.value.length * (showBranchActionColumn.value ? 256 : 144)
+
+    return `${baseWidth + branchWidth}px`
+})
 const emptyColspan = computed(() => {
     const baseColumns = isTransferTab.value ? 7 : 8
     const branchColumns = branches.value.length * (showBranchActionColumn.value ? 3 : 2)
@@ -294,9 +300,12 @@ function branchTransferClasses(row, branchId) {
 </script>
 
 <template>
-    <section class="max-w-full min-w-0 overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
+    <section class="w-full max-w-full overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
         <div class="max-w-full overflow-x-auto overflow-y-hidden">
-            <table class="min-w-[1180px] table-auto border-collapse text-xs xl:text-sm">
+            <table
+                class="w-full table-fixed border-collapse text-xs xl:text-sm"
+                :style="{ minWidth: tableMinWidth }"
+            >
                 <thead>
                     <tr class="border-b border-secondary bg-secondary text-text">
                         <th class="w-36 min-w-36 px-3 py-3 text-left font-semibold">CODIGO DE BARRAS</th>

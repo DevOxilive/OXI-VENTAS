@@ -179,7 +179,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="min-w-0 overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
+  <section class="w-full max-w-full overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
     <TableDesktop
       v-if="!isMobileViewport"
       :items="items"

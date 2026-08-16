@@ -133,14 +133,36 @@ function renderCellContentFromValue(value, column, row) {
     content: formatted,
   }
 }
+
+function columnStyle(column) {
+  const width = column.width || column.minWidth
+
+  if (!width) {
+    return {
+      minWidth: '140px',
+    }
+  }
+
+  if (String(width).trim().endsWith('%')) {
+    return {
+      width,
+      minWidth: column.minWidth || '120px',
+    }
+  }
+
+  return {
+    width,
+    minWidth: width,
+  }
+}
 </script>
 
 <template>
-  <div class="hidden max-h-[560px] min-w-0 overflow-x-hidden overflow-y-auto md:block">
-      <table class="w-full table-fixed border-collapse text-sm">
+  <div class="hidden max-h-[560px] max-w-full overflow-x-auto overflow-y-auto md:block">
+      <table class="w-max min-w-full table-auto border-collapse text-sm">
         <thead class="border-b border-secondary bg-secondary text-text">
           <tr>
-            <th v-if="selectable" class="sticky top-0 z-20 w-10 bg-secondary px-4 py-3">
+            <th v-if="selectable" class="sticky top-0 z-20 w-10 min-w-10 bg-secondary px-4 py-3">
               <button
                 type="button"
                 role="checkbox"
@@ -157,11 +179,12 @@ function renderCellContentFromValue(value, column, row) {
             </th>
 
             <th v-for="column in visibleColumns" :key="column.key"
-              class="sticky top-0 z-20 min-w-0 bg-secondary px-4 py-3 text-left font-semibold">
+              class="sticky top-0 z-20 bg-secondary px-4 py-3 text-left font-semibold"
+              :style="columnStyle(column)">
               <span class="block truncate" :title="column.label">{{ column.label }}</span>
             </th>
 
-            <th v-if="canViewActions" class="sticky top-0 z-20 whitespace-nowrap bg-secondary px-4 py-3 text-center font-semibold">
+            <th v-if="canViewActions" class="sticky top-0 z-20 w-32 min-w-32 whitespace-nowrap bg-secondary px-4 py-3 text-center font-semibold">
               Acciones
             </th>
           </tr>
@@ -174,7 +197,7 @@ function renderCellContentFromValue(value, column, row) {
             striped && tableRow.index % 2 === 1 ? 'bg-secondary' : '',
             selectable && isRowSelected(tableRow.row) ? 'bg-primary/15' : '',
           ]" @click="handleRowClick(tableRow.row)">
-            <td v-if="selectable" class="px-4 py-3 w-10">
+            <td v-if="selectable" class="w-10 min-w-10 px-4 py-3">
               <button
                 type="button"
                 role="checkbox"
@@ -190,8 +213,9 @@ function renderCellContentFromValue(value, column, row) {
               </button>
             </td>
 
-            <td v-for="cell in tableRow.cells" :key="cell.key" class="min-w-0 overflow-hidden px-4 py-3 align-middle"
-              :class="cell.column.cellClass || ''">
+            <td v-for="cell in tableRow.cells" :key="cell.key" class="overflow-hidden px-4 py-3 align-middle"
+              :class="cell.column.cellClass || ''"
+              :style="columnStyle(cell.column)">
               <slot
                 :name="`cell-${cell.column.key}`"
                 :row="tableRow.row"
@@ -253,7 +277,7 @@ function renderCellContentFromValue(value, column, row) {
               </slot>
             </td>
 
-            <td v-if="canViewActions" class="px-4 py-3">
+            <td v-if="canViewActions" class="w-32 min-w-32 px-4 py-3">
               <div class="flex items-center justify-center gap-2">
                 <template v-for="action in tableRow.visibleActions" :key="action.id">
                   <ActionIconButton :icon="action.icon"
