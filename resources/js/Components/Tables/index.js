@@ -7,6 +7,7 @@
 export { default as GlobalTable } from "./GlobalTable.vue";
 export { default as TableDesktop } from "./TableDesktop.vue";
 export { default as TableMobile } from "./TableMobile.vue";
+export { default as TableSurface } from "./TableSurface.vue";
 
 export {
     formatCellValue,

@@ -122,15 +122,15 @@ onBeforeUnmount(() => {
 
         <div
             v-if="open"
-            class="z-40 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-secondary bg-background p-2 shadow-xl"
+            class="z-40 mt-2 max-h-72 w-full min-w-full overflow-y-auto rounded-xl border border-secondary bg-background p-2 shadow-xl sm:w-[28rem]"
             :class="floating ? 'absolute' : 'relative'"
         >
-            <div class="mb-2 flex h-10 items-center gap-2 rounded-lg bg-secondary px-3">
-                <span class="material-symbols-outlined text-[18px] text-text opacity-60">filter_list</span>
+            <div class="mb-2 flex h-11 items-center gap-3 rounded-lg bg-secondary px-3">
+                <span class="material-symbols-outlined shrink-0 text-[18px] text-text opacity-60">filter_list</span>
                 <input
                     v-model="search"
                     type="text"
-                    class="min-w-0 flex-1 bg-transparent text-sm text-text placeholder:text-text placeholder:opacity-50 outline-none"
+                    class="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-text placeholder:text-text placeholder:opacity-50 outline-none focus:border-0 focus:ring-0"
                     placeholder="Escribe para filtrar"
                 />
             </div>
@@ -151,7 +151,7 @@ onBeforeUnmount(() => {
                 @click="toggleOption(option)"
             >
                 <span
-                    class="flex h-4 w-4 items-center justify-center rounded border"
+                    class="flex h-4 w-4 shrink-0 items-center justify-center rounded border"
                     :class="isSelected(option) ? 'border-primary bg-primary text-white' : 'border-secondary bg-background'"
                 >
                     <span v-if="isSelected(option)" class="material-symbols-outlined text-[13px]">
@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
                     </span>
                 </span>
 
-                <span class="truncate text-text">
+                <span class="min-w-0 truncate text-text" :title="getOptionLabel(option)">
                     {{ getOptionLabel(option) }}
                 </span>
             </button>

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, useSlots } from 'vue'
+import TableSurface from './TableSurface.vue'
 import TableDesktop from './TableDesktop.vue'
 import TableMobile from './TableMobile.vue'
 
@@ -179,7 +180,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="w-full max-w-full overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
+  <TableSurface>
     <TableDesktop
       v-if="!isMobileViewport"
       :items="items"
@@ -268,5 +269,5 @@ onBeforeUnmount(() => {
         </button>
       </div>
     </footer>
-  </section>
+  </TableSurface>
 </template>

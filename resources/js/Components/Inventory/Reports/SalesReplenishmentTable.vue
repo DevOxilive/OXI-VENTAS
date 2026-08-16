@@ -1,5 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { TableSurface } from '@/Components/Tables'
 
 const props = defineProps({
     report: {
@@ -34,6 +35,19 @@ const emptyColspan = computed(() => {
 
     return baseColumns + branchColumns
 })
+
+const tableClasses = {
+    scroll: 'max-w-full overflow-x-auto overflow-y-hidden',
+    table: 'w-full table-fixed border-collapse text-xs xl:text-sm',
+    headRow: 'border-b border-secondary bg-secondary text-text',
+    sectionRow: 'border-y border-primary bg-secondary text-text',
+    bodyRow: 'border-b border-secondary bg-background odd:bg-secondary transition-colors hover:bg-primary/10',
+    headerCell: 'px-2 py-3 font-semibold',
+    sectionCell: 'px-2 py-2 font-semibold',
+    bodyCell: 'px-2 py-2 align-middle',
+    input: 'h-9 w-full min-w-0 rounded-lg border border-secondary bg-background px-2 text-center text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary',
+    primaryInput: 'h-9 w-full min-w-0 rounded-lg border border-secondary bg-background px-2 text-center text-sm font-bold text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary',
+}
 
 function money(value) {
     return new Intl.NumberFormat('es-MX', {
@@ -300,38 +314,38 @@ function branchTransferClasses(row, branchId) {
 </script>
 
 <template>
-    <section class="w-full max-w-full overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm">
-        <div class="max-w-full overflow-x-auto overflow-y-hidden">
+    <TableSurface>
+        <div :class="tableClasses.scroll">
             <table
-                class="w-full table-fixed border-collapse text-xs xl:text-sm"
+                :class="tableClasses.table"
                 :style="{ minWidth: tableMinWidth }"
             >
                 <thead>
-                    <tr class="border-b border-secondary bg-secondary text-text">
-                        <th class="w-36 min-w-36 px-3 py-3 text-left font-semibold">CODIGO DE BARRAS</th>
-                        <th v-if="!isTransferTab" class="w-16 min-w-16 px-2 py-3 text-center font-semibold">P</th>
-                        <th class="w-16 min-w-16 px-2 py-3 text-center font-semibold">V</th>
-                        <th class="w-16 min-w-16 px-2 py-3 text-center font-semibold">E</th>
-                        <th class="w-72 min-w-72 px-3 py-3 text-left font-semibold">PRODUCTO</th>
+                    <tr :class="tableClasses.headRow">
+                        <th :class="[tableClasses.headerCell, 'w-36 min-w-36 px-3 text-left']">CODIGO DE BARRAS</th>
+                        <th v-if="!isTransferTab" :class="[tableClasses.headerCell, 'w-16 min-w-16 text-center']">P</th>
+                        <th :class="[tableClasses.headerCell, 'w-16 min-w-16 text-center']">V</th>
+                        <th :class="[tableClasses.headerCell, 'w-16 min-w-16 text-center']">E</th>
+                        <th :class="[tableClasses.headerCell, 'w-72 min-w-72 px-3 text-left']">PRODUCTO</th>
                         <template v-for="branch in branches" :key="`head-${branch.id}`">
-                            <th class="w-20 min-w-20 px-2 py-3 text-center font-semibold">E {{ branch.name }}</th>
-                            <th class="w-16 min-w-16 px-2 py-3 text-center font-semibold">MES</th>
-                            <th v-if="showBranchActionColumn" class="w-20 min-w-20 px-2 py-3 text-center font-semibold">{{ branchMetricLabel() }}</th>
+                            <th :class="[tableClasses.headerCell, 'w-20 min-w-20 text-center']">E {{ branch.name }}</th>
+                            <th :class="[tableClasses.headerCell, 'w-16 min-w-16 text-center']">MES</th>
+                            <th v-if="showBranchActionColumn" :class="[tableClasses.headerCell, 'w-20 min-w-20 text-center']">{{ branchMetricLabel() }}</th>
                         </template>
-                        <th class="w-20 min-w-20 px-2 py-3 text-center font-semibold">P. P.</th>
-                        <th class="w-20 min-w-20 px-2 py-3 text-center font-semibold">P.C.</th>
-                        <th class="w-56 min-w-56 px-3 py-3 text-left font-semibold">OBSERVACIONES</th>
+                        <th :class="[tableClasses.headerCell, 'w-20 min-w-20 text-center']">P. P.</th>
+                        <th :class="[tableClasses.headerCell, 'w-20 min-w-20 text-center']">P.C.</th>
+                        <th :class="[tableClasses.headerCell, 'w-56 min-w-56 px-3 text-left']">OBSERVACIONES</th>
                     </tr>
                 </thead>
 
                 <tbody v-if="hasRows">
                     <template v-for="section in sections" :key="section.label">
-                        <tr class="border-y border-primary bg-secondary text-text">
-                            <th class="w-36 min-w-36 px-3 py-2 text-center">CODIGO DE BARRAS</th>
-                            <th v-if="!isTransferTab" class="w-16 min-w-16 px-2 py-2 text-center">P</th>
-                            <th class="w-16 min-w-16 px-2 py-2 text-center">V</th>
-                            <th class="w-16 min-w-16 px-2 py-2 text-center">E</th>
-                            <th class="w-72 min-w-72 px-3 py-2 text-left">
+                        <tr :class="tableClasses.sectionRow">
+                            <th :class="[tableClasses.sectionCell, 'w-36 min-w-36 px-3 text-center']">CODIGO DE BARRAS</th>
+                            <th v-if="!isTransferTab" :class="[tableClasses.sectionCell, 'w-16 min-w-16 text-center']">P</th>
+                            <th :class="[tableClasses.sectionCell, 'w-16 min-w-16 text-center']">V</th>
+                            <th :class="[tableClasses.sectionCell, 'w-16 min-w-16 text-center']">E</th>
+                            <th :class="[tableClasses.sectionCell, 'w-72 min-w-72 px-3 text-left']">
                                 <div class="flex flex-col gap-2">
                                     <button
                                         type="button"
@@ -354,22 +368,22 @@ function branchTransferClasses(row, branchId) {
                                 </div>
                             </th>
                             <template v-for="branch in branches" :key="`section-${section.label}-${branch.id}`">
-                                <th class="w-20 min-w-20 px-2 py-2 text-center">E {{ branch.name }}</th>
-                                <th class="w-16 min-w-16 px-2 py-2 text-center">MES</th>
-                                <th v-if="showBranchActionColumn" class="w-20 min-w-20 px-2 py-2 text-center">{{ branchMetricLabel() }}</th>
+                                <th :class="[tableClasses.sectionCell, 'w-20 min-w-20 text-center']">E {{ branch.name }}</th>
+                                <th :class="[tableClasses.sectionCell, 'w-16 min-w-16 text-center']">MES</th>
+                                <th v-if="showBranchActionColumn" :class="[tableClasses.sectionCell, 'w-20 min-w-20 text-center']">{{ branchMetricLabel() }}</th>
                             </template>
-                            <th class="w-20 min-w-20 px-2 py-2 text-center">P. P.</th>
-                            <th class="w-20 min-w-20 px-2 py-2 text-center">P.C.</th>
-                            <th class="w-56 min-w-56 px-3 py-2 text-left">OBSERVACIONES</th>
+                            <th :class="[tableClasses.sectionCell, 'w-20 min-w-20 text-center']">P. P.</th>
+                            <th :class="[tableClasses.sectionCell, 'w-20 min-w-20 text-center']">P.C.</th>
+                            <th :class="[tableClasses.sectionCell, 'w-56 min-w-56 px-3 text-left']">OBSERVACIONES</th>
                         </tr>
 
                         <tr
                             v-for="row in section.rows"
                             :key="row.id"
-                            class="border-b border-secondary bg-background odd:bg-secondary transition-colors hover:bg-primary/10"
+                            :class="tableClasses.bodyRow"
                         >
                             <td
-                                class="w-36 min-w-36 max-w-36 truncate px-3 py-2 font-medium"
+                                :class="[tableClasses.bodyCell, 'w-36 min-w-36 max-w-36 truncate px-3 font-medium']"
                                 :title="row.code"
                             >
                                 {{ row.code }}
@@ -379,7 +393,7 @@ function branchTransferClasses(row, branchId) {
                                     :value="editableValue(row, 'total_suggested', row.total_suggested)"
                                     type="text"
                                     inputmode="decimal"
-                                class="h-9 w-full min-w-0 rounded-lg border border-secondary bg-background px-2 text-center text-sm font-bold text-primary outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                                    :class="tableClasses.primaryInput"
                                     @input="updateEditable(row, 'total_suggested', $event.target.value)"
                                 />
                             </td>
@@ -393,7 +407,7 @@ function branchTransferClasses(row, branchId) {
                                     {{ quantity(row.total_stock) }}
                                 </span>
                             </td>
-                            <td class="w-72 min-w-72 max-w-72 px-3 py-2">
+                            <td :class="[tableClasses.bodyCell, 'w-72 min-w-72 max-w-72 px-3']">
                                 <p class="truncate font-semibold text-text" :title="row.product">{{ row.product }}</p>
                                 <p class="truncate text-xs text-text opacity-65" :title="`${row.department} / ${row.category}`">{{ row.department }} / {{ row.category }}</p>
                             </td>
@@ -415,7 +429,7 @@ function branchTransferClasses(row, branchId) {
                                         :value="isTransferTab ? editableBranchTransferValue(row, branch.id) : editableValue(row, `branch-${branch.id}-${branchMetricKey()}`, metricFor(row, branch.id, branchMetricKey()))"
                                         type="text"
                                         inputmode="decimal"
-                                        class="h-9 w-full min-w-0 rounded-lg border border-secondary bg-background px-2 text-center text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                                        :class="tableClasses.input"
                                         @input="updateEditable(row, isTransferTab ? `branch-${branch.id}-transfer` : `branch-${branch.id}-${branchMetricKey()}`, $event.target.value)"
                                     />
                                 </td>
@@ -433,7 +447,7 @@ function branchTransferClasses(row, branchId) {
                                     v-else
                                     :value="observationValue(row)"
                                     type="text"
-                                    class="h-9 w-full rounded-lg border border-secondary bg-background px-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                                    :class="[tableClasses.input, 'text-left']"
                                     @input="updateEditable(row, 'observation', $event.target.value)"
                                 />
                             </td>
@@ -450,5 +464,5 @@ function branchTransferClasses(row, branchId) {
                 </tbody>
             </table>
         </div>
-    </section>
+    </TableSurface>
 </template>
