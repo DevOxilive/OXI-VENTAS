@@ -71,6 +71,7 @@ function listProjectFiles() {
 }
 
 const projectFiles = listProjectFiles()
+    .filter((file) => ![...ignoredDirectories].some((ignored) => file === ignored || file.startsWith(`${ignored}/`)))
 
 const problems = []
 

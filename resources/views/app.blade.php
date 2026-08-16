@@ -70,12 +70,14 @@
                 'scheme' => $realtimeTunnelConfig['scheme'],
             ];
         } elseif (app()->environment('production')) {
+            $reverbOptions = config('broadcasting.connections.reverb.options', []);
+
             $realtimeConfig = [
                 'broadcaster' => 'reverb',
                 'key' => config('broadcasting.connections.reverb.key'),
-                'host' => request()->getHost(),
-                'port' => request()->isSecure() ? 443 : request()->getPort(),
-                'scheme' => request()->getScheme(),
+                'host' => $reverbOptions['host'] ?: request()->getHost(),
+                'port' => $reverbOptions['port'] ?: (request()->isSecure() ? 443 : request()->getPort()),
+                'scheme' => $reverbOptions['scheme'] ?: request()->getScheme(),
             ];
         } else {
             $realtimeConfig = [
