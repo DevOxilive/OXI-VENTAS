@@ -80,6 +80,7 @@ class BranchController extends Controller
                 'deleteBranches' => $canDeleteBranches,
             ],
             'googleMapsApiKey' => config('services.google_maps.api_key'),
+            'googleMapsMapId' => config('services.google_maps.map_id'),
         ]);
     }
 

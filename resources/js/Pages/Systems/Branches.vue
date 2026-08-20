@@ -30,6 +30,10 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  googleMapsMapId: {
+    type: String,
+    default: "",
+  },
 })
 
 defineOptions({
@@ -55,6 +59,7 @@ let isSyncingGoogleMap = false
 let addressSearchTimeout = null
 
 const defaultMapCenter = { lat: 19.432608, lng: -99.133209 }
+const defaultGoogleMapsMapId = "DEMO_MAP_ID"
 
 const form = useForm({
   name: "",
@@ -327,7 +332,8 @@ function loadGoogleMaps() {
     }
 
     const script = document.createElement("script")
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(props.googleMapsApiKey)}&libraries=places&v=weekly&loading=async`    script.async = true
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(props.googleMapsApiKey)}&libraries=places,marker&v=weekly&loading=async`
+    script.async = true
     script.defer = true
     script.onload = () => resolve(window.google)
     script.onerror = () => reject(new Error("No fue posible cargar Google Maps."))
@@ -360,12 +366,13 @@ async function initializeGoogleMap() {
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: true,
+      mapId: props.googleMapsMapId || defaultGoogleMapsMapId,
     })
 
-    googleMarker = new google.maps.Marker({
+    googleMarker = new google.maps.marker.AdvancedMarkerElement({
       map: googleMap,
       position: coordinates ? center : null,
-      draggable: !isBranchFormReadonly.value,
+      gmpDraggable: !isBranchFormReadonly.value,
     })
 
     googleCircle = new google.maps.Circle({
@@ -411,18 +418,18 @@ function syncGoogleMapFromForm() {
   isSyncingGoogleMap = true
 
   try {
-    googleMarker.setDraggable(!isBranchFormReadonly.value)
+    googleMarker.gmpDraggable = !isBranchFormReadonly.value
     googleCircle.setEditable(!isBranchFormReadonly.value)
 
     if (!coordinates) {
-      googleMarker.setMap(null)
+      googleMarker.map = null
       googleCircle.setVisible(false)
       return
     }
 
     const position = { lat: coordinates.latitude, lng: coordinates.longitude }
-    googleMarker.setMap(googleMap)
-    googleMarker.setPosition(position)
+    googleMarker.map = googleMap
+    googleMarker.position = position
     googleCircle.setCenter(position)
     googleCircle.setRadius(radius)
     googleCircle.setVisible(true)
