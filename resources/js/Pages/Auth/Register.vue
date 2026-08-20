@@ -55,7 +55,7 @@ const branches = usePage().props.branches;
             class="md:w-1/2 bg-gradient-to-br from-green-400 to-green-600 flex flex-col justify-center items-center text-white p-8"
         >
             <img src="@/img/OXILIVE.ico" alt="Logo" class="w-24 mb-4" />
-            <h1 class="text-3xl md:text-4xl font-bold text-center">OXI-VENTAS</h1>
+            <h1 class="text-3xl md:text-4xl font-bold text-center">Super-Kay</h1>
         </div>
 
         <!-- DERECHA -->

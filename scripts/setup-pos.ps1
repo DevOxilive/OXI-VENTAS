@@ -20,7 +20,7 @@ function Run-Step {
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-Write-Host "Preparando OXI-VENTAS en: $root" -ForegroundColor Green
+Write-Host "Preparando Super-Kay en: $root" -ForegroundColor Green
 
 Run-Step "Instalando dependencias PHP" "composer" @("install")
 Run-Step "Instalando dependencias frontend" "npm" @("install")

@@ -1,6 +1,6 @@
-# OXI-VENTAS
+# Super-Kay
 
-Proyecto Laravel 12 + Inertia + Vue 3 para operación interna de OXI-VENTAS.
+Proyecto Laravel 12 + Inertia + Vue 3 para operación interna de Super-Kay.
 
 ## Requisitos
 

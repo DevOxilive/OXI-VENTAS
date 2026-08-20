@@ -8,11 +8,11 @@
     <meta name="theme-color" content="#e0000f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="{{ config('app.name', 'Super-Kay') }}">
-    <meta name="application-name" content="{{ config('app.name', 'Super-Kay') }}">
+    <meta name="apple-mobile-web-app-title" content="Super-Kay">
+    <meta name="application-name" content="Super-Kay">
     <meta name="mobile-web-app-capable" content="yes">
 
-    <title inertia>{{ config('app.name', 'Laravel') }}</title>
+    <title inertia>Super-Kay</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
