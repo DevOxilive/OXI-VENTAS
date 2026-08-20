@@ -325,6 +325,12 @@ export function generateMenu(role, permissions = [], branches = []) {
                         key: "sales.pos",
                         icon: "point_of_sale",
                         url: route("ventas.home"),
+                    },
+                    {
+                        text: "Historial de ventas",
+                        key: "sales.history",
+                        icon: "receipt_long",
+                        url: route("ventas.history"),
                     }]
                     : []),
                 ...(canUse("cashClosures")

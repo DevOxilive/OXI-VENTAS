@@ -24,7 +24,11 @@ class StockMovementService
         ?int $userId = null,
         array $batches = [],
         string $batchAllocationMethod = StockMovementBatch::ALLOCATION_MANUAL,
-        array $manualBatches = []
+        array $manualBatches = [],
+        ?int $saleId = null,
+        ?int $saleDetailId = null,
+        ?int $saleCancellationId = null,
+        ?int $saleCancellationDetailId = null
     ): StockMovement {
         if ((float) $quantity === 0.0) {
             throw new InvalidArgumentException('La cantidad no puede ser 0.');
@@ -39,7 +43,11 @@ class StockMovementService
             $userId,
             $batches,
             $batchAllocationMethod,
-            $manualBatches
+            $manualBatches,
+            $saleId,
+            $saleDetailId,
+            $saleCancellationId,
+            $saleCancellationDetailId
         ) {
             return $this->performMovement(
                 branchProduct: $branchProduct,
@@ -51,6 +59,10 @@ class StockMovementService
                 batches: $batches,
                 batchAllocationMethod: $batchAllocationMethod,
                 manualBatches: $manualBatches,
+                saleId: $saleId,
+                saleDetailId: $saleDetailId,
+                saleCancellationId: $saleCancellationId,
+                saleCancellationDetailId: $saleCancellationDetailId,
             );
         });
 
@@ -172,6 +184,7 @@ class StockMovementService
         $validReasonsByType = [
             StockMovement::TYPE_IN => [
                 StockMovement::REASON_PURCHASE,
+                StockMovement::REASON_RETURN,
             ],
             StockMovement::TYPE_OUT => [
                 StockMovement::REASON_SALE,
@@ -383,7 +396,11 @@ class StockMovementService
         ?int $userId = null,
         array $batches = [],
         string $batchAllocationMethod = StockMovementBatch::ALLOCATION_MANUAL,
-        array $manualBatches = []
+        array $manualBatches = [],
+        ?int $saleId = null,
+        ?int $saleDetailId = null,
+        ?int $saleCancellationId = null,
+        ?int $saleCancellationDetailId = null
     ): StockMovement {
         $branchProduct = BranchProduct::whereKey($branchProduct->id)
             ->lockForUpdate()
@@ -433,6 +450,10 @@ class StockMovementService
 
         $movement = StockMovement::create([
             'branch_product_id' => $branchProduct->id,
+            'sale_id' => $saleId,
+            'sale_detail_id' => $saleDetailId,
+            'sale_cancellation_id' => $saleCancellationId,
+            'sale_cancellation_detail_id' => $saleCancellationDetailId,
             'type' => $type,
             'reason' => $reason,
             'quantity' => $quantity,

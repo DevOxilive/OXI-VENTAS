@@ -408,9 +408,21 @@ Route::middleware([
                 ->middleware($salesAccess)
                 ->name('products.search');
 
+            Route::get('/historial', [SalesController::class, 'history'])
+                ->middleware($salesAccess)
+                ->name('history');
+
             Route::post('/', [SalesController::class, 'store'])
                 ->middleware(['permission:sales.create', 'idempotent'])
                 ->name('store');
+
+            Route::post('/{sale}/cancelar', [SalesController::class, 'cancel'])
+                ->middleware(['permission:sales.update', 'idempotent'])
+                ->name('cancel');
+
+            Route::get('/{sale}/ticket', [SalesController::class, 'ticket'])
+                ->middleware($salesAccess)
+                ->name('ticket');
 
             Route::get('/cortes', [CashRegisterClosureController::class, 'index'])
                 ->middleware($cashClosuresAccess)

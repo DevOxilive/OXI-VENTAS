@@ -26,6 +26,12 @@ export const salesRegisteredReportTableConfig = {
             mobileDisplay: true,
         },
         {
+            key: 'status_label',
+            label: 'Estado',
+            format: 'text',
+            mobileDisplay: true,
+        },
+        {
             key: 'total_products_sold_display',
             label: 'Total productos vendidos',
             format: 'text',

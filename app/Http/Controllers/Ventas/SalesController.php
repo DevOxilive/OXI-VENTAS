@@ -12,6 +12,7 @@ use App\Models\SaleDetail;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use App\Models\TicketTemplate;
+use App\Services\SaleCancellationService;
 use App\Services\StockMovementService;
 use App\Support\SystemPermission;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -59,6 +60,81 @@ class SalesController extends Controller
             'nearExpirationAlerts' => $selectorMode
                 ? []
                 : $this->buildNearExpirationAlerts($nearExpirationProducts)->values(),
+            'ticketTemplate' => [
+                'id' => $ticketTemplate->id,
+                'name' => $ticketTemplate->name,
+                'slug' => $ticketTemplate->slug,
+                'settings' => TicketTemplate::sanitizeSettings($ticketTemplate->settings ?? []),
+            ],
+        ]);
+    }
+
+    public function history(Request $request)
+    {
+        $user = $request->user()->loadMissing(['branches', 'role']);
+        $allowedBranches = $this->allowedBranches($user);
+        $allowedBranchIds = $allowedBranches->pluck('id')->map(fn ($id) => (int) $id)->values();
+
+        abort_if($allowedBranchIds->isEmpty(), 403, 'No tienes sucursales disponibles para consultar ventas.');
+
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'branch_id' => ['nullable', 'integer'],
+            'status' => ['nullable', 'in:completed,cancelled'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
+        ]);
+
+        $branchId = (int) ($filters['branch_id'] ?? 0);
+        $branchIds = $branchId > 0 && $allowedBranchIds->contains($branchId)
+            ? [$branchId]
+            : $allowedBranchIds->all();
+        $search = trim((string) ($filters['search'] ?? ''));
+
+        $sales = Sale::query()
+            ->with([
+                'branch:id,name',
+                'employee:id,first_name,last_name',
+                'paymentMethod:id,name',
+                'details.product:id,name,inventory_unit,unit',
+                'details.product.barcodes:id,product_id,code',
+                'cancellation.cancelledBy:id,name',
+            ])
+            ->whereIn('branch_id', $branchIds)
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->whereDate('date', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereDate('date', '<=', $date))
+            ->when($search !== '', function ($query) use ($search) {
+                $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+
+                $query->where(function ($subQuery) use ($like) {
+                    $subQuery
+                        ->where('folio', 'like', $like)
+                        ->orWhereHas('employee', fn ($employeeQuery) => $employeeQuery
+                            ->where('first_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like))
+                        ->orWhereHas('details.product', fn ($productQuery) => $productQuery
+                            ->where('name', 'like', $like)
+                            ->orWhereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('code', 'like', $like)));
+                });
+            })
+            ->latest('date')
+            ->paginate(25)
+            ->withQueryString()
+            ->through(fn (Sale $sale) => $this->mapRecentSale($sale));
+
+        $ticketTemplate = TicketTemplate::salesTemplate();
+
+        return Inertia::render('Ventas/SalesHistory', [
+            'sales' => $sales,
+            'branchesDB' => $allowedBranches->values(),
+            'filters' => [
+                'search' => $search,
+                'branch_id' => $branchId > 0 ? $branchId : null,
+                'status' => $filters['status'] ?? '',
+                'date_from' => $filters['date_from'] ?? '',
+                'date_to' => $filters['date_to'] ?? '',
+            ],
             'ticketTemplate' => [
                 'id' => $ticketTemplate->id,
                 'name' => $ticketTemplate->name,
@@ -273,47 +349,10 @@ class SalesController extends Controller
                         ->where('quantity', '>', 0)
                         ->exists();
 
-                if ($useBatches) {
-                    $manualBatches = $this->allocateBatchesForSale($branchProduct, $baseQuantity);
-
-                    $stockService->move(
-                        branchProduct: $branchProduct,
-                        type: StockMovement::TYPE_OUT,
-                        reason: StockMovement::REASON_SALE,
-                        quantity: $baseQuantity,
-                        notes: 'Venta generada desde punto de venta',
-                        userId: $user->id,
-                        batches: [],
-                        batchAllocationMethod: StockMovementBatch::ALLOCATION_MANUAL,
-                        manualBatches: $manualBatches
-                    );
-                } else {
-                    $previousStock = (float) $branchProduct->stock;
-                    $newStock = $previousStock - $baseQuantity;
-
-                    $branchProduct->update([
-                        'stock' => $newStock,
-                    ]);
-
-                    StockMovement::create([
-                        'branch_product_id' => $branchProduct->id,
-                        'type' => StockMovement::TYPE_OUT,
-                        'reason' => StockMovement::REASON_SALE,
-                        'quantity' => $baseQuantity,
-                        'unit_cost' => $presentation === 'box'
-                            ? ($product?->cost_per_box ?? 0)
-                            : ($product?->cost_per_piece ?? $product?->cost ?? 0),
-                        'previous_stock' => $previousStock,
-                        'new_stock' => $newStock,
-                        'user_id' => $user->id,
-                        'notes' => 'Venta generada desde punto de venta',
-                    ]);
-                }
-
                 $subtotal = round($quantity * $unitPrice, 2);
                 $total += $subtotal;
 
-                SaleDetail::create([
+                $saleDetail = SaleDetail::create([
                     'sale_id' => $sale->id,
                     'product_id' => $branchProduct->product_id,
                     'barcode_id' => $item['barcode_id'] ?? null,
@@ -331,6 +370,47 @@ class SalesController extends Controller
                         : ($product?->cost_per_piece ?? $product?->cost ?? 0),
                     'subtotal' => $subtotal,
                 ]);
+
+                if ($useBatches) {
+                    $manualBatches = $this->allocateBatchesForSale($branchProduct, $baseQuantity);
+
+                    $stockService->move(
+                        branchProduct: $branchProduct,
+                        type: StockMovement::TYPE_OUT,
+                        reason: StockMovement::REASON_SALE,
+                        quantity: $baseQuantity,
+                        notes: 'Venta generada desde punto de venta',
+                        userId: $user->id,
+                        batches: [],
+                        batchAllocationMethod: StockMovementBatch::ALLOCATION_MANUAL,
+                        manualBatches: $manualBatches,
+                        saleId: $sale->id,
+                        saleDetailId: $saleDetail->id
+                    );
+                } else {
+                    $previousStock = (float) $branchProduct->stock;
+                    $newStock = $previousStock - $baseQuantity;
+
+                    $branchProduct->update([
+                        'stock' => $newStock,
+                    ]);
+
+                    StockMovement::create([
+                        'branch_product_id' => $branchProduct->id,
+                        'sale_id' => $sale->id,
+                        'sale_detail_id' => $saleDetail->id,
+                        'type' => StockMovement::TYPE_OUT,
+                        'reason' => StockMovement::REASON_SALE,
+                        'quantity' => $baseQuantity,
+                        'unit_cost' => $presentation === 'box'
+                            ? ($product?->cost_per_box ?? 0)
+                            : ($product?->cost_per_piece ?? $product?->cost ?? 0),
+                        'previous_stock' => $previousStock,
+                        'new_stock' => $newStock,
+                        'user_id' => $user->id,
+                        'notes' => 'Venta generada desde punto de venta',
+                    ]);
+                }
             }
 
             $total = round($total, 2);
@@ -369,6 +449,43 @@ class SalesController extends Controller
         }
 
         return back()->with($responsePayload);
+    }
+
+    public function cancel(Request $request, Sale $sale, SaleCancellationService $cancellationService)
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $user = $request->user()->loadMissing(['branches', 'role']);
+        $this->resolveBranchById($sale->branch_id, $user);
+
+        $cancellation = $cancellationService->cancel(
+            sale: $sale,
+            user: $user,
+            reason: $data['reason']
+        );
+
+        return back()->with([
+            'success' => 'Ticket '.$sale->folio.' cancelado correctamente.',
+            'sale_cancellation' => [
+                'id' => $cancellation->id,
+                'sale_id' => $sale->id,
+                'folio' => $sale->folio,
+                'amount' => (float) $cancellation->amount,
+                'cancelled_at' => $cancellation->cancelled_at?->format('d/m/Y H:i'),
+            ],
+        ]);
+    }
+
+    public function ticket(Request $request, Sale $sale)
+    {
+        $user = $request->user()->loadMissing(['branches', 'role']);
+        $this->resolveBranchById($sale->branch_id, $user);
+
+        return response()->json([
+            'print_job' => $this->buildPrintJobPayload($sale),
+        ]);
     }
 
     private function nearExpirationProducts(Branch $branch, int $limit): Collection
@@ -452,6 +569,64 @@ class SalesController extends Controller
             ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
             ->orderBy('name')
             ->get();
+    }
+
+    private function mapRecentSale(Sale $sale): array
+    {
+        return [
+            'id' => (int) $sale->id,
+            'folio' => $sale->folio ?: 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
+            'date' => optional($sale->date)->toISOString(),
+            'date_display' => optional($sale->date)->format('d/m/Y H:i') ?? '-',
+            'branch' => $sale->branch?->name ?? '-',
+            'seller' => trim(($sale->employee?->first_name ?? '').' '.($sale->employee?->last_name ?? '')) ?: 'Sin vendedor',
+            'payment_method' => $sale->paymentMethod
+                ? $this->displayPaymentMethodName($sale->paymentMethod->name)
+                : 'Sin metodo',
+            'cash_box_number' => $sale->cash_box_number ?: '1',
+            'status' => $sale->status,
+            'status_label' => $sale->status === 'cancelled' ? 'Cancelada' : 'Completada',
+            'can_cancel' => $sale->status === 'completed' && ! $sale->cancellation,
+            'total' => (float) $sale->total,
+            'details' => $sale->details
+                ->map(fn (SaleDetail $detail) => $this->mapRecentSaleDetail($detail))
+                ->values()
+                ->all(),
+            'cancellation' => $sale->cancellation ? [
+                'reason' => $sale->cancellation->reason,
+                'amount' => (float) $sale->cancellation->amount,
+                'cancelled_at_display' => optional($sale->cancellation->cancelled_at)->format('d/m/Y H:i') ?? '-',
+                'cancelled_by' => $sale->cancellation->cancelledBy?->name ?? 'Sin usuario',
+            ] : null,
+        ];
+    }
+
+    private function mapRecentSaleDetail(SaleDetail $detail): array
+    {
+        $product = $detail->product;
+        $unit = strtolower($product?->inventory_unit ?? $product?->unit ?? 'pza') === 'kg' ? 'kg' : 'pza';
+        $baseQuantity = (float) ($detail->base_quantity ?? $detail->quantity ?? 0);
+
+        return [
+            'id' => (int) $detail->id,
+            'product' => $product?->name ?? 'Producto sin nombre',
+            'code' => $product?->barcodes?->first()?->code ?? '-',
+            'quantity_display' => $this->formatQuantityForTicket($baseQuantity, $unit),
+            'unit_price' => (float) $detail->unit_price,
+            'discount_amount' => (float) ($detail->discount_amount ?? 0),
+            'subtotal' => (float) $detail->subtotal,
+        ];
+    }
+
+    private function formatQuantityForTicket(float $quantity, string $unit): string
+    {
+        if ($unit !== 'kg') {
+            return ((string) (int) round($quantity)).' pzas';
+        }
+
+        $formatted = rtrim(rtrim(number_format($quantity, 3, '.', ''), '0'), '.') ?: '0';
+
+        return $formatted.' kg';
     }
 
     private function shouldShowBranchSelector(Request $request, $user, $allowedBranches): bool

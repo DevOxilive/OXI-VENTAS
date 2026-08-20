@@ -18,6 +18,10 @@ class CashRegisterClosure extends Model
         'period_end',
         'sales_count',
         'sales_total',
+        'refunds_count',
+        'refunds_total',
+        'refund_cash_total',
+        'refund_card_total',
         'expected_cash',
         'card_total',
         'other_total',
@@ -29,6 +33,7 @@ class CashRegisterClosure extends Model
         'cash_difference',
         'card_difference',
         'payment_breakdown',
+        'refund_breakdown',
         'denomination_breakdown',
         'notes',
     ];
@@ -37,6 +42,9 @@ class CashRegisterClosure extends Model
         'period_start' => 'datetime',
         'period_end' => 'datetime',
         'sales_total' => 'decimal:2',
+        'refunds_total' => 'decimal:2',
+        'refund_cash_total' => 'decimal:2',
+        'refund_card_total' => 'decimal:2',
         'expected_cash' => 'decimal:2',
         'card_total' => 'decimal:2',
         'other_total' => 'decimal:2',
@@ -48,6 +56,7 @@ class CashRegisterClosure extends Model
         'cash_difference' => 'decimal:2',
         'card_difference' => 'decimal:2',
         'payment_breakdown' => 'array',
+        'refund_breakdown' => 'array',
         'denomination_breakdown' => 'array',
     ];
 

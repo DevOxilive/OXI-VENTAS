@@ -18,6 +18,7 @@ class Sale extends Model
         'cash_received',
         'change_due',
         'status',
+        'cancelled_at',
     ];
 
     protected $casts = [
@@ -25,6 +26,7 @@ class Sale extends Model
         'total' => 'decimal:2',
         'cash_received' => 'decimal:2',
         'change_due' => 'decimal:2',
+        'cancelled_at' => 'datetime',
     ];
 
     public function details()
@@ -50,5 +52,15 @@ class Sale extends Model
     public function paymentMethod()
     {
         return $this->belongsTo(PaymentMethod::class);
+    }
+
+    public function cancellation()
+    {
+        return $this->hasOne(SaleCancellation::class);
+    }
+
+    public function stockMovements()
+    {
+        return $this->hasMany(StockMovement::class);
     }
 }

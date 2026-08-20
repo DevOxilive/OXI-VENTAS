@@ -44,4 +44,14 @@ class SaleDetail extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    public function stockMovements()
+    {
+        return $this->hasMany(StockMovement::class);
+    }
+
+    public function cancellationDetail()
+    {
+        return $this->hasOne(SaleCancellationDetail::class);
+    }
 }

@@ -275,11 +275,12 @@ class SalesReportController extends Controller
                 'branch:id,name,slug',
                 'employee:id,first_name,last_name',
                 'details.product.barcodes:id,product_id,code',
+                'cancellation.cancelledBy:id,name',
+                'cancellation.details.product:id,name',
             ])
             ->select('sales.*')
             ->selectSub($totalProductsSubquery, 'total_products_sold')
             ->whereIn('branch_id', $filters['branch_ids'])
-            ->where('status', 'completed')
             ->latest('date');
 
         $this->applyDateFilters($query, $filters, 'date');
@@ -428,6 +429,29 @@ class SalesReportController extends Controller
             'date_display' => optional($sale->date)->format('d/m/Y H:i') ?? '-',
             'branch' => $sale->branch?->name ?? '-',
             'seller' => $this->employeeName($sale),
+            'status' => $sale->status,
+            'status_label' => $sale->status === 'cancelled' ? 'Cancelada' : 'Completada',
+            'status_tone' => $sale->status === 'cancelled' ? 'danger' : 'success',
+            'cancelled_at' => optional($sale->cancelled_at)->toISOString(),
+            'cancelled_at_display' => optional($sale->cancelled_at)->format('d/m/Y H:i') ?? null,
+            'cancellation' => $sale->cancellation ? [
+                'id' => (int) $sale->cancellation->id,
+                'reason' => $sale->cancellation->reason,
+                'amount' => (float) $sale->cancellation->amount,
+                'cancelled_at' => optional($sale->cancellation->cancelled_at)->toISOString(),
+                'cancelled_at_display' => optional($sale->cancellation->cancelled_at)->format('d/m/Y H:i') ?? '-',
+                'cancelled_by' => $sale->cancellation->cancelledBy?->name ?? 'Sin usuario',
+                'details' => $sale->cancellation->details
+                    ->map(fn ($detail) => [
+                        'id' => (int) $detail->id,
+                        'product' => $detail->product?->name ?? 'Producto sin nombre',
+                        'quantity' => (float) $detail->quantity,
+                        'base_quantity' => (float) $detail->base_quantity,
+                        'subtotal' => (float) $detail->subtotal,
+                    ])
+                    ->values()
+                    ->all(),
+            ] : null,
             'total_products_sold' => $totalProductsSold,
             'total_products_sold_display' => $this->saleTotalQuantityDisplay($sale, $totalProductsSold),
             'total' => (float) $sale->total,

@@ -16,6 +16,8 @@ class StockMovement extends Model
 
     public const REASON_SALE = 'SALE';
 
+    public const REASON_RETURN = 'RETURN';
+
     public const REASON_DAMAGED = 'DAMAGED';
 
     public const REASON_EXPIRED = 'EXPIRED';
@@ -26,6 +28,10 @@ class StockMovement extends Model
 
     protected $fillable = [
         'branch_product_id',
+        'sale_id',
+        'sale_detail_id',
+        'sale_cancellation_id',
+        'sale_cancellation_detail_id',
         'type',
         'reason',
         'quantity',
@@ -51,6 +57,26 @@ class StockMovement extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function sale()
+    {
+        return $this->belongsTo(Sale::class);
+    }
+
+    public function saleDetail()
+    {
+        return $this->belongsTo(SaleDetail::class);
+    }
+
+    public function saleCancellation()
+    {
+        return $this->belongsTo(SaleCancellation::class);
+    }
+
+    public function saleCancellationDetail()
+    {
+        return $this->belongsTo(SaleCancellationDetail::class);
     }
 
     public function batches()

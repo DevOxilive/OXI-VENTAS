@@ -113,6 +113,7 @@ const canCreateClosure = computed(() => can("sales.cash-closures.create"));
 const summaryCards = computed(() => [
   { label: "Ventas", value: props.current?.sales_count ?? 0, tone: "neutral" },
   { label: "Venta total", value: money(props.current?.sales_total), tone: "dark" },
+  { label: "Devoluciones", value: money(props.current?.refunds_total), tone: "danger" },
   { label: "Efectivo", value: money(props.current?.expected_cash), tone: "success" },
   { label: "Tarjeta", value: money(props.current?.card_total), tone: "neutral" },
 ]);
@@ -665,6 +666,7 @@ onMounted(() => {
           <div class="grid grid-cols-2 gap-3">
             <MetricCard label="Caja" :value="`#${form.cash_box_number}`" size="sm" />
             <MetricCard label="Ventas" :value="current.sales_count" size="sm" />
+            <MetricCard label="Devoluciones" :value="money(current.refunds_total)" tone="danger" size="sm" />
             <MetricCard label="Efectivo sistema" :value="money(current.expected_cash)" tone="success" size="sm" />
             <MetricCard label="Efectivo contado" :value="money(countedCashTotal)" tone="dark" size="sm" />
             <MetricCard

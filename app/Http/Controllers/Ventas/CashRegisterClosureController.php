@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\CashRegisterClosure;
 use App\Models\Sale;
+use App\Models\SaleCancellation;
 use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Support\SystemPermission;
@@ -105,6 +106,8 @@ class CashRegisterClosureController extends Controller
             ->selectRaw('COUNT(*) as cuts_count')
             ->selectRaw('COALESCE(SUM(sales_count), 0) as sales_count')
             ->selectRaw('COALESCE(SUM(sales_total), 0) as sales_total')
+            ->selectRaw('COALESCE(SUM(refunds_count), 0) as refunds_count')
+            ->selectRaw('COALESCE(SUM(refunds_total), 0) as refunds_total')
             ->selectRaw('COALESCE(SUM(expected_cash), 0) as expected_cash')
             ->selectRaw('COALESCE(SUM(card_total), 0) as card_total')
             ->selectRaw('COALESCE(SUM(other_total), 0) as other_total')
@@ -168,6 +171,10 @@ class CashRegisterClosureController extends Controller
                 'period_end' => $current['period_end_raw'],
                 'sales_count' => $current['sales_count'],
                 'sales_total' => $current['sales_total'],
+                'refunds_count' => $current['refunds_count'],
+                'refunds_total' => $current['refunds_total'],
+                'refund_cash_total' => $current['refund_cash_total'],
+                'refund_card_total' => $current['refund_card_total'],
                 'expected_cash' => $current['expected_cash'],
                 'card_total' => $current['card_total'],
                 'other_total' => 0,
@@ -179,6 +186,7 @@ class CashRegisterClosureController extends Controller
                 'cash_difference' => round($countedCash - $expectedDrawerCash, 2),
                 'card_difference' => round($countedCard - (float) $current['card_total'], 2),
                 'payment_breakdown' => $current['payment_breakdown'],
+                'refund_breakdown' => $current['refund_breakdown'],
                 'denomination_breakdown' => $denominations,
                 'notes' => $data['notes'] ?? null,
             ]);
@@ -274,6 +282,15 @@ class CashRegisterClosureController extends Controller
             ->filter(fn (Sale $sale) => (string) ($sale->cash_box_number ?: '1') === (string) $cashBoxNumber)
             ->values();
 
+        $refunds = SaleCancellation::query()
+            ->with(['paymentMethod:id,name', 'cancelledBy:id,name'])
+            ->where('branch_id', $branch->id)
+            ->where('cash_box_number', (string) $cashBoxNumber)
+            ->where('cancelled_at', '>', $periodStart)
+            ->where('cancelled_at', '<=', $periodEnd)
+            ->orderBy('cancelled_at')
+            ->get();
+
         $paymentBreakdown = $sales
             ->groupBy(fn (Sale $sale) => $sale->paymentMethod?->name ?? 'Sin metodo')
             ->map(fn (Collection $group, string $method) => [
@@ -285,10 +302,25 @@ class CashRegisterClosureController extends Controller
             ])
             ->values();
 
-        $expectedCash = $paymentBreakdown->sum('expected_cash');
-        $cardTotal = $paymentBreakdown
+        $refundBreakdown = $refunds
+            ->groupBy(fn (SaleCancellation $refund) => $refund->paymentMethod?->name ?? 'Sin metodo')
+            ->map(fn (Collection $group, string $method) => [
+                'method' => $method,
+                'refunds_count' => $group->count(),
+                'total' => round((float) $group->sum('amount'), 2),
+                'refund_cash' => $this->isCashMethod($method) ? round((float) $group->sum('amount'), 2) : 0,
+                'type' => $this->paymentType($method),
+            ])
+            ->values();
+
+        $refundCashTotal = $refundBreakdown->sum('refund_cash');
+        $refundCardTotal = $refundBreakdown
             ->where('type', 'card')
             ->sum('total');
+        $expectedCash = $paymentBreakdown->sum('expected_cash') - $refundCashTotal;
+        $cardTotal = $paymentBreakdown
+            ->where('type', 'card')
+            ->sum('total') - $refundCardTotal;
 
         return [
             'cash_box_number' => $cashBoxNumber,
@@ -298,12 +330,18 @@ class CashRegisterClosureController extends Controller
             'period_end' => $periodEnd->format('d/m/Y H:i'),
             'sales_count' => $sales->count(),
             'sales_total' => round((float) $sales->sum('total'), 2),
+            'refunds_count' => $refunds->count(),
+            'refunds_total' => round((float) $refunds->sum('amount'), 2),
+            'refund_cash_total' => round((float) $refundCashTotal, 2),
+            'refund_card_total' => round((float) $refundCardTotal, 2),
             'expected_cash' => round((float) $expectedCash, 2),
             'card_total' => round((float) $cardTotal, 2),
             'other_total' => 0,
             'payment_breakdown' => $paymentBreakdown->all(),
+            'refund_breakdown' => $refundBreakdown->all(),
             'active_users' => $this->activeUsers($sales),
             'sales' => $sales->map(fn (Sale $sale) => $this->mapSale($sale))->values()->all(),
+            'refunds' => $refunds->map(fn (SaleCancellation $refund) => $this->mapRefund($refund))->values()->all(),
         ];
     }
 
@@ -358,6 +396,20 @@ class CashRegisterClosureController extends Controller
         ];
     }
 
+    private function mapRefund(SaleCancellation $refund): array
+    {
+        return [
+            'id' => $refund->id,
+            'sale_id' => $refund->sale_id,
+            'date' => $refund->cancelled_at?->format('d/m/Y H:i'),
+            'user' => $refund->cancelledBy?->name ?? 'Sin usuario',
+            'payment_method' => $refund->paymentMethod?->name ?? 'Sin metodo',
+            'cash_box_number' => $refund->cash_box_number ?: '1',
+            'total' => (float) $refund->amount,
+            'reason' => $refund->reason,
+        ];
+    }
+
     private function mapBranchSelector(Branch $branch): array
     {
         $current = $this->buildCurrentCut($branch);
@@ -365,6 +417,8 @@ class CashRegisterClosureController extends Controller
         return array_merge($this->mapBranch($branch), [
             'sales_count' => $current['sales_count'],
             'sales_total' => $current['sales_total'],
+            'refunds_count' => $current['refunds_count'],
+            'refunds_total' => $current['refunds_total'],
             'expected_cash' => $current['expected_cash'],
             'card_total' => $current['card_total'],
             'other_total' => $current['other_total'],
@@ -380,6 +434,8 @@ class CashRegisterClosureController extends Controller
             ->selectRaw('COUNT(*) as cuts_count')
             ->selectRaw('COALESCE(SUM(sales_count), 0) as sales_count')
             ->selectRaw('COALESCE(SUM(sales_total), 0) as sales_total')
+            ->selectRaw('COALESCE(SUM(refunds_count), 0) as refunds_count')
+            ->selectRaw('COALESCE(SUM(refunds_total), 0) as refunds_total')
             ->selectRaw('COALESCE(SUM(expected_cash), 0) as expected_cash')
             ->selectRaw('COALESCE(SUM(card_total), 0) as card_total')
             ->selectRaw('COALESCE(SUM(cash_difference), 0) as cash_difference')
@@ -395,6 +451,8 @@ class CashRegisterClosureController extends Controller
             'cuts_count' => (int) ($summary->cuts_count ?? 0),
             'sales_count' => (int) ($summary->sales_count ?? 0),
             'sales_total' => (float) ($summary->sales_total ?? 0),
+            'refunds_count' => (int) ($summary->refunds_count ?? 0),
+            'refunds_total' => (float) ($summary->refunds_total ?? 0),
             'expected_cash' => (float) ($summary->expected_cash ?? 0),
             'card_total' => (float) ($summary->card_total ?? 0),
             'cash_difference' => (float) ($summary->cash_difference ?? 0),
@@ -426,6 +484,10 @@ class CashRegisterClosureController extends Controller
             'period' => $closure->period_start?->format('d/m/Y H:i') . ' - ' . $closure->period_end?->format('d/m/Y H:i'),
             'sales_count' => $closure->sales_count,
             'sales_total' => (float) $closure->sales_total,
+            'refunds_count' => (int) ($closure->refunds_count ?? 0),
+            'refunds_total' => (float) ($closure->refunds_total ?? 0),
+            'refund_cash_total' => (float) ($closure->refund_cash_total ?? 0),
+            'refund_card_total' => (float) ($closure->refund_card_total ?? 0),
             'expected_cash' => (float) $closure->expected_cash,
             'card_total' => (float) $closure->card_total,
             'other_total' => (float) $closure->other_total,
@@ -493,6 +555,8 @@ class CashRegisterClosureController extends Controller
             'cuts_count' => (int) ($summary->cuts_count ?? 0),
             'sales_count' => (int) ($summary->sales_count ?? 0),
             'sales_total' => (float) ($summary->sales_total ?? 0),
+            'refunds_count' => (int) ($summary->refunds_count ?? 0),
+            'refunds_total' => (float) ($summary->refunds_total ?? 0),
             'expected_cash' => (float) ($summary->expected_cash ?? 0),
             'card_total' => (float) ($summary->card_total ?? 0),
             'other_total' => (float) ($summary->other_total ?? 0),
@@ -535,6 +599,10 @@ class CashRegisterClosureController extends Controller
             'period_end' => $closure->period_end?->format('d/m/Y H:i'),
             'sales_count' => (int) $closure->sales_count,
             'sales_total' => (float) $closure->sales_total,
+            'refunds_count' => (int) ($closure->refunds_count ?? 0),
+            'refunds_total' => (float) ($closure->refunds_total ?? 0),
+            'refund_cash_total' => (float) ($closure->refund_cash_total ?? 0),
+            'refund_card_total' => (float) ($closure->refund_card_total ?? 0),
             'expected_cash' => (float) $closure->expected_cash,
             'card_total' => (float) $closure->card_total,
             'other_total' => (float) $closure->other_total,
@@ -547,6 +615,7 @@ class CashRegisterClosureController extends Controller
             'card_difference' => (float) $closure->card_difference,
             'denomination_breakdown' => $closure->denomination_breakdown ?? [],
             'payment_breakdown' => $closure->payment_breakdown ?? [],
+            'refund_breakdown' => $closure->refund_breakdown ?? [],
             'notes' => $closure->notes,
         ];
 

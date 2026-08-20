@@ -167,6 +167,7 @@ const saleCards = computed(() => {
         { label: 'Folio', value: selectedSale.value.folio, tone: 'neutral' },
         { label: 'Fecha', value: selectedSale.value.date_display, tone: 'neutral' },
         { label: 'Vendedor', value: selectedSale.value.seller, tone: 'neutral' },
+        { label: 'Estado', value: selectedSale.value.status_label, tone: selectedSale.value.status_tone || 'neutral' },
         { label: 'Total pagado', value: money(selectedSale.value.total), tone: 'dark' },
     ]
 })
@@ -265,6 +266,19 @@ function closeSaleModal() {
                     no-data-message="Esta venta no tiene productos registrados."
                     :show-pagination="false"
                 />
+
+                <section
+                    v-if="selectedSale.cancellation"
+                    class="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-text"
+                >
+                    <p class="font-black">Cancelacion registrada</p>
+                    <div class="mt-2 grid gap-2 md:grid-cols-3">
+                        <p><span class="font-semibold opacity-60">Fecha:</span> {{ selectedSale.cancellation.cancelled_at_display }}</p>
+                        <p><span class="font-semibold opacity-60">Usuario:</span> {{ selectedSale.cancellation.cancelled_by }}</p>
+                        <p><span class="font-semibold opacity-60">Monto:</span> {{ money(selectedSale.cancellation.amount) }}</p>
+                    </div>
+                    <p class="mt-3 whitespace-pre-line">{{ selectedSale.cancellation.reason }}</p>
+                </section>
             </div>
         </GlobalModal>
     </PageLayout>

@@ -713,7 +713,7 @@ function handlePrinterChange(value) {
 }
 
 function resolvePrintJob(printJob) {
-  const cashBoxNumber = String(selectedCashBoxNumber.value || "1");
+  const cashBoxNumber = String(printJob?.cash_box_number || selectedCashBoxNumber.value || "1");
 
   return {
     ...printJob,
@@ -1387,6 +1387,7 @@ function handleSaleRegistered(payload = {}) {
   clearCart();
   saleForm.reset("items", "cash_received");
   saleForm.payment_method_id = props.defaultPaymentMethodId ?? "";
+  void refreshRealtimeProps(page, ["nearExpirationAlerts"]);
 
   if (printJob) {
     if (printerBridgeReady.value && selectedPrinterName.value) {
@@ -2044,6 +2045,7 @@ async function submitSale() {
           </div>
         </aside>
       </div>
+
     </template>
   </PageLayout>
 </template>
