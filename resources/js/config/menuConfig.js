@@ -1,6 +1,15 @@
 export function generateMenu(role, permissions = [], branches = []) {
     const can = (permission) => permissions.includes(permission);
     const canAny = (permissionList) => permissionList.some((permission) => can(permission));
+    const routeUrl = (name, params) => {
+        try {
+            return typeof route === "function" && route().has(name)
+                ? route(name, params)
+                : null;
+        } catch {
+            return null;
+        }
+    };
     const canRegisterSalesAttendance =
         ["Ventas", "Vendedor"].includes(role) && can("attendance.register");
 
@@ -305,6 +314,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         "sales.purchase-orders.view",
         "sales.purchase-orders.receive",
     ]);
+    const salesHistoryUrl = routeUrl("ventas.history");
 
     if (
         canUse("sales") ||
@@ -326,12 +336,12 @@ export function generateMenu(role, permissions = [], branches = []) {
                         icon: "point_of_sale",
                         url: route("ventas.home"),
                     },
-                    {
+                    ...(salesHistoryUrl ? [{
                         text: "Historial de ventas",
                         key: "sales.history",
                         icon: "receipt_long",
-                        url: route("ventas.history"),
-                    }]
+                        url: salesHistoryUrl,
+                    }] : [])]
                     : []),
                 ...(canUse("cashClosures")
                     ? [
