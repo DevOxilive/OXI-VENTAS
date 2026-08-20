@@ -327,8 +327,7 @@ function loadGoogleMaps() {
     }
 
     const script = document.createElement("script")
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(props.googleMapsApiKey)}&libraries=places&v=weekly`
-    script.async = true
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(props.googleMapsApiKey)}&libraries=places&v=weekly&loading=async`    script.async = true
     script.defer = true
     script.onload = () => resolve(window.google)
     script.onerror = () => reject(new Error("No fue posible cargar Google Maps."))
@@ -753,123 +752,50 @@ onBeforeUnmount(() => {
 <template>
   <PageLayout>
     <template #toolbar>
-      <GlobalToolbar
-        :icon="toolbarConfig.icon"
-        :title="toolbarConfig.title"
-        :subtitle="toolbarConfig.subtitle"
-        :search="search"
-        :search-placeholder="toolbarConfig.searchPlaceholder"
-        :show-search="toolbarConfig.showSearch"
-        :actions="toolbarConfig.actions"
-        :show-records-per-page="toolbarConfig.showRecordsPerPage"
-        :total-records="normalizedBranches.length"
-        :filtered-records="filteredBranches.length"
-        @update:search="search = $event"
-        @action="handleToolbarAction"
-      />
+      <GlobalToolbar :icon="toolbarConfig.icon" :title="toolbarConfig.title" :subtitle="toolbarConfig.subtitle"
+        :search="search" :search-placeholder="toolbarConfig.searchPlaceholder" :show-search="toolbarConfig.showSearch"
+        :actions="toolbarConfig.actions" :show-records-per-page="toolbarConfig.showRecordsPerPage"
+        :total-records="normalizedBranches.length" :filtered-records="filteredBranches.length"
+        @update:search="search = $event" @action="handleToolbarAction" />
     </template>
 
-    <GlobalTable
-      :items="filteredBranches"
-      :columns="branchTableConfig.columns"
-      :actions="branchActions"
-      :row-key="branchTableConfig.rowKey"
-      :no-data-message="branchTableConfig.noDataMessage"
-      :mobile-card-header-field="branchTableConfig.mobileCardHeaderField"
-      @action="handleTableAction"
-      @row-click="handleRowClick"
-    />
+    <GlobalTable :items="filteredBranches" :columns="branchTableConfig.columns" :actions="branchActions"
+      :row-key="branchTableConfig.rowKey" :no-data-message="branchTableConfig.noDataMessage"
+      :mobile-card-header-field="branchTableConfig.mobileCardHeaderField" @action="handleTableAction"
+      @row-click="handleRowClick" />
 
-    <GlobalModal
-      v-if="showCreateModal"
-      v-bind="modalConfig"
-      @save="submit"
-      @close="closeCreateModal"
-    >
+    <GlobalModal v-if="showCreateModal" v-bind="modalConfig" @save="submit" @close="closeCreateModal">
       <form @submit.prevent="submit" @input="handleBranchFormInput">
-        <FormPanel
-          title="Datos de la sucursal"
-          description="Captura el nombre y el color que identificara visualmente a la sucursal."
-          :heading-border="true"
-          body-class="space-y-5"
-        >
-          <InputField
-            v-model="form.name"
-            label="Nombre de sucursal"
-            field="name"
-            :readonly="isBranchFormReadonly"
-            placeholder="Ej. Ajusco"
-            :error="form.errors.name"
-          />
+        <FormPanel title="Datos de la sucursal"
+          description="Captura el nombre y el color que identificara visualmente a la sucursal." :heading-border="true"
+          body-class="space-y-5">
+          <InputField v-model="form.name" label="Nombre de sucursal" field="name" :readonly="isBranchFormReadonly"
+            placeholder="Ej. Ajusco" :error="form.errors.name" />
 
-          <ColorField
-            v-model="form.color"
-            label="Color"
-            field="color"
-            :disabled="isBranchFormReadonly"
-            :error="form.errors.color"
-          />
+          <ColorField v-model="form.color" label="Color" field="color" :disabled="isBranchFormReadonly"
+            :error="form.errors.color" />
 
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <InputField
-              v-model="form.street"
-              label="Calle"
-              field="street"
-              :readonly="isBranchFormReadonly"
-              :error="form.errors.street"
-            />
+            <InputField v-model="form.street" label="Calle" field="street" :readonly="isBranchFormReadonly"
+              :error="form.errors.street" />
 
-            <InputField
-              v-model="form.external_number"
-              label="Numero exterior"
-              field="external_number"
-              validation-field="externalNumber"
-              :readonly="isBranchFormReadonly"
-              :error="form.errors.external_number"
-            />
+            <InputField v-model="form.external_number" label="Numero exterior" field="external_number"
+              validation-field="externalNumber" :readonly="isBranchFormReadonly" :error="form.errors.external_number" />
 
-            <InputField
-              v-model="form.internal_number"
-              label="Numero interior"
-              field="internal_number"
-              validation-field="internalNumber"
-              :readonly="isBranchFormReadonly"
-              :error="form.errors.internal_number"
-            />
+            <InputField v-model="form.internal_number" label="Numero interior" field="internal_number"
+              validation-field="internalNumber" :readonly="isBranchFormReadonly" :error="form.errors.internal_number" />
 
-            <InputField
-              v-model="form.postal_code"
-              label="Codigo postal"
-              field="postal_code"
-              validation-field="postalCode"
-              :readonly="isBranchFormReadonly"
-              :error="form.errors.postal_code"
-            />
+            <InputField v-model="form.postal_code" label="Codigo postal" field="postal_code"
+              validation-field="postalCode" :readonly="isBranchFormReadonly" :error="form.errors.postal_code" />
 
-            <InputField
-              v-model="form.neighborhood"
-              label="Colonia"
-              field="neighborhood"
-              :readonly="isBranchFormReadonly"
-              :error="form.errors.neighborhood"
-            />
+            <InputField v-model="form.neighborhood" label="Colonia" field="neighborhood"
+              :readonly="isBranchFormReadonly" :error="form.errors.neighborhood" />
 
-            <InputField
-              v-model="form.municipality"
-              label="Municipio"
-              field="municipality"
-              :readonly="isBranchFormReadonly"
-              :error="form.errors.municipality"
-            />
+            <InputField v-model="form.municipality" label="Municipio" field="municipality"
+              :readonly="isBranchFormReadonly" :error="form.errors.municipality" />
 
-            <InputField
-              v-model="form.address_state"
-              label="Estado"
-              field="address_state"
-              validation-field="addressState"
-              :readonly="isBranchFormReadonly"
-              :error="form.errors.address_state"
-            />
+            <InputField v-model="form.address_state" label="Estado" field="address_state"
+              validation-field="addressState" :readonly="isBranchFormReadonly" :error="form.errors.address_state" />
           </div>
 
           <div class="space-y-4 rounded-2xl border border-secondary bg-secondary p-4">
@@ -884,77 +810,51 @@ onBeforeUnmount(() => {
                 </p>
               </div>
 
-              <a
-                :href="googleMapsOpenUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center justify-center rounded-xl border border-primary bg-background px-3 py-2 text-xs font-semibold text-primary transition hover:bg-secondary"
-              >
+              <a :href="googleMapsOpenUrl" target="_blank" rel="noopener noreferrer"
+                class="inline-flex items-center justify-center rounded-xl border border-primary bg-background px-3 py-2 text-xs font-semibold text-primary transition hover:bg-secondary">
                 Abrir mapa
               </a>
             </div>
 
             <div class="overflow-hidden rounded-2xl border border-secondary bg-background">
-              <div
-                ref="mapContainer"
-                class="h-72 w-full"
-              />
+              <div ref="mapContainer" class="h-72 w-full" />
             </div>
 
             <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div class="flex-1">
                 <p class="text-xs text-text opacity-70">
-                  Completa los datos de direccion y busca el punto. Tambien puedes seleccionarlo directamente en el mapa.
+                  Completa los datos de direccion y busca el punto. Tambien puedes seleccionarlo directamente en el
+                  mapa.
                 </p>
 
-                <p
-                  v-if="locationSearchError"
-                  class="mt-2 text-xs font-medium text-danger"
-                >
+                <p v-if="locationSearchError" class="mt-2 text-xs font-medium text-danger">
                   {{ locationSearchError }}
                 </p>
               </div>
 
-              <button
-                v-if="!isBranchFormReadonly"
-                type="button"
+              <button v-if="!isBranchFormReadonly" type="button"
                 class="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                :disabled="isSearchingAddress || !fullAddress"
-                @click="searchAddressLocation"
-              >
+                :disabled="isSearchingAddress || !fullAddress" @click="searchAddressLocation">
                 {{ isSearchingAddress ? "Buscando..." : "Buscar ubicacion" }}
               </button>
             </div>
 
             <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div class="flex-1">
-                <InputField
-                  v-model="form.maps_url"
-                  label="Enlace de Google Maps"
-                  field="maps_url"
-                  :readonly="true"
-                  :preserve-case="true"
-                  placeholder="Se genera al seleccionar la ubicacion"
-                  :error="form.errors.maps_url || form.errors.attendance_latitude"
-                />
+                <InputField v-model="form.maps_url" label="Enlace de Google Maps" field="maps_url" :readonly="true"
+                  :preserve-case="true" placeholder="Se genera al seleccionar la ubicacion"
+                  :error="form.errors.maps_url || form.errors.attendance_latitude" />
               </div>
 
               <div class="flex gap-2">
-                <button
-                  type="button"
+                <button type="button"
                   class="inline-flex min-h-10 items-center justify-center rounded-xl border border-secondary bg-background px-3 text-xs font-semibold text-text transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="!selectedMapCoordinates"
-                  @click="copyGoogleMapsLocation"
-                >
+                  :disabled="!selectedMapCoordinates" @click="copyGoogleMapsLocation">
                   Copiar ubicación
                 </button>
 
-                <a
-                  :href="googleMapsOpenUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex min-h-10 items-center justify-center rounded-xl border border-primary bg-background px-3 text-xs font-semibold text-primary transition hover:bg-secondary"
-                >
+                <a :href="googleMapsOpenUrl" target="_blank" rel="noopener noreferrer"
+                  class="inline-flex min-h-10 items-center justify-center rounded-xl border border-primary bg-background px-3 text-xs font-semibold text-primary transition hover:bg-secondary">
                   Abrir Google Maps
                 </a>
               </div>
@@ -969,12 +869,9 @@ onBeforeUnmount(() => {
                 Longitud: {{ form.attendance_longitude || "Sin punto" }}
               </span>
 
-              <button
-                v-if="!isBranchFormReadonly && selectedMapCoordinates"
-                type="button"
+              <button v-if="!isBranchFormReadonly && selectedMapCoordinates" type="button"
                 class="rounded-full border border-secondary bg-background px-3 py-1 font-semibold text-primary"
-                @click="clearAttendanceLocation"
-              >
+                @click="clearAttendanceLocation">
                 Limpiar punto
               </button>
             </div>
@@ -986,33 +883,16 @@ onBeforeUnmount(() => {
                     Radio permitido para asistencias
                   </label>
 
-                  <input
-                    id="branch-geofence-radius-range"
-                    v-model.number="form.attendance_geofence_radius_meters"
-                    type="range"
-                    min="10"
-                    max="1000"
-                    step="10"
-                    :disabled="isBranchFormReadonly"
-                    class="mt-3 w-full accent-primary"
-                    @input="clampGeofenceRadius"
-                    @change="clampGeofenceRadius"
-                  >
+                  <input id="branch-geofence-radius-range" v-model.number="form.attendance_geofence_radius_meters"
+                    type="range" min="10" max="1000" step="10" :disabled="isBranchFormReadonly"
+                    class="mt-3 w-full accent-primary" @input="clampGeofenceRadius" @change="clampGeofenceRadius">
                 </div>
 
                 <div class="w-full sm:w-36">
-                  <InputField
-                    v-model="form.attendance_geofence_radius_meters"
-                    label="Metros"
-                    field="attendance-geofence-radius"
-                    type="number"
-                    min="10"
-                    max="1000"
-                    :readonly="isBranchFormReadonly"
-                    :error="form.errors.attendance_geofence_radius_meters"
-                    @input="clampGeofenceRadius"
-                    @blur="clampGeofenceRadius"
-                  />
+                  <InputField v-model="form.attendance_geofence_radius_meters" label="Metros"
+                    field="attendance-geofence-radius" type="number" min="10" max="1000"
+                    :readonly="isBranchFormReadonly" :error="form.errors.attendance_geofence_radius_meters"
+                    @input="clampGeofenceRadius" @blur="clampGeofenceRadius" />
                 </div>
               </div>
 
