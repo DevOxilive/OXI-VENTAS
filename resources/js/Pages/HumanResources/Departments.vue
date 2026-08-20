@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from "vue";
+import { Head } from "@inertiajs/vue3";
 
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
@@ -10,14 +11,13 @@ import TextareaField from "@/Components/Forms/TextareaField.vue";
 import ToggleSwitch from "@/Components/Forms/ToggleSwitch.vue";
 import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import GlobalToolbar from "@/Components/Toolbars/GlobalToolbar.vue";
-import OrganizationTablePanel from "@/Components/HumanResourses/OrganizationTablePanel.vue";
+import GlobalTable from "@/Components/Tables/GlobalTable.vue";
 import { usePermissions } from "@/Composables/usePermissions";
 import { useOrganizationStructure } from "@/Composables/HumanResources/useOrganizationStructure";
 import {
     departmentTableConfig,
     positionTableConfig,
 } from "@/config/TableConfigs/organizationStructureTableConfig";
-import { getOrganizationTableToolbarConfig } from "@/config/ToolbarConfigs/organizationStructureToolbarConfig";
 
 defineOptions({ layout: AdminLayout });
 
@@ -33,6 +33,7 @@ const props = defineProps({
 });
 
 const { can } = usePermissions();
+const activeSection = ref(can("departments.view") ? "departments" : "positions");
 const departmentSearch = ref("");
 const positionSearch = ref("");
 
@@ -49,16 +50,6 @@ const {
     submit,
     deleteRecord,
 } = useOrganizationStructure(props);
-
-const departmentToolbarConfig = computed(() => getOrganizationTableToolbarConfig({
-    entity: "department",
-    canCreate: can("departments.create"),
-}));
-
-const positionToolbarConfig = computed(() => getOrganizationTableToolbarConfig({
-    entity: "position",
-    canCreate: can("positions.create"),
-}));
 
 function visibleActions(config) {
     return config.actions.map((action) => ({
@@ -97,6 +88,67 @@ const departmentOptions = computed(() => props.departments.map((department) => (
     label: department.active ? department.name : `${department.name} (Inactivo)`,
 })));
 
+const isDepartmentSection = computed(() => activeSection.value === "departments");
+const sectionTabs = computed(() => [
+    can("departments.view") && {
+        key: "departments",
+        label: "Departamentos",
+        icon: "domain",
+    },
+    can("positions.view") && {
+        key: "positions",
+        label: "Puestos",
+        icon: "badge",
+    },
+].filter(Boolean));
+const activeRows = computed(() => (
+    isDepartmentSection.value ? filteredDepartments.value : filteredPositions.value
+));
+const activeTotalRecords = computed(() => (
+    isDepartmentSection.value ? props.departments.length : props.positions.length
+));
+const activeTableConfig = computed(() => (
+    isDepartmentSection.value ? departmentTableConfig : positionTableConfig
+));
+const activeTableActions = computed(() => (
+    isDepartmentSection.value ? departmentActions.value : positionActions.value
+));
+const activeSearch = computed(() => (
+    isDepartmentSection.value ? departmentSearch.value : positionSearch.value
+));
+const activeCreatePermission = computed(() => (
+    isDepartmentSection.value ? can("departments.create") : can("positions.create")
+));
+const toolbarConfig = computed(() => ({
+    icon: "account_tree",
+    title: "Registro de Departamentos",
+    subtitle: isDepartmentSection.value
+        ? "Administra los departamentos internos de Capital Humano."
+        : "Administra los puestos disponibles y su relación con cada departamento.",
+    search: activeSearch.value,
+    searchPlaceholder: isDepartmentSection.value
+        ? "Buscar departamento..."
+        : "Buscar puesto o departamento...",
+    showSearch: true,
+    compactFilters: true,
+    filters: [],
+    actions: [
+        {
+            id: "create",
+            label: isDepartmentSection.value ? "Dar de alta departamento" : "Dar de alta puesto",
+            icon: isDepartmentSection.value ? "domain_add" : "person_add",
+            variant: "primary",
+            hidden: () => !activeCreatePermission.value,
+        },
+    ],
+    tabs: sectionTabs.value,
+    activeTab: activeSection.value,
+    showRecordsPerPage: false,
+    totalRecords: activeTotalRecords.value,
+    filteredRecords: activeRows.value.length,
+    showCounter: true,
+}));
+
 const isReadOnly = computed(() => modalMode.value === "view");
 const departmentPositions = computed(() => selectedRecord.value?.positions || []);
 
@@ -128,54 +180,56 @@ function handleTableAction(targetEntity, { action, row }) {
 
     openModal(targetEntity, action, row);
 }
+
+function updateSection(section) {
+    if (!sectionTabs.value.some((tab) => tab.key === section)) return;
+    activeSection.value = section;
+}
+
+function updateSearch(value) {
+    if (isDepartmentSection.value) {
+        departmentSearch.value = value;
+        return;
+    }
+
+    positionSearch.value = value;
+}
+
+function handleToolbarAction(action) {
+    if (action !== "create") return;
+    openModal(isDepartmentSection.value ? "department" : "position", "create");
+}
+
+function handleActiveTableAction(event) {
+    handleTableAction(isDepartmentSection.value ? "department" : "position", event);
+}
 </script>
 
 <template>
+    <Head title="Registro de Departamentos" />
+
     <PageLayout>
         <template #toolbar>
             <GlobalToolbar
-                icon="account_tree"
-                title="Registro de Departamentos"
-                subtitle="Administra departamentos y los puestos que pertenecen a cada uno"
-                :show-search="false"
-                :show-records-per-page="false"
-                :show-counter="false"
+                v-bind="toolbarConfig"
+                @update:search="updateSearch"
+                @update:active-tab="updateSection"
+                @action="handleToolbarAction"
             />
         </template>
 
-        <div class="grid items-start gap-5 2xl:grid-cols-2">
-            <OrganizationTablePanel
-                :icon="departmentToolbarConfig.icon"
-                :title="departmentToolbarConfig.title"
-                :subtitle="departmentToolbarConfig.subtitle"
-                :search-placeholder="departmentToolbarConfig.searchPlaceholder"
-                :search="departmentSearch"
-                :items="filteredDepartments"
-                :total-records="departments.length"
-                :table-config="departmentTableConfig"
-                :table-actions="departmentActions"
-                :toolbar-actions="departmentToolbarConfig.actions"
-                @update:search="departmentSearch = $event"
-                @create="openModal('department', 'create')"
-                @action="handleTableAction('department', $event)"
+        <section class="space-y-5">
+            <GlobalTable
+                :items="activeRows"
+                :columns="activeTableConfig.columns"
+                :actions="activeTableActions"
+                :row-key="activeTableConfig.rowKey"
+                :no-data-message="activeTableConfig.noDataMessage"
+                :mobile-card-header-field="activeTableConfig.mobileCardHeaderField"
+                :show-pagination="false"
+                @action="handleActiveTableAction"
             />
-
-            <OrganizationTablePanel
-                :icon="positionToolbarConfig.icon"
-                :title="positionToolbarConfig.title"
-                :subtitle="positionToolbarConfig.subtitle"
-                :search-placeholder="positionToolbarConfig.searchPlaceholder"
-                :search="positionSearch"
-                :items="filteredPositions"
-                :total-records="positions.length"
-                :table-config="positionTableConfig"
-                :table-actions="positionActions"
-                :toolbar-actions="positionToolbarConfig.actions"
-                @update:search="positionSearch = $event"
-                @create="openModal('position', 'create')"
-                @action="handleTableAction('position', $event)"
-            />
-        </div>
+        </section>
 
         <GlobalModal
             v-if="showModal"
