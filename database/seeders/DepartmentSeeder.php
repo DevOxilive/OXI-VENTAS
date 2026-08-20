@@ -9,20 +9,6 @@ class DepartmentSeeder extends Seeder
 {
     public function run(): void
     {
-        $departments = [
-            ['name' => 'Administración', 'active' => true],
-            ['name' => 'Ventas', 'active' => true],
-            ['name' => 'Inventario', 'active' => true],
-            ['name' => 'Logística', 'active' => true],
-            ['name' => 'Sistemas', 'active' => true],
-            ['name' => 'Recursos Humanos', 'active' => true],
-        ];
-
-        foreach ($departments as $department) {
-            DB::table('departments')->updateOrInsert(
-                ['name' => $department['name']],
-                array_merge($department, ['created_at' => now(), 'updated_at' => now()])
-            );
-        }
+        // Seeder intencionalmente vacío para pruebas limpias en servidor.
     }
 }

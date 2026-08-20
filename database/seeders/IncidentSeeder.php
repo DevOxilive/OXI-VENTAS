@@ -9,15 +9,6 @@ class IncidentSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('incidents')->updateOrInsert(
-            ['id' => 1],
-            [
-                'trip_id' => 1,
-                'description' => 'Ruta sin incidencias; entrega recibida completa.',
-                'date' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]
-        );
+        // Seeder intencionalmente vacío para pruebas limpias en servidor.
     }
 }

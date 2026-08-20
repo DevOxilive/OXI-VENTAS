@@ -8,8 +8,6 @@ class InventoryReportSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call([
-            InventoryBranchHistorySeeder::class,
-        ]);
+        // Seeder intencionalmente vacío para pruebas limpias en servidor.
     }
 }

@@ -27,6 +27,9 @@ class InventoryBranchHistorySeeder extends Seeder
 
     public function run(): void
     {
+        // Seeder intencionalmente vacío para pruebas limpias en servidor.
+        return;
+
         Event::fakeFor(function () {
             $stockService = app(StockMovementService::class);
             $categories = $this->categories();

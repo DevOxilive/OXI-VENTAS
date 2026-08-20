@@ -11,26 +11,9 @@ class DatabaseSeeder extends Seeder
         $this->call([
             PermissionSeeder::class,
             RoleSeeder::class,
-
-            DepartmentSeeder::class,
-            PositionSeeder::class,
-            EmployeeSeeder::class,
-            BranchSeeder::class,
             ProductDepartmentSeeder::class,
             ProductCategorySeeder::class,
             UsersSeeder::class,
-
-            SupplierSeeder::class,
-            CustomerSeeder::class,
-            PaymentMethodSeeder::class,
-
-            VehicleSeeder::class,
-            TripSeeder::class,
-            TripDetailSeeder::class,
-            IncidentSeeder::class,
-            InventoryReportSeeder::class,
-            SalesOperationsSeeder::class,
-            PhysicalCountDemoSeeder::class,
         ]);
     }
 }

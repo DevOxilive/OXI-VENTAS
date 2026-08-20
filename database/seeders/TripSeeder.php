@@ -9,20 +9,6 @@ class TripSeeder extends Seeder
 {
     public function run(): void
     {
-        $employeeId = DB::table('employees')->value('id') ?? 1;
-
-        DB::table('trips')->updateOrInsert(
-            ['id' => 1],
-            [
-                'departure_date' => now(),
-                'arrival_date' => null,
-                'employee_id' => $employeeId,
-                'vehicle_id' => 1,
-                'destination' => 'Ruta Ajusco - Diana para reposición de stock',
-                'status' => 'pending',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]
-        );
+        // Seeder intencionalmente vacío para pruebas limpias en servidor.
     }
 }

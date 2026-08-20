@@ -22,6 +22,9 @@ class PhysicalCountDemoSeeder extends Seeder
 
     public function run(): void
     {
+        // Seeder intencionalmente vacío para pruebas limpias en servidor.
+        return;
+
         DB::transaction(function () {
             $this->clearPreviousSeedData();
 

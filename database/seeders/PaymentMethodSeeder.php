@@ -9,21 +9,6 @@ class PaymentMethodSeeder extends Seeder
 {
     public function run(): void
     {
-        $methods = [
-            ['id' => 1, 'name' => 'Efectivo', 'active' => true],
-            ['id' => 2, 'name' => 'Tarjeta', 'active' => true],
-            ['id' => 3, 'name' => 'Transferencia', 'active' => true],
-            ['id' => 4, 'name' => 'Mixto', 'active' => true],
-        ];
-
-        foreach ($methods as $method) {
-            DB::table('payment_methods')->updateOrInsert(
-                ['id' => $method['id']],
-                array_merge($method, [
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ])
-            );
-        }
+        // Seeder intencionalmente vacío para pruebas limpias en servidor.
     }
 }

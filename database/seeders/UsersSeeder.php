@@ -2,88 +2,137 @@
 
 namespace Database\Seeders;
 
-use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class UsersSeeder extends Seeder
 {
+    private const BASE_PASSWORD = '123123123';
+
     public function run(): void
     {
-        User::query()
-            ->where('email', 'brayan@oxilive.com.mx')
-            ->delete();
-
         $users = [
-            ['name' => 'Kevin', 'email' => 'kevin@oxilive.com.mx', 'role' => 'Sistemas', 'branches' => []],
-            ['name' => 'Asael', 'email' => 'asael@oxilive.com.mx', 'role' => 'Super Administrador', 'branches' => 'all'],
-            ['name' => 'Ana', 'email' => 'ana.lilia@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Ajusco', 'Diana']],
-            ['name' => 'Laura', 'email' => 'laura@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Lago', 'Cecilia']],
-            ['name' => 'Blanca', 'email' => 'blanca@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Ajusco']],
-            ['name' => 'Diana', 'email' => 'diana@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Diana']],
-            ['name' => 'Rodrigo', 'email' => 'rodrigo@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Lago']],
-            ['name' => 'Tono', 'email' => 'tono@oxilive.com.mx', 'role' => 'Inventario', 'branches' => ['Cecilia']],
-            ['name' => 'Margarita', 'email' => 'margarita@oxilive.com.mx', 'role' => 'Ventas', 'branches' => ['Ajusco', 'Diana']],
-            ['name' => 'Mairani', 'email' => 'mairani@oxilive.com.mx', 'role' => 'Ventas', 'branches' => ['Lago', 'Cecilia']],
-            ['name' => 'Patria', 'email' => 'patria@oxilive.com.mx', 'role' => 'Recursos Humanos', 'branches' => []],
-            ['name' => 'Doctor Carlos', 'email' => 'carlos@oxilive.com.mx', 'role' => 'Administrador', 'branches' => 'all'],
-            ['name' => 'Adriana Cuevas', 'email' => 'adriana.cuevas@oxilive.com.mx', 'role' => 'Super Administrador', 'branches' => 'all'],
+            [
+                'name' => 'Sistemas',
+                'email' => 'sistemas@oxilive.com.mx',
+                'role' => 'Super Administrador',
+                'first_name' => 'Sistemas',
+                'last_name' => 'OXI',
+                'department' => 'Sistemas',
+                'position' => 'Sistemas',
+            ],
+            [
+                'name' => 'Doctor Carlos',
+                'email' => 'carlos@oxilive.com.mx',
+                'role' => 'Administrador',
+                'first_name' => 'Doctor',
+                'last_name' => 'Carlos',
+                'department' => 'Administracion',
+                'position' => 'Administrador general',
+            ],
+            [
+                'name' => 'Patria',
+                'email' => 'patria@oxilive.com.mx',
+                'role' => 'Recursos Humanos',
+                'first_name' => 'Patria',
+                'last_name' => 'Mendoza',
+                'department' => 'Recursos Humanos',
+                'position' => 'Auxiliar RH',
+            ],
         ];
 
-        $branchIdsByName = Branch::query()
-            ->where('active', true)
-            ->pluck('id', 'name')
-            ->map(fn ($id) => (int) $id);
-        $allBranchIds = $branchIdsByName->values()->all();
+        $allowedEmails = collect($users)->pluck('email')->all();
+
+        User::query()
+            ->whereNotIn('email', $allowedEmails)
+            ->get()
+            ->each(function (User $user): void {
+                $user->permissions()->sync([]);
+                $user->branches()->sync([]);
+                $user->delete();
+            });
 
         foreach ($users as $userData) {
-            $employee = Employee::query()->where('email', $userData['email'])->firstOrFail();
-            $role = Role::query()->where('name', $userData['role'])->firstOrFail();
+            $role = Role::query()
+                ->where('name', $userData['role'])
+                ->firstOrFail();
+            $employee = $this->employeeFor($userData);
 
-            $user = User::updateOrCreate(
+            $user = User::withTrashed()->updateOrCreate(
                 ['email' => $userData['email']],
                 [
                     'employee_id' => $employee->id,
                     'name' => $userData['name'],
-                    'password' => Hash::make('123123123'),
+                    'password' => Hash::make(self::BASE_PASSWORD),
                     'role_id' => $role->id,
-                    'branch_id' => $this->primaryBranchId($userData['branches'], $branchIdsByName),
+                    'branch_id' => null,
                     'is_active' => true,
                 ],
             );
 
+            if ($user->trashed()) {
+                $user->restore();
+            }
+
             $user->forceFill(['email_verified_at' => now()])->save();
-
-            // Los permisos directos se limpian para que el rol sea la fuente real.
             $user->permissions()->sync([]);
-            $user->branches()->sync($this->branchIdsForUser($userData['branches'], $branchIdsByName, $allBranchIds));
+            $user->branches()->sync([]);
         }
     }
 
-    private function branchIdsForUser(array|string $branches, $branchIdsByName, array $allBranchIds): array
+    private function employeeFor(array $userData): Employee
     {
-        if ($branches === 'all') {
-            return $allBranchIds;
+        DB::table('departments')->updateOrInsert(
+            ['name' => $userData['department']],
+            [
+                'active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $departmentId = DB::table('departments')
+            ->where('name', $userData['department'])
+            ->value('id');
+
+        DB::table('positions')->updateOrInsert(
+            [
+                'name' => $userData['position'],
+                'department_id' => $departmentId,
+            ],
+            [
+                'description' => 'Puesto base para acceso inicial al sistema.',
+                'active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $positionId = DB::table('positions')
+            ->where('name', $userData['position'])
+            ->where('department_id', $departmentId)
+            ->value('id');
+
+        $employee = Employee::withTrashed()->updateOrCreate(
+            ['email' => $userData['email']],
+            [
+                'first_name' => $userData['first_name'],
+                'last_name' => $userData['last_name'],
+                'employment_status' => 'Activo',
+                'start_date' => now()->toDateString(),
+                'phone' => null,
+                'position_id' => $positionId,
+            ],
+        );
+
+        if ($employee->trashed()) {
+            $employee->restore();
         }
 
-        return collect($branches)
-            ->map(fn (string $branchName) => $branchIdsByName[$branchName] ?? null)
-            ->filter()
-            ->values()
-            ->all();
-    }
-
-    private function primaryBranchId(array|string $branches, $branchIdsByName): ?int
-    {
-        if ($branches === 'all' || $branches === []) {
-            return null;
-        }
-
-        $firstBranchName = collect($branches)->first();
-
-        return $firstBranchName ? ($branchIdsByName[$firstBranchName] ?? null) : null;
+        return $employee;
     }
 }
