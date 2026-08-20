@@ -22,6 +22,10 @@ const props = defineProps({
         type: String,
         default: '',
     },
+    icon: {
+        type: String,
+        default: '',
+    },
     highlighted: {
         type: Boolean,
         default: false,
@@ -127,6 +131,16 @@ const checkboxStyle = computed(() => ({
                     />
                 </svg>
             </span>
+        </span>
+
+        <span
+            v-if="icon"
+            class="grid h-10 w-10 shrink-0 place-items-center rounded-xl transition"
+            :class="checked
+                ? 'bg-primary text-white'
+                : 'bg-secondary text-primary group-hover:bg-primary group-hover:text-white'"
+        >
+            <span class="material-symbols-outlined text-[21px]">{{ icon }}</span>
         </span>
 
         <div class="min-w-0 flex-1">

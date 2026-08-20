@@ -163,7 +163,7 @@ function getActionButtonClasses(action) {
 </script>
 
 <template>
-  <div class="space-y-2 bg-secondary p-3 md:hidden">
+  <div class="space-y-2 bg-secondary p-3 lg:hidden">
     <article v-for="tableRow in tableRows" :key="tableRow.key"
       class="rounded-2xl border border-secondary bg-background p-3 shadow-sm" @click="handleRowClick(tableRow.row)">
       <div class="flex justify-between items-start gap-3">

@@ -158,7 +158,7 @@ function columnStyle(column) {
 </script>
 
 <template>
-  <div class="hidden max-h-[560px] max-w-full overflow-x-auto overflow-y-auto md:block">
+  <div class="hidden max-h-[560px] max-w-full overflow-x-auto overflow-y-auto lg:block">
       <table class="w-max min-w-full table-auto border-collapse text-sm">
         <thead class="border-b border-secondary bg-secondary text-text">
           <tr>

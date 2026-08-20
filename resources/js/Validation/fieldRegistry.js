@@ -306,6 +306,15 @@ export const fieldRegistry = {
         message: "La cantidad permite hasta 999.999 kilogramos.",
     },
 
+    product_piece_quantity: {
+        required: true,
+        type: "decimal",
+        max: 13,
+        maxIntegerDigits: 6,
+        maxDecimalDigits: 6,
+        message: "La cantidad permite maximo 6 enteros y 6 decimales.",
+    },
+
     description: {
         required: false,
         type: "text",
@@ -320,6 +329,15 @@ export const fieldRegistry = {
         message: "El costo debe ser un número válido con máximo 2 decimales.",
     },
 
+    product_price: {
+        required: true,
+        type: "decimal",
+        max: 7,
+        maxIntegerDigits: 4,
+        maxDecimalDigits: 2,
+        message: "El precio permite maximo 4 enteros y 2 decimales.",
+    },
+
     sale_price: {
         required: true,
         type: "decimal",
@@ -332,6 +350,8 @@ export const fieldRegistry = {
         required: false,
         type: "decimal",
         max: 6,
+        maxIntegerDigits: 3,
+        maxDecimalDigits: 2,
         message:
             "El porcentaje debe ser un número válido con máximo 2 decimales.",
     },

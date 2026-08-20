@@ -89,6 +89,14 @@ const props = defineProps({
         type: Object,
         default: () => ({}),
     },
+    sections: {
+        type: Array,
+        default: () => [],
+    },
+    activeSection: {
+        type: [Number, String],
+        default: null,
+    },
 })
 
 const emit = defineEmits(['save', 'close'])
@@ -122,6 +130,8 @@ const layoutProps = computed(() => ({
     closeOnBackdrop: props.closeOnBackdrop,
     contentClass: props.contentClass,
     panelClass: props.panelClass,
+    sections: props.sections,
+    activeSection: props.activeSection,
 }))
 
 function closeModal() {

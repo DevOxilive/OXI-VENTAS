@@ -21,7 +21,7 @@ export function getProductModalConfig({
         closeButtonText: 'Cancelar',
         ...modalPresets.workspace,
         size: 'full',
-        height: 'auto',
+        height: 'full',
         alerts: {
             entityName: 'Producto',
             create: {

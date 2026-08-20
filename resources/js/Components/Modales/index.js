@@ -4,6 +4,7 @@ export { default as ModalDesktop } from './ModalDesktop.vue'
 export { default as ModalFooter } from './ModalFooter.vue'
 export { default as ModalHeader } from './ModalHeader.vue'
 export { default as ModalMobile } from './ModalMobile.vue'
+export { default as ModalSectionNavigation } from './ModalSectionNavigation.vue'
 export {
     confirmModalAction,
     getModalActionMessages,

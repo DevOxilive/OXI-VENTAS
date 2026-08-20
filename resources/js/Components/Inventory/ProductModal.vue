@@ -61,8 +61,11 @@ const form = useForm({
   grams: null,
   record_version: "",
 });
-const categoryInputMode = ref("select");
-const syncingCategoryFields = ref(false);
+const activeStep = ref(1);
+const modalSections = [
+  { id: 1, label: "Datos y precios" },
+  { id: 2, label: "Sucursales activas" },
+];
 const marginPercentage = ref("");
 const pricingDriver = ref("percentage");
 const syncingPricing = ref(false);
@@ -166,7 +169,7 @@ watch(
   () => props.product,
   (product) => {
     form.reset();
-    categoryInputMode.value = "select";
+    activeStep.value = 1;
 
     if (!product) return;
 
@@ -212,6 +215,9 @@ const units = [
 
 const isKilogramUnit = computed(() => form.inventory_unit === "kg");
 const hasBoxPresentation = computed(() => Boolean(form.has_box_presentation));
+const selectedBranchIds = computed(() =>
+  new Set(form.branch_ids.map((branchId) => Number(branchId)))
+);
 const categoriesForDepartment = computed(() => {
   if (!form.product_department_id) return [];
 
@@ -233,18 +239,20 @@ const modalConfig = computed(() =>
   })
 );
 
-function toggleCategoryInputMode() {
-  if (categoryInputMode.value === "select") {
-    categoryInputMode.value = "text";
-    form.category_id = "";
-    form.clearErrors("category_id");
+function goToStep(step) {
+  activeStep.value = step;
+}
+
+function goToFirstInvalidStep(errors) {
+  const fields = Object.keys(errors || {});
+  if (fields.length > 0 && fields.every((field) => field === "branch_ids")) {
+    activeStep.value = 2;
     return;
   }
 
-  categoryInputMode.value = "select";
-  form.category_name = "";
-  form.clearErrors("category_name");
+  activeStep.value = 1;
 }
+
 const imagePreview = computed(() => {
   if (filePreviewUrl.value) return filePreviewUrl.value;
   if (!form.image || form.image instanceof File) return null;
@@ -338,7 +346,6 @@ function setCreateDefaults() {
   form.barcodes = [""];
   form.branch_ids = [];
   ensureCurrentBranchSelected();
-  categoryInputMode.value = "select";
   form.inventory_unit = "pza";
   form.has_box_presentation = false;
   form.pieces_per_box = "";
@@ -378,12 +385,16 @@ function ensureCurrentBranchSelected() {
 function toggleBranchSelection(branchId) {
   if (props.mode === "view" || isCurrentBranch(branchId)) return;
 
-  if (form.branch_ids.includes(branchId)) {
-    form.branch_ids = form.branch_ids.filter((id) => id !== branchId);
+  if (selectedBranchIds.value.has(Number(branchId))) {
+    form.branch_ids = form.branch_ids.filter((id) => Number(id) !== Number(branchId));
     return;
   }
 
   form.branch_ids = [...form.branch_ids, branchId];
+}
+
+function isBranchSelected(branchId) {
+  return selectedBranchIds.value.has(Number(branchId));
 }
 
 watch(
@@ -442,8 +453,6 @@ watch(
 watch(
   () => form.product_department_id,
   () => {
-    if (syncingCategoryFields.value) return;
-
     const selectedCategoryBelongsToDepartment = categoriesForDepartment.value.some((category) => {
       return Number(category.id) === Number(form.category_id);
     });
@@ -457,14 +466,12 @@ watch(
 watch(
   () => form.category_id,
   (categoryId) => {
-    if (syncingCategoryFields.value || !categoryId) return;
+    if (!categoryId) return;
 
     const category = props.categoriesDB.find((item) => Number(item.id) === Number(categoryId));
 
     if (category?.product_department_id) {
-      syncingCategoryFields.value = true;
       form.product_department_id = category.product_department_id;
-      syncingCategoryFields.value = false;
     }
   }
 );
@@ -520,11 +527,7 @@ function submit() {
     return;
   }
   ensureCurrentBranchSelected();
-  if (categoryInputMode.value === "text") {
-    form.category_id = "";
-  } else {
-    form.category_name = "";
-  }
+  form.category_name = "";
   if (props.mode === "create") {
     form.post(
       route("inventory.branches.products.store", {
@@ -540,7 +543,9 @@ function submit() {
 
           emit("close");
         },
-        onError: () => {
+        onError: (errors) => {
+          goToFirstInvalidStep(errors);
+
           const barcodeError = form.errors["barcodes.0"];
 
           if (barcodeError) {
@@ -585,6 +590,8 @@ function submit() {
             emit("close");
           },
           onError: (errors) => {
+            goToFirstInvalidStep(errors);
+
             const barcodeError =
               errors["barcodes.0"] ||
               errors.barcodes ||
@@ -627,10 +634,13 @@ function submit() {
 <template>
   <GlobalModal
     v-bind="modalConfig"
+    :sections="modalSections"
+    :active-section="activeStep"
+    :show-footer="false"
     @save="submit"
     @close="$emit('close')"
   >
-    <div class="rounded-[28px] border border-secondary bg-background p-4 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.18)] md:p-5 xl:p-6">
+    <div class="bg-background p-4 md:p-5 xl:p-6">
       <input
         ref="fileInput"
         type="file"
@@ -639,15 +649,15 @@ function submit() {
         @change="handleFileChange"
       />
 
-      <div class="grid grid-cols-1 gap-4 xl:grid-cols-[210px_340px_minmax(0,1fr)]">
-        <section class="hidden xl:block">
-          <div class="mb-3">
-            <h3 class="text-sm font-semibold text-text">Imagen</h3>
-          </div>
-
+      <div
+        v-show="activeStep === 1"
+        class="grid gap-5"
+        :class="'grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)]'"
+      >
+        <section class="hidden xl:flex xl:flex-col">
           <button
             type="button"
-            class="flex min-h-[286px] w-full items-center justify-center rounded-[24px] border border-dashed bg-secondary p-4 text-left transition"
+            class="flex h-full min-h-[480px] w-full items-center justify-center rounded-[24px] border border-dashed bg-secondary p-4 text-left transition"
             :class="
               mode === 'view'
                 ? 'cursor-default border-secondary'
@@ -685,10 +695,6 @@ function submit() {
         </section>
 
         <section class="space-y-3 xl:hidden">
-          <div>
-            <h3 class="text-sm font-semibold text-text">Imagen</h3>
-          </div>
-
           <button
             type="button"
             class="flex min-h-[180px] w-full items-center justify-center rounded-[22px] border border-dashed bg-secondary p-4 text-left transition"
@@ -726,16 +732,11 @@ function submit() {
           </button>
         </section>
 
+        <div class="min-w-0 space-y-4">
         <section class="space-y-3">
-          <div>
-            <h3 class="text-sm font-semibold text-text">Códigos de barras</h3>
-          </div>
-
-          <div class="rounded-[22px] border border-secondary bg-secondary p-3">
+          <div class="border-y border-secondary py-4">
             <div class="mb-3 flex items-center justify-between gap-3">
-              <p class="text-xs font-medium text-text opacity-70">
-                {{ form.barcodes.length > 1 ? `${form.barcodes.length} códigos capturados` : 'Captura el código principal' }}
-              </p>
+              <span aria-hidden="true"></span>
 
               <button
                 v-if="mode !== 'view'"
@@ -747,7 +748,7 @@ function submit() {
               </button>
             </div>
 
-            <div class="max-h-[250px] space-y-2 overflow-y-auto pr-1">
+            <div class="max-h-[152px] space-y-2 overflow-y-auto pr-1">
               <div
                 v-for="(barcode, index) in form.barcodes"
                 :key="index"
@@ -778,9 +779,6 @@ function submit() {
         </section>
 
         <section class="space-y-4">
-          <div>
-            <h3 class="text-sm font-semibold text-text">Datos básicos</h3>
-          </div>
 
           <div class="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
             <InputField
@@ -794,84 +792,25 @@ function submit() {
               class="md:col-span-2 2xl:col-span-3"
             />
 
-            <template v-if="categoryInputMode === 'select'">
-              <SelectField
-                label="Departamento"
-                field="product_department_id"
-                v-model="form.product_department_id"
-                :options="productDepartmentsDB"
-                placeholder="Selecciona un departamento"
-                :disabled="mode === 'view'"
-                :error="form.errors.product_department_id"
-              />
+            <SelectField
+              label="Departamento"
+              field="product_department_id"
+              v-model="form.product_department_id"
+              :options="productDepartmentsDB"
+              placeholder="Selecciona un departamento"
+              :disabled="mode === 'view'"
+              :error="form.errors.product_department_id"
+            />
 
-              <div>
-                <div class="mb-1 flex items-center justify-between gap-2">
-                  <label for="category_id" class="block text-sm font-semibold text-text">
-                    Categoría
-                  </label>
-
-                  <button
-                    v-if="mode !== 'view'"
-                    type="button"
-                    @click="toggleCategoryInputMode"
-                    class="rounded-lg border border-secondary bg-background px-2.5 py-1 text-[11px] font-semibold text-text transition hover:border-primary hover:text-primary"
-                  >
-                    + Nueva categoría
-                  </button>
-                </div>
-
-                <SelectField
-                  label="Categoría"
-                  field="category_id"
-                  v-model="form.category_id"
-                  :options="categoriesForDepartment"
-                  placeholder="Selecciona una categoría"
-                  :disabled="mode === 'view' || !form.product_department_id"
-                  :error="form.errors.category_id"
-                  :hide-label="true"
-                />
-              </div>
-            </template>
-
-            <template v-else>
-              <SelectField
-                label="Departamento"
-                field="product_department_id"
-                v-model="form.product_department_id"
-                :options="productDepartmentsDB"
-                placeholder="Selecciona un departamento"
-                :disabled="mode === 'view'"
-                :error="form.errors.product_department_id"
-              />
-
-              <div>
-                <div class="mb-1 flex items-center justify-between gap-2">
-                  <label for="category_name" class="block text-sm font-semibold text-text">
-                    Categoría
-                  </label>
-
-                  <button
-                    v-if="mode !== 'view'"
-                    type="button"
-                    @click="toggleCategoryInputMode"
-                    class="rounded-lg border border-secondary bg-background px-2.5 py-1 text-[11px] font-semibold text-text transition hover:border-primary hover:text-primary"
-                  >
-                    Usar existente
-                  </button>
-                </div>
-
-                <InputField
-                  label="Categoría"
-                  field="category_name"
-                  v-model="form.category_name"
-                  placeholder="Escribe la categoría"
-                  :error="form.errors.category_name"
-                  :readonly="mode === 'view'"
-                  :hide-label="true"
-                />
-              </div>
-            </template>
+            <SelectField
+              label="Categoría"
+              field="category_id"
+              v-model="form.category_id"
+              :options="categoriesForDepartment"
+              placeholder="Selecciona una categoría"
+              :disabled="mode === 'view' || !form.product_department_id"
+              :error="form.errors.category_id"
+            />
 
             <SelectField
               label="Unidad base de inventario"
@@ -882,19 +821,21 @@ function submit() {
               :disabled="mode === 'view'"
             />
 
-            <label
+            <div
               v-if="!isKilogramUnit"
-              class="flex min-h-[72px] items-center justify-between gap-3 rounded-xl border border-secondary bg-secondary px-4 py-3"
+              class="relative"
             >
-              <span>
-                <span class="block text-sm font-semibold text-text">Captura y vende por caja</span>
-                <span class="block text-xs text-text opacity-70">El inventario se sigue guardando en piezas.</span>
-              </span>
-              <ToggleSwitch
-                v-model="form.has_box_presentation"
-                :disabled="mode === 'view'"
-              />
-            </label>
+              <label class="mb-1 block text-sm font-semibold text-text">
+                Captura y vende por caja
+              </label>
+              <div class="flex h-[46px] items-center justify-between rounded-xl border border-secondary bg-background px-4">
+                <span class="text-xs text-text opacity-70">Inventario en piezas.</span>
+                <ToggleSwitch
+                  v-model="form.has_box_presentation"
+                  :disabled="mode === 'view'"
+                />
+              </div>
+            </div>
 
             <InputField
               v-if="hasBoxPresentation"
@@ -912,17 +853,17 @@ function submit() {
             <InputField
               label="Stock mínimo"
               field="min_stock"
-              :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'quantity'"
+              :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'product_piece_quantity'"
               v-model="form.min_stock"
               :error="form.errors.min_stock"
               type="text"
-              :inputmode="isKilogramUnit ? 'decimal' : 'numeric'"
+              inputmode="decimal"
               :readonly="mode === 'view'"
             />
-
             <InputField
               :label="isKilogramUnit ? 'Precio compra por kilogramo' : 'Precio compra por pieza'"
               field="cost_per_piece"
+              validation-field="product_price"
               v-model="form.cost_per_piece"
               prefix="$"
               :error="form.errors.cost_per_piece"
@@ -935,6 +876,7 @@ function submit() {
               v-if="hasBoxPresentation"
               label="Precio compra por caja"
               field="cost_per_box"
+              validation-field="product_price"
               v-model="form.cost_per_box"
               prefix="$"
               :error="form.errors.cost_per_box"
@@ -945,7 +887,7 @@ function submit() {
 
             <template v-if="canManagePricing">
               <InputField
-                label="Porcentaje"
+                label="Porcentaje de ganancia"
                 field="margin_percentage"
                 :model-value="marginPercentage"
                 @update:modelValue="handleMarginPercentageChange"
@@ -958,6 +900,7 @@ function submit() {
               <InputField
                 :label="isKilogramUnit ? 'Precio venta por kilogramo' : 'Precio venta por pieza'"
                 field="sale_price_per_piece"
+                validation-field="product_price"
                 :model-value="form.sale_price_per_piece"
                 @update:modelValue="handleSalePriceChange"
                 prefix="$"
@@ -975,6 +918,7 @@ function submit() {
                 <InputField
                   label="Precio venta por caja"
                   field="sale_price_per_box"
+                  validation-field="product_price"
                   :model-value="form.sale_price_per_box"
                   @update:modelValue="handleBoxSalePriceChange"
                   prefix="$"
@@ -1009,16 +953,12 @@ function submit() {
             </template>
           </div>
         </section>
+        </div>
 
-        <section class="space-y-3 xl:col-span-3">
-          <div class="flex items-center justify-between gap-3 border-t border-secondary pt-4">
-            <div>
-              <h3 class="text-sm font-semibold text-text">
-                Sucursales donde se agregará
-              </h3>
-              <p class="text-xs text-text opacity-70">Selecciona dónde estará disponible este producto.</p>
-            </div>
+      </div>
 
+      <section v-show="activeStep === 2" class="space-y-5">
+          <div class="flex justify-end">
             <button
               v-if="mode !== 'view'"
               type="button"
@@ -1037,22 +977,23 @@ function submit() {
             </button>
           </div>
 
-          <div class="overflow-y-auto rounded-[20px] border border-secondary bg-secondary p-3 xl:max-h-[176px]">
-            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div class="overflow-y-auto py-4 xl:max-h-[320px]">
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
               <SelectionCheckboxCard
                 v-for="branchItem in branchesDB"
                 :key="branchItem.id"
-                compact
                 variant="solid"
-                :checked="form.branch_ids.includes(branchItem.id)"
+                icon="storefront"
+                class="min-h-[116px]"
+                :checked="isBranchSelected(branchItem.id)"
                 :disabled="mode === 'view' || isCurrentBranch(branchItem.id)"
                 :highlighted="isCurrentBranch(branchItem.id)"
                 :title="branchItem.name"
                 :description="
                   isCurrentBranch(branchItem.id)
                     ? 'Sucursal actual'
-                    : form.branch_ids.includes(branchItem.id)
-                      ? 'Disponible para este producto'
+                    : isBranchSelected(branchItem.id)
+                      ? 'Haz clic para eliminar'
                       : 'Haz clic para agregar'
                 "
                 :badge="isCurrentBranch(branchItem.id) ? 'Fija' : ''"
@@ -1064,8 +1005,48 @@ function submit() {
           <p v-if="form.errors.branch_ids" class="text-xs text-primary">
             {{ form.errors.branch_ids }}
           </p>
-        </section>
-      </div>
+      </section>
     </div>
+
+    <template #footer>
+      <div class="flex items-center justify-between gap-3 border-t border-secondary bg-background px-5 py-4 md:px-8">
+        <button
+          v-if="activeStep > 1"
+          type="button"
+          class="rounded-xl border border-secondary bg-background px-4 py-2.5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
+          @click="goToStep(activeStep - 1)"
+        >
+          Volver a datos
+        </button>
+        <span v-else />
+
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            class="rounded-xl border border-secondary bg-background px-4 py-2.5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
+            @click="$emit('close')"
+          >
+            Cancelar
+          </button>
+          <button
+            v-if="activeStep < 2"
+            type="button"
+            class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-95"
+            @click="goToStep(activeStep + 1)"
+          >
+            Continuar
+          </button>
+          <button
+            v-else-if="mode !== 'view'"
+            type="button"
+            class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="form.processing"
+            @click="submit"
+          >
+            {{ form.processing ? 'Guardando...' : mode === 'edit' ? 'Actualizar producto' : 'Guardar producto' }}
+          </button>
+        </div>
+      </div>
+    </template>
   </GlobalModal>
 </template>

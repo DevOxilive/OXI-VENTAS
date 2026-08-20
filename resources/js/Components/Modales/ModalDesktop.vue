@@ -80,6 +80,14 @@ defineProps({
         type: [String, Array, Object],
         default: '',
     },
+    sections: {
+        type: Array,
+        default: () => [],
+    },
+    activeSection: {
+        type: [Number, String],
+        default: null,
+    },
 })
 
 const emit = defineEmits(['save', 'close'])
@@ -117,6 +125,8 @@ function closeFromBackdrop(closeOnBackdrop) {
                     :subtitle="subtitle"
                     :total-errors="totalErrors"
                     :mode="mode"
+                    :sections="sections"
+                    :active-section="activeSection"
                     @close="$emit('close')"
                 />
             </slot>
