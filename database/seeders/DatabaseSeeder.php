@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             ProductDepartmentSeeder::class,
             ProductCategorySeeder::class,
+            PaymentMethodSeeder::class,
             UsersSeeder::class,
         ]);
     }

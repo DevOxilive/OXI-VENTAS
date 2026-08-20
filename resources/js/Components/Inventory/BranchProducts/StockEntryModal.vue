@@ -70,6 +70,12 @@ const quantityStep = computed(() => isKilogramUnit.value ? 0.001 : 1)
 const entry = computed(() => form.batches?.[0] ?? null)
 
 const today = computed(() => new Date().toISOString().slice(0, 10))
+const activeSection = ref(1)
+const modalSections = [
+    { id: 1, label: 'Datos del lote' },
+    { id: 2, label: 'Distribución por sucursal' },
+    { id: 3, label: 'Notas' },
+]
 
 const minExpirationDate = computed(() => {
     const date = new Date(today.value)
@@ -330,6 +336,39 @@ function decreaseEntryQuantity() {
     syncQuantity()
 }
 
+function goToSection(section) {
+    activeSection.value = Math.min(3, Math.max(1, Number(section) || 1))
+}
+
+function focusFirstErrorSection() {
+    const errorKeys = [
+        ...Object.entries(frontendErrors)
+            .filter(([, message]) => Boolean(message))
+            .map(([key]) => key),
+        ...Object.keys(form.errors || {}),
+    ]
+
+    if (!errorKeys.length) return
+
+    if (errorKeys.some((key) => [
+        'quantity',
+        'lot_number',
+        'expiration_date',
+        'received_at',
+        'batches',
+        'batches.0.lot_number',
+        'batches.0.expiration_date',
+        'batches.0.received_at',
+    ].includes(key) || key.startsWith('batch_'))) {
+        goToSection(1)
+        return
+    }
+
+    if (errorKeys.some((key) => key.includes('branch_allocations'))) {
+        goToSection(2)
+    }
+}
+
 function allocationPayload() {
     if (!branchDistributionEnabled.value) {
         return []
@@ -382,6 +421,7 @@ function saveEntry() {
         })),
         branch_allocations: payloadAllocations,
     }))
+    focusFirstErrorSection()
 }
 
 function closeModal() {
@@ -412,6 +452,7 @@ watch(
 )
 
 onMounted(() => {
+    activeSection.value = 1
     ensureEntryReady()
 })
 </script>
@@ -419,6 +460,9 @@ onMounted(() => {
 <template>
     <GlobalModal
         v-bind="modalConfig"
+        :sections="modalSections"
+        :active-section="activeSection"
+        :show-footer="false"
         @save="saveEntry"
         @close="closeModal"
     >
@@ -426,175 +470,177 @@ onMounted(() => {
             v-if="entry"
             class="min-h-0 w-full"
         >
-            <div class="space-y-5 p-5">
-                <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)_minmax(250px,0.85fr)]">
-                    <FormPanel
-                        title="Datos del producto"
-                        description="Captura la cantidad y los datos principales del lote."
-                        panel-class="border-y shadow-none"
-                        body-class="space-y-4"
-                    >
-                        <div class="grid grid-cols-1 gap-4">
-                            <div>
-                                <label class="mb-1 block text-sm font-semibold text-text">
-                                    Cantidad total ({{ entryQuantityLabel }})
-                                </label>
-                                <QuantityStepper
-                                    :value="entry.quantity"
-                                    :aria-label="`Cantidad total en ${entryQuantityLabel}`"
-                                    :disabled="form.processing"
-                                    :allow-decimal="isKilogramUnit"
-                                    :max-integer-digits="3"
-                                    :max-decimal-digits="3"
-                                    :decrease-disabled="quantityNumber(entry.quantity) <= quantityStep"
-                                    @decrease="decreaseEntryQuantity"
-                                    @increase="increaseEntryQuantity"
-                                    @update="updateEntryQuantity"
-                                />
-
-                                <p
-                                    v-if="isBoxUnit"
-                                    class="mt-2 text-xs text-text opacity-70"
-                                >
-                                    Cada caja contiene {{ piecesPerBox }} piezas. Esta entrada registrará {{ totalPieces }} piezas.
-                                </p>
-                            </div>
-
-                            <InputField
-                                v-model="entry.lot_number"
-                                label="Numero de lote"
-                                placeholder="Ej. AIHK-342"
-                                field="lot_number"
-                                :readonly="form.processing"
-                                :error="frontendErrors.lot_number || form.errors['batches.0.lot_number']"
-                                @update:model-value="normalizeLotNumber"
+            <div class="bg-background p-4 md:p-5 xl:p-6">
+                <FormPanel
+                    v-show="activeSection === 1"
+                    title="Datos del lote"
+                    description="Captura la cantidad y los datos principales del lote."
+                    panel-class="shadow-none"
+                    body-class="space-y-4"
+                >
+                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        <div class="lg:col-span-2">
+                            <label class="mb-1 block text-sm font-semibold text-text">
+                                Cantidad total ({{ entryQuantityLabel }})
+                            </label>
+                            <QuantityStepper
+                                :value="entry.quantity"
+                                :aria-label="`Cantidad total en ${entryQuantityLabel}`"
+                                :disabled="form.processing"
+                                :allow-decimal="isKilogramUnit"
+                                :max-integer-digits="3"
+                                :max-decimal-digits="3"
+                                :decrease-disabled="quantityNumber(entry.quantity) <= quantityStep"
+                                @decrease="decreaseEntryQuantity"
+                                @increase="increaseEntryQuantity"
+                                @update="updateEntryQuantity"
                             />
 
-                            <InputField
-                                v-model="entry.expiration_date"
-                                label="Caducidad"
-                                type="date"
-                                field="expiration_date"
-                                :readonly="form.processing"
-                                :min="minExpirationDate"
-                                :error="frontendErrors.expiration_date || form.errors['batches.0.expiration_date']"
-                            />
-
-                            <InputField
-                                v-model="entry.supplier"
-                                label="Proveedor"
-                                placeholder="Opcional"
-                                field="supplier"
-                                :readonly="form.processing"
-                            />
-                        </div>
-                    </FormPanel>
-
-                    <FormPanel
-                        title="Distribucion por sucursal"
-                        description="Selecciona las sucursales y define sus cantidades."
-                        panel-class="border-y shadow-none"
-                    >
-                        <div
-                            v-if="isBoxUnit"
-                            class="mb-4 flex items-center justify-between gap-3"
-                        >
-                            <p class="text-xs font-semibold text-text">
-                                Distribuir por
+                            <p
+                                v-if="isBoxUnit"
+                                class="mt-2 text-xs text-text opacity-70"
+                            >
+                                Cada caja contiene {{ piecesPerBox }} piezas. Esta entrada registrará {{ totalPieces }} piezas.
                             </p>
-
-                            <div class="inline-flex rounded-xl border border-secondary bg-background p-1">
-                                <button
-                                    type="button"
-                                    class="rounded-lg px-3 py-1.5 text-xs font-semibold transition"
-                                    :class="distributionUnit === 'boxes'
-                                        ? 'bg-primary text-white'
-                                        : 'text-text hover:text-primary'"
-                                    :disabled="form.processing"
-                                    @click="setDistributionUnit('boxes')"
-                                >
-                                    Cajas
-                                </button>
-                                <button
-                                    type="button"
-                                    class="rounded-lg px-3 py-1.5 text-xs font-semibold transition"
-                                    :class="distributionUnit === 'pieces'
-                                        ? 'bg-primary text-white'
-                                        : 'text-text hover:text-primary'"
-                                    :disabled="form.processing"
-                                    @click="setDistributionUnit('pieces')"
-                                >
-                                    Piezas
-                                </button>
-                            </div>
                         </div>
 
-                        <div class="max-h-[320px] space-y-2 overflow-y-auto overscroll-contain pr-2">
-                            <div
-                                v-for="branch in branchOptions"
-                                :key="branch.id"
-                                class="grid grid-cols-[minmax(0,1fr)_132px] items-center gap-2"
-                            >
-                                <SelectionCheckboxCard
-                                    :checked="branchSelected(branch.id)"
-                                    :disabled="isCurrentBranch(branch.id) || form.processing"
-                                    :title="branch.name"
-                                    :description="isCurrentBranch(branch.id) ? 'Sucursal actual' : 'Incluir en la entrada'"
-                                    :badge="isCurrentBranch(branch.id) ? 'Fija' : ''"
-                                    :highlighted="isCurrentBranch(branch.id)"
-                                    variant="solid"
-                                    :compact="true"
-                                    @toggle="toggleBranch(branch)"
-                                />
-
-                                <QuantityStepper
-                                    class="justify-self-end"
-                                    :value="findAllocation(branch.id)?.quantity ?? ''"
-                                    :aria-label="`Cantidad de ${distributionQuantityLabel} para ${branch.name}`"
-                                    :disabled="form.processing || !branchSelected(branch.id)"
-                                    :allow-decimal="isKilogramUnit"
-                                    :max-integer-digits="3"
-                                    :max-decimal-digits="3"
-                                    :decrease-disabled="quantityNumber(findAllocation(branch.id)?.quantity) <= 0"
-                                    @decrease="decreaseBranchAllocation(branch.id)"
-                                    @increase="increaseBranchAllocation(branch.id)"
-                                    @update="updateBranchAllocation(branch.id, $event)"
-                                />
-                            </div>
-                        </div>
-
-                        <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
-                            <span class="rounded-full border border-secondary bg-background px-3 py-1 text-text opacity-80">
-                                Asignado: {{ totalAllocatedDistributionQuantity }} / {{ totalDistributionQuantity || 0 }} {{ distributionQuantityLabel }}
-                            </span>
-
-                            <span
-                                class="rounded-full border px-3 py-1"
-                                :class="remainingQuantity === 0
-                                    ? 'border-accent bg-secondary text-accent'
-                                    : 'border-primary bg-secondary text-primary'"
-                            >
-                                Pendiente: {{ remainingDistributionQuantity }} {{ distributionQuantityLabel }}
-                            </span>
-                        </div>
-                    </FormPanel>
-
-                    <FormPanel
-                        title="Notas"
-                        description="Agrega cualquier detalle adicional de esta entrada."
-                        panel-class="border-y shadow-none"
-                    >
-                        <TextareaField
-                            v-model="form.notes"
-                            label="Notas"
-                            placeholder="Opcional"
-                            field="notes"
+                        <InputField
+                            v-model="entry.lot_number"
+                            label="Numero de lote"
+                            placeholder="Ej. AIHK-342"
+                            field="lot_number"
                             :readonly="form.processing"
-                            :rows="9"
-                            :max-height="280"
+                            :error="frontendErrors.lot_number || form.errors['batches.0.lot_number']"
+                            @update:model-value="normalizeLotNumber"
                         />
-                    </FormPanel>
-                </div>
+
+                        <InputField
+                            v-model="entry.expiration_date"
+                            label="Caducidad"
+                            type="date"
+                            field="expiration_date"
+                            :readonly="form.processing"
+                            :min="minExpirationDate"
+                            :error="frontendErrors.expiration_date || form.errors['batches.0.expiration_date']"
+                        />
+
+                        <InputField
+                            v-model="entry.supplier"
+                            class="lg:col-span-2"
+                            label="Proveedor"
+                            placeholder="Opcional"
+                            field="supplier"
+                            :readonly="form.processing"
+                        />
+                    </div>
+                </FormPanel>
+
+                <FormPanel
+                    v-show="activeSection === 2"
+                    title="Distribucion por sucursal"
+                    description="Selecciona las sucursales y define sus cantidades."
+                    panel-class="shadow-none"
+                >
+                    <div
+                        v-if="isBoxUnit"
+                        class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <p class="text-xs font-semibold text-text">
+                            Distribuir por
+                        </p>
+
+                        <div class="inline-flex w-full rounded-xl border border-secondary bg-background p-1 sm:w-auto">
+                            <button
+                                type="button"
+                                class="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:flex-none"
+                                :class="distributionUnit === 'boxes'
+                                    ? 'bg-primary text-white'
+                                    : 'text-text hover:text-primary'"
+                                :disabled="form.processing"
+                                @click="setDistributionUnit('boxes')"
+                            >
+                                Cajas
+                            </button>
+                            <button
+                                type="button"
+                                class="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:flex-none"
+                                :class="distributionUnit === 'pieces'
+                                    ? 'bg-primary text-white'
+                                    : 'text-text hover:text-primary'"
+                                :disabled="form.processing"
+                                @click="setDistributionUnit('pieces')"
+                            >
+                                Piezas
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="max-h-[46dvh] space-y-3 overflow-y-auto overscroll-contain pr-1 sm:max-h-[360px] sm:pr-2">
+                        <div
+                            v-for="branch in branchOptions"
+                            :key="branch.id"
+                            class="grid grid-cols-1 gap-3 rounded-2xl border border-secondary bg-background p-3 sm:grid-cols-[minmax(0,1fr)_132px] sm:items-center"
+                        >
+                            <SelectionCheckboxCard
+                                :checked="branchSelected(branch.id)"
+                                :disabled="isCurrentBranch(branch.id) || form.processing"
+                                :title="branch.name"
+                                :description="isCurrentBranch(branch.id) ? 'Sucursal actual' : 'Incluir en la entrada'"
+                                :badge="isCurrentBranch(branch.id) ? 'Fija' : ''"
+                                :highlighted="isCurrentBranch(branch.id)"
+                                variant="solid"
+                                :compact="true"
+                                @toggle="toggleBranch(branch)"
+                            />
+
+                            <QuantityStepper
+                                class="w-full sm:justify-self-end"
+                                :value="findAllocation(branch.id)?.quantity ?? ''"
+                                :aria-label="`Cantidad de ${distributionQuantityLabel} para ${branch.name}`"
+                                :disabled="form.processing || !branchSelected(branch.id)"
+                                :allow-decimal="isKilogramUnit"
+                                :max-integer-digits="3"
+                                :max-decimal-digits="3"
+                                :decrease-disabled="quantityNumber(findAllocation(branch.id)?.quantity) <= 0"
+                                @decrease="decreaseBranchAllocation(branch.id)"
+                                @increase="increaseBranchAllocation(branch.id)"
+                                @update="updateBranchAllocation(branch.id, $event)"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="mt-4 grid gap-2 text-xs font-semibold sm:flex sm:flex-wrap sm:items-center">
+                        <span class="rounded-full border border-secondary bg-background px-3 py-1.5 text-center text-text opacity-80">
+                            Asignado: {{ totalAllocatedDistributionQuantity }} / {{ totalDistributionQuantity || 0 }} {{ distributionQuantityLabel }}
+                        </span>
+
+                        <span
+                            class="rounded-full border px-3 py-1.5 text-center"
+                            :class="remainingQuantity === 0
+                                ? 'border-accent bg-secondary text-accent'
+                                : 'border-primary bg-secondary text-primary'"
+                        >
+                            Pendiente: {{ remainingDistributionQuantity }} {{ distributionQuantityLabel }}
+                        </span>
+                    </div>
+                </FormPanel>
+
+                <FormPanel
+                    v-show="activeSection === 3"
+                    title="Notas"
+                    description="Agrega cualquier detalle adicional de esta entrada."
+                    panel-class="shadow-none"
+                >
+                    <TextareaField
+                        v-model="form.notes"
+                        label="Notas"
+                        placeholder="Opcional"
+                        field="notes"
+                        :readonly="form.processing"
+                        :rows="8"
+                        :max-height="280"
+                    />
+                </FormPanel>
 
                 <div class="hidden">
                     <InputField
@@ -609,5 +655,49 @@ onMounted(() => {
                 </div>
             </div>
         </section>
+
+        <template #footer>
+            <div class="flex items-center justify-between gap-3 border-t border-secondary bg-background px-4 py-4 md:px-8">
+                <button
+                    v-if="activeSection > 1"
+                    type="button"
+                    class="rounded-xl border border-secondary bg-background px-4 py-2.5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
+                    :disabled="form.processing"
+                    @click="goToSection(activeSection - 1)"
+                >
+                    Volver
+                </button>
+                <span v-else />
+
+                <div class="flex items-center gap-3">
+                    <button
+                        type="button"
+                        class="rounded-xl border border-secondary bg-background px-4 py-2.5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
+                        :disabled="form.processing"
+                        @click="closeModal"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        v-if="activeSection < 3"
+                        type="button"
+                        class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="form.processing"
+                        @click="goToSection(activeSection + 1)"
+                    >
+                        Continuar
+                    </button>
+                    <button
+                        v-else
+                        type="button"
+                        class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="form.processing"
+                        @click="saveEntry"
+                    >
+                        {{ form.processing ? 'Registrando...' : 'Registrar entrada' }}
+                    </button>
+                </div>
+            </div>
+        </template>
     </GlobalModal>
 </template>
