@@ -72,6 +72,20 @@ function getFirstRequestError(errors) {
     return null
 }
 
+function getReadableRequestError(errors) {
+    const message = getFirstRequestError(errors)
+
+    // Cuando Laravel no encuentra una traducción devuelve la clave (por ejemplo,
+    // "validation.required"). Esa clave nunca debe llegar a una persona usuaria.
+    if (!message) return null
+
+    if (/^validation\.[\w.]+$/i.test(message.trim())) {
+        return 'Completa el campo para continuar.'
+    }
+
+    return message
+}
+
 export function getModalRequestOptions({
     mode = 'save',
     entityName = 'Registro',
@@ -112,7 +126,7 @@ export function getModalRequestOptions({
             if (showError) {
                 ErrorAlert({
                     title: messages.errorTitle,
-                    message: getFirstRequestError(errors) ?? messages.errorMessage,
+                    message: getReadableRequestError(errors) ?? messages.errorMessage,
                 })
             }
 
