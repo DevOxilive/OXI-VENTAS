@@ -29,7 +29,9 @@ class BranchInventoryController extends Controller
             ->orderBy('branches.name')
             ->first();
 
-        abort_unless($branch, 403, 'No tienes sucursales habilitadas para consultar inventario.');
+        if (! $branch) {
+            return $this->redirectToBranchSetup($request, 'inventario');
+        }
 
         return redirect()->route('inventory.branches.inventory', [
             'branch' => $branch->id,

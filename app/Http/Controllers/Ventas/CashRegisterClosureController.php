@@ -29,6 +29,10 @@ class CashRegisterClosureController extends Controller
         $branches = $this->accessibleBranches($request);
         $isAdminSelector = $user->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL) && !$request->filled('branch');
 
+        if ($branches->isEmpty()) {
+            return $this->redirectToBranchSetup($request, 'cortes de caja');
+        }
+
         if ($isAdminSelector) {
             return Inertia::render('Ventas/CashRegisterClosures', [
                 'selectorMode' => true,
@@ -53,6 +57,11 @@ class CashRegisterClosureController extends Controller
     public function reports(Request $request, ?Branch $branch = null)
     {
         $branches = $this->accessibleBranches($request);
+
+        if (! $branch && $branches->isEmpty()) {
+            return $this->redirectToBranchSetup($request, 'reportes de cortes');
+        }
+
         $filters = $request->validate([
             'folio' => ['nullable', 'string', 'max:80'],
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -81,7 +90,6 @@ class CashRegisterClosureController extends Controller
         }
 
         $branch = $branch ?: $branches->first();
-        abort_unless($branch, 404, 'No hay sucursales disponibles.');
 
         $branchIds = [$branch->id];
 

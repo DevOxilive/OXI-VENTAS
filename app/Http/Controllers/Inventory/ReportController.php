@@ -85,6 +85,10 @@ class ReportController extends Controller
             return redirect()->route($reportConfig['route']);
         }
 
+        if ($branches->isEmpty()) {
+            return $this->redirectToBranchSetup($request, $reportConfig['label']);
+        }
+
         if ($branches->count() === 1) {
             return redirect()->route($reportConfig['route'], [
                 'branch' => $branches->first()->id,
@@ -365,8 +369,6 @@ class ReportController extends Controller
             ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
             ->orderBy('branches.name')
             ->get();
-
-        abort_if($branches->isEmpty(), 403, 'No tienes sucursales habilitadas para consultar reportes.');
 
         return $branches;
     }

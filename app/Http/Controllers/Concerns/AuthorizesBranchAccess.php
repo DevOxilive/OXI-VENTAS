@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Concerns;
 
 use App\Models\Branch;
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 trait AuthorizesBranchAccess
@@ -20,6 +21,22 @@ trait AuthorizesBranchAccess
             403,
             'No tienes acceso a esta sucursal.'
         );
+    }
+
+    protected function redirectToBranchSetup(Request $request, string $moduleName): RedirectResponse
+    {
+        /** @var User|null $user */
+        $user = $request->user()?->loadMissing(['role', 'branches']);
+        $hasActiveBranches = Branch::query()->where('active', true)->exists();
+        $canManageBranches = (bool) $user?->hasPermission('branches.view');
+        $routeName = $canManageBranches ? 'branches.index' : 'dashboard';
+
+        return redirect()->route($routeName)->with('warning', [
+            'title' => 'Sucursal requerida',
+            'message' => $hasActiveBranches
+                ? "Para abrir {$moduleName}, tu usuario necesita tener una sucursal activa asignada."
+                : "Para abrir {$moduleName}, primero crea una sucursal activa.",
+        ]);
     }
 
     protected function resolveAccessibleBranch(Request $request, ?string $branchSlug): Branch

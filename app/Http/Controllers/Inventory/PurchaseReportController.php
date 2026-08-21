@@ -27,6 +27,11 @@ class PurchaseReportController extends Controller
     public function salesPurchaseLists(Request $request)
     {
         $branches = $this->accessiblePurchaseBranches($request);
+
+        if ($branches->isEmpty()) {
+            return $this->redirectToBranchSetup($request, 'listas de compra');
+        }
+
         $branch = $this->selectedPurchaseBranch($request, $branches);
 
         if (! $branch) {
@@ -49,6 +54,11 @@ class PurchaseReportController extends Controller
     public function salesPurchaseOrders(Request $request)
     {
         $branches = $this->accessiblePurchaseBranches($request);
+
+        if ($branches->isEmpty()) {
+            return $this->redirectToBranchSetup($request, 'ordenes de compra');
+        }
+
         $branch = $this->selectedPurchaseBranch($request, $branches);
 
         if (! $branch) {

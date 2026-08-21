@@ -9,7 +9,7 @@ import {
     usePermissions,
     updateLivePermissions,
 } from '@/Composables/usePermissions'
-import { ToastAlert } from '@/Components/Modales/UniversalActionModal'
+import { ToastAlert, WarningAlert } from '@/Components/Modales/UniversalActionModal'
 import {
     REALTIME_BROWSER_EVENTS,
     REALTIME_CHANNELS,
@@ -109,6 +109,22 @@ function closeSidebarFromOutside() {
 
 function logout() {
     router.post(route('logout'))
+}
+
+function normalizeFlashMessage(value, fallbackTitle) {
+    if (!value) return null
+
+    if (typeof value === 'string') {
+        return {
+            title: fallbackTitle,
+            message: value,
+        }
+    }
+
+    return {
+        title: value.title || fallbackTitle,
+        message: value.message || '',
+    }
 }
 
 function syncTheme(theme) {
@@ -224,6 +240,17 @@ watch(desktopSidebarCollapsed, (value) => {
 
     window.localStorage.setItem(desktopSidebarStorageKey, String(value))
 })
+
+watch(
+    () => page.props.flash?.warning,
+    (warning) => {
+        const alert = normalizeFlashMessage(warning, 'Atencion requerida')
+        if (!alert) return
+
+        WarningAlert(alert)
+    },
+    { immediate: true },
+)
 </script>
 
 <template>

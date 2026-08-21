@@ -92,6 +92,11 @@ class SalesReportController extends Controller
     private function renderReport(Request $request, ?Branch $branch = null)
     {
         $branches = $this->reportBranches($request);
+
+        if ($branches->isEmpty()) {
+            return $this->redirectToBranchSetup($request, 'reportes de ventas');
+        }
+
         $filters = $this->resolveFilters($request, $branch, $branches);
         $activeTab = $filters['tab'];
         $reportBranches = $this->selectedReportBranches($branch, $branches, $filters);
@@ -123,6 +128,11 @@ class SalesReportController extends Controller
     private function downloadProductsExcel(Request $request, ?Branch $branch = null)
     {
         $branches = $this->reportBranches($request);
+
+        if ($branches->isEmpty()) {
+            return $this->redirectToBranchSetup($request, 'reportes de ventas');
+        }
+
         $filters = $this->resolveFilters($request, $branch, $branches);
         $fileScope = $branch ? $this->safeSegment($branch->slug ?: $branch->name) : 'global';
 
@@ -148,7 +158,13 @@ class SalesReportController extends Controller
 
     private function downloadSalesExcel(Request $request, ?Branch $branch = null)
     {
-        $filters = $this->resolveFilters($request, $branch);
+        $branches = $this->reportBranches($request);
+
+        if ($branches->isEmpty()) {
+            return $this->redirectToBranchSetup($request, 'reportes de ventas');
+        }
+
+        $filters = $this->resolveFilters($request, $branch, $branches);
         $rows = $this->registeredSalesQuery($filters)
             ->get()
             ->map(fn (Sale $sale) => $this->mapSaleRow($sale));
@@ -162,7 +178,13 @@ class SalesReportController extends Controller
 
     private function downloadSalesPdf(Request $request, ?Branch $branch = null)
     {
-        $filters = $this->resolveFilters($request, $branch);
+        $branches = $this->reportBranches($request);
+
+        if ($branches->isEmpty()) {
+            return $this->redirectToBranchSetup($request, 'reportes de ventas');
+        }
+
+        $filters = $this->resolveFilters($request, $branch, $branches);
         $rows = $this->registeredSalesQuery($filters)
             ->get()
             ->map(fn (Sale $sale) => $this->mapSaleRow($sale));
@@ -549,8 +571,6 @@ class SalesReportController extends Controller
             ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
             ->orderBy('branches.name')
             ->get();
-
-        abort_if($branches->isEmpty(), 403, 'No tienes sucursales habilitadas para consultar reportes.');
 
         return $branches;
     }

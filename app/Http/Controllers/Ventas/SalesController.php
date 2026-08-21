@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Ventas;
 
+use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
@@ -15,7 +16,6 @@ use App\Models\TicketTemplate;
 use App\Services\SaleCancellationService;
 use App\Services\StockMovementService;
 use App\Support\SystemPermission;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +24,8 @@ use Inertia\Inertia;
 
 class SalesController extends Controller
 {
+    use AuthorizesBranchAccess;
+
     public function index(Request $request)
     {
         $user = $request->user()->loadMissing(['branches', 'role']);
@@ -34,7 +36,7 @@ class SalesController extends Controller
             : $this->resolveBranch($request, $user, $allowedBranches);
 
         if (! $selectorMode && ! $branch) {
-            throw new AuthorizationException('No tienes una sucursal disponible para generar ventas.');
+            return $this->redirectToBranchSetup($request, 'punto de venta');
         }
 
         $nearExpirationProducts = $selectorMode
@@ -75,7 +77,9 @@ class SalesController extends Controller
         $allowedBranches = $this->allowedBranches($user);
         $allowedBranchIds = $allowedBranches->pluck('id')->map(fn ($id) => (int) $id)->values();
 
-        abort_if($allowedBranchIds->isEmpty(), 403, 'No tienes sucursales disponibles para consultar ventas.');
+        if ($allowedBranchIds->isEmpty()) {
+            return $this->redirectToBranchSetup($request, 'historial de ventas');
+        }
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
