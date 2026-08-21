@@ -1,13 +1,13 @@
 export function generateMenu(role, permissions = [], branches = []) {
     const can = (permission) => permissions.includes(permission);
     const canAny = (permissionList) => permissionList.some((permission) => can(permission));
-    const routeUrl = (name, params) => {
+    const routeUrl = (name, params, fallback = null) => {
         try {
             return typeof route === "function" && route().has(name)
                 ? route(name, params)
-                : null;
+                : fallback;
         } catch {
-            return null;
+            return fallback;
         }
     };
     const canRegisterSalesAttendance =
@@ -314,7 +314,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         "sales.purchase-orders.view",
         "sales.purchase-orders.receive",
     ]);
-    const salesHistoryUrl = routeUrl("ventas.history");
+    const salesHistoryUrl = routeUrl("ventas.history", undefined, "/ventas/historial");
 
     if (
         canUse("sales") ||

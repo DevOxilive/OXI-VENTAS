@@ -173,8 +173,18 @@ function currentFilterPayload() {
   };
 }
 
+function salesHistoryUrl() {
+  try {
+    return typeof route === "function" && route().has("ventas.history")
+      ? route("ventas.history")
+      : "/ventas/historial";
+  } catch {
+    return "/ventas/historial";
+  }
+}
+
 function applyFilters() {
-  router.get(route("ventas.history"), currentFilterPayload(), {
+  router.get(salesHistoryUrl(), currentFilterPayload(), {
     preserveState: true,
     preserveScroll: true,
     replace: true,
