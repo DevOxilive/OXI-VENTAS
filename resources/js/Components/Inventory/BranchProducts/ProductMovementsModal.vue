@@ -23,6 +23,7 @@ const {
     movementGroupOptions,
     userOptions,
     tableRows,
+    movementSummary,
     quantityClass,
     formatNumber,
     resetFilters,
@@ -201,6 +202,38 @@ const modalConfig = getProductMovementsModalConfig()
                     </div>
                 </div>
             </section>
+
         </div>
+
+        <template #footer="{ close }">
+            <footer class="sticky bottom-0 flex flex-col gap-3 border-t border-secondary bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text opacity-80">
+                    <span class="font-semibold text-violet-700">Resumen:</span>
+
+                    <template v-if="movementSummary.length">
+                        <span
+                            v-for="item in movementSummary"
+                            :key="item.key"
+                            class="inline-flex items-center gap-1"
+                        >
+                            <span class="font-semibold text-violet-700">{{ item.label }}:</span>
+                            <span class="font-semibold">{{ item.count }}</span>
+                            <span v-if="item.displayEntries" class="font-semibold text-emerald-700">{{ item.displayEntries }}</span>
+                            <span v-if="item.displayExits" class="font-semibold text-rose-700">{{ item.displayExits }}</span>
+                        </span>
+                    </template>
+
+                    <span v-else>Sin movimientos para resumir.</span>
+                </div>
+
+                <button
+                    type="button"
+                    class="w-full shrink-0 rounded-full border border-secondary bg-secondary px-8 py-3 text-text transition hover:brightness-95 sm:w-auto"
+                    @click="close"
+                >
+                    Cerrar
+                </button>
+            </footer>
+        </template>
     </GlobalModal>
 </template>

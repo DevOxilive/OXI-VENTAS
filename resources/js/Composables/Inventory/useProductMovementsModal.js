@@ -34,6 +34,18 @@ export function useProductMovementsModal(props, emit) {
     }
 
     function resolveGroupKey(movement) {
+        if (movement.reason === "PURCHASE") {
+            return "purchases";
+        }
+
+        if (movement.reason === "SALE") {
+            return "sales";
+        }
+
+        if (movement.reason === "RETURN") {
+            return "returns";
+        }
+
         if (movement.reason === "DAMAGED") {
             return "damaged";
         }
@@ -69,6 +81,9 @@ export function useProductMovementsModal(props, emit) {
 
     const movementGroupOptions = computed(() => [
         { value: "all", label: "Todos" },
+        { value: "purchases", label: "Compras" },
+        { value: "sales", label: "Ventas" },
+        { value: "returns", label: "Devoluciones" },
         { value: "audits", label: "Auditorías" },
         { value: "adjustments", label: "Ajustes manuales" },
         { value: "damaged", label: "Dañados" },
@@ -131,6 +146,7 @@ export function useProductMovementsModal(props, emit) {
             {
                 PURCHASE: "Compra",
                 SALE: "Venta",
+                RETURN: "Devolución",
                 DAMAGED: "Dañado",
                 EXPIRED: "Caducado",
                 OTHER: "Otro",
@@ -282,6 +298,59 @@ export function useProductMovementsModal(props, emit) {
         })),
     );
 
+    function signedQuantity(movement) {
+        if (isAdministrativeAdjustment(movement)) return 0;
+
+        const quantity = Number(movement.quantity ?? 0);
+
+        if (movement.type === "IN") return Math.abs(quantity);
+        if (movement.type === "OUT") return -Math.abs(quantity);
+
+        const previousStock = Number(movement.previous_stock ?? 0);
+        const newStock = Number(movement.new_stock ?? 0);
+
+        return newStock - previousStock;
+    }
+
+    const movementSummary = computed(() => {
+        const summaries = new Map();
+
+        filteredMovements.value.forEach((movement) => {
+            const key = resolveGroupKey(movement);
+            const label = reasonLabel(movement.reason, movement);
+            const quantity = signedQuantity(movement);
+
+            if (!summaries.has(key)) {
+                summaries.set(key, {
+                    key,
+                    label,
+                    count: 0,
+                    entries: 0,
+                    exits: 0,
+                    net: 0,
+                });
+            }
+
+            const summary = summaries.get(key);
+            summary.count += 1;
+            summary.net += quantity;
+
+            if (quantity > 0) {
+                summary.entries += quantity;
+            } else if (quantity < 0) {
+                summary.exits += Math.abs(quantity);
+            }
+        });
+
+        return Array.from(summaries.values())
+            .map((item) => ({
+                ...item,
+                displayEntries: item.entries > 0 ? `+${formatNumber(item.entries)} ${unit.value}` : "",
+                displayExits: item.exits > 0 ? `-${formatNumber(item.exits)} ${unit.value}` : "",
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label, "es"));
+    });
+
     function resetFilters() {
         filters.userName = "";
         filters.dateFrom = "";
@@ -316,6 +385,7 @@ export function useProductMovementsModal(props, emit) {
         movementGroupOptions,
         userOptions,
         tableRows,
+        movementSummary,
         quantityClass,
         formatNumber,
         resetFilters,
