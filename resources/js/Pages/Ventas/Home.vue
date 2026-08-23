@@ -1466,8 +1466,8 @@ async function submitSale(creditEmployee = null, estimatedPaymentDate = null) {
 
   if (!selectedCreditEmployee && !isCashPayment.value && !cardPaymentConfirmed.value) {
     ErrorAlert({
-      title: "Confirma el pago con tarjeta",
-      message: "Marca que la terminal aprobo el cobro antes de registrar la venta.",
+      title: "Confirma el cobro",
+      message: "Marca la confirmación del cobro.",
     });
     return;
   }
@@ -2088,7 +2088,7 @@ function submitCreditSale() {
         </aside>
       </div>
 
-    <GlobalModal v-if="showCreditModal" title="Venta a crédito" subtitle="El inventario se descontará hoy y el saldo quedará en la cuenta del empleado." size="2xl" :columns="1" save-button-text="Registrar fiado" close-button-text="Cancelar" @close="showCreditModal = false" @save="submitCreditSale">
+    <GlobalModal v-if="showCreditModal" title="Venta a crédito" subtitle="Selecciona el empleado para registrar la venta." size="2xl" :columns="1" save-button-text="Registrar fiado" close-button-text="Cancelar" @close="showCreditModal = false" @save="submitCreditSale">
       <div class="space-y-4">
         <SelectField v-model="creditEmployeeId" label="Empleado" field="credit_employee_id" :options="creditEmployees" option-label="name" option-value="id" placeholder="Selecciona al empleado" />
         <InputField v-model="creditDueDate" label="Fecha estimada de pago (opcional)" field="estimated_payment_date" type="date" />

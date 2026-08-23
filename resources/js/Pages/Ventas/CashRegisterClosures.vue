@@ -380,7 +380,7 @@ function saveClosure() {
     entityName: "Corte de caja",
     successTitle: "Corte registrado correctamente",
     errorTitle: "No se pudo registrar el corte",
-    errorMessage: "Revisa las denominaciones, tarjeta capturada y caja detectada.",
+    errorMessage: "Revisa los datos capturados.",
     preserveScroll: true,
     onSuccess: async (pageResponse) => {
       closeClosureModal();
@@ -533,7 +533,7 @@ onMounted(() => {
     <GlobalModal
       v-if="showClosureModal"
       title="Registrar corte de caja"
-      :subtitle="`Caja #${form.cash_box_number} detectada desde las ventas registradas.`"
+      :subtitle="`Caja #${form.cash_box_number}. Captura el dinero físico y los pagos con tarjeta registrados en terminal.`"
       :processing="form.processing"
       :total-errors="Object.keys(form.errors).length"
       save-button-text="Guardar e imprimir"
@@ -632,7 +632,7 @@ onMounted(() => {
             label="Observaciones"
             field="notes"
             :rows="4"
-            placeholder="Notas del corte, faltantes, sobrantes o aclaraciones."
+            placeholder="Observaciones del corte."
             :error="form.errors.notes"
           />
         </div>
@@ -668,7 +668,7 @@ onMounted(() => {
                 <span>{{ money(form.cash_left) }}</span>
               </div>
               <div class="flex justify-between gap-3">
-                <span class="opacity-60">Retiro estimado</span>
+                <span class="opacity-60">Retiro</span>
                 <span>{{ money(cashToWithdraw) }}</span>
               </div>
             </div>

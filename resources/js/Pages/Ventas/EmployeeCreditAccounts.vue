@@ -469,7 +469,7 @@ function submitPayment() {
     return
   }
   if (isCardPayment.value && !payment.confirmed_card_payment) {
-    ErrorAlert({ title: 'Confirma el pago con tarjeta', message: 'Marca la confirmación cuando la terminal ya haya aprobado el cobro.' })
+    ErrorAlert({ title: 'Confirma el cobro', message: 'Marca la confirmación del pago.' })
     return
   }
 
@@ -634,7 +634,7 @@ onMounted(() => {
               </span>
               <span class="min-w-0">
                 <span class="block text-sm font-black">Confirmar pago antes de registrar abono</span>
-                <span class="block text-xs font-semibold opacity-70">Marca esta opción cuando la terminal ya haya aprobado el cobro.</span>
+                <span class="block text-xs font-semibold opacity-70">Marca esta opción para continuar.</span>
               </span>
             </span>
             <span
