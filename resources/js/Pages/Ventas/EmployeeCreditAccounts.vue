@@ -11,6 +11,7 @@ import InputField from '@/Components/Forms/InputField.vue'
 import MultiSelectDropdown from '@/Components/Forms/MultiSelectDropdown.vue'
 import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
+import { usePermissions } from '@/Composables/usePermissions'
 import {
   connectQzTray,
   getDefaultQzPrinter,
@@ -35,6 +36,7 @@ const props = defineProps({
 })
 
 const page = usePage()
+const { can } = usePermissions()
 const selected = ref(null)
 const selectedLimit = ref(null)
 const loading = ref(false)
@@ -62,6 +64,7 @@ const limitForm = useForm({
 })
 
 const rows = computed(() => props.accounts?.data || [])
+const canPrintEmployeeCredit = computed(() => can('sales.employee-credit.print'))
 const money = (value) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(value || 0))
 const compactNumber = (value) => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 3 }).format(Number(value || 0))
 
@@ -426,6 +429,10 @@ function buildAccountPrintJob(account) {
 
 async function printAccountTicket() {
   if (!selected.value) return
+  if (!canPrintEmployeeCredit.value) {
+    ErrorAlert({ title: 'Permiso requerido', message: 'Tu usuario no tiene permiso para imprimir o reimprimir tickets de estado de cuenta.' })
+    return
+  }
   if (!selectedPrinterName.value) {
     ErrorAlert({ title: 'Impresora requerida', message: 'Selecciona una impresora para imprimir el estado de cuenta.' })
     return
@@ -469,7 +476,9 @@ function submitPayment() {
   payment.post(route('ventas.employee-credit.pay', { account: selected.value.id }), {
     preserveScroll: true,
     onSuccess: async () => {
-      await printAccountTicket()
+      if (canPrintEmployeeCredit.value) {
+        await printAccountTicket()
+      }
       selected.value = null
     },
   })
@@ -484,7 +493,9 @@ function submitLimit() {
 }
 
 onMounted(() => {
-  void initializePrinterBridge({ silent: true })
+  if (canPrintEmployeeCredit.value) {
+    void initializePrinterBridge({ silent: true })
+  }
 })
 </script>
 
@@ -551,7 +562,7 @@ onMounted(() => {
           </div>
         </section>
 
-        <section class="grid gap-3 rounded-xl border border-secondary bg-secondary/30 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <section v-if="canPrintEmployeeCredit" class="grid gap-3 rounded-xl border border-secondary bg-secondary/30 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div>
             <SelectField
               label="Impresora"

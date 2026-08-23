@@ -144,6 +144,7 @@ class PermissionSeeder extends Seeder
             'sales.employee-credit.view',
             'sales.employee-credit.create',
             'sales.employee-credit.collect',
+            'sales.employee-credit.print',
             'sales.cash-closures.view',
             'sales.cash-closures.create',
             'sales.cash-closures.update',

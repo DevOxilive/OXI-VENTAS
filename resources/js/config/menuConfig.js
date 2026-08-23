@@ -62,7 +62,7 @@ export function generateMenu(role, permissions = [], branches = []) {
             "audits.physical-counts.delete",
         ],
         sales: ["sales.view", "sales.create", "sales.update", "sales.delete"],
-        employeeCredit: ["sales.employee-credit.view", "sales.employee-credit.create", "sales.employee-credit.collect"],
+        employeeCredit: ["sales.employee-credit.view", "sales.employee-credit.create", "sales.employee-credit.collect", "sales.employee-credit.print"],
         cashClosures: [
             "sales.cash-closures.view",
             "sales.cash-closures.create",
@@ -315,11 +315,12 @@ export function generateMenu(role, permissions = [], branches = []) {
         "sales.purchase-orders.view",
         "sales.purchase-orders.receive",
     ]);
+    const canViewEmployeeCredit = can("sales.employee-credit.view");
     const salesHistoryUrl = routeUrl("ventas.history", undefined, "/ventas/historial");
 
     if (
         canUse("sales") ||
-        canUse("employeeCredit") ||
+        canViewEmployeeCredit ||
         canUse("cashClosures") ||
         canUsePurchaseLists ||
         canUsePurchaseOrderTracking ||
@@ -345,7 +346,7 @@ export function generateMenu(role, permissions = [], branches = []) {
                         url: salesHistoryUrl,
                     }] : [])]
                     : []),
-                ...(canUse("employeeCredit") ? [{ text: "Estados de Cuenta", key: "sales.employee-credit", icon: "account_balance_wallet", url: route("ventas.employee-credit.index") }] : []),
+                ...(canViewEmployeeCredit ? [{ text: "Estados de Cuenta", key: "sales.employee-credit", icon: "account_balance_wallet", url: route("ventas.employee-credit.index") }] : []),
                 ...(canUse("cashClosures")
                     ? [
                           {

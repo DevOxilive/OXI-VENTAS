@@ -28,6 +28,7 @@ const permissionModuleOrder = [
     "inventory.general-purchase-orders",
     "audits",
     "sales",
+    "sales.employee-credit",
     "sales.attendance",
     "sales.purchase-lists",
     "sales.purchase-orders",
@@ -134,6 +135,10 @@ const permissionModules = {
     },
     "sales.purchase-orders": {
         label: "Seguimiento de Órdenes de compra",
+        section: "sales",
+    },
+    "sales.employee-credit": {
+        label: "Estados de cuenta",
         section: "sales",
     },
     "reports.sales": {
@@ -253,8 +258,9 @@ const permissionLabels = {
     "sales.delete": "Eliminar ventas",
     "sales.reports": "Ver reportes de ventas",
     "sales.employee-credit.view": "Ver estados de cuenta de empleados",
-    "sales.employee-credit.create": "Registrar ventas a crédito de empleados",
+    "sales.employee-credit.create": "Dar crédito desde el punto de venta",
     "sales.employee-credit.collect": "Registrar abonos de empleados",
+    "sales.employee-credit.print": "Imprimir y reimprimir tickets de estado de cuenta",
     "reports.sales.view": "Ver reportes de ventas",
     "reports.sales.export.excel": "Exportar reportes de ventas en Excel",
     "reports.sales.export.pdf": "Exportar reportes de ventas en PDF",
@@ -409,6 +415,10 @@ export function getPermissionModule(permissionName = "") {
 
     if (permissionName.startsWith("sales.purchase-lists.")) {
         return "sales.purchase-lists";
+    }
+
+    if (permissionName.startsWith("sales.employee-credit.")) {
+        return "sales.employee-credit";
     }
 
     if (permissionName === "attendance.register") {

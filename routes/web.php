@@ -191,11 +191,11 @@ Route::middleware([
     });
 
     Route::get('/qz/certificate', [QzTrayController::class, 'certificate'])
-        ->middleware('permission:systems.qz.sign')
+        ->middleware('permission:systems.qz.sign,sales.employee-credit.print')
         ->name('qz.certificate');
 
     Route::post('/qz/sign', [QzTrayController::class, 'sign'])
-        ->middleware(['permission:systems.qz.sign', 'idempotent'])
+        ->middleware(['permission:systems.qz.sign,sales.employee-credit.print', 'idempotent'])
         ->name('qz.sign');
 
     /*
