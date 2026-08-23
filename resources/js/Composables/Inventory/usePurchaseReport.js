@@ -61,8 +61,9 @@ export function usePurchaseReport(props) {
     let filterTimer = null;
 
     const localFilters = ref({
-        search: props.filters?.search ?? "",
-        category_id: props.filters?.category_id ?? "",
+        departmentIds: props.filters?.department_ids ?? [],
+        categoryIds: props.filters?.category_ids ?? [],
+        productIds: props.filters?.product_ids ?? [],
         stock: props.filters?.stock ?? "",
         per_page: props.filters?.per_page ?? 25,
     });
@@ -207,8 +208,9 @@ export function usePurchaseReport(props) {
             route("ventas.purchase-reports.index"),
             {
                 branch: props.currentBranch.id,
-                search: localFilters.value.search || undefined,
-                category_id: localFilters.value.category_id || undefined,
+                department_ids: localFilters.value.departmentIds?.length ? localFilters.value.departmentIds : undefined,
+                category_ids: localFilters.value.categoryIds?.length ? localFilters.value.categoryIds : undefined,
+                product_ids: localFilters.value.productIds?.length ? localFilters.value.productIds : undefined,
                 stock: localFilters.value.stock || undefined,
                 per_page: localFilters.value.per_page || 25,
                 list_status: props.listFilters?.status || "DRAFT",
@@ -220,20 +222,6 @@ export function usePurchaseReport(props) {
                 replace: true,
             }
         );
-    }
-
-    function resetFilters() {
-        localFilters.value = {
-            search: "",
-            category_id: "",
-            stock: "",
-            per_page: 25,
-        };
-    }
-
-    function clearWorkspace() {
-        clearDraft();
-        resetFilters();
     }
 
     function editDraft(order) {
@@ -368,9 +356,7 @@ export function usePurchaseReport(props) {
         itemBaseQuantity,
         removeItem,
         clearDraft,
-        clearWorkspace,
         applyFilters,
-        resetFilters,
         editDraft,
         saveDraft,
         generateOrder,

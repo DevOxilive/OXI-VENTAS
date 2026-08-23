@@ -56,6 +56,7 @@ class GeneralPurchaseOrderController extends Controller
                 'folio' => $cycle->folio,
                 'status' => $cycle->status,
             ],
+            'notificationSummary' => $this->purchaseOrderNotificationSummary($request),
             'generation' => $this->canViewStatus($request, 'GENERATE')
                 ? $this->generationPayload($request)
                 : [],
@@ -594,6 +595,47 @@ class GeneralPurchaseOrderController extends Controller
             'orders' => $orders->values(),
             'inventory_users' => $inventoryUsers,
             'draft' => null,
+        ];
+    }
+
+    private function purchaseOrderNotificationSummary(Request $request): array
+    {
+        $user = $request->user();
+        $user->loadMissing('role');
+
+        $accessibleBranchIds = $user->accessibleBranchIds();
+        $isInventoryUser = $user->role?->name === 'Inventario';
+
+        $items = PurchaseOrder::query()
+            ->with(['branch', 'user', 'assignedTo'])
+            ->withCount('items')
+            ->withCount('transfers')
+            ->whereIn('branch_id', $accessibleBranchIds)
+            ->where('status', PurchaseOrder::STATUS_GENERATED)
+            ->whereNull('general_purchase_order_id')
+            ->whereNotNull('assigned_to_user_id')
+            ->when($isInventoryUser, fn ($query) => $query->where('assigned_to_user_id', $user->id))
+            ->latest('generated_at')
+            ->latest('id')
+            ->limit(8)
+            ->get()
+            ->map(fn (PurchaseOrder $order) => [
+                'id' => $order->id,
+                'branch_id' => $order->branch_id,
+                'folio' => $order->folio,
+                'title' => $order->folio,
+                'description' => ($order->branch?->name ?? 'Sucursal').' · '.$order->items_count.' producto(s)',
+                'meta' => 'Solicitada por '.($order->user?->name ?? 'Sin informacion'),
+                'badge' => (int) $order->transfers_count > 0 ? 'Transferida' : 'Asignada',
+                'tone' => (int) $order->transfers_count > 0 ? 'blue' : 'amber',
+                'status' => $order->status,
+                'updated_at' => $order->updated_at,
+            ]);
+
+        return [
+            'mode' => 'inventory',
+            'count' => $items->count(),
+            'items' => $items,
         ];
     }
 

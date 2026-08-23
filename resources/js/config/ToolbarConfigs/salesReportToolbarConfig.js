@@ -1,5 +1,13 @@
 export const SALES_REPORT_TABS = [
     {
+        key: 'sales',
+        label: 'Ventas registradas',
+        icon: 'receipt_long',
+    },
+]
+
+export const REPLENISHMENT_REPORT_TABS = [
+    {
         key: 'pedido',
         label: 'Pedido',
         icon: 'playlist_add',
@@ -19,11 +27,6 @@ export const SALES_REPORT_TABS = [
         label: 'Pedido a tiendas',
         icon: 'local_shipping',
     },
-    {
-        key: 'sales',
-        label: 'Ventas registradas',
-        icon: 'receipt_long',
-    },
 ]
 
 export function getSalesReportToolbarConfig({
@@ -35,26 +38,27 @@ export function getSalesReportToolbarConfig({
     activeTab = 'pedido',
     showBranchFilter = false,
     isGlobalReport = false,
+    reportMode = 'sales',
 } = {}) {
-    const isSalesTab = activeTab === 'sales'
+    const isSalesReport = reportMode === 'sales'
 
     return {
-        icon: 'monitoring',
-        title: 'Reportes de ventas',
-        subtitle: isSalesTab
+        icon: isSalesReport ? 'monitoring' : 'playlist_add_check',
+        title: isSalesReport ? 'Reporte de ventas' : 'Planeacion de compra',
+        subtitle: isSalesReport
             ? 'Consulta ventas registradas y revisa el detalle de sus productos.'
-            : 'Analiza rotacion comercial, stock por sucursal y sugerencias de reposicion.',
+            : 'Genera criterios operativos para pedido, transferencias y ordenes de compra generales.',
         backButton: !isGlobalReport,
         backLabel: 'Vista global',
         search: filters?.search ?? '',
-        searchPlaceholder: isSalesTab
+        searchPlaceholder: isSalesReport
             ? 'Buscar folio, producto o vendedor...'
             : 'Buscar producto, codigo, departamento o categoria...',
-        showSearch: isSalesTab,
-        showRecordsPerPage: isSalesTab,
+        showSearch: isSalesReport,
+        showRecordsPerPage: isSalesReport,
         recordsPerPage: Number(filters?.perPage ?? 25),
         showCounter: false,
-        tabs: SALES_REPORT_TABS,
+        tabs: isSalesReport ? [] : REPLENISHMENT_REPORT_TABS,
         activeTab,
         filters: [
             {
@@ -80,7 +84,7 @@ export function getSalesReportToolbarConfig({
                 options: branches,
                 optionLabel: 'name',
                 optionValue: 'id',
-                visible: !isSalesTab && showBranchFilter,
+                visible: showBranchFilter,
             },
             {
                 key: 'folio',
@@ -88,8 +92,35 @@ export function getSalesReportToolbarConfig({
                 type: 'text',
                 placeholder: 'Folio de venta',
                 value: filters?.folio ?? '',
-                visible: isSalesTab,
+                visible: isSalesReport,
                 maxLength: 80,
+            },
+            {
+                key: 'status',
+                label: 'Estado',
+                type: 'select',
+                placeholder: 'Todos los estados',
+                value: filters?.status ?? '',
+                visible: isSalesReport,
+                options: [
+                    { label: 'Completadas', value: 'completed' },
+                    { label: 'Canceladas', value: 'cancelled' },
+                    { label: 'Abonos aplicados', value: 'payment' },
+                ],
+            },
+            {
+                key: 'paymentMethod',
+                label: 'Forma de pago',
+                type: 'select',
+                placeholder: 'Todas las formas',
+                value: filters?.paymentMethod ?? '',
+                visible: isSalesReport,
+                options: [
+                    { label: 'Efectivo', value: 'cash' },
+                    { label: 'Tarjeta', value: 'card' },
+                    { label: 'Credito empleado', value: 'credit' },
+                    { label: 'Abonos', value: 'payment' },
+                ],
             },
             {
                 key: 'departmentIds',
@@ -100,7 +131,7 @@ export function getSalesReportToolbarConfig({
                 options: departments,
                 optionLabel: 'name',
                 optionValue: 'id',
-                visible: !isSalesTab,
+                visible: !isSalesReport,
             },
             {
                 key: 'categoryIds',
@@ -111,7 +142,7 @@ export function getSalesReportToolbarConfig({
                 options: categories,
                 optionLabel: 'name',
                 optionValue: 'id',
-                visible: !isSalesTab,
+                visible: !isSalesReport,
             },
             {
                 key: 'productIds',
@@ -122,7 +153,7 @@ export function getSalesReportToolbarConfig({
                 options: products,
                 optionLabel: 'name',
                 optionValue: 'id',
-                visible: !isSalesTab,
+                visible: !isSalesReport,
             },
         ],
         actions: [
@@ -139,7 +170,7 @@ export function getSalesReportToolbarConfig({
                 icon: 'picture_as_pdf',
                 variant: 'red',
                 permission: 'reports.sales.export.pdf',
-                hidden: !isSalesTab,
+                hidden: !isSalesReport,
             },
         ],
     }

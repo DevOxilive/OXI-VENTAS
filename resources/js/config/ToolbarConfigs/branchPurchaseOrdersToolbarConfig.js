@@ -1,4 +1,4 @@
-export function getBranchPurchaseOrdersToolbarConfig({ filters = {}, total = 0, branchName = '' } = {}) {
+export function getBranchPurchaseOrdersToolbarConfig({ filters = {}, total = 0, branchName = '', actions = [] } = {}) {
     return {
         icon: 'receipt_long',
         title: 'Órdenes de compra',
@@ -7,7 +7,7 @@ export function getBranchPurchaseOrdersToolbarConfig({ filters = {}, total = 0, 
         showSearch: false,
         compactFilters: true,
         filters: [],
-        actions: [],
+        actions,
         tabs: [
             { key: 'GENERATED', label: 'Pendientes', icon: 'schedule' },
             { key: 'REVIEW', label: 'Por revisar', icon: 'fact_check' },

@@ -11,12 +11,13 @@ use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Models\ProductDepartment;
 use App\Models\User;
 use App\Services\PurchaseCycleService;
-use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -121,6 +122,7 @@ class PurchaseReportController extends Controller
             'branchesDB' => $this->mapPurchaseBranches($this->accessiblePurchaseBranches($request)),
             'ordersDB' => $orders,
             'filters' => $filters,
+            'notificationSummary' => $this->salesPurchaseOrderNotificationSummary($request, $branch),
         ]);
     }
 
@@ -163,6 +165,7 @@ class PurchaseReportController extends Controller
                 'user_id' => $request->user()?->id,
                 'assigned_to_user_id' => $assignedUser?->id,
                 'source' => PurchaseOrder::SOURCE_CENTRAL,
+                'folio' => $generateOrder ? $this->makeGeneratedFolio($branch) : null,
                 'status' => $generateOrder
                     ? PurchaseOrder::STATUS_GENERATED
                     : PurchaseOrder::STATUS_DRAFT,
@@ -194,7 +197,6 @@ class PurchaseReportController extends Controller
                 ]);
             }
 
-            $report->update(['folio' => $this->makeFolio($report)]);
             $this->refreshTotals($report);
 
             if ($generateOrder) {
@@ -262,7 +264,7 @@ class PurchaseReportController extends Controller
             true,
         );
 
-        DB::transaction(function () use ($assignedUser, $branch, $purchaseReport, $request, $validated) {
+        $generatedOrder = DB::transaction(function () use ($assignedUser, $branch, $purchaseReport, $request, $validated) {
             $lockedOrder = $this->lockCurrentVersion($request, $purchaseReport);
             abort_unless($lockedOrder->status === PurchaseOrder::STATUS_DRAFT, 422);
             abort_if($lockedOrder->general_purchase_order_id, 422, 'La solicitud ya forma parte de una orden general.');
@@ -274,15 +276,44 @@ class PurchaseReportController extends Controller
             $this->syncItems($lockedOrder, $branch, $validated['items']);
             $this->refreshTotals($lockedOrder);
 
-            $lockedOrder->update([
+            $generatedOrder = $lockedOrder->replicate([
+                'folio',
+                'status',
+                'generated_at',
+                'created_at',
+                'updated_at',
+            ]);
+            $generatedOrder->forceFill([
+                'folio' => $this->makeGeneratedFolio($branch),
                 'status' => PurchaseOrder::STATUS_GENERATED,
                 'generated_at' => now(),
-            ]);
+            ])->save();
 
-            app(PurchaseCycleService::class)->registerOrder($lockedOrder, $request->user());
+            foreach ($lockedOrder->items as $item) {
+                $generatedOrder->items()->create($item->only([
+                    'branch_product_id',
+                    'product_id',
+                    'current_stock',
+                    'min_stock',
+                    'requested_quantity',
+                    'purchase_presentation',
+                    'package_quantity',
+                    'units_per_package',
+                    'estimated_price',
+                    'estimated_total',
+                    'status',
+                ]));
+            }
+
+            $this->refreshTotals($generatedOrder);
+            $lockedOrder->delete();
+
+            app(PurchaseCycleService::class)->registerOrder($generatedOrder, $request->user());
+
+            return $generatedOrder;
         }, 3);
 
-        $this->notifyInventoryAssignment($purchaseReport, $assignedUser, $branch);
+        $this->notifyInventoryAssignment($generatedOrder, $assignedUser, $branch);
 
         return redirect()->route('ventas.purchase-reports.index', [
             'branch' => $branch->id,
@@ -390,8 +421,9 @@ class PurchaseReportController extends Controller
         $perPage = TablePagination::resolvePerPage($request);
 
         $filters = [
-            'search' => $request->input('search', ''),
-            'category_id' => $request->input('category_id', ''),
+            'department_ids' => $this->integerList($request->input('department_ids', [])),
+            'category_ids' => $this->integerList($request->input('category_ids', [])),
+            'product_ids' => $this->integerList($request->input('product_ids', [])),
             'stock' => $request->input('stock', ''),
             'per_page' => $perPage,
         ];
@@ -495,7 +527,9 @@ class PurchaseReportController extends Controller
             'productsDB' => $products,
             'reportsDB' => $reports,
             'filters' => $filters,
+            'productDepartmentsDB' => $this->productDepartmentOptions($branch),
             'categoriesDB' => $this->categoryOptions($branch),
+            'productOptionsDB' => $this->productOptions($branch),
             'inventoryUsersDB' => $this->inventoryUsersForBranch($branch),
             'purchaseCycle' => [
                 'id' => $cycle->id,
@@ -575,29 +609,18 @@ class PurchaseReportController extends Controller
                 'product.barcodes',
             ])
             ->where('branch_id', $branch->id)
-            ->when($filters['search'], function ($query, $search) {
-                FlexibleSearch::apply($query, $search, function ($searchQuery, $phrase, $terms) {
-                    FlexibleSearch::orWhereColumns($searchQuery, [
-                        'branch_products.barcode',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product', [
-                        'name',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
-                        'code',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product.category.productDepartment', [
-                        'name',
-                    ], $phrase, $terms);
+            ->when($filters['department_ids'], function ($query, $departmentIds) {
+                $query->whereHas('product.category', function ($categoryQuery) use ($departmentIds) {
+                    $categoryQuery->whereIn('product_department_id', $departmentIds);
                 });
             })
-            ->when($filters['category_id'], function ($query, $categoryId) {
-                $query->whereHas('product', function ($productQuery) use ($categoryId) {
-                    $productQuery->where('category_id', $categoryId);
+            ->when($filters['category_ids'], function ($query, $categoryIds) {
+                $query->whereHas('product', function ($productQuery) use ($categoryIds) {
+                    $productQuery->whereIn('category_id', $categoryIds);
                 });
+            })
+            ->when($filters['product_ids'], function ($query, $productIds) {
+                $query->whereIn('product_id', $productIds);
             })
             ->when($filters['stock'] === 'LOW', function ($query) {
                 $query->whereColumn('stock', '<=', 'min_stock')
@@ -618,6 +641,52 @@ class PurchaseReportController extends Controller
             ->distinct()
             ->orderBy('categories.name')
             ->get();
+    }
+
+    private function productDepartmentOptions(Branch $branch)
+    {
+        return ProductDepartment::query()
+            ->select(['product_departments.id', 'product_departments.name'])
+            ->join('categories', 'categories.product_department_id', '=', 'product_departments.id')
+            ->join('products', 'products.category_id', '=', 'categories.id')
+            ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
+            ->where('branch_products.branch_id', $branch->id)
+            ->distinct()
+            ->orderBy('product_departments.name')
+            ->get();
+    }
+
+    private function productOptions(Branch $branch)
+    {
+        return BranchProduct::query()
+            ->with(['product.category:id,product_department_id,name', 'product.barcodes:id,product_id,code'])
+            ->where('branch_id', $branch->id)
+            ->orderBy('id')
+            ->get()
+            ->map(function (BranchProduct $branchProduct) {
+                $product = $branchProduct->product;
+
+                return [
+                    'id' => $product?->id,
+                    'name' => trim(($product?->name ?? 'Producto sin nombre')
+                        .' - '
+                        .($product?->barcodes?->first()?->code ?: ($branchProduct->barcode ?: 'Sin codigo'))),
+                    'category_id' => $product?->category_id,
+                    'product_department_id' => $product?->category?->product_department_id,
+                ];
+            })
+            ->filter(fn (array $product) => filled($product['id']))
+            ->values();
+    }
+
+    private function integerList(mixed $value): array
+    {
+        return collect(is_array($value) ? $value : explode(',', (string) $value))
+            ->map(fn ($item) => (int) $item)
+            ->filter(fn (int $item) => $item > 0)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function accessiblePurchaseBranches(Request $request)
@@ -719,12 +788,71 @@ class PurchaseReportController extends Controller
         Branch $branch
     ): void {
         event(new RealtimeActivityLogged(
-            "La orden {$purchaseOrder->folio} de {$branch->name} se asigno a {$assignedUser->name}.",
+            "Recibiste la Orden de compra {$purchaseOrder->folio} de {$branch->name}.",
             'Ventas',
-            'assigned',
+            'purchase_order_assigned',
             $purchaseOrder->folio,
             [$assignedUser->id],
+            false,
         ));
+    }
+
+    private function salesPurchaseOrderNotificationSummary(Request $request, Branch $branch): array
+    {
+        $items = PurchaseOrder::query()
+            ->withCount('items')
+            ->where('branch_id', $branch->id)
+            ->where('user_id', $request->user()?->id)
+            ->where(function ($query) {
+                $query
+                    ->where('status', PurchaseOrder::STATUS_REVIEW)
+                    ->orWhereNotNull('inventory_edited_at')
+                    ->orWhereIn('review_status', [
+                        PurchaseOrder::REVIEW_APPROVED,
+                        PurchaseOrder::REVIEW_REJECTED,
+                    ]);
+            })
+            ->latest('updated_at')
+            ->latest('id')
+            ->limit(8)
+            ->get()
+            ->map(function (PurchaseOrder $order) {
+                $badge = match (true) {
+                    $order->status === PurchaseOrder::STATUS_REVIEW => 'Por revisar',
+                    $order->review_status === PurchaseOrder::REVIEW_APPROVED => 'Aprobada',
+                    $order->review_status === PurchaseOrder::REVIEW_REJECTED => 'Rechazada',
+                    (bool) $order->inventory_edited_at => 'Editada',
+                    default => 'Aviso',
+                };
+
+                $tone = match ($badge) {
+                    'Aprobada' => 'green',
+                    'Rechazada' => 'red',
+                    'Editada' => 'blue',
+                    default => 'amber',
+                };
+
+                return [
+                    'id' => $order->id,
+                    'branch_id' => $order->branch_id,
+                    'folio' => $order->folio,
+                    'status' => $order->status,
+                    'title' => $order->folio,
+                    'description' => $order->items_count.' producto(s) · '.$this->statusLabel($order->status, $order->review_status),
+                    'meta' => $order->inventory_edited_at
+                        ? 'Inventario hizo ajustes en esta orden.'
+                        : 'Da seguimiento a esta Orden de compra.',
+                    'badge' => $badge,
+                    'tone' => $tone,
+                    'updated_at' => $order->updated_at,
+                ];
+            });
+
+        return [
+            'mode' => 'sales',
+            'count' => $items->count(),
+            'items' => $items,
+        ];
     }
 
     private function abortIfDraftDoesNotBelongToUser(
@@ -922,9 +1050,29 @@ class PurchaseReportController extends Controller
         ]);
     }
 
-    private function makeFolio(PurchaseOrder $purchaseOrder): string
+    private function makeGeneratedFolio(Branch $branch): string
     {
-        return sprintf('OC-%s-%04d', now()->format('Ymd'), $purchaseOrder->id);
+        $branchName = Str::of($branch->name ?: 'Sucursal')
+            ->ascii()
+            ->replaceMatches('/[^A-Za-z0-9]+/', '-')
+            ->trim('-')
+            ->value() ?: 'Sucursal';
+        $prefix = "OC-{$branchName}";
+        $nextSequence = PurchaseOrder::query()
+            ->where('status', '!=', PurchaseOrder::STATUS_DRAFT)
+            ->where('folio', 'like', "{$prefix}-%")
+            ->lockForUpdate()
+            ->pluck('folio')
+            ->map(function (?string $folio): int {
+                if (! $folio || ! preg_match('/-(\d{6})$/', $folio, $matches)) {
+                    return 0;
+                }
+
+                return (int) $matches[1];
+            })
+            ->max() + 1;
+
+        return sprintf('%s-%06d', $prefix, $nextSequence);
     }
 
     private function statusLabel(string $status, ?string $reviewStatus = null): string

@@ -382,6 +382,12 @@ export function generateMenu(role, permissions = [], branches = []) {
                 key: "reports.sales",
                 icon: "monitoring",
                 url: route("inventory.reports.sales"),
+            },
+            {
+                text: "Planeación de compra",
+                key: "reports.replenishment",
+                icon: "playlist_add_check",
+                url: route("inventory.reports.replenishment"),
             }]
             : []),
         ...(canUse("cashClosureReports")

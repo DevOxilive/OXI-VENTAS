@@ -8,7 +8,6 @@ import GlobalToolbar from "@/Components/Toolbars/GlobalToolbar.vue";
 import GlobalTable from "@/Components/Tables/GlobalTable.vue";
 import AppButton from "@/Components/Buttons/AppButton.vue";
 import ActionIconButton from "@/Components/Forms/ActionIconButton.vue";
-import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
 import QuantityStepper from "@/Components/Forms/QuantityStepper.vue";
 import PresentationSwitch from "@/Components/Inventory/PresentationSwitch.vue";
@@ -38,7 +37,15 @@ const props = defineProps({
     },
     productsDB: Object,
     filters: Object,
+    productDepartmentsDB: {
+        type: Array,
+        default: () => [],
+    },
     categoriesDB: Array,
+    productOptionsDB: {
+        type: Array,
+        default: () => [],
+    },
     inventoryUsersDB: {
         type: Array,
         default: () => [],
@@ -79,6 +86,27 @@ const inventoryUserOptions = computed(() => props.inventoryUsersDB.map((user) =>
     value: user.value ?? user.id,
     label: user.email ? `${user.label ?? user.name} - ${user.email}` : (user.label ?? user.name),
 })));
+const selectedDepartmentIds = computed(() => new Set((report.localFilters.value.departmentIds || []).map(String)));
+const selectedCategoryIds = computed(() => new Set((report.localFilters.value.categoryIds || []).map(String)));
+const toolbarCategories = computed(() => {
+    if (selectedDepartmentIds.value.size === 0) return props.categoriesDB ?? [];
+
+    return (props.categoriesDB ?? []).filter((category) =>
+        selectedDepartmentIds.value.has(String(category.product_department_id))
+    );
+});
+const toolbarProducts = computed(() => {
+    const products = props.productOptionsDB ?? [];
+
+    return products.filter((product) => {
+        const matchesDepartment = selectedDepartmentIds.value.size === 0
+            || selectedDepartmentIds.value.has(String(product.product_department_id));
+        const matchesCategory = selectedCategoryIds.value.size === 0
+            || selectedCategoryIds.value.has(String(product.category_id));
+
+        return matchesDepartment && matchesCategory;
+    });
+});
 const toolbarConfig = computed(() => props.selectorMode
     ? {
         title: "Lista de compra",
@@ -92,12 +120,14 @@ const toolbarConfig = computed(() => props.selectorMode
     }
     : getPurchaseReportToolbarConfig({
         branchName: branchLabel.value,
-        editingFolio: report.editingOrder.value?.folio || "",
+        editingFolio: report.editingOrder.value ? "borrador seleccionado" : "",
         cycleFolio: props.purchaseCycle?.folio || "",
         cycleSubmitted: cycleSubmitted.value,
-        hasProducts: report.selectedCount.value > 0,
-        canCreate: canCreatePurchaseReport.value,
-        canClear: canWorkOnPurchaseList.value,
+        filters: report.localFilters.value,
+        departments: props.productDepartmentsDB ?? [],
+        categories: toolbarCategories.value,
+        products: toolbarProducts.value,
+        stockOptions,
         perPage: report.localFilters.value.per_page,
         total: Number(pagination.value?.total ?? 0),
     }));
@@ -141,6 +171,49 @@ function handleTableAction({ action, row }) {
     }
 }
 
+function handleToolbarFilter({ key, value }) {
+    if (key === "departmentIds") {
+        const departmentIds = (value || []).map(String);
+        const validCategoryIds = new Set((props.categoriesDB ?? [])
+            .filter((category) => departmentIds.length === 0
+                || departmentIds.includes(String(category.product_department_id)))
+            .map((category) => String(category.id)));
+        const validProductIds = new Set((props.productOptionsDB ?? [])
+            .filter((product) => departmentIds.length === 0
+                || departmentIds.includes(String(product.product_department_id)))
+            .map((product) => String(product.id)));
+
+        report.localFilters.value.departmentIds = value || [];
+        report.localFilters.value.categoryIds = (report.localFilters.value.categoryIds || [])
+            .filter((categoryId) => validCategoryIds.has(String(categoryId)));
+        report.localFilters.value.productIds = (report.localFilters.value.productIds || [])
+            .filter((productId) => validProductIds.has(String(productId)));
+        return;
+    }
+
+    if (key === "categoryIds") {
+        const categoryIds = (value || []).map(String);
+        const validProductIds = new Set((props.productOptionsDB ?? [])
+            .filter((product) => categoryIds.length === 0
+                || categoryIds.includes(String(product.category_id)))
+            .map((product) => String(product.id)));
+
+        report.localFilters.value.categoryIds = value || [];
+        report.localFilters.value.productIds = (report.localFilters.value.productIds || [])
+            .filter((productId) => validProductIds.has(String(productId)));
+        return;
+    }
+
+    if (key === "productIds") {
+        report.localFilters.value.productIds = value || [];
+        return;
+    }
+
+    if (key === "stock") {
+        report.localFilters.value.stock = value || "";
+    }
+}
+
 async function openDraft(draft) {
     if (!canUpdatePurchaseReport.value) return;
 
@@ -160,42 +233,6 @@ async function openDraft(draft) {
     }
 
     report.editDraft(draft);
-}
-
-function handleToolbarAction(action) {
-    if (action === "clear") {
-        report.clearWorkspace();
-    }
-
-    if (action === "submit-empty") submitWithoutProducts();
-}
-
-async function submitWithoutProducts() {
-    if (!canCreatePurchaseReport.value) return;
-
-    const result = await confirmModalAction({
-        mode: "create",
-        entityName: "solicitud",
-        title: "Confirmar sin productos",
-        message: `Se registrará que ${branchLabel.value} no necesita productos en ${props.purchaseCycle?.folio || "el ciclo actual"}.`,
-        confirmText: "Confirmar solicitud",
-    });
-
-    if (!result.isConfirmed) return;
-
-    router.post(
-        route("inventory.branches.purchase-reports.submit-empty", {
-            branch: props.currentBranch.id,
-        }),
-        {},
-        getModalRequestOptions({
-            mode: "create",
-            entityName: "Solicitud",
-            successTitle: "Solicitud registrada correctamente",
-            errorTitle: "No se pudo registrar la solicitud",
-            errorMessage: "Actualiza la página y revisa el ciclo de compra actual.",
-        }),
-    );
 }
 
 async function generateOrder() {
@@ -231,18 +268,23 @@ async function deleteDraft(draft) {
             branch: props.currentBranch.id,
             purchaseReport: draft.id,
         }),
-        getModalRequestOptions({
-            mode: "delete",
-            entityName: "Borrador",
-            successTitle: "Borrador eliminado correctamente",
-            errorTitle: "No se pudo eliminar el borrador",
-            errorMessage: "Actualiza la página y vuelve a intentarlo.",
-            onSuccess: () => {
-                if (Number(report.editingOrder.value?.id) === Number(draft.id)) {
-                    report.clearDraft();
-                }
+        {
+            ...getModalRequestOptions({
+                mode: "delete",
+                entityName: "Borrador",
+                successTitle: "Borrador eliminado correctamente",
+                errorTitle: "No se pudo eliminar el borrador",
+                errorMessage: "Actualiza la página y vuelve a intentarlo.",
+                onSuccess: () => {
+                    if (Number(report.editingOrder.value?.id) === Number(draft.id)) {
+                        report.clearDraft();
+                    }
+                },
+            }),
+            data: {
+                record_version: draft.record_version || draft.updated_at || null,
             },
-        }),
+        },
     );
 }
 
@@ -276,7 +318,7 @@ function selectBranch(branchId) {
             <template #toolbar>
                 <GlobalToolbar
                     v-bind="toolbarConfig"
-                    @action="handleToolbarAction"
+                    @update:filter="handleToolbarFilter"
                     @update:records-per-page="report.localFilters.value.per_page = $event"
                 />
             </template>
@@ -298,52 +340,26 @@ function selectBranch(branchId) {
             </div>
 
             <div v-else>
+                <PurchaseReportDrafts
+                    class="mb-4"
+                    :reports="purchaseLists"
+                    :pagination="reportsDB"
+                    @edit="openDraft"
+                    @delete="deleteDraft"
+                    @paginate="paginateLists"
+                />
+
                 <section
                     class="grid min-w-0 gap-5"
                     :class="canWorkOnPurchaseList
-                        ? 'xl:grid-cols-[minmax(340px,0.72fr)_minmax(0,1.15fr)_minmax(340px,0.85fr)]'
+                        ? 'xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.75fr)]'
                         : 'xl:grid-cols-1'"
                 >
-                    <PurchaseReportDrafts
-                        :reports="purchaseLists"
-                        :pagination="reportsDB"
-                        @edit="openDraft"
-                        @delete="deleteDraft"
-                        @paginate="paginateLists"
-                    />
-
                     <article
                         v-if="canWorkOnPurchaseList"
-                        class="min-w-0 rounded-[28px] border border-secondary bg-background p-5 shadow-sm"
+                        class="min-w-0 rounded-2xl border border-secondary bg-background p-4 shadow-sm"
                     >
-                        <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-[minmax(0,1.3fr)_180px_180px]">
-                            <InputField
-                                v-model="report.localFilters.value.search"
-                                label="Buscar productos"
-                                field="toolbar_search"
-                                icon="barcode_scanner"
-                                placeholder="Codigo, codigo alterno, nombre o categoria"
-                            />
-
-                            <SelectField
-                                v-model="report.localFilters.value.category_id"
-                                label="Categoria"
-                                field="purchase_report_category"
-                                :options="categoriesDB"
-                                placeholder="Todas"
-                            />
-
-                            <SelectField
-                                v-model="report.localFilters.value.stock"
-                                label="Stock"
-                                field="purchase_report_stock"
-                                :options="stockOptions"
-                                placeholder="Todo"
-                            />
-
-                        </div>
-
-                        <div class="mt-4">
+                        <div>
                             <GlobalTable
                                 :items="tableRows"
                                 :pagination="pagination"
@@ -357,11 +373,11 @@ function selectBranch(branchId) {
 
                     <article
                         v-if="canWorkOnPurchaseList"
-                        class="flex min-h-0 min-w-0 flex-col rounded-[28px] border border-secondary bg-background p-5 shadow-sm"
+                        class="flex min-h-0 min-w-0 flex-col rounded-2xl border border-secondary bg-background p-4 shadow-sm"
                     >
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <SectionHeading
-                                :title="report.isEditing.value ? `Productos de ${report.editingOrder.value?.folio}` : 'Productos de la lista'"
+                                :title="report.isEditing.value ? 'Productos del borrador' : 'Productos de la lista'"
                                 description="Define las piezas necesarias antes de guardar la lista."
                                 spacing="sm"
                             />
@@ -376,7 +392,7 @@ function selectBranch(branchId) {
                             </div>
                         </div>
 
-                        <div class="mt-4 max-h-[calc(100vh-27rem)] min-h-[260px] space-y-3 overflow-y-auto pr-1">
+                        <div class="mt-4 max-h-[calc(100vh-25rem)] min-h-[260px] space-y-3 overflow-y-auto pr-1">
                             <article
                                 v-for="item in selectedProducts"
                                 :key="item.branch_product_id"

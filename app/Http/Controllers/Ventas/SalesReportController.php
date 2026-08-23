@@ -44,14 +44,26 @@ class SalesReportController extends Controller
 
     public function global(Request $request)
     {
-        return $this->renderReport($request);
+        return $this->renderReport($request, null, 'sales');
     }
 
     public function index(Request $request, Branch $branch)
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
-        return $this->renderReport($request, $branch);
+        return $this->renderReport($request, $branch, 'sales');
+    }
+
+    public function globalReplenishment(Request $request)
+    {
+        return $this->renderReport($request, null, 'replenishment');
+    }
+
+    public function replenishment(Request $request, Branch $branch)
+    {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
+        return $this->renderReport($request, $branch, 'replenishment');
     }
 
     public function exportGlobalProductsExcel(Request $request)
@@ -64,6 +76,18 @@ class SalesReportController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         return $this->downloadProductsExcel($request, $branch);
+    }
+
+    public function exportGlobalReplenishmentExcel(Request $request)
+    {
+        return $this->downloadProductsExcel($request, null, 'replenishment');
+    }
+
+    public function exportReplenishmentExcel(Request $request, Branch $branch)
+    {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
+        return $this->downloadProductsExcel($request, $branch, 'replenishment');
     }
 
     public function exportGlobalSalesExcel(Request $request)
@@ -90,7 +114,7 @@ class SalesReportController extends Controller
         return $this->downloadSalesPdf($request, $branch);
     }
 
-    private function renderReport(Request $request, ?Branch $branch = null)
+    private function renderReport(Request $request, ?Branch $branch = null, string $reportMode = 'sales')
     {
         $branches = $this->reportBranches($request);
 
@@ -98,14 +122,17 @@ class SalesReportController extends Controller
             return $this->redirectToBranchSetup($request, 'reportes de ventas');
         }
 
-        $filters = $this->resolveFilters($request, $branch, $branches);
+        $filters = $this->resolveFilters($request, $branch, $branches, $reportMode);
         $activeTab = $filters['tab'];
         $reportBranches = $this->selectedReportBranches($branch, $branches, $filters);
-        $replenishmentReport = app(SalesReplenishmentReportService::class)->build($reportBranches, $filters);
+        $replenishmentReport = $reportMode === 'replenishment'
+            ? app(SalesReplenishmentReportService::class)->build($reportBranches, $filters)
+            : ['branches' => [], 'sections' => []];
 
         return Inertia::render('Inventory/Reports/SalesReports', [
             'currentBranch' => $branch ? $this->mapBranch($branch) : null,
             'reportScope' => $branch ? 'branch' : 'global',
+            'reportMode' => $reportMode,
             'branchesDB' => $branches->map(fn (Branch $availableBranch) => $this->mapBranch($availableBranch))->values(),
             'selectionCatalogs' => $this->selectionCatalogs($branches),
             'filters' => $this->mapFilters($filters),
@@ -123,10 +150,13 @@ class SalesReportController extends Controller
                     ->withQueryString()
                     ->through(fn (Sale $sale) => $this->mapSaleRow($sale))
                 : $this->emptyPaginator(),
+            'salesSummary' => $activeTab === self::TAB_SALES
+                ? $this->salesReportSummary($this->salesReportRows($filters))
+                : $this->emptySalesSummary(),
         ]);
     }
 
-    private function downloadProductsExcel(Request $request, ?Branch $branch = null)
+    private function downloadProductsExcel(Request $request, ?Branch $branch = null, string $reportMode = 'sales')
     {
         $branches = $this->reportBranches($request);
 
@@ -134,7 +164,7 @@ class SalesReportController extends Controller
             return $this->redirectToBranchSetup($request, 'reportes de ventas');
         }
 
-        $filters = $this->resolveFilters($request, $branch, $branches);
+        $filters = $this->resolveFilters($request, $branch, $branches, $reportMode);
         $fileScope = $branch ? $this->safeSegment($branch->slug ?: $branch->name) : 'global';
 
         if (in_array($filters['tab'], self::REPLENISHMENT_TABS, true)) {
@@ -166,13 +196,7 @@ class SalesReportController extends Controller
         }
 
         $filters = $this->resolveFilters($request, $branch, $branches);
-        $sales = $this->registeredSalesQuery($filters)
-            ->get()
-            ->map(fn (Sale $sale) => $this->mapSaleRow($sale));
-        $rows = $sales
-            ->concat($this->employeeCreditPaymentReportRows($filters))
-            ->sortBy(fn (array $row) => ($row['date_sort'] ?? '').'|'.($row['operation_sort'] ?? ''))
-            ->values();
+        $rows = $this->salesReportRows($filters);
         $fileScope = $branch ? $this->safeSegment($branch->slug ?: $branch->name) : 'global';
 
         return Excel::download(
@@ -190,15 +214,15 @@ class SalesReportController extends Controller
         }
 
         $filters = $this->resolveFilters($request, $branch, $branches);
-        $rows = $this->registeredSalesQuery($filters)
-            ->get()
-            ->map(fn (Sale $sale) => $this->mapSaleRow($sale));
+        $rows = $this->salesReportRows($filters);
         $fileScope = $branch ? $this->safeSegment($branch->slug ?: $branch->name) : 'global';
+        $summary = $this->salesReportSummary($rows);
 
         $pdf = Pdf::loadView('pdf.sales-registered-report', [
             'branch' => $branch ?: (object) ['name' => 'Todas las sucursales accesibles'],
             'filters' => $filters,
             'rows' => $rows,
+            'summary' => $summary,
             'title' => 'Ventas registradas',
         ])->setPaper('letter', 'landscape');
 
@@ -329,6 +353,14 @@ class SalesReportController extends Controller
 
         $this->applyDateFilters($query, $filters, 'date');
 
+        if (in_array($filters['status'] ?? null, ['completed', 'cancelled'], true)) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (in_array($filters['payment_method'] ?? null, ['cash', 'card', 'credit'], true)) {
+            $this->applySalePaymentMethodFilter($query, $filters['payment_method']);
+        }
+
         if (filled($filters['folio'] ?? null)) {
             $query->where('folio', 'like', '%'.$this->likeValue($filters['folio']).'%');
         }
@@ -373,6 +405,54 @@ class SalesReportController extends Controller
 
         $this->applyDateFilters($query, $filters, 'paid_at');
 
+        if (in_array($filters['status'] ?? null, ['completed', 'cancelled'], true)) {
+            return collect();
+        }
+
+        if (in_array($filters['payment_method'] ?? null, ['cash', 'card', 'credit'], true)) {
+            return collect();
+        }
+
+        if (filled($filters['folio'] ?? null)) {
+            $folio = '%'.$this->likeValue($filters['folio']).'%';
+
+            $query->where(function (Builder $subQuery) use ($folio) {
+                $subQuery
+                    ->where('folio', 'like', $folio)
+                    ->orWhereHas('allocations.charge.sale', fn (Builder $saleQuery) => $saleQuery->where('folio', 'like', $folio));
+            });
+        }
+
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $like = '%'.$this->likeValue($search).'%';
+
+            $query->where(function (Builder $subQuery) use ($like) {
+                $subQuery
+                    ->where('folio', 'like', $like)
+                    ->orWhereHas('account.employee', function (Builder $employeeQuery) use ($like) {
+                        $employeeQuery
+                            ->where('first_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like);
+                    })
+                    ->orWhereHas('receivedBy', fn (Builder $userQuery) => $userQuery->where('name', 'like', $like))
+                    ->orWhereHas('allocations.charge.sale', function (Builder $saleQuery) use ($like) {
+                        $saleQuery
+                            ->where('folio', 'like', $like)
+                            ->orWhereHas('employee', function (Builder $employeeQuery) use ($like) {
+                                $employeeQuery
+                                    ->where('first_name', 'like', $like)
+                                    ->orWhere('last_name', 'like', $like);
+                            })
+                            ->orWhereHas('details.product', function (Builder $productQuery) use ($like) {
+                                $productQuery
+                                    ->where('name', 'like', $like)
+                                    ->orWhereHas('barcodes', fn (Builder $barcodeQuery) => $barcodeQuery->where('code', 'like', $like));
+                            });
+                    });
+            });
+        }
+
         return $query->get()
             ->flatMap(function (EmployeeCreditPayment $payment) {
                 return $payment->allocations
@@ -382,12 +462,76 @@ class SalesReportController extends Controller
             ->values();
     }
 
-    private function resolveFilters(Request $request, ?Branch $branch = null, $branches = null): array
+    private function salesReportRows(array $filters): \Illuminate\Support\Collection
+    {
+        $sales = (($filters['status'] ?? null) === 'payment' || ($filters['payment_method'] ?? null) === 'payment')
+            ? collect()
+            : $this->registeredSalesQuery($filters)
+                ->get()
+                ->map(fn (Sale $sale) => $this->mapSaleRow($sale));
+
+        return $sales
+            ->concat($this->employeeCreditPaymentReportRows($filters))
+            ->sortBy(fn (array $row) => ($row['date_sort'] ?? '').'|'.($row['operation_sort'] ?? ''))
+            ->values();
+    }
+
+    private function salesReportSummary(\Illuminate\Support\Collection $rows): array
+    {
+        $summary = $this->emptySalesSummary();
+
+        foreach ($rows as $operation) {
+            $amount = collect($operation['details'] ?? [])
+                ->sum(fn (array $detail) => (float) ($detail['report_amount'] ?? $detail['subtotal'] ?? 0));
+
+            if (($operation['operation_type'] ?? 'sale') === 'payment') {
+                $summary['credit_payments'] += $amount;
+                continue;
+            }
+
+            $method = str($operation['payment_method'] ?? '')->lower()->ascii()->toString();
+
+            if (str_contains($method, 'efectivo')) {
+                $summary['cash'] += $amount;
+            } elseif (str_contains($method, 'tarjeta') || str_contains($method, 'debito') || str_contains($method, 'credito') && ! str_contains($method, 'empleado')) {
+                $summary['card'] += $amount;
+            } else {
+                $summary['credit'] += $amount;
+            }
+        }
+
+        $summary['sold_total'] = $summary['cash'] + $summary['card'] + $summary['credit'];
+        $summary['collected_total'] = $summary['cash'] + $summary['card'] + $summary['credit_payments'];
+        $summary['operations_count'] = $rows->count();
+        $summary['products_count'] = $rows->sum(fn (array $row) => count($row['details'] ?? []));
+
+        return collect($summary)
+            ->map(fn ($value) => is_float($value) ? round($value, 2) : $value)
+            ->all();
+    }
+
+    private function emptySalesSummary(): array
+    {
+        return [
+            'cash' => 0.0,
+            'card' => 0.0,
+            'credit' => 0.0,
+            'credit_payments' => 0.0,
+            'sold_total' => 0.0,
+            'collected_total' => 0.0,
+            'operations_count' => 0,
+            'products_count' => 0,
+        ];
+    }
+
+    private function resolveFilters(Request $request, ?Branch $branch = null, $branches = null, string $reportMode = 'sales'): array
     {
         $validated = $request->validate([
             'tab' => ['nullable', 'in:products,sales,pedido,transferencias,sin-movimiento,pedido-tiendas'],
             'search' => ['nullable', 'string', 'max:120'],
             'folio' => ['nullable', 'string', 'max:80'],
+            'status' => ['nullable', 'in:completed,cancelled,payment'],
+            'payment_method' => ['nullable', 'in:cash,card,credit,payment'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'coverage_months' => ['nullable', 'integer', 'in:1,2,3,6'],
@@ -414,13 +558,18 @@ class SalesReportController extends Controller
             ? [(int) $branch->id]
             : ($requestedBranchIds->isNotEmpty() ? $requestedBranchIds->all() : $accessibleBranchIds->all());
 
-        $tab = $validated['tab'] ?? self::TAB_ORDER;
+        $tab = $validated['tab'] ?? ($reportMode === 'sales' ? self::TAB_SALES : self::TAB_ORDER);
         $tab = $tab === self::TAB_PRODUCTS ? self::TAB_ORDER : $tab;
+        $tab = $reportMode === 'sales'
+            ? self::TAB_SALES
+            : (in_array($tab, self::REPLENISHMENT_TABS, true) ? $tab : self::TAB_ORDER);
 
         return [
             'tab' => $tab,
             'search' => trim((string) ($validated['search'] ?? '')),
             'folio' => trim((string) ($validated['folio'] ?? '')),
+            'status' => $validated['status'] ?? '',
+            'payment_method' => $validated['payment_method'] ?? '',
             'date_from' => $validated['date_from'] ?? now()->startOfMonth()->toDateString(),
             'date_to' => $validated['date_to'] ?? now()->toDateString(),
             'coverage_months' => (int) ($validated['coverage_months'] ?? 2),
@@ -444,6 +593,8 @@ class SalesReportController extends Controller
             'tab' => $filters['tab'],
             'search' => $filters['search'],
             'folio' => $filters['folio'],
+            'status' => $filters['status'],
+            'payment_method' => $filters['payment_method'],
             'date_from' => $filters['date_from'],
             'date_to' => $filters['date_to'],
             'coverage_months' => $filters['coverage_months'],
@@ -637,6 +788,34 @@ class SalesReportController extends Controller
         if (filled($filters['date_to'] ?? null)) {
             $query->whereDate($column, '<=', $filters['date_to']);
         }
+    }
+
+    private function applySalePaymentMethodFilter(Builder $query, string $paymentMethod): void
+    {
+        $query->whereHas('paymentMethod', function (Builder $paymentQuery) use ($paymentMethod) {
+            $paymentQuery->where(function (Builder $nameQuery) use ($paymentMethod) {
+                match ($paymentMethod) {
+                    'cash' => $nameQuery->where('name', 'like', '%Efectivo%'),
+                    'card' => $nameQuery
+                        ->where('name', 'like', '%Tarjeta%')
+                        ->orWhere('name', 'like', '%Débito%')
+                        ->orWhere('name', 'like', '%Debito%')
+                        ->orWhere(function (Builder $creditCardQuery) {
+                            $creditCardQuery
+                                ->where('name', 'like', '%Crédito%')
+                                ->where('name', 'not like', '%empleado%');
+                        })
+                        ->orWhere(function (Builder $creditCardQuery) {
+                            $creditCardQuery
+                                ->where('name', 'like', '%Credito%')
+                                ->where('name', 'not like', '%empleado%');
+                        }),
+                    default => $nameQuery
+                        ->where('name', 'like', '%Crédito empleado%')
+                        ->orWhere('name', 'like', '%Credito empleado%'),
+                };
+            });
+        });
     }
 
     private function applyProductSearch($query, string $search): void

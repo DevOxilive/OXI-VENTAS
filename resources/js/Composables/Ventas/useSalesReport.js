@@ -4,11 +4,14 @@ import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination
 
 export function useSalesReport(props) {
     const { handlePageChange } = useGlobalTablePagination()
+    const initialReportMode = props.reportMode ?? 'sales'
 
     const filtersState = reactive({
-        tab: props.activeTab ?? 'pedido',
+        tab: props.activeTab ?? (initialReportMode === 'sales' ? 'sales' : 'pedido'),
         search: props.filters?.search ?? '',
         folio: props.filters?.folio ?? '',
+        status: props.filters?.status ?? '',
+        paymentMethod: props.filters?.payment_method ?? '',
         dateFrom: props.filters?.date_from ?? '',
         dateTo: props.filters?.date_to ?? '',
         coverageMonths: Number(props.filters?.coverage_months ?? 2),
@@ -24,9 +27,10 @@ export function useSalesReport(props) {
     let refreshTimeout = null
     let syncingFilters = false
 
-    const activeTab = computed(() => filtersState.tab || 'pedido')
-    const isSalesTab = computed(() => activeTab.value === 'sales')
-    const isReplenishmentTab = computed(() => activeTab.value !== 'sales')
+    const reportMode = computed(() => props.reportMode ?? 'sales')
+    const activeTab = computed(() => reportMode.value === 'sales' ? 'sales' : (filtersState.tab || 'pedido'))
+    const isSalesTab = computed(() => reportMode.value === 'sales')
+    const isReplenishmentTab = computed(() => reportMode.value === 'replenishment')
     const isGlobalReport = computed(() => (props.reportScope ?? props.filters?.scope) === 'global')
     const branchOptions = computed(() => props.branchesDB ?? [])
     const showBranchFilter = computed(() => isGlobalReport.value)
@@ -66,7 +70,9 @@ export function useSalesReport(props) {
     ]
 
     function backToReportsCenter() {
-        router.get(route('inventory.reports.sales'))
+        router.get(route(reportMode.value === 'sales'
+            ? 'inventory.reports.sales'
+            : 'inventory.reports.replenishment'))
     }
 
     function updateSearch(value) {
@@ -90,13 +96,15 @@ export function useSalesReport(props) {
 
     function getRequestFilters(overrides = {}) {
         return {
-            tab: filtersState.tab,
+            tab: activeTab.value,
             search: filtersState.search || undefined,
             folio: isSalesTab.value ? (filtersState.folio || undefined) : undefined,
+            status: isSalesTab.value ? (filtersState.status || undefined) : undefined,
+            payment_method: isSalesTab.value ? (filtersState.paymentMethod || undefined) : undefined,
             date_from: filtersState.dateFrom || undefined,
             date_to: filtersState.dateTo || undefined,
             coverage_months: isReplenishmentTab.value ? filtersState.coverageMonths : undefined,
-            branch_ids: isReplenishmentTab.value ? filtersState.branchIds : undefined,
+            branch_ids: isGlobalReport.value ? filtersState.branchIds : undefined,
             department_ids: isReplenishmentTab.value ? filtersState.departmentIds : undefined,
             category_ids: isReplenishmentTab.value ? filtersState.categoryIds : undefined,
             product_ids: isReplenishmentTab.value ? filtersState.productIds : undefined,
@@ -108,10 +116,14 @@ export function useSalesReport(props) {
 
     function reportRoute() {
         if (isGlobalReport.value) {
-            return route('inventory.reports.sales')
+            return route(reportMode.value === 'sales'
+                ? 'inventory.reports.sales'
+                : 'inventory.reports.replenishment')
         }
 
-        return route('inventory.branches.reports.sales', {
+        return route(reportMode.value === 'sales'
+            ? 'inventory.branches.reports.sales'
+            : 'inventory.branches.reports.replenishment', {
             branch: filtersState.branchId || props.currentBranch?.id,
         })
     }
@@ -126,16 +138,16 @@ export function useSalesReport(props) {
 
     function downloadReport(format) {
         const routeName = isGlobalReport.value
-            ? (activeTab.value === 'sales'
+            ? (isSalesTab.value
                 ? (format === 'pdf'
                     ? 'inventory.reports.sales.registered.pdf'
                     : 'inventory.reports.sales.registered.excel')
-                : 'inventory.reports.sales.products.excel')
-            : (activeTab.value === 'sales'
+                : 'inventory.reports.replenishment.excel')
+            : (isSalesTab.value
                 ? (format === 'pdf'
                     ? 'inventory.branches.reports.sales.registered.pdf'
                     : 'inventory.branches.reports.sales.registered.excel')
-                : 'inventory.branches.reports.sales.products.excel')
+                : 'inventory.branches.reports.replenishment.excel')
 
         const params = {
             ...(!isGlobalReport.value ? { branch: filtersState.branchId || props.currentBranch?.id } : {}),
@@ -177,9 +189,11 @@ export function useSalesReport(props) {
         () => props.filters,
         (filters) => {
             syncingFilters = true
-            filtersState.tab = props.activeTab ?? filters?.tab ?? 'pedido'
+            filtersState.tab = props.activeTab ?? filters?.tab ?? (reportMode.value === 'sales' ? 'sales' : 'pedido')
             filtersState.search = filters?.search ?? ''
             filtersState.folio = filters?.folio ?? ''
+            filtersState.status = filters?.status ?? ''
+            filtersState.paymentMethod = filters?.payment_method ?? ''
             filtersState.dateFrom = filters?.date_from ?? ''
             filtersState.dateTo = filters?.date_to ?? ''
             filtersState.coverageMonths = Number(filters?.coverage_months ?? 2)
@@ -209,6 +223,7 @@ export function useSalesReport(props) {
 
     return {
         filtersState,
+        reportMode,
         activeTab,
         isSalesTab,
         isReplenishmentTab,

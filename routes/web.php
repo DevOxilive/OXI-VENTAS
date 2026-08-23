@@ -693,9 +693,17 @@ Route::middleware([
             ->middleware('permission:reports.sales.view')
             ->name('reports.sales');
 
+        Route::get('/reports/replenishment', [SalesReportController::class, 'globalReplenishment'])
+            ->middleware('permission:reports.sales.view')
+            ->name('reports.replenishment');
+
         Route::get('/reports/sales/products/excel', [SalesReportController::class, 'exportGlobalProductsExcel'])
             ->middleware('permission:reports.sales.export.excel')
             ->name('reports.sales.products.excel');
+
+        Route::get('/reports/replenishment/excel', [SalesReportController::class, 'exportGlobalReplenishmentExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('reports.replenishment.excel');
 
         Route::get('/reports/sales/registered/excel', [SalesReportController::class, 'exportGlobalSalesExcel'])
             ->middleware('permission:reports.sales.export.excel')
@@ -786,9 +794,17 @@ Route::middleware([
             ->middleware('permission:reports.sales.view')
             ->name('branches.reports.sales');
 
+        Route::get('/branches/{branch}/reports/replenishment', [SalesReportController::class, 'replenishment'])
+            ->middleware('permission:reports.sales.view')
+            ->name('branches.reports.replenishment');
+
         Route::get('/branches/{branch}/reports/sales/products/excel', [SalesReportController::class, 'exportProductsExcel'])
             ->middleware('permission:reports.sales.export.excel')
             ->name('branches.reports.sales.products.excel');
+
+        Route::get('/branches/{branch}/reports/replenishment/excel', [SalesReportController::class, 'exportReplenishmentExcel'])
+            ->middleware('permission:reports.sales.export.excel')
+            ->name('branches.reports.replenishment.excel');
 
         Route::get('/branches/{branch}/reports/sales/registered/excel', [SalesReportController::class, 'exportSalesExcel'])
             ->middleware('permission:reports.sales.export.excel')

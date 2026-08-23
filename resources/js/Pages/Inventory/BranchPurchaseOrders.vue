@@ -8,8 +8,10 @@ import GlobalCard from '@/Components/Cards/GlobalCard.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import BranchPurchaseOrderModal from '@/Components/Inventory/PurchaseReports/BranchPurchaseOrderModal.vue'
+import FloatingNotificationModal from '@/Components/Notifications/FloatingNotificationModal.vue'
 import { ErrorAlert } from '@/Components/Modales/UniversalActionModal'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
+import { useNotificationSeenState } from '@/Composables/useNotificationSeenState'
 import { getBranchPurchaseOrdersTableConfig } from '@/config/TableConfigs/branchPurchaseOrdersTableConfig'
 import { getBranchPurchaseOrdersToolbarConfig } from '@/config/ToolbarConfigs/branchPurchaseOrdersToolbarConfig'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
@@ -37,6 +39,10 @@ const props = defineProps({
         type: Object,
         default: () => ({}),
     },
+    notificationSummary: {
+        type: Object,
+        default: () => ({ mode: 'sales', count: 0, items: [] }),
+    },
 })
 
 const page = usePage()
@@ -44,6 +50,7 @@ const { handlePageChange } = useGlobalTablePagination()
 const selectedOrder = ref(null)
 const modalMode = ref('view')
 const loadingOrder = ref(false)
+const notificationPanelOpen = ref(false)
 const localFilters = ref({
     status: props.filters?.status ?? 'GENERATED',
     per_page: Number(props.filters?.per_page ?? 25),
@@ -52,6 +59,30 @@ let unsubscribeOrderActivity = null
 
 const rows = computed(() => props.ordersDB?.data ?? [])
 const pagination = computed(() => props.ordersDB ?? {})
+const notificationItems = computed(() => props.notificationSummary?.items ?? [])
+const notificationSeenStorageKey = computed(() => `purchase-orders:sales:seen:${page.props.auth.user.id}:${props.currentBranch?.id ?? 'all'}`)
+const notificationDismissedStorageKey = computed(() => `purchase-orders:sales:dismissed:${page.props.auth.user.id}:${props.currentBranch?.id ?? 'all'}`)
+const {
+    visibleItems: visibleNotificationItems,
+    unreadCount: notificationCount,
+    loadSeenNotifications,
+    loadDismissedNotifications,
+    markNotificationsSeen,
+    dismissNotification,
+} = useNotificationSeenState({
+    items: notificationItems,
+    storageKey: notificationSeenStorageKey,
+    dismissedStorageKey: notificationDismissedStorageKey,
+})
+const toolbarActions = computed(() => props.selectorMode ? [] : [
+    {
+        id: 'notifications',
+        label: 'Avisos',
+        icon: 'notifications',
+        variant: notificationCount.value ? 'amber' : 'slate',
+        badge: notificationCount.value || '',
+    },
+])
 const tableConfig = computed(() => getBranchPurchaseOrdersTableConfig({
     status: localFilters.value.status,
 }))
@@ -70,18 +101,25 @@ const toolbarConfig = computed(() => props.selectorMode
         filters: localFilters.value,
         total: Number(pagination.value?.total ?? 0),
         branchName: props.currentBranch?.name,
+        actions: toolbarActions.value,
     }))
 
 onMounted(() => {
     if (!page.props.auth?.user?.id || props.selectorMode) return
+    loadSeenNotifications()
+    loadDismissedNotifications()
 
     unsubscribeOrderActivity = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.activityLogged,
         (event) => {
-            if (event?.action !== 'review_requested') return
+            if (![
+                'review_requested',
+                'purchase_order_reviewed',
+                'purchase_order_edited',
+            ].includes(event?.action)) return
 
-            refreshRealtimeProps(page, ['ordersDB'])
+            refreshRealtimeProps(page, ['ordersDB', 'notificationSummary'])
         },
     )
 })
@@ -160,6 +198,22 @@ function handleTableAction({ action, row }) {
     if (action === 'view') openOrder(row, 'view')
 }
 
+function handleToolbarAction(action) {
+    if (action === 'notifications') {
+        notificationPanelOpen.value = true
+        markNotificationsSeen()
+    }
+}
+
+function closeNotificationPanel() {
+    notificationPanelOpen.value = false
+}
+
+function openNotificationOrder(item) {
+    closeNotificationPanel()
+    openOrder({ id: item.id }, 'view')
+}
+
 function handleCompleted() {
     selectedOrder.value = null
     applyStatus('REVIEW')
@@ -175,8 +229,21 @@ function handleCompleted() {
                 v-bind="toolbarConfig"
                 @update:active-tab="updateStatus"
                 @update:records-per-page="updatePerPage"
+                @action="handleToolbarAction"
             />
         </template>
+
+        <FloatingNotificationModal
+            :open="notificationPanelOpen"
+            eyebrow="Órdenes de compra"
+            title="Avisos de seguimiento"
+            subtitle="Cambios de Inventario y órdenes listas para revisar."
+            :items="visibleNotificationItems"
+            empty-description="No hay órdenes de compra con avisos pendientes."
+            @close="closeNotificationPanel"
+            @select="openNotificationOrder"
+            @dismiss="dismissNotification"
+        />
 
         <div
             v-if="selectorMode"

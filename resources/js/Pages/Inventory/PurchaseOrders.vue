@@ -14,11 +14,13 @@ import BranchPurchaseOrderModal from '@/Components/Inventory/PurchaseReports/Bra
 import PurchaseOrderTransferModal from '@/Components/Inventory/PurchaseReports/PurchaseOrderTransferModal.vue'
 import PurchaseOrderTransferHistoryModal from '@/Components/Inventory/PurchaseReports/PurchaseOrderTransferHistoryModal.vue'
 import PendingPurchaseOrderEditModal from '@/Components/Inventory/PurchaseReports/PendingPurchaseOrderEditModal.vue'
+import FloatingNotificationModal from '@/Components/Notifications/FloatingNotificationModal.vue'
 import { ErrorAlert } from '@/Components/Modales/UniversalActionModal'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { usePurchaseOrders } from '@/Composables/Inventory/usePurchaseOrders'
 import { usePermissions } from '@/Composables/usePermissions'
+import { useNotificationSeenState } from '@/Composables/useNotificationSeenState'
 import { getPurchaseOrdersTableConfig } from '@/config/TableConfigs/purchaseOrdersTableConfig'
 import { getGeneralPurchaseSourceOrdersTableConfig } from '@/config/TableConfigs/generalPurchaseSourceOrdersTableConfig'
 import { getPurchaseOrdersToolbarConfig } from '@/config/ToolbarConfigs/purchaseOrdersToolbarConfig'
@@ -35,6 +37,7 @@ const props = defineProps({
         type: Object,
         default: () => ({ branches: [], orders: [], inventory_users: [], draft: null }),
     },
+    notificationSummary: { type: Object, default: () => ({ mode: 'inventory', count: 0, items: [] }) },
 })
 
 const page = usePage()
@@ -47,6 +50,7 @@ const transferOrder = ref(null)
 const transferHistoryOrder = ref(null)
 const editingSourceOrder = ref(null)
 const loadingSourceOrder = ref(false)
+const notificationPanelOpen = ref(false)
 const selectedOrderIds = ref([])
 const initialSelectedOrder = (props.generation?.orders ?? []).find((order) => selectedOrderIds.value.includes(Number(order.id)))
 const initialBranch = initialSelectedOrder?.branch_id
@@ -110,6 +114,30 @@ const availableTabs = computed(() => [
     can('inventory.purchase-orders.general.view') && { key: 'PURCHASING', label: 'En compra', icon: 'local_shipping' },
     can('inventory.purchase-orders.general.view') && { key: 'COMPLETED', label: 'Completadas', icon: 'task_alt' },
 ].filter(Boolean))
+const notificationItems = computed(() => props.notificationSummary?.items ?? [])
+const notificationSeenStorageKey = computed(() => `purchase-orders:inventory:seen:${page.props.auth.user.id}`)
+const notificationDismissedStorageKey = computed(() => `purchase-orders:inventory:dismissed:${page.props.auth.user.id}`)
+const {
+    visibleItems: visibleNotificationItems,
+    unreadCount: notificationCount,
+    loadSeenNotifications,
+    loadDismissedNotifications,
+    markNotificationsSeen,
+    dismissNotification,
+} = useNotificationSeenState({
+    items: notificationItems,
+    storageKey: notificationSeenStorageKey,
+    dismissedStorageKey: notificationDismissedStorageKey,
+})
+const toolbarActions = computed(() => [
+    {
+        id: 'notifications',
+        label: 'Avisos',
+        icon: 'notifications',
+        variant: notificationCount.value ? 'amber' : 'slate',
+        badge: notificationCount.value || '',
+    },
+])
 const toolbarConfig = computed(() => getPurchaseOrdersToolbarConfig({
     filters: orders.localFilters.value,
     total: activeStatus.value === 'GENERATE'
@@ -117,6 +145,7 @@ const toolbarConfig = computed(() => getPurchaseOrdersToolbarConfig({
         : Number(orders.pagination.value?.total ?? 0),
     mode: 'view',
     tabs: availableTabs.value,
+    actions: toolbarActions.value,
 }))
 
 watch(() => props.generation?.orders, (availableOrders = []) => {
@@ -137,14 +166,16 @@ watch(() => props.generation?.orders, (availableOrders = []) => {
 
 onMounted(() => {
     if (!page.props.auth?.user?.id) return
+    loadSeenNotifications()
+    loadDismissedNotifications()
 
     unsubscribeOrderActivity = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.activityLogged,
         (event) => {
-            if (!['assigned', 'purchase_order_transferred'].includes(event?.action)) return
+            if (!['purchase_order_assigned', 'purchase_order_transferred'].includes(event?.action)) return
 
-            refreshRealtimeProps(page, ['generation'])
+            refreshRealtimeProps(page, ['generation', 'notificationSummary'])
         },
     )
 })
@@ -293,6 +324,25 @@ function handleGeneralTableAction({ action, row }) {
     }
 }
 
+function handleToolbarAction(action) {
+    if (action === 'notifications') {
+        notificationPanelOpen.value = true
+        markNotificationsSeen()
+    }
+}
+
+function closeNotificationPanel() {
+    notificationPanelOpen.value = false
+}
+
+function openNotificationOrder(item) {
+    closeNotificationPanel()
+    openSourceOrder({
+        id: item.id,
+        branch_id: item.branch_id,
+    })
+}
+
 function disabledGeneralDraftSave() {
     if (!canPrepareGeneralOrder.value) return
 
@@ -357,8 +407,21 @@ async function generateGeneralOrder() {
                 @update:filter="orders.updateFilter"
                 @update:records-per-page="orders.localFilters.value.per_page = $event"
                 @update:active-tab="updateStatus"
+                @action="handleToolbarAction"
             />
         </template>
+
+        <FloatingNotificationModal
+            :open="notificationPanelOpen"
+            eyebrow="Órdenes de compra"
+            title="Avisos pendientes"
+            subtitle="Órdenes asignadas o transferidas que requieren atención de Inventario."
+            :items="visibleNotificationItems"
+            empty-description="No hay órdenes de compra asignadas por atender."
+            @close="closeNotificationPanel"
+            @select="openNotificationOrder"
+            @dismiss="dismissNotification"
+        />
 
         <div
             v-if="activeStatus === 'GENERATE'"

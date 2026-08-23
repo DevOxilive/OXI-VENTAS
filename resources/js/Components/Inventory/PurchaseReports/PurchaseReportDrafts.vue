@@ -1,5 +1,4 @@
 <script setup>
-import GlobalCard from '@/Components/Cards/GlobalCard.vue'
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
 import { usePermissions } from '@/Composables/usePermissions'
 
@@ -27,8 +26,8 @@ function formatDate(date) {
     }).format(new Date(date))
 }
 
-function reportTitle(report) {
-    return report.folio || `Lista #${report.id}`
+function reportTitle(report, index) {
+    return report.draft_label || `Borrador ${String(index + 1).padStart(3, '0')}`
 }
 
 function reportDetails(report) {
@@ -39,25 +38,39 @@ function reportDetails(report) {
 </script>
 
 <template>
-    <GlobalCard
-        title="Borradores"
-        description="Continúa una lista guardada."
-        icon="edit_note"
-        :clickable="false"
-        class="h-full"
-    >
+    <article class="flex h-40 min-h-0 flex-col rounded-2xl border border-secondary bg-background p-4 shadow-sm">
+        <div class="shrink-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex min-w-0 items-center gap-3">
+                <span class="material-symbols-outlined rounded-xl bg-secondary p-2 text-2xl text-primary">
+                    edit_note
+                </span>
+                <div class="min-w-0">
+                    <h2 class="text-base font-black text-text">
+                        Borradores
+                    </h2>
+                    <p class="truncate text-sm text-text opacity-70">
+                        Continúa una lista guardada o confirma que ya no quedan pendientes.
+                    </p>
+                </div>
+            </div>
+
+            <span class="w-fit rounded-full border border-secondary bg-secondary px-3 py-1 text-xs font-black text-text">
+                {{ reports.length }} {{ reports.length === 1 ? 'borrador' : 'borradores' }}
+            </span>
+        </div>
+
         <div
             v-if="reports.length"
-            class="mt-5 max-h-[calc(100vh-27rem)] space-y-2 overflow-y-auto pr-1"
+            class="mt-4 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5"
         >
             <article
-                v-for="report in reports"
+                v-for="(report, index) in reports"
                 :key="report.id"
-                class="flex items-center justify-between gap-3 rounded-2xl border border-secondary bg-secondary px-3 py-3"
+                class="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-secondary bg-secondary px-3 py-2.5"
             >
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-bold text-text">
-                        {{ reportTitle(report) }}
+                        {{ reportTitle(report, index) }}
                     </p>
                     <p class="mt-1 truncate text-xs text-text opacity-60">
                         {{ reportDetails(report) }}
@@ -88,14 +101,14 @@ function reportDetails(report) {
 
         <p
             v-else
-            class="mt-5 rounded-2xl border border-dashed border-secondary bg-secondary px-4 py-5 text-center text-sm text-text opacity-70"
+            class="mt-4 flex min-h-0 flex-1 items-center justify-center rounded-xl border border-dashed border-secondary bg-secondary px-4 py-3 text-center text-sm text-text opacity-70"
         >
             Todavía no hay borradores guardados.
         </p>
 
         <div
             v-if="Number(pagination.last_page || 1) > 1"
-            class="mt-4 flex items-center justify-between border-t border-secondary pt-4"
+            class="mt-3 flex shrink-0 items-center justify-between border-t border-secondary pt-3"
         >
             <ActionIconButton
                 icon="chevron_left"
@@ -119,5 +132,5 @@ function reportDetails(report) {
                 @click="emit('paginate', pagination.next_page_url)"
             />
         </div>
-    </GlobalCard>
+    </article>
 </template>

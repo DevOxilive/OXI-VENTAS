@@ -8,10 +8,10 @@ import { GlobalToolbar } from '@/Components/Toolbars'
 import { GlobalTable } from '@/Components/Tables'
 import { GlobalModal } from '@/Components/Modales'
 import MetricCard from '@/Components/Cards/MetricCard.vue'
+import SalesRegisteredReportTable from '@/Components/Inventory/Reports/SalesRegisteredReportTable.vue'
 import SalesReplenishmentTable from '@/Components/Inventory/Reports/SalesReplenishmentTable.vue'
 import { getSalesReportToolbarConfig } from '@/config/ToolbarConfigs/salesReportToolbarConfig'
 import { salesProductsReportTableConfig } from '@/config/TableConfigs/salesProductsReportTableConfig'
-import { salesRegisteredReportTableConfig } from '@/config/TableConfigs/salesRegisteredReportTableConfig'
 import { useSalesReport } from '@/Composables/Ventas/useSalesReport'
 
 defineOptions({ layout: AdminLayout })
@@ -24,6 +24,10 @@ const props = defineProps({
     reportScope: {
         type: String,
         default: 'branch',
+    },
+    reportMode: {
+        type: String,
+        default: 'sales',
     },
     branchesDB: {
         type: Array,
@@ -54,6 +58,19 @@ const props = defineProps({
         type: Object,
         default: () => ({ data: [] }),
     },
+    salesSummary: {
+        type: Object,
+        default: () => ({
+            cash: 0,
+            card: 0,
+            credit: 0,
+            credit_payments: 0,
+            sold_total: 0,
+            collected_total: 0,
+            operations_count: 0,
+            products_count: 0,
+        }),
+    },
     salesReplenishment: {
         type: Object,
         default: () => ({ branches: [], sections: {} }),
@@ -72,7 +89,6 @@ const {
     showBranchFilter,
     tableRows,
     tablePagination,
-    salesActions,
     backToReportsCenter,
     updateSearch,
     updateTab,
@@ -92,6 +108,7 @@ const toolbarConfig = computed(() => getSalesReportToolbarConfig({
     activeTab: activeTab.value,
     showBranchFilter: showBranchFilter.value,
     isGlobalReport: isGlobalReport.value,
+    reportMode: props.reportMode,
 }))
 
 const selectedDepartmentIds = computed(() => new Set((filtersState.departmentIds || []).map(String)))
@@ -141,12 +158,7 @@ watch(filteredProducts, (products) => {
 })
 
 const tableConfig = computed(() => (
-    isSalesTab.value
-        ? {
-            ...salesRegisteredReportTableConfig,
-            actions: salesActions,
-        }
-        : salesProductsReportTableConfig
+    salesProductsReportTableConfig
 ))
 
 const detailColumns = [
@@ -201,7 +213,7 @@ function closeSaleModal() {
 </script>
 
 <template>
-    <Head title="Reportes de ventas" />
+    <Head :title="props.reportMode === 'sales' ? 'Reporte de ventas' : 'Planeacion de compra'" />
 
     <PageLayout>
         <template #toolbar>
@@ -222,6 +234,14 @@ function closeSaleModal() {
                 :report="salesReplenishment"
                 :active-tab="activeTab"
                 @update-section-period="updateSectionPeriod"
+            />
+
+            <SalesRegisteredReportTable
+                v-else-if="isSalesTab"
+                :rows="tableRows"
+                :pagination="tablePagination"
+                :summary="props.salesSummary"
+                @page-change="handlePageChange"
             />
 
             <GlobalTable

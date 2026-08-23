@@ -1,4 +1,4 @@
-export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, mode = 'view', tabs = null } = {}) {
+export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, mode = 'view', tabs = null, actions = [] } = {}) {
     const headings = {
         view: ['Órdenes de compra generales', 'Selecciona Órdenes de compra de sucursal, prepara la Orden de compra general y consulta su seguimiento.'],
         tracking: ['Seguimiento de compras', 'Registra lo comprado al regresar de Central.'],
@@ -17,7 +17,7 @@ export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, mode =
         showSearch: mode !== 'view' || filters.status !== 'GENERATE',
         compactFilters: true,
         filters: [],
-        actions: [],
+        actions,
         tabs: mode === 'view' ? (tabs ?? [
             { key: 'GENERATE', label: 'Generar', icon: 'playlist_add' },
             { key: 'PURCHASING', label: 'En compra', icon: 'local_shipping' },

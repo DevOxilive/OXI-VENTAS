@@ -9,11 +9,13 @@ import TimeField from '@/Components/Forms/TimeField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import FloatingNotificationModal from '@/Components/Notifications/FloatingNotificationModal.vue'
 import { GlobalToolbar } from '@/Components/Toolbars'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
 import { getAttendanceIncidentsToolbarConfig } from '@/config/ToolbarConfigs/attendanceIncidentsToolbarConfig'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
+import { useNotificationSeenState } from '@/Composables/useNotificationSeenState'
 
 defineOptions({ layout: AdminLayout })
 
@@ -48,7 +50,6 @@ const modalOpen = ref(false)
 const modalMode = ref('create')
 const selectedIncident = ref(null)
 const notificationPanelOpen = ref(false)
-const dismissedNotificationKeys = ref(new Set())
 let filterTimer = null
 let unsubscribeIncidents = null
 
@@ -92,10 +93,21 @@ const modalSaveText = computed(() => modalMode.value === 'edit' ? 'Guardar cambi
 const totalErrors = computed(() => Object.keys(form.errors || {}).length)
 const isReadonly = computed(() => modalMode.value === 'view')
 const notificationStorageKey = computed(() => `attendance-incidents:dismissed:${page.props.auth.user.id}`)
-const notificationItems = computed(() => (props.notificationSummary.items || []).filter((item) => {
-  return !dismissedNotificationKeys.value.has(notificationItemKey(item))
-}))
-const notificationCount = computed(() => notificationItems.value.length)
+const notificationSeenStorageKey = computed(() => `attendance-incidents:seen:${page.props.auth.user.id}`)
+const notificationItems = computed(() => props.notificationSummary.items || [])
+const {
+  visibleItems: visibleNotificationItems,
+  unreadCount: notificationCount,
+  loadSeenNotifications,
+  loadDismissedNotifications,
+  markNotificationsSeen,
+  dismissNotification,
+} = useNotificationSeenState({
+  items: notificationItems,
+  storageKey: notificationSeenStorageKey,
+  dismissedStorageKey: notificationStorageKey,
+  itemKey: notificationItemKey,
+})
 const notificationMode = computed(() => props.notificationSummary.mode || 'submitted')
 const notificationPanelTitle = computed(() => notificationMode.value === 'review'
   ? 'Incidencias pendientes'
@@ -103,6 +115,18 @@ const notificationPanelTitle = computed(() => notificationMode.value === 'review
 const notificationPanelSubtitle = computed(() => notificationMode.value === 'review'
   ? 'Solicitudes que requieren aprobacion o rechazo.'
   : 'Ultimas incidencias aprobadas o denegadas.')
+const notificationModalItems = computed(() => visibleNotificationItems.value.map((item) => ({
+  ...item,
+  key: notificationItemKey(item),
+  title: item.employee_name,
+  description: `Incidencia ${item.status_label}`,
+  badge: item.status_label,
+  tone: {
+    pending: 'amber',
+    approved: 'green',
+    rejected: 'red',
+  }[item.status] || 'slate',
+})))
 const toolbarActions = computed(() => [
   {
     id: 'notifications',
@@ -169,6 +193,10 @@ function handleToolbarAction(action) {
 
 function toggleNotificationPanel() {
   notificationPanelOpen.value = !notificationPanelOpen.value
+
+  if (notificationPanelOpen.value) {
+    markNotificationsSeen()
+  }
 }
 
 function closeNotificationPanel() {
@@ -179,23 +207,7 @@ function notificationItemKey(item) {
   return `${item.id}:${item.status}:${item.updated_at || ''}`
 }
 
-function loadDismissedNotifications() {
-  try {
-    dismissedNotificationKeys.value = new Set(JSON.parse(localStorage.getItem(notificationStorageKey.value) || '[]'))
-  } catch {
-    dismissedNotificationKeys.value = new Set()
-  }
-}
-
-function dismissNotification(item) {
-  const next = new Set(dismissedNotificationKeys.value)
-  next.add(notificationItemKey(item))
-  dismissedNotificationKeys.value = next
-  localStorage.setItem(notificationStorageKey.value, JSON.stringify([...next].slice(-80)))
-}
-
 function openNotificationIncident(item) {
-  dismissNotification(item)
   const row = (props.incidents.data || []).find((incident) => Number(incident.id) === Number(item.id))
 
   if (row) {
@@ -363,6 +375,7 @@ function refreshIncidents(event) {
 
 onMounted(() => {
   loadDismissedNotifications()
+  loadSeenNotifications()
   unsubscribeIncidents = subscribePrivateRealtime(
     REALTIME_CHANNELS.user(page.props.auth.user.id),
     REALTIME_EVENTS.attendanceChanged,
@@ -388,70 +401,17 @@ onBeforeUnmount(() => {
       @action="handleToolbarAction"
     />
 
-    <section
-      v-if="notificationPanelOpen"
-      class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-xl"
-    >
-      <div class="border-b border-secondary bg-primary px-4 py-4 text-white">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-white/80">
-              Incidencias
-            </p>
-            <h3 class="mt-1 text-lg font-black">
-              {{ notificationPanelTitle }}
-            </h3>
-            <p class="mt-1 text-xs text-white/80">
-              {{ notificationPanelSubtitle }}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
-            @click="closeNotificationPanel"
-          >
-            <span class="material-symbols-outlined text-[18px]">close</span>
-          </button>
-        </div>
-      </div>
-
-      <div v-if="notificationItems.length" class="max-h-[360px] space-y-2 overflow-y-auto bg-secondary p-3">
-        <button
-          v-for="item in notificationItems"
-          :key="item.id"
-          type="button"
-          class="w-full rounded-xl border border-secondary bg-background p-3 text-left shadow-sm transition hover:border-primary"
-          @click="openNotificationIncident(item)"
-        >
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <p class="truncate text-sm font-black text-text">
-                {{ item.employee_name }}
-              </p>
-              <p class="mt-1 text-xs text-text opacity-65">
-                Incidencia {{ item.status_label }}
-              </p>
-            </div>
-
-            <span
-              class="shrink-0 rounded-full px-2 py-1 text-[11px] font-black"
-              :class="{
-                'bg-amber-100 text-amber-700': item.status === 'pending',
-                'bg-emerald-100 text-emerald-700': item.status === 'approved',
-                'bg-red-100 text-red-700': item.status === 'rejected',
-              }"
-            >
-              {{ item.status_label }}
-            </span>
-          </div>
-        </button>
-      </div>
-
-      <div v-else class="bg-secondary p-4 text-sm text-text opacity-70">
-        No hay avisos de incidencias por atender.
-      </div>
-    </section>
+    <FloatingNotificationModal
+      :open="notificationPanelOpen"
+      eyebrow="Incidencias"
+      :title="notificationPanelTitle"
+      :subtitle="notificationPanelSubtitle"
+      :items="notificationModalItems"
+      empty-description="No hay avisos de incidencias por atender."
+      @close="closeNotificationPanel"
+      @select="openNotificationIncident"
+      @dismiss="dismissNotification"
+    />
 
     <GlobalTable
       :items="incidents.data || []"
