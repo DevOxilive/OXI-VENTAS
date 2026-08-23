@@ -10,6 +10,7 @@ class RoleSeeder extends Seeder
 {
     public function run(): void
     {
+        $now = now();
         $roleNames = [
             'Super Administrador',
             'Administrador',
@@ -20,11 +21,22 @@ class RoleSeeder extends Seeder
             'Inventario',
         ];
 
-        foreach ($roleNames as $roleName) {
-            DB::table('roles')->updateOrInsert(
-                ['name' => $roleName],
-                ['created_at' => now(), 'updated_at' => now()]
-            );
+        $roleRows = collect($roleNames)
+            ->map(fn (string $roleName) => [
+                'name' => $roleName,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+        if (DB::table('roles')->doesntExist()) {
+            DB::table('roles')->insert($roleRows->all());
+        } else {
+            foreach ($roleRows as $roleRow) {
+                DB::table('roles')->updateOrInsert(
+                    ['name' => $roleRow['name']],
+                    ['created_at' => $roleRow['created_at'], 'updated_at' => $roleRow['updated_at']]
+                );
+            }
         }
 
         $roles = DB::table('roles')
@@ -38,16 +50,20 @@ class RoleSeeder extends Seeder
 
         $allPermissionNames = $permissionIdsByName->keys()->all();
 
-        $this->syncRolePermissions($roles['Administrador']->id, $allPermissionNames, $permissionIdsByName);
-        $this->syncRolePermissions($roles['Super Administrador']->id, $allPermissionNames, $permissionIdsByName);
+        $rolePermissions = [];
 
-        $this->syncRolePermissions(
+        $this->collectRolePermissions($rolePermissions, $roles['Administrador']->id, $allPermissionNames, $permissionIdsByName);
+        $this->collectRolePermissions($rolePermissions, $roles['Super Administrador']->id, $allPermissionNames, $permissionIdsByName);
+
+        $this->collectRolePermissions(
+            $rolePermissions,
             $roles['Sistemas']->id,
             $this->permissionsStartingWith($permissionIdsByName, ['users.', 'systems.']),
             $permissionIdsByName
         );
 
-        $this->syncRolePermissions(
+        $this->collectRolePermissions(
+            $rolePermissions,
             $roles['Recursos Humanos']->id,
             [
                 'employees.view',
@@ -98,10 +114,11 @@ class RoleSeeder extends Seeder
             'systems.qz.sign',
         ];
 
-        $this->syncRolePermissions($roles['Ventas']->id, $salesPermissions, $permissionIdsByName);
-        $this->syncRolePermissions($roles['Vendedor']->id, $salesPermissions, $permissionIdsByName);
+        $this->collectRolePermissions($rolePermissions, $roles['Ventas']->id, $salesPermissions, $permissionIdsByName);
+        $this->collectRolePermissions($rolePermissions, $roles['Vendedor']->id, $salesPermissions, $permissionIdsByName);
 
-        $this->syncRolePermissions(
+        $this->collectRolePermissions(
+            $rolePermissions,
             $roles['Inventario']->id,
             [
                 'inventory.products.view',
@@ -144,6 +161,14 @@ class RoleSeeder extends Seeder
             $permissionIdsByName
         );
 
+        DB::table('role_permission')
+            ->whereIn('role_id', $roles->pluck('id')->all())
+            ->delete();
+
+        if ($rolePermissions) {
+            DB::table('role_permission')->insert($rolePermissions);
+        }
+
         $adminUser = User::where('email', 'carlos@oxilive.com.mx')->first();
 
         if ($adminUser) {
@@ -151,7 +176,7 @@ class RoleSeeder extends Seeder
         }
     }
 
-    private function syncRolePermissions(int $roleId, array $permissionNames, $permissionIdsByName): void
+    private function collectRolePermissions(array &$rolePermissions, int $roleId, array $permissionNames, $permissionIdsByName): void
     {
         $permissionIds = collect($permissionNames)
             ->unique()
@@ -160,15 +185,11 @@ class RoleSeeder extends Seeder
             ->values()
             ->all();
 
-        DB::table('role_permission')
-            ->where('role_id', $roleId)
-            ->delete();
-
         foreach ($permissionIds as $permissionId) {
-            DB::table('role_permission')->insert([
+            $rolePermissions[] = [
                 'role_id' => $roleId,
                 'permission_id' => $permissionId,
-            ]);
+            ];
         }
     }
 

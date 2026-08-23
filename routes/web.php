@@ -27,6 +27,7 @@ use App\Http\Controllers\SystemTrashController;
 use App\Http\Controllers\TicketTemplateController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Ventas\CashRegisterClosureController;
+use App\Http\Controllers\Ventas\EmployeeCreditAccountController;
 use App\Http\Controllers\Ventas\SalesController;
 use App\Http\Controllers\Ventas\SalesReportController;
 use App\Models\Branch;
@@ -85,8 +86,7 @@ Route::get('/pwa/manifest.webmanifest', function () {
 
     return response()->json($manifest, 200, [
         'Content-Type' => 'application/manifest+json',
-        'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-        'Pragma' => 'no-cache',
+        'Cache-Control' => 'public, max-age=86400, stale-while-revalidate=604800',
     ]);
 })->name('pwa.manifest');
 
@@ -263,6 +263,16 @@ Route::middleware([
             ->middleware('permission:systems.cash-closure-tickets.update')
             ->name('cash-closure-tickets.update');
 
+        Route::get('/employee-credit-statement-tickets', function () {
+            return redirect()->route('printers.employee-credit-statement-tickets.index');
+        })
+            ->middleware($ticketsAccess)
+            ->name('employee-credit-statement-tickets.index');
+
+        Route::put('/employee-credit-statement-tickets/{ticketTemplate}', [TicketTemplateController::class, 'update'])
+            ->middleware('permission:systems.tickets.update')
+            ->name('employee-credit-statement-tickets.update');
+
         Route::get('/labels', function () {
             return redirect()->route('printers.labels.index');
         })
@@ -420,6 +430,19 @@ Route::middleware([
                 ->middleware(['permission:sales.update', 'idempotent'])
                 ->name('cancel');
 
+            Route::get('/estados-cuenta', [EmployeeCreditAccountController::class, 'index'])
+                ->middleware('permission:sales.employee-credit.view')
+                ->name('employee-credit.index');
+            Route::get('/estados-cuenta/{account}', [EmployeeCreditAccountController::class, 'show'])
+                ->middleware('permission:sales.employee-credit.view')
+                ->name('employee-credit.show');
+            Route::put('/estados-cuenta/{account}/limite', [EmployeeCreditAccountController::class, 'updateLimit'])
+                ->middleware('permission:sales.employee-credit.create')
+                ->name('employee-credit.limit');
+            Route::post('/estados-cuenta/{account}/pagos', [EmployeeCreditAccountController::class, 'pay'])
+                ->middleware(['permission:sales.employee-credit.collect', 'idempotent'])
+                ->name('employee-credit.pay');
+
             Route::get('/{sale}/ticket', [SalesController::class, 'ticket'])
                 ->middleware($salesAccess)
                 ->name('ticket');
@@ -487,6 +510,14 @@ Route::middleware([
         Route::put('/cash-closure-tickets/{ticketTemplate}', [TicketTemplateController::class, 'update'])
             ->middleware('permission:systems.cash-closure-tickets.update')
             ->name('cash-closure-tickets.update');
+
+        Route::get('/employee-credit-statement-tickets', [TicketTemplateController::class, 'employeeCreditStatements'])
+            ->middleware($ticketsAccess)
+            ->name('employee-credit-statement-tickets.index');
+
+        Route::put('/employee-credit-statement-tickets/{ticketTemplate}', [TicketTemplateController::class, 'update'])
+            ->middleware('permission:systems.tickets.update')
+            ->name('employee-credit-statement-tickets.update');
 
         Route::get('/labels', [TicketTemplateController::class, 'labels'])
             ->middleware($labelsAccess)

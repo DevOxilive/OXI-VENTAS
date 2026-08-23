@@ -77,6 +77,7 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  creditEmployees: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -121,8 +122,13 @@ const saleForm = useForm({
   payment_method_id: props.defaultPaymentMethodId ?? "",
   cash_received: "",
   items: [],
+  credit_employee_id: null,
+  estimated_payment_date: null,
 });
 const saleSubmitting = ref(false);
+const showCreditModal = ref(false);
+const creditEmployeeId = ref("");
+const creditDueDate = ref("");
 
 function formatMoney(value) {
   return new Intl.NumberFormat("es-MX", {
@@ -1139,6 +1145,11 @@ function clearCart() {
   cart.value = [];
   search.value = "";
   saleForm.cash_received = "";
+  saleForm.credit_employee_id = null;
+  saleForm.estimated_payment_date = null;
+  creditEmployeeId.value = "";
+  creditDueDate.value = "";
+  showCreditModal.value = false;
   cardPaymentConfirmed.value = false;
   highlightedSuggestionIndex.value = 0;
   focusSearch();
@@ -1409,7 +1420,18 @@ function handleSaleRegistered(payload = {}) {
   });
 }
 
-async function submitSale() {
+function openCreditModal() {
+  if (!cart.value.length) return ErrorAlert({ title: "Venta vacía", message: "Agrega productos antes de registrar un fiado." });
+  creditEmployeeId.value = "";
+  creditDueDate.value = "";
+  showCreditModal.value = true;
+}
+
+async function submitSale(creditEmployee = null, estimatedPaymentDate = null) {
+  const selectedCreditEmployee = Number.isFinite(Number(creditEmployee)) && Number(creditEmployee) > 0
+    ? Number(creditEmployee)
+    : null;
+
   if (!canCreateSale.value) {
     WarningAlert({
       title: "Sin permiso para cobrar",
@@ -1426,7 +1448,7 @@ async function submitSale() {
     return;
   }
 
-  if (!saleForm.payment_method_id) {
+  if (!saleForm.payment_method_id && !selectedCreditEmployee) {
     ErrorAlert({
       title: "Forma de pago requerida",
       message: "Selecciona efectivo o pago con tarjeta antes de cobrar.",
@@ -1434,7 +1456,7 @@ async function submitSale() {
     return;
   }
 
-  if (isCashPayment.value && receivedAmount.value < cartTotal.value) {
+  if (!selectedCreditEmployee && isCashPayment.value && receivedAmount.value < cartTotal.value) {
     ErrorAlert({
       title: "Efectivo insuficiente",
       message: "El monto recibido debe cubrir el total de la venta.",
@@ -1442,7 +1464,7 @@ async function submitSale() {
     return;
   }
 
-  if (!isCashPayment.value && !cardPaymentConfirmed.value) {
+  if (!selectedCreditEmployee && !isCashPayment.value && !cardPaymentConfirmed.value) {
     ErrorAlert({
       title: "Confirma el pago con tarjeta",
       message: "Marca que la terminal aprobo el cobro antes de registrar la venta.",
@@ -1452,9 +1474,11 @@ async function submitSale() {
 
   saleForm.branch_id = selectedBranchId.value || props.currentBranch?.id || "";
   saleForm.cash_box_number = String(selectedCashBoxNumber.value || "1");
-  saleForm.cash_received = isCashPayment.value
+  saleForm.cash_received = selectedCreditEmployee ? 0 : (isCashPayment.value
     ? Number(saleForm.cash_received || 0)
-    : Number(cartTotal.value || 0);
+    : Number(cartTotal.value || 0));
+  saleForm.credit_employee_id = selectedCreditEmployee;
+  saleForm.estimated_payment_date = selectedCreditEmployee ? (estimatedPaymentDate || null) : null;
   saleForm.items = cart.value.map((item) => ({
     branch_product_id: item.branch_product_id,
     product_id: item.product_id,
@@ -1485,13 +1509,22 @@ async function submitSale() {
       saleForm.setError(error.response.data.errors);
     }
 
+      const validationMessage = error?.response?.data?.message
+        || Object.values(error?.response?.data?.errors || {}).flat().filter(Boolean).join(" ");
+
       ErrorAlert({
         title: "No se pudo guardar la venta",
-        message: "Revisa el stock, el efectivo recibido o la sucursal seleccionada.",
+        message: validationMessage || "Revisa el stock, el efectivo recibido o la sucursal seleccionada.",
       });
   } finally {
     saleSubmitting.value = false;
   }
+}
+
+function submitCreditSale() {
+  if (!creditEmployeeId.value) return ErrorAlert({ title: "Empleado requerido", message: "Selecciona a quién se cargará la compra." });
+  showCreditModal.value = false;
+  void submitSale(Number(creditEmployeeId.value), creditDueDate.value || null);
 }
 </script>
 
@@ -2024,6 +2057,15 @@ async function submitSale() {
 
               <div class="mt-auto space-y-3 pt-6">
                 <button
+                  v-if="can('sales.employee-credit.create')"
+                  type="button"
+                  class="inline-flex w-full items-center justify-center rounded-2xl border border-primary bg-background px-4 py-3 text-base font-bold text-primary transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="saleSubmitting || !cart.length"
+                  @click="openCreditModal"
+                >
+                  Venta a crédito
+                </button>
+                <button
                   v-if="lastPrintJob"
                   type="button"
                   class="inline-flex w-full items-center justify-center rounded-2xl border border-secondary bg-background px-4 py-3.5 text-base font-bold text-text transition hover:border-primary hover:bg-secondary"
@@ -2036,7 +2078,7 @@ async function submitSale() {
                   type="button"
                   class="inline-flex w-full items-center justify-center rounded-2xl border border-primary bg-primary px-4 py-4 text-base font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                   :disabled="saleSubmitting || !canCharge"
-                  @click="submitSale"
+                  @click="submitSale()"
                 >
                   {{ !canCreateSale ? "Sin permiso para cobrar" : saleSubmitting ? "Guardando..." : "Cobrar venta" }}
                 </button>
@@ -2045,6 +2087,14 @@ async function submitSale() {
           </div>
         </aside>
       </div>
+
+    <GlobalModal v-if="showCreditModal" title="Venta a crédito" subtitle="El inventario se descontará hoy y el saldo quedará en la cuenta del empleado." size="2xl" :columns="1" save-button-text="Registrar fiado" close-button-text="Cancelar" @close="showCreditModal = false" @save="submitCreditSale">
+      <div class="space-y-4">
+        <SelectField v-model="creditEmployeeId" label="Empleado" field="credit_employee_id" :options="creditEmployees" option-label="name" option-value="id" placeholder="Selecciona al empleado" />
+        <InputField v-model="creditDueDate" label="Fecha estimada de pago (opcional)" field="estimated_payment_date" type="date" />
+        <MetricCard label="Cargo a cuenta" :value="formatMoney(cartTotal)" tone="dark" size="lg" />
+      </div>
+    </GlobalModal>
 
     </template>
   </PageLayout>

@@ -10,15 +10,34 @@ class PermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        foreach (self::catalog() as $permission) {
-            DB::table('permissions')->updateOrInsert(
-                ['name' => $permission],
-                [
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]
-            );
+        $now = now();
+
+        $rows = collect(self::catalog())
+            ->map(fn (string $permission) => [
+                'name' => $permission,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+        if (DB::table('permissions')->doesntExist()) {
+            DB::table('permissions')->insert($rows->all());
+            return;
         }
+
+        $existing = DB::table('permissions')
+            ->whereIn('name', $rows->pluck('name')->all())
+            ->pluck('name')
+            ->all();
+
+        $missing = $rows->reject(fn (array $permission) => in_array($permission['name'], $existing, true));
+
+        if ($missing->isNotEmpty()) {
+            DB::table('permissions')->insert($missing->values()->all());
+        }
+
+        DB::table('permissions')
+            ->whereIn('name', $rows->pluck('name')->all())
+            ->update(['updated_at' => $now]);
     }
 
     public static function catalog(): array
@@ -122,6 +141,9 @@ class PermissionSeeder extends Seeder
             'sales.update',
             'sales.delete',
             'sales.reports',
+            'sales.employee-credit.view',
+            'sales.employee-credit.create',
+            'sales.employee-credit.collect',
             'sales.cash-closures.view',
             'sales.cash-closures.create',
             'sales.cash-closures.update',

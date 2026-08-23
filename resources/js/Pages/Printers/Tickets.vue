@@ -75,9 +75,10 @@ const blockCatalog = computed(() =>
 
 const previewBlocks = computed(() => buildTicketPreviewBlocks(previewTemplate.value, props.samplePrintJob));
 const updateRouteName = computed(() =>
-  props.template?.slug === "cash-closure-ticket"
-    ? "printers.cash-closure-tickets.update"
-    : "printers.tickets.update"
+  ({
+    "cash-closure-ticket": "printers.cash-closure-tickets.update",
+    "employee-credit-statement-ticket": "printers.employee-credit-statement-tickets.update",
+  }[props.template?.slug] || "printers.tickets.update")
 );
 const updatePermission = computed(() =>
   props.template?.slug === "cash-closure-ticket"
@@ -126,6 +127,8 @@ function resetTemplate() {
     ...nextSettings,
     subheader_text: props.templateContext?.defaultSubheader || nextSettings.subheader_text,
     footer_text: props.templateContext?.defaultFooter || nextSettings.footer_text,
+    items_format: props.templateContext?.itemFormat || nextSettings.items_format,
+    open_cash_drawer: props.template?.slug === "employee-credit-statement-ticket" ? false : nextSettings.open_cash_drawer,
   };
 
   form.defaults({
@@ -154,6 +157,8 @@ function saveTemplate() {
 
   form.settings = normalizeTicketTemplate({
     ...form.settings,
+    items_format: props.templateContext?.itemFormat || form.settings.items_format,
+    open_cash_drawer: props.template?.slug === "employee-credit-statement-ticket" ? false : form.settings.open_cash_drawer,
   });
 
   form

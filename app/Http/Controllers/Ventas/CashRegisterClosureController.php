@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\CashRegisterClosure;
+use App\Models\EmployeeCreditPayment;
 use App\Models\Sale;
 use App\Models\SaleCancellation;
 use App\Models\TicketTemplate;
@@ -277,7 +278,9 @@ class CashRegisterClosureController extends Controller
         $sales = Sale::query()
             ->with(['paymentMethod:id,name', 'employee.user:id,employee_id,name'])
             ->where('branch_id', $branch->id)
-            ->where('status', 'completed')
+            // La venta original sigue siendo parte del periodo en que ocurrió. Si se
+            // devolvió después, el reembolso se resta como evento separado y vigente.
+            ->whereIn('status', ['completed', 'cancelled'])
             ->where('date', '>', $periodStart)
             ->where('date', '<=', $periodEnd)
             ->orderBy('date')
@@ -299,6 +302,14 @@ class CashRegisterClosureController extends Controller
             ->orderBy('cancelled_at')
             ->get();
 
+        $creditPayments = EmployeeCreditPayment::query()
+            ->with('paymentMethod:id,name')
+            ->where('branch_id', $branch->id)
+            ->where('cash_box_number', (string) $cashBoxNumber)
+            ->where('paid_at', '>', $periodStart)
+            ->where('paid_at', '<=', $periodEnd)
+            ->get();
+
         $paymentBreakdown = $sales
             ->groupBy(fn (Sale $sale) => $sale->paymentMethod?->name ?? 'Sin metodo')
             ->map(fn (Collection $group, string $method) => [
@@ -308,7 +319,12 @@ class CashRegisterClosureController extends Controller
                 'expected_cash' => $this->isCashMethod($method) ? round((float) $group->sum('total'), 2) : 0,
                 'type' => $this->paymentType($method),
             ])
-            ->values();
+            ->values()
+            ->merge($creditPayments->groupBy(fn (EmployeeCreditPayment $payment) => $payment->paymentMethod?->name ?? 'Sin metodo')
+                ->map(fn (Collection $group, string $method) => [
+                    'method' => $method.' (abonos)', 'sales_count' => $group->count(), 'total' => round((float) $group->sum('amount'), 2),
+                    'expected_cash' => $this->isCashMethod($method) ? round((float) $group->sum('amount'), 2) : 0, 'type' => $this->paymentType($method),
+                ])->values());
 
         $refundBreakdown = $refunds
             ->groupBy(fn (SaleCancellation $refund) => $refund->paymentMethod?->name ?? 'Sin metodo')
@@ -725,6 +741,10 @@ class CashRegisterClosureController extends Controller
     private function paymentType(string $method): string
     {
         $method = mb_strtolower($method);
+
+        if (str_contains($method, 'crédito empleado') || str_contains($method, 'credito empleado')) {
+            return 'other';
+        }
 
         if (str_contains($method, 'efectivo') || str_contains($method, 'cash')) {
             return 'cash';

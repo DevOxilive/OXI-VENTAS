@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Employee;
-use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +14,7 @@ class UsersSeeder extends Seeder
 
     public function run(): void
     {
+        $password = Hash::make(self::BASE_PASSWORD);
         $users = [
             [
                 'name' => 'Sistemas',
@@ -44,6 +44,9 @@ class UsersSeeder extends Seeder
                 'position' => 'Auxiliar RH',
             ],
         ];
+        $roleIdsByName = DB::table('roles')
+            ->whereIn('name', collect($users)->pluck('role')->unique()->all())
+            ->pluck('id', 'name');
 
         $allowedEmails = collect($users)->pluck('email')->all();
 
@@ -57,9 +60,12 @@ class UsersSeeder extends Seeder
             });
 
         foreach ($users as $userData) {
-            $role = Role::query()
-                ->where('name', $userData['role'])
-                ->firstOrFail();
+            $roleId = $roleIdsByName[$userData['role']] ?? null;
+
+            if (!$roleId) {
+                throw new \RuntimeException("No existe el rol base {$userData['role']}.");
+            }
+
             $employee = $this->employeeFor($userData);
 
             $user = User::withTrashed()->updateOrCreate(
@@ -67,8 +73,8 @@ class UsersSeeder extends Seeder
                 [
                     'employee_id' => $employee->id,
                     'name' => $userData['name'],
-                    'password' => Hash::make(self::BASE_PASSWORD),
-                    'role_id' => $role->id,
+                    'password' => $password,
+                    'role_id' => $roleId,
                     'branch_id' => null,
                     'is_active' => true,
                 ],

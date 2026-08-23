@@ -62,6 +62,7 @@ export function generateMenu(role, permissions = [], branches = []) {
             "audits.physical-counts.delete",
         ],
         sales: ["sales.view", "sales.create", "sales.update", "sales.delete"],
+        employeeCredit: ["sales.employee-credit.view", "sales.employee-credit.create", "sales.employee-credit.collect"],
         cashClosures: [
             "sales.cash-closures.view",
             "sales.cash-closures.create",
@@ -318,6 +319,7 @@ export function generateMenu(role, permissions = [], branches = []) {
 
     if (
         canUse("sales") ||
+        canUse("employeeCredit") ||
         canUse("cashClosures") ||
         canUsePurchaseLists ||
         canUsePurchaseOrderTracking ||
@@ -343,6 +345,7 @@ export function generateMenu(role, permissions = [], branches = []) {
                         url: salesHistoryUrl,
                     }] : [])]
                     : []),
+                ...(canUse("employeeCredit") ? [{ text: "Estados de Cuenta", key: "sales.employee-credit", icon: "account_balance_wallet", url: route("ventas.employee-credit.index") }] : []),
                 ...(canUse("cashClosures")
                     ? [
                           {
@@ -442,6 +445,12 @@ export function generateMenu(role, permissions = [], branches = []) {
                               key: "printers.tickets",
                               icon: "receipt_long",
                               url: route("printers.tickets.index"),
+                          },
+                          {
+                              text: "Estados de cuenta",
+                              key: "printers.employee-credit-statement-tickets",
+                              icon: "account_balance_wallet",
+                              url: route("printers.employee-credit-statement-tickets.index"),
                           },
                       ]
                     : []),

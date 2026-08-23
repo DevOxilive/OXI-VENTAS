@@ -41,6 +41,7 @@ class TicketTemplate extends Model
             'cash_box_text' => 'CAJA',
             'footer_text' => 'Gracias por tu compra',
             'show_dividers' => true,
+            'items_format' => 'standard',
             'blocks' => [
                 ['key' => 'logo', 'enabled' => true, 'position_percent' => 50, 'size_percent' => 100],
                 ['key' => 'cash_box', 'enabled' => true, 'position_percent' => 100, 'size_percent' => 104],
@@ -135,6 +136,42 @@ class TicketTemplate extends Model
         }
 
         return $template->fresh();
+    }
+
+    public static function employeeCreditStatementTemplate(): self
+    {
+        $template = static::query()->firstOrCreate(
+            ['slug' => 'employee-credit-statement-ticket'],
+            [
+                'name' => 'Ticket de estado de cuenta',
+                'is_active' => true,
+                'settings' => static::employeeCreditStatementDefaultSettings(),
+            ]
+        );
+
+        $normalizedSettings = static::sanitizeSettings(
+            $template->settings ?? static::employeeCreditStatementDefaultSettings(),
+            static::employeeCreditStatementDefaultSettings()
+        );
+
+        if (!$template->settings || $normalizedSettings !== ($template->settings ?? [])) {
+            $template->update([
+                'settings' => $normalizedSettings,
+            ]);
+        }
+
+        return $template->fresh();
+    }
+
+    public static function employeeCreditStatementDefaultSettings(): array
+    {
+        return array_replace(static::defaultSettings(), [
+            'subheader_text' => 'ESTADO DE CUENTA',
+            'footer_text' => 'Conserva este comprobante para aclaraciones',
+            'open_cash_drawer' => false,
+            'items_format' => 'credit_statement',
+            'blocks' => static::defaultSettings()['blocks'],
+        ]);
     }
 
     public static function cashClosureDefaultSettings(): array
@@ -236,6 +273,9 @@ class TicketTemplate extends Model
             'cash_box_text' => static::nonBlankText($settings['cash_box_text'] ?? null, $defaults['cash_box_text']),
             'footer_text' => static::nonBlankText($settings['footer_text'] ?? null, $defaults['footer_text']),
             'show_dividers' => true,
+            'items_format' => in_array(($settings['items_format'] ?? $defaults['items_format'] ?? 'standard'), ['standard', 'credit_statement'], true)
+                ? (string) ($settings['items_format'] ?? $defaults['items_format'] ?? 'standard')
+                : ($defaults['items_format'] ?? 'standard'),
             'blocks' => $settings['blocks'],
         ];
     }

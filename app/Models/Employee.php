@@ -48,4 +48,9 @@ class Employee extends Model
     {
         return $this->belongsTo(Position::class);
     }
+
+    public function creditAccount()
+    {
+        return $this->hasOne(EmployeeCreditAccount::class);
+    }
 }

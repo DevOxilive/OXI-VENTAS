@@ -59,6 +59,11 @@ class Sale extends Model
         return $this->hasOne(SaleCancellation::class);
     }
 
+    public function cancellations()
+    {
+        return $this->hasMany(SaleCancellation::class);
+    }
+
     public function stockMovements()
     {
         return $this->hasMany(StockMovement::class);

@@ -129,12 +129,48 @@ class TicketTemplateController extends Controller
         ]);
     }
 
+    public function employeeCreditStatements()
+    {
+        $template = TicketTemplate::employeeCreditStatementTemplate();
+
+        return Inertia::render('Printers/Tickets', [
+            'template' => [
+                'id' => $template->id,
+                'name' => $template->name,
+                'slug' => $template->slug,
+                'is_active' => $template->is_active,
+                'settings' => $this->resolvedSettings($template),
+                'updated_at' => $template->updated_at?->toJSON(),
+            ],
+            'samplePrintJob' => $this->sampleEmployeeCreditStatementPrintJob(),
+            'templateContext' => [
+                'title' => 'Tickets de estado de cuenta',
+                'subtitle' => 'Plantilla usada automaticamente al imprimir adeudos de empleados.',
+                'defaultName' => 'Ticket de estado de cuenta',
+                'defaultSubheader' => 'ESTADO DE CUENTA',
+                'defaultFooter' => 'Conserva este comprobante para aclaraciones',
+                'itemFormat' => 'credit_statement',
+                'fieldLabels' => [
+                    'name' => 'Plantilla de estado de cuenta',
+                    'subheader' => 'Titulo del estado de cuenta',
+                    'footer' => 'Mensaje final',
+                ],
+                'blockLabels' => [
+                    'items' => 'Tickets y productos pendientes',
+                    'totals' => 'Total seleccionado',
+                ],
+            ],
+        ]);
+    }
+
     public function update(Request $request, TicketTemplate $ticketTemplate)
     {
         $routeName = (string) $request->route()?->getName();
 
         if (str_contains($routeName, 'cash-closure-tickets.')) {
             abort_unless($ticketTemplate->slug === 'cash-closure-ticket', 404);
+        } elseif (str_contains($routeName, 'employee-credit-statement-tickets.')) {
+            abort_unless($ticketTemplate->slug === 'employee-credit-statement-ticket', 404);
         } else {
             abort_unless($ticketTemplate->slug === 'sales-ticket', 404);
         }
@@ -153,6 +189,7 @@ class TicketTemplateController extends Controller
             'settings.cash_box_text' => ['nullable', 'string', 'max:80'],
             'settings.footer_text' => ['nullable', 'string', 'max:160'],
             'settings.show_dividers' => ['required', 'boolean'],
+            'settings.items_format' => ['nullable', 'string', 'in:standard,credit_statement'],
             'settings.blocks' => ['required', 'array', 'min:1'],
             'settings.blocks.*.key' => ['required', 'string', 'max:60'],
             'settings.blocks.*.enabled' => ['required', 'boolean'],
@@ -160,9 +197,11 @@ class TicketTemplateController extends Controller
             'settings.blocks.*.size_percent' => ['required', 'integer', 'min:60', 'max:180'],
         ]);
 
-        $defaults = $ticketTemplate->slug === 'cash-closure-ticket'
-            ? TicketTemplate::cashClosureDefaultSettings()
-            : TicketTemplate::defaultSettings();
+        $defaults = match ($ticketTemplate->slug) {
+            'cash-closure-ticket' => TicketTemplate::cashClosureDefaultSettings(),
+            'employee-credit-statement-ticket' => TicketTemplate::employeeCreditStatementDefaultSettings(),
+            default => TicketTemplate::defaultSettings(),
+        };
 
         DB::transaction(function () use ($request, $ticketTemplate, $data, $defaults) {
             $ticketTemplate = $this->lockCurrentVersion($request, $ticketTemplate);
@@ -283,6 +322,45 @@ class TicketTemplateController extends Controller
                 '0.5' => 1,
             ],
             'notes' => 'Corte cuadrado sin incidencias.',
+        ];
+    }
+
+    private function sampleEmployeeCreditStatementPrintJob(): array
+    {
+        return [
+            'type' => 'employee_credit_statement',
+            'folio' => 'EDO-000001',
+            'date' => now()->format('d/m/Y H:i'),
+            'branch_name' => 'Sistemas OXI',
+            'payment_method' => 'Estado de cuenta',
+            'user_name' => 'Usuario de sesion',
+            'cash_box_text' => 'EDO. CTA.',
+            'total' => 45.00,
+            'cash_received' => 0,
+            'change_due' => 0,
+            'credit_groups' => [
+                [
+                    'label' => 'Viernes, 21 de agosto',
+                    'charges' => [
+                        [
+                            'folio' => 'V-000007',
+                            'total' => 24.00,
+                            'items' => [
+                                ['code' => '1234567890', 'product' => 'Bonafont 500ml', 'quantity_label' => '1 Pza', 'unit_price' => 21.00, 'subtotal' => 21.00],
+                                ['code' => '0987654321', 'product' => 'Aciditos', 'quantity_label' => '1 Pza', 'unit_price' => 3.00, 'subtotal' => 3.00],
+                            ],
+                        ],
+                        [
+                            'folio' => 'V-000006',
+                            'total' => 21.00,
+                            'items' => [
+                                ['code' => '1234567890', 'product' => 'Bonafont 500ml', 'quantity_label' => '1 Pza', 'unit_price' => 21.00, 'subtotal' => 21.00],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            'items' => [],
         ];
     }
 

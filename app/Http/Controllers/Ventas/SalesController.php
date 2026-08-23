@@ -6,6 +6,9 @@ use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
+use App\Models\Employee;
+use App\Models\EmployeeCreditAccount;
+use App\Models\EmployeeCreditCharge;
 use App\Models\PaymentMethod;
 use App\Models\ProductBatch;
 use App\Models\Sale;
@@ -13,6 +16,7 @@ use App\Models\SaleDetail;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use App\Models\TicketTemplate;
+use App\Models\User;
 use App\Services\SaleCancellationService;
 use App\Services\StockMovementService;
 use App\Support\SystemPermission;
@@ -59,6 +63,9 @@ class SalesController extends Controller
             'productsDB' => [],
             'paymentMethodsDB' => $paymentMethods,
             'defaultPaymentMethodId' => $this->defaultPaymentMethodId($paymentMethods),
+            'creditEmployees' => $user->hasPermission('sales.employee-credit.create')
+                ? $this->creditEmployeeOptions()
+                : [],
             'nearExpirationAlerts' => $selectorMode
                 ? []
                 : $this->buildNearExpirationAlerts($nearExpirationProducts)->values(),
@@ -69,6 +76,28 @@ class SalesController extends Controller
                 'settings' => TicketTemplate::sanitizeSettings($ticketTemplate->settings ?? []),
             ],
         ]);
+    }
+
+    private function creditEmployeeOptions(): array
+    {
+        return User::query()
+            ->with('employee:id,first_name,last_name,employment_status')
+            ->where('is_active', true)
+            ->whereNotNull('employee_id')
+            ->whereHas('employee', fn ($query) => $query->where('employment_status', '!=', 'Inactivo'))
+            ->orderBy('name')
+            ->get(['id', 'employee_id', 'name', 'email'])
+            ->map(function (User $user): array {
+                $employeeName = trim(($user->employee?->first_name ?? '').' '.($user->employee?->last_name ?? ''));
+                $displayName = $employeeName ?: $user->name;
+
+                return [
+                    'id' => $user->employee_id,
+                    'name' => $user->email ? "{$displayName} - {$user->email}" : $displayName,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     public function history(Request $request)
@@ -102,7 +131,9 @@ class SalesController extends Controller
                 'paymentMethod:id,name',
                 'details.product:id,name,inventory_unit,unit',
                 'details.product.barcodes:id,product_id,code',
-                'cancellation.cancelledBy:id,name',
+                'details.cancellationDetails',
+                'cancellations.cancelledBy:id,name',
+                'cancellations.details',
             ])
             ->whereIn('branch_id', $branchIds)
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
@@ -215,7 +246,9 @@ class SalesController extends Controller
         $data = $request->validate([
             'branch_id' => ['required', 'exists:branches,id'],
             'cash_box_number' => ['nullable', 'string', 'max:10'],
-            'payment_method_id' => ['required', 'exists:payment_methods,id'],
+            'payment_method_id' => ['nullable', 'exists:payment_methods,id'],
+            'credit_employee_id' => ['nullable', 'integer', 'exists:employees,id'],
+            'estimated_payment_date' => ['nullable', 'date'],
             'cash_received' => ['required', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.branch_product_id' => ['required', 'exists:branch_products,id'],
@@ -231,8 +264,20 @@ class SalesController extends Controller
 
         $user = $request->user()->loadMissing(['branches', 'role']);
         $branch = $this->resolveBranchById($data['branch_id'], $user);
-        $paymentMethod = $this->allowedPaymentMethods()
-            ->firstWhere('id', (int) $data['payment_method_id']);
+        $isEmployeeCredit = filled($data['credit_employee_id'] ?? null);
+        if ($isEmployeeCredit && ! $user->hasPermission('sales.employee-credit.create')) {
+            abort(403);
+        }
+
+        if ($isEmployeeCredit) {
+            $paymentMethod = PaymentMethod::query()->updateOrCreate(
+                ['name' => 'Crédito empleado'],
+                ['active' => true]
+            );
+        } else {
+            $paymentMethod = $this->allowedPaymentMethods()
+                ->firstWhere('id', (int) ($data['payment_method_id'] ?? 0));
+        }
 
         if (! $paymentMethod) {
             throw ValidationException::withMessages([
@@ -251,14 +296,14 @@ class SalesController extends Controller
             ->values()
             ->all();
 
-        $sale = DB::transaction(function () use ($data, $user, $branch, $paymentMethod, $stockService) {
+        $sale = DB::transaction(function () use ($data, $user, $branch, $paymentMethod, $stockService, $isEmployeeCredit) {
             $sale = Sale::create([
                 'date' => now(),
                 'employee_id' => $user->employee_id,
                 'customer_id' => null,
                 'branch_id' => $branch->id,
                 'cash_box_number' => (string) ($data['cash_box_number'] ?? '1'),
-                'payment_method_id' => $data['payment_method_id'],
+                'payment_method_id' => $paymentMethod->id,
                 'total' => 0,
                 'cash_received' => 0,
                 'change_due' => 0,
@@ -418,10 +463,10 @@ class SalesController extends Controller
             }
 
             $total = round($total, 2);
-            $isCashPayment = $this->isCashPaymentMethod($paymentMethod->name);
+            $isCashPayment = ! $isEmployeeCredit && $this->isCashPaymentMethod($paymentMethod->name);
             $cashReceived = $isCashPayment
                 ? round((float) $data['cash_received'], 2)
-                : $total;
+                : ($isEmployeeCredit ? 0 : $total);
 
             if ($isCashPayment && $cashReceived < $total) {
                 throw ValidationException::withMessages([
@@ -435,6 +480,29 @@ class SalesController extends Controller
                 'cash_received' => $cashReceived,
                 'change_due' => $isCashPayment ? round($cashReceived - $total, 2) : 0,
             ]);
+
+            if ($isEmployeeCredit) {
+                $account = EmployeeCreditAccount::query()->firstOrCreate(
+                    ['employee_id' => (int) $data['credit_employee_id']],
+                    ['active' => true]
+                );
+                if (! $account->active) {
+                    throw ValidationException::withMessages(['credit_employee_id' => 'El crédito de este empleado no está habilitado.']);
+                }
+                $currentBalance = (float) $account->charges()->where('status', 'open')->sum('outstanding_amount');
+                if ($account->credit_limit !== null && $currentBalance + $total > (float) $account->credit_limit) {
+                    throw ValidationException::withMessages(['credit_employee_id' => 'La compra excede el límite de crédito del empleado.']);
+                }
+                EmployeeCreditCharge::create([
+                    'employee_credit_account_id' => $account->id,
+                    'sale_id' => $sale->id,
+                    'branch_id' => $branch->id,
+                    'amount' => $total,
+                    'outstanding_amount' => $total,
+                    'estimated_payment_date' => $data['estimated_payment_date'] ?? null,
+                    'status' => 'open',
+                ]);
+            }
 
             return $sale;
         }, 3);
@@ -459,6 +527,9 @@ class SalesController extends Controller
     {
         $data = $request->validate([
             'reason' => ['required', 'string', 'min:5', 'max:1000'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.sale_detail_id' => ['required', 'integer', 'exists:sale_details,id'],
+            'items.*.quantity' => ['required', 'numeric', 'gt:0'],
         ]);
 
         $user = $request->user()->loadMissing(['branches', 'role']);
@@ -467,11 +538,12 @@ class SalesController extends Controller
         $cancellation = $cancellationService->cancel(
             sale: $sale,
             user: $user,
-            reason: $data['reason']
+            reason: $data['reason'],
+            items: $data['items'],
         );
 
         return back()->with([
-            'success' => 'Ticket '.$sale->folio.' cancelado correctamente.',
+            'success' => 'Devolucion del ticket '.$sale->folio.' registrada correctamente.',
             'sale_cancellation' => [
                 'id' => $cancellation->id,
                 'sale_id' => $sale->id,
@@ -590,18 +662,23 @@ class SalesController extends Controller
             'cash_box_number' => $sale->cash_box_number ?: '1',
             'status' => $sale->status,
             'status_label' => $sale->status === 'cancelled' ? 'Cancelada' : 'Completada',
-            'can_cancel' => $sale->status === 'completed' && ! $sale->cancellation,
+            'can_cancel' => $sale->status === 'completed' && $sale->details->contains(
+                fn (SaleDetail $detail) => (float) $detail->quantity - (float) $detail->cancellationDetails->sum('quantity') > 0.000001
+            ),
             'total' => (float) $sale->total,
             'details' => $sale->details
                 ->map(fn (SaleDetail $detail) => $this->mapRecentSaleDetail($detail))
                 ->values()
                 ->all(),
-            'cancellation' => $sale->cancellation ? [
-                'reason' => $sale->cancellation->reason,
-                'amount' => (float) $sale->cancellation->amount,
-                'cancelled_at_display' => optional($sale->cancellation->cancelled_at)->format('d/m/Y H:i') ?? '-',
-                'cancelled_by' => $sale->cancellation->cancelledBy?->name ?? 'Sin usuario',
-            ] : null,
+            'returns' => $sale->cancellations
+                ->map(fn ($cancellation) => [
+                    'reason' => $cancellation->reason,
+                    'amount' => (float) $cancellation->amount,
+                    'cancelled_at_display' => optional($cancellation->cancelled_at)->format('d/m/Y H:i') ?? '-',
+                    'cancelled_by' => $cancellation->cancelledBy?->name ?? 'Sin usuario',
+                ])
+                ->values()
+                ->all(),
         ];
     }
 
@@ -616,6 +693,9 @@ class SalesController extends Controller
             'product' => $product?->name ?? 'Producto sin nombre',
             'code' => $product?->barcodes?->first()?->code ?? '-',
             'quantity_display' => $this->formatQuantityForTicket($baseQuantity, $unit),
+            'quantity' => (float) $detail->quantity,
+            'remaining_quantity' => max(0, (float) $detail->quantity - (float) $detail->cancellationDetails->sum('quantity')),
+            'sale_unit' => $detail->sale_unit,
             'unit_price' => (float) $detail->unit_price,
             'discount_amount' => (float) ($detail->discount_amount ?? 0),
             'subtotal' => (float) $detail->subtotal,
@@ -743,7 +823,6 @@ class SalesController extends Controller
                     ->orWhereRaw('LOWER(name) LIKE ?', ['%cash%'])
                     ->orWhereRaw('LOWER(name) LIKE ?', ['%tarjeta%'])
                     ->orWhereRaw('LOWER(name) LIKE ?', ['%card%'])
-                    ->orWhereRaw('LOWER(name) LIKE ?', ['%credito%'])
                     ->orWhereRaw('LOWER(name) LIKE ?', ['%debito%']);
             })
             ->orderBy('id')
@@ -770,6 +849,10 @@ class SalesController extends Controller
     private function displayPaymentMethodName(string $methodName): string
     {
         $normalized = $this->normalizedPaymentMethodName($methodName);
+
+        if (str_contains($normalized, 'credito empleado')) {
+            return 'Crédito empleado';
+        }
 
         if (str_contains($normalized, 'tarjeta') || str_contains($normalized, 'card') || str_contains($normalized, 'credito') || str_contains($normalized, 'debito')) {
             return 'Tarjeta';

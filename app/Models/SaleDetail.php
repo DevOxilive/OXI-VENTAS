@@ -45,6 +45,11 @@ class SaleDetail extends Model
         return $this->belongsTo(Product::class);
     }
 
+    public function barcode()
+    {
+        return $this->belongsTo(Barcode::class);
+    }
+
     public function stockMovements()
     {
         return $this->hasMany(StockMovement::class);
@@ -53,5 +58,10 @@ class SaleDetail extends Model
     public function cancellationDetail()
     {
         return $this->hasOne(SaleCancellationDetail::class);
+    }
+
+    public function cancellationDetails()
+    {
+        return $this->hasMany(SaleCancellationDetail::class);
     }
 }

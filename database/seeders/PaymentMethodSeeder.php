@@ -9,19 +9,22 @@ class PaymentMethodSeeder extends Seeder
 {
     public function run(): void
     {
+        $now = now();
         $methods = [
             ['id' => 1, 'name' => 'Efectivo', 'active' => true],
             ['id' => 2, 'name' => 'Tarjeta', 'active' => true],
+            ['id' => 3, 'name' => 'Crédito empleado', 'active' => true],
         ];
 
-        foreach ($methods as $method) {
-            DB::table('payment_methods')->updateOrInsert(
-                ['id' => $method['id']],
-                array_merge($method, [
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ])
-            );
-        }
+        DB::table('payment_methods')->upsert(
+            collect($methods)
+                ->map(fn (array $method) => array_merge($method, [
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]))
+                ->all(),
+            ['id'],
+            ['name', 'active', 'updated_at']
+        );
     }
 }

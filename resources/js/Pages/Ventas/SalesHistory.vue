@@ -59,7 +59,10 @@ const filtersState = reactive({
 
 const cancellationForm = useForm({
   reason: "",
+  items: [],
 });
+
+const returnQuantities = reactive({});
 
 const columns = [
   { key: "folio", label: "Folio", format: "text", mobileSecondary: true },
@@ -265,22 +268,43 @@ function openCancellationModal(row) {
 
   cancellationSale.value = row;
   cancellationForm.reason = "";
+  cancellationForm.items = [];
+  Object.keys(returnQuantities).forEach((key) => delete returnQuantities[key]);
+  (row.details || []).forEach((detail) => {
+    returnQuantities[detail.id] = 0;
+  });
   cancellationForm.clearErrors();
 }
 
 function closeCancellationModal() {
   cancellationSale.value = null;
+  Object.keys(returnQuantities).forEach((key) => delete returnQuantities[key]);
   cancellationForm.clearErrors();
 }
 
 function saveCancellation() {
   if (!cancellationSale.value?.can_cancel || cancellationForm.processing) return;
 
+  cancellationForm.items = (cancellationSale.value.details || [])
+    .map((detail) => ({
+      sale_detail_id: detail.id,
+      quantity: Number(returnQuantities[detail.id] || 0),
+    }))
+    .filter((item) => item.quantity > 0);
+
+  if (!cancellationForm.items.length) {
+    ErrorAlert({
+      title: "Selecciona productos",
+      message: "Captura una cantidad mayor a cero en al menos un producto para registrar la devolución.",
+    });
+    return;
+  }
+
   cancellationForm.post(route("ventas.cancel", { sale: cancellationSale.value.id }), getModalRequestOptions({
     entityName: "Cancelacion de ticket",
-    successTitle: "Ticket cancelado correctamente",
-    errorTitle: "No se pudo cancelar el ticket",
-    errorMessage: "Revisa el motivo capturado y que la venta siga activa.",
+    successTitle: "Devolución registrada correctamente",
+    errorTitle: "No se pudo registrar la devolución",
+    errorMessage: "Revisa las cantidades, el motivo y que el ticket siga activo.",
     preserveScroll: true,
     onSuccess: () => {
       closeCancellationModal();
@@ -510,51 +534,61 @@ async function reprintSaleTicket(sale) {
         />
 
         <section
-          v-if="selectedSale.cancellation"
+          v-if="selectedSale.returns?.length"
           class="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-text"
         >
-          <p class="font-black">Cancelacion registrada</p>
-          <div class="mt-2 grid gap-2 md:grid-cols-3">
-            <p><span class="font-semibold opacity-60">Fecha:</span> {{ selectedSale.cancellation.cancelled_at_display }}</p>
-            <p><span class="font-semibold opacity-60">Usuario:</span> {{ selectedSale.cancellation.cancelled_by }}</p>
-            <p><span class="font-semibold opacity-60">Monto:</span> {{ money(selectedSale.cancellation.amount) }}</p>
-          </div>
-          <p class="mt-3 whitespace-pre-line">{{ selectedSale.cancellation.reason }}</p>
+          <p class="font-black">Devoluciones registradas</p>
+          <article v-for="(returnedSale, index) in selectedSale.returns" :key="index" class="mt-3 border-t border-primary/20 pt-3 first:border-0 first:pt-0">
+            <div class="grid gap-2 md:grid-cols-3">
+              <p><span class="font-semibold opacity-60">Fecha:</span> {{ returnedSale.cancelled_at_display }}</p>
+              <p><span class="font-semibold opacity-60">Usuario:</span> {{ returnedSale.cancelled_by }}</p>
+              <p><span class="font-semibold opacity-60">Monto:</span> {{ money(returnedSale.amount) }}</p>
+            </div>
+            <p class="mt-2 whitespace-pre-line">{{ returnedSale.reason }}</p>
+          </article>
         </section>
       </div>
     </GlobalModal>
 
     <GlobalModal
       v-if="cancellationSale"
-      title="Cancelar ticket"
+      title="Registrar devolución"
       :subtitle="`${cancellationSale.folio} · ${money(cancellationSale.total)}`"
       mode="delete"
       size="2xl"
       :columns="1"
       :processing="cancellationForm.processing"
       :total-errors="Object.keys(cancellationForm.errors).length"
-      save-button-text="Cancelar ticket"
+      save-button-text="Confirmar devolución"
       close-button-text="Conservar venta"
       @close="closeCancellationModal"
       @save="saveCancellation"
     >
       <div class="space-y-4">
         <section class="rounded-2xl border border-secondary bg-secondary p-4 text-sm text-text">
-          <p class="font-black">Productos que se devolveran al inventario</p>
+          <p class="font-black">Productos que volverán al inventario</p>
           <p class="mt-1 opacity-65">
             La devolucion se registrara con la fecha actual y quedara vinculada a este ticket.
           </p>
         </section>
 
-        <GlobalTable
-          :items="cancellationSale.details || []"
-          :columns="detailColumns"
-          :actions="[]"
-          row-key="id"
-          mobile-card-header-field="product"
-          no-data-message="Esta venta no tiene productos registrados."
-          :show-pagination="false"
-        />
+        <div class="overflow-x-auto rounded-2xl border border-secondary">
+          <table class="min-w-full text-sm text-text">
+            <thead class="bg-secondary text-left text-xs uppercase opacity-70">
+              <tr><th class="px-3 py-3">Producto</th><th class="px-3 py-3">Comprado</th><th class="px-3 py-3">Pendiente</th><th class="px-3 py-3">Devolver</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="detail in cancellationSale.details || []" :key="detail.id" class="border-t border-secondary">
+                <td class="px-3 py-3 font-semibold">{{ detail.product }}</td>
+                <td class="px-3 py-3">{{ detail.quantity_display }}</td>
+                <td class="px-3 py-3">{{ detail.remaining_quantity }} {{ detail.sale_unit === 'box' ? 'cajas' : detail.sale_unit === 'kg' ? 'kg' : 'pzas' }}</td>
+                <td class="px-3 py-3">
+                  <input v-model.number="returnQuantities[detail.id]" type="number" min="0" :max="detail.remaining_quantity" :step="detail.sale_unit === 'kg' ? '0.001' : '1'" class="w-28 rounded-lg border border-secondary bg-background px-3 py-2 text-text" :disabled="Number(detail.remaining_quantity) <= 0" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <TextareaField
           v-model="cancellationForm.reason"

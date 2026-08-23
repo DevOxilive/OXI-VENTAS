@@ -66,6 +66,7 @@ const DEFAULT_TEMPLATE = {
   cash_box_text: "CAJA",
   footer_text: "Gracias por tu compra",
   show_dividers: true,
+  items_format: "standard",
   blocks: BLOCK_CATALOG.map((block) => ({
     key: block.key,
     enabled: ![
@@ -169,6 +170,7 @@ export function normalizeTicketTemplate(input = {}) {
     cash_box_text: nonBlankText(input.cash_box_text, base.cash_box_text),
     footer_text: nonBlankText(input.footer_text, base.footer_text),
     show_dividers: true,
+    items_format: input.items_format === "credit_statement" ? "credit_statement" : "standard",
     blocks: normalizedBlocks,
   };
 }
@@ -601,6 +603,11 @@ function buildRowsForBlock(template, printJob, block) {
       rows.push({ type: "pair", label: "Pago", value: printJob.payment_method, block_key: block.key, position_percent: block.position_percent, size_percent: block.size_percent });
       break;
     case "items":
+      if (template.items_format === "credit_statement" || printJob.type === "employee_credit_statement") {
+        rows.push(...buildCreditStatementItemRows(template, printJob, block));
+        break;
+      }
+
       if (printJob.type === "cash_closure") {
         const labels = {
           "1000": "$1000",
@@ -727,6 +734,81 @@ function buildRowsForBlock(template, printJob, block) {
       break;
     default:
       break;
+  }
+
+  return rows;
+}
+
+function buildCreditStatementItemRows(template, printJob, block) {
+  const rows = [];
+  const width = lineWidthForPaper(template.paper_width);
+  const groups = Array.isArray(printJob.credit_groups) ? printJob.credit_groups : [];
+
+  groups.forEach((group) => {
+    const groupLabel = normalizeText(group.label || group.date_label || group.date || "Sin fecha");
+
+    if (groupLabel) {
+      rows.push({
+        type: "text",
+        text: `Fecha de venta: ${groupLabel}`,
+        block_key: block.key,
+        position_percent: 50,
+        size_percent: Math.max(76, block.size_percent - 8),
+        bold: true,
+      });
+    }
+
+    (group.charges || []).forEach((charge) => {
+      rows.push({
+        type: "columns",
+        left: `Ticket: ${charge.folio || "Sin folio"}`,
+        right: `Total: $${Number(charge.total || charge.outstanding_amount || 0).toFixed(2)}`,
+        block_key: block.key,
+        position_percent: block.position_percent,
+        size_percent: Math.max(76, block.size_percent - 8),
+        bold: true,
+      });
+
+      (charge.items || []).forEach((item) => {
+        const code = normalizeText(item.code || "-");
+        const product = normalizeText(item.product || item.product_name || "Producto");
+        const quantity = normalizeText(item.quantity_label || `${Number(item.quantity || 0).toFixed(2)} Pza`);
+        const unitPrice = `$${Number(item.unit_price || 0).toFixed(2)}`;
+        const subtotal = `$${Number(item.subtotal || 0).toFixed(2)}`;
+        const productLine = `${code} ${product}`;
+
+        rows.push({
+          type: "text",
+          text: productLine,
+          block_key: block.key,
+          position_percent: block.position_percent,
+          size_percent: Math.max(70, block.size_percent - 12),
+          bold: true,
+        });
+        rows.push({
+          type: "columns",
+          left: `${quantity} x ${unitPrice}`,
+          right: subtotal,
+          block_key: block.key,
+          position_percent: block.position_percent,
+          size_percent: Math.max(70, block.size_percent - 10),
+        });
+      });
+
+      if ((charge.items || []).length && template.show_dividers) {
+        rows.push({
+          type: "divider",
+          text: "-".repeat(width),
+          block_key: block.key,
+          position_percent: block.position_percent,
+          size_percent: Math.max(70, block.size_percent - 14),
+        });
+      }
+    });
+  });
+
+  if (rows.at(-1)?.type === "divider") {
+    rows.pop();
   }
 
   return rows;
