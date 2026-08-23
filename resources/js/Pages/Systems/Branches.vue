@@ -478,7 +478,7 @@ async function searchAddressLocation({ silent = false } = {}) {
 
   if (!fullAddress.value) {
     if (!silent) {
-      locationSearchError.value = "Captura la direccion de la sucursal antes de buscarla."
+      locationSearchError.value = "Captura la dirección de la sucursal antes de buscarla."
     }
     return
   }
@@ -502,7 +502,7 @@ async function searchAddressLocation({ silent = false } = {}) {
   } catch (error) {
     if (!silent) {
       locationSearchError.value = error.response?.data?.message
-        || "No fue posible encontrar esa direccion. Marca el punto directamente en el mapa."
+        || "No fue posible encontrar esa dirección. Marca el punto directamente en el mapa."
     }
   } finally {
     isSearchingAddress.value = false
@@ -792,7 +792,7 @@ onBeforeUnmount(() => {
             <InputField v-model="form.internal_number" label="Numero interior" field="internal_number"
               validation-field="internalNumber" :readonly="isBranchFormReadonly" :error="form.errors.internal_number" />
 
-            <InputField v-model="form.postal_code" label="Codigo postal" field="postal_code"
+            <InputField v-model="form.postal_code" label="código postal" field="postal_code"
               validation-field="postalCode" :readonly="isBranchFormReadonly" :error="form.errors.postal_code" />
 
             <InputField v-model="form.neighborhood" label="Colonia" field="neighborhood"
@@ -809,7 +809,7 @@ onBeforeUnmount(() => {
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p class="text-sm font-semibold text-text">
-                  Ubicacion para asistencias
+                  ubicación para asistencias
                 </p>
 
                 <p class="mt-1 text-xs text-text opacity-70">
@@ -830,7 +830,7 @@ onBeforeUnmount(() => {
             <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div class="flex-1">
                 <p class="text-xs text-text opacity-70">
-                  Completa los datos de direccion y busca el punto. Tambien puedes seleccionarlo directamente en el
+                  Completa los datos de dirección y busca el punto. también puedes seleccionarlo directamente en el
                   mapa.
                 </p>
 
@@ -842,14 +842,14 @@ onBeforeUnmount(() => {
               <button v-if="!isBranchFormReadonly" type="button"
                 class="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="isSearchingAddress || !fullAddress" @click="searchAddressLocation">
-                {{ isSearchingAddress ? "Buscando..." : "Buscar ubicacion" }}
+                {{ isSearchingAddress ? "Buscando..." : "Buscar ubicación" }}
               </button>
             </div>
 
             <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div class="flex-1">
                 <InputField v-model="form.maps_url" label="Enlace de Google Maps" field="maps_url" :readonly="true"
-                  :preserve-case="true" placeholder="Se genera al seleccionar la ubicacion"
+                  :preserve-case="true" placeholder="Se genera al seleccionar la ubicación"
                   :error="form.errors.maps_url || form.errors.attendance_latitude" />
               </div>
 
@@ -904,7 +904,7 @@ onBeforeUnmount(() => {
               </div>
 
               <p class="text-xs text-text opacity-70">
-                Por defecto se usan 100 metros. El radio maximo permitido es de 1000 metros.
+                Por defecto se usan 100 metros. El radio máximo permitido es de 1000 metros.
               </p>
             </div>
           </div>

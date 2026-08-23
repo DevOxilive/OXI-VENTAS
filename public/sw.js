@@ -1,4 +1,4 @@
-const VERSION = 'oxi-ventas-pwa-v9';
+const VERSION = 'oxi-ventas-pwa-v10';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -6,11 +6,14 @@ const PRECACHE_URLS = [
     '/offline.html',
     '/favicon.ico',
     '/icons/icon-192.png',
+    '/icons/maskable-192.png',
+    '/pwa/manifest.webmanifest',
 ];
 
-const CACHEABLE_DESTINATIONS = new Set(['font']);
+const CACHEABLE_DESTINATIONS = new Set(['font', 'image', 'manifest']);
 const CACHEABLE_PATHS = [
-    /^\/icons\/(?:icon-192|apple-touch-icon)\.png$/,
+    /^\/icons\/(?:icon-192|icon-512|maskable-192|maskable-512|apple-touch-icon)\.png$/,
+    /^\/pwa\/manifest\.webmanifest$/,
 ];
 
 self.addEventListener('install', (event) => {

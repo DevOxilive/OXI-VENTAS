@@ -5,7 +5,6 @@ import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
-import PwaInstallPrompt from './Components/PwaInstallPrompt.vue';
 
 const appName = 'Super-Kay';
 const themeStorageKey = 'color-theme';
@@ -18,6 +17,21 @@ const pages = {
     './Pages/Dashboard.vue': () => import('./Pages/Dashboard.vue'),
     ...import.meta.glob('./Pages/**/*.vue'),
 };
+
+function runAfterFirstPaint(callback) {
+    if (typeof window === 'undefined') return;
+
+    const schedule = window.requestIdleCallback
+        ? window.requestIdleCallback
+        : (handler) => window.setTimeout(handler, 1200);
+
+    if (document.readyState === 'complete') {
+        schedule(callback);
+        return;
+    }
+
+    window.addEventListener('load', () => schedule(callback), { once: true });
+}
 
 function applyTheme(theme) {
     if (typeof document === 'undefined') return;
@@ -71,9 +85,13 @@ createInertiaApp({
 const pwaRoot = document.getElementById('pwa-install-root');
 
 if (pwaRoot) {
-    createApp({
-        render: () => h(PwaInstallPrompt),
-    }).mount(pwaRoot);
+    runAfterFirstPaint(async () => {
+        const { default: PwaInstallPrompt } = await import('./Components/PwaInstallPrompt.vue');
+
+        createApp({
+            render: () => h(PwaInstallPrompt),
+        }).mount(pwaRoot);
+    });
 }
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
