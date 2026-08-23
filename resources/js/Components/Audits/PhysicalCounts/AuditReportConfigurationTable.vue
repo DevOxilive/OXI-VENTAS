@@ -33,8 +33,8 @@ const columns = [
 ]
 
 const actions = [
-    { id: 'excel', label: 'Exportar Excel', icon: 'table_view', variant: 'green', permission: 'reports.audits.export.excel' },
-    { id: 'pdf', label: 'Exportar PDF', icon: 'picture_as_pdf', variant: 'red', permission: 'reports.audits.export.pdf' },
+    { id: 'excel', label: 'Excel', icon: 'table_view', variant: 'amber', permission: 'reports.audits.export.excel' },
+    { id: 'pdf', label: 'PDF', icon: 'picture_as_pdf', variant: 'red', permission: 'reports.audits.export.pdf' },
     { id: 'remove', label: 'Quitar de la tabla', icon: 'delete', variant: 'red' },
 ]
 

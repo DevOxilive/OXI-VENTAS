@@ -146,14 +146,7 @@ const toolbarConfig = computed(() => ({
       value: filtersState.dateTo,
     },
   ],
-  actions: [
-    {
-      id: "clear",
-      label: "Limpiar",
-      icon: "restart_alt",
-      variant: "slate",
-    },
-  ],
+  actions: [],
   totalRecords: props.sales?.total || 0,
   filteredRecords: props.sales?.total || 0,
   showCounter: true,
@@ -213,20 +206,6 @@ function updateSearch(value) {
 function updateFilter({ key, value }) {
   if (!Object.prototype.hasOwnProperty.call(filtersState, key)) return;
   filtersState[key] = value || "";
-}
-
-function clearFilters() {
-  filtersState.search = "";
-  filtersState.branchId = "";
-  filtersState.status = "";
-  filtersState.dateFrom = "";
-  filtersState.dateTo = "";
-}
-
-function handleToolbarAction(actionId) {
-  if (actionId === "clear") {
-    clearFilters();
-  }
 }
 
 function handlePageChange(url) {
@@ -481,7 +460,6 @@ async function reprintSaleTicket(sale) {
         v-bind="toolbarConfig"
         @update:search="updateSearch"
         @update:filter="updateFilter"
-        @action="handleToolbarAction"
       />
     </template>
 

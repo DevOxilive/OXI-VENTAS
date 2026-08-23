@@ -26,7 +26,6 @@ const {
     movementSummary,
     quantityClass,
     formatNumber,
-    resetFilters,
     closeModal,
 } = useProductMovementsModal(props, emit)
 
@@ -61,11 +60,6 @@ const modalConfig = getProductMovementsModalConfig()
                         </div>
                     </div>
 
-                    <button type="button"
-                        class="inline-flex h-9 items-center justify-center rounded-lg border border-secondary bg-background px-3 text-sm font-semibold text-text transition hover:border-primary hover:bg-secondary hover:text-primary"
-                        @click="resetFilters">
-                        Limpiar filtros
-                    </button>
                 </div>
             </section>
 

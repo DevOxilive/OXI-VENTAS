@@ -58,30 +58,15 @@ export function useSalesReport(props) {
         },
         {
             id: 'excel',
-            label: 'Descargar Excel',
+            label: 'Excel',
             icon: 'table_view',
-            variant: 'green',
+            variant: 'amber',
             permission: 'reports.sales.export.excel',
         },
     ]
 
     function backToReportsCenter() {
         router.get(route('inventory.reports.sales'))
-    }
-
-    function resetFilters() {
-        filtersState.search = ''
-        filtersState.folio = ''
-        filtersState.dateFrom = ''
-        filtersState.dateTo = ''
-        filtersState.coverageMonths = 2
-        filtersState.branchId = props.currentBranch?.id ? Number(props.currentBranch.id) : null
-        filtersState.branchIds = []
-        filtersState.departmentIds = []
-        filtersState.categoryIds = []
-        filtersState.productIds = []
-        filtersState.sectionPeriods = {}
-        filtersState.perPage = 25
     }
 
     function updateSearch(value) {
@@ -177,11 +162,6 @@ export function useSalesReport(props) {
 
     function handleToolbarAction(action) {
         const actionId = typeof action === 'string' ? action : action?.id
-
-        if (actionId === 'clear') {
-            resetFilters()
-            return
-        }
 
         if (actionId === 'excel') {
             downloadReport('excel')

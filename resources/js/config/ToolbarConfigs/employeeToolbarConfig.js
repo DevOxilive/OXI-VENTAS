@@ -71,9 +71,9 @@ export function getEmployeeToolbarConfig({
             },
             {
                 id: "export",
-                label: "Exportar Excel",
-                icon: "download",
-                variant: "slate",
+                label: "Excel",
+                icon: "table_view",
+                variant: "amber",
                 hidden: () => !canExport,
             },
         ],

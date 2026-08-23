@@ -4,7 +4,9 @@ export const toolbarActionVariants = {
     green: "border border-accent bg-accent text-background hover:brightness-105",
     red: "border border-primary bg-primary text-white hover:brightness-110",
     amber: "border border-accent bg-accent text-background hover:brightness-105",
-    slate: "border border-secondary bg-secondary text-text hover:brightness-95",
+    secondary: "border border-accent bg-accent text-background hover:brightness-105",
+    slate: "border border-accent bg-accent text-background hover:brightness-105",
+    danger: "border border-primary bg-primary text-white hover:brightness-110",
     purple: "border border-primary bg-primary text-white hover:brightness-110",
 };
 

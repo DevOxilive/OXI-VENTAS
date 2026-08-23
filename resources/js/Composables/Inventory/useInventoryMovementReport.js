@@ -35,17 +35,6 @@ export function useInventoryMovementReport(props) {
         }))
     }
 
-    function resetFilters() {
-        filtersState.categoryId = ''
-        filtersState.userId = ''
-        filtersState.movementType = ''
-        filtersState.movementReason = ''
-        filtersState.dateFrom = ''
-        filtersState.dateTo = ''
-        filtersState.search = ''
-        filtersState.perPage = 25
-    }
-
     function updateSearch(value) {
         filtersState.search = value
     }
@@ -104,11 +93,6 @@ export function useInventoryMovementReport(props) {
 
     function handleToolbarAction(action) {
         const actionId = typeof action === 'string' ? action : action?.id
-
-        if (actionId === 'clear') {
-            resetFilters()
-            return
-        }
 
         if (actionId === 'excel') {
             downloadReport('excel')

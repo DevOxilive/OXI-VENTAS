@@ -237,7 +237,7 @@ function openCreateModal() {
 }
 
 function exportExcel() {
-    console.log('Exportar Excel')
+    console.log('Excel')
 }
 
 function handleToolbarAction(action) {
@@ -257,7 +257,7 @@ function handleToolbarAction(action) {
             :show-counter="false"
             :actions="[
                 { id: 'create', label: 'Nuevo producto', icon: 'add_circle', variant: 'primary' },
-                { id: 'export', label: 'Exportar Excel', icon: 'download', variant: 'secondary' },
+                { id: 'export', label: 'Excel', icon: 'table_view', variant: 'amber' },
             ]"
             @action="handleToolbarAction"
         />

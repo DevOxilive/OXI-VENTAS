@@ -2,6 +2,7 @@ export function getAttendanceIncidentsToolbarConfig({
   filters = {},
   statuses = [],
   total = 0,
+  actions = [],
 }) {
   return {
     icon: 'event_note',
@@ -20,5 +21,6 @@ export function getAttendanceIncidentsToolbarConfig({
       { key: 'to', type: 'date', label: 'Hasta', value: filters.to ?? '', min: filters.from || undefined },
       { key: 'status', label: 'Estado', placeholder: 'Todos los estados', value: filters.status ?? '', options: statuses },
     ],
+    actions,
   }
 }

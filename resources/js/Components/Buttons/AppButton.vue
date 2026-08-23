@@ -23,6 +23,7 @@ const props = defineProps({
 const variantClasses = {
     primary: 'border border-primary bg-primary text-white shadow-sm hover:brightness-110 focus:ring-primary',
     secondary: 'border border-secondary bg-secondary text-text shadow-sm hover:brightness-95 focus:ring-accent',
+    gold: 'border border-accent bg-accent text-background shadow-sm hover:brightness-105 focus:ring-accent',
     success: 'border border-green-600 bg-green-600 text-white shadow-sm hover:brightness-110 focus:ring-green-600',
     danger: 'border border-primary bg-primary text-white shadow-sm hover:brightness-95 focus:ring-primary',
 }

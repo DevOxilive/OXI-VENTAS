@@ -4,6 +4,7 @@ export function getAttendanceRegistrationToolbarConfig({
     branches = [],
     canViewAttendance = false,
     total = 0,
+    actions = [],
 } = {}) {
     const visibleFilters = canViewAttendance
         ? [
@@ -27,5 +28,6 @@ export function getAttendanceRegistrationToolbarConfig({
         showCounter: canViewAttendance,
         compactFilters: true,
         filters: visibleFilters,
+        actions,
     }
 }

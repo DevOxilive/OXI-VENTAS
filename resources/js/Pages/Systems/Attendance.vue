@@ -80,13 +80,54 @@ const biometricActionLabel = computed(() => (
     passkeyReady.value ? 'Agregar o cambiar Face ID/huella' : 'Configurar Face ID o huella'
 ))
 const selfie = ref(null)
+const selfieInput = ref(null)
 const evidenceRecord = ref(null)
+const toolbarActions = computed(() => [
+    ...(props.canRegister ? [
+        {
+            id: 'selfie',
+            label: selfie.value ? 'Foto lista' : 'Tomar foto',
+            icon: 'photo_camera',
+            variant: 'amber',
+            hidden: () => !hasAvailableAttendanceTypes.value,
+        },
+        {
+            id: 'register',
+            label: !hasAvailableAttendanceTypes.value
+                ? 'Asistencia completa'
+                : registering.value ? 'Validando...' : 'Registrar asistencia',
+            icon: 'fingerprint',
+            variant: 'primary',
+            disabled: registering.value || !hasAvailableAttendanceTypes.value,
+        },
+        {
+            id: 'passkey',
+            label: biometricActionLabel.value,
+            icon: 'face',
+            variant: 'amber',
+            disabled: registering.value,
+        },
+    ] : []),
+    ...(canExportExcel.value ? [{
+        id: 'excel',
+        label: 'Excel',
+        icon: 'table_view',
+        variant: 'amber',
+    }] : []),
+    ...(canExportPdf.value ? [{
+        id: 'pdf',
+        label: 'PDF',
+        icon: 'picture_as_pdf',
+        variant: 'red',
+    }] : []),
+])
 const attendanceRegistrationToolbarConfig = computed(() => getAttendanceRegistrationToolbarConfig({
     filters,
     types: props.options.types || [],
     branches: props.options.branches || [],
     canViewAttendance: props.canViewAttendance,
     total: Number(props.records?.total ?? 0),
+    actions: toolbarActions.value,
 }))
 
 const columns = [
@@ -153,6 +194,32 @@ function handleAttendanceFilter({ key, value }) {
 
 function handleAttendanceAction({ action, row }) {
     if (action === 'view-evidence' && row.evidence) evidenceRecord.value = row
+}
+
+function handleToolbarAction(action) {
+    if (action === 'selfie') {
+        selfieInput.value?.click()
+        return
+    }
+
+    if (action === 'register') {
+        registerAttendance()
+        return
+    }
+
+    if (action === 'passkey') {
+        registerPasskey()
+        return
+    }
+
+    if (action === 'excel') {
+        window.location.href = route('human-resources.attendance.export-excel', filters)
+        return
+    }
+
+    if (action === 'pdf') {
+        window.location.href = route('human-resources.attendance.export-pdf', filters)
+    }
 }
 
 async function registerAttendance() {
@@ -385,43 +452,19 @@ onBeforeUnmount(() => {
             @update:search="filters.search = $event"
             @update:filter="handleAttendanceFilter"
             @update:records-per-page="filters.per_page = $event"
-        >
-            <template #actions>
-                <div v-if="canRegister || canExportExcel || canExportPdf" class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
-                    <div v-if="canRegister && showAttendanceBranchSelector" class="min-w-56">
-                        <SelectField v-model="attendanceBranchId" hide-label field="attendance-branch" :options="attendanceBranches" :disabled="registering" />
-                    </div>
-                    <div v-if="canRegister" class="min-w-56 rounded-xl border border-secondary bg-secondary px-4 py-2.5">
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-text opacity-60">Horario actual</p>
-                        <p class="mt-0.5 text-sm font-semibold text-text">{{ selectedAttendanceShift?.label || 'Sin horario pendiente' }}</p>
-                    </div>
-                    <div v-if="canRegister" class="min-w-48">
-                        <SelectField v-model="attendanceType" hide-label field="attendance-type" :options="attendanceTypeOptions" :disabled="!hasAvailableAttendanceTypes" />
-                    </div>
-                    <AppButton v-if="canRegister && hasAvailableAttendanceTypes" as="label" variant="secondary" class="h-11 cursor-pointer">
-                        <span class="material-symbols-outlined mr-2 text-lg">photo_camera</span>
-                        {{ selfie ? 'Foto lista' : 'Tomar foto de asistencia' }}
-                        <input class="sr-only" type="file" accept="image/jpeg,image/png,image/webp" capture="user" @change="selfie = $event.target.files?.[0] || null">
-                    </AppButton>
-                    <AppButton v-if="canRegister" :disabled="registering || !hasAvailableAttendanceTypes" @click="registerAttendance">
-                        <span class="material-symbols-outlined mr-2 text-[19px]">fingerprint</span>
-                        {{ !hasAvailableAttendanceTypes ? 'Asistencia del dia completa' : registering ? 'Validando dispositivo...' : 'Registrar asistencia' }}
-                    </AppButton>
-                    <AppButton v-if="canRegister" :disabled="registering" variant="secondary" @click="registerPasskey">
-                        <span class="material-symbols-outlined mr-2 text-[19px]">face</span>
-                        {{ biometricActionLabel }}
-                    </AppButton>
-                    <AppButton v-if="canExportExcel" as="a" :href="route('human-resources.attendance.export-excel', filters)" variant="secondary">
-                        <span class="material-symbols-outlined mr-2 text-[19px]">download</span>
-                        Exportar Excel
-                    </AppButton>
-                    <AppButton v-if="canExportPdf" as="a" :href="route('human-resources.attendance.export-pdf', filters)" variant="secondary">
-                        <span class="material-symbols-outlined mr-2 text-[19px]">picture_as_pdf</span>
-                        Exportar PDF
-                    </AppButton>
-                </div>
-            </template>
-        </GlobalToolbar>
+            @action="handleToolbarAction"
+        />
+
+        <input ref="selfieInput" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp" capture="user" @change="selfie = $event.target.files?.[0] || null">
+
+        <section v-if="canRegister" class="grid gap-3 rounded-2xl border border-secondary bg-background p-4 shadow-sm md:grid-cols-3">
+            <SelectField v-if="showAttendanceBranchSelector" v-model="attendanceBranchId" label="Sucursal" field="attendance-branch" :options="attendanceBranches" :disabled="registering" />
+            <div class="rounded-xl border border-secondary bg-secondary px-4 py-2.5">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-text opacity-60">Horario actual</p>
+                <p class="mt-0.5 text-sm font-semibold text-text">{{ selectedAttendanceShift?.label || 'Sin horario pendiente' }}</p>
+            </div>
+            <SelectField v-model="attendanceType" label="Tipo de asistencia" field="attendance-type" :options="attendanceTypeOptions" :disabled="!hasAvailableAttendanceTypes" />
+        </section>
 
         <template v-if="canViewAttendance">
             <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

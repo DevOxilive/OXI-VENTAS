@@ -351,13 +351,6 @@ export function useProductMovementsModal(props, emit) {
             .sort((a, b) => a.label.localeCompare(b.label, "es"));
     });
 
-    function resetFilters() {
-        filters.userName = "";
-        filters.dateFrom = "";
-        filters.dateTo = "";
-        filters.movementGroup = "all";
-    }
-
     function closeModal() {
         emit("close");
     }
@@ -388,7 +381,6 @@ export function useProductMovementsModal(props, emit) {
         movementSummary,
         quantityClass,
         formatNumber,
-        resetFilters,
         closeModal,
     };
 }

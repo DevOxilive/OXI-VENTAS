@@ -54,16 +54,6 @@ export function useInventoryReport(props) {
         filtersState.reportType = status.report
     }
 
-    function resetFilters() {
-        filtersState.reportType = 'dashboard'
-        filtersState.status = ''
-        filtersState.categoryId = ''
-        filtersState.dateFrom = ''
-        filtersState.dateTo = ''
-        filtersState.search = ''
-        filtersState.perPage = 25
-    }
-
     function updateSearch(value) {
         filtersState.search = value
     }
@@ -129,11 +119,6 @@ export function useInventoryReport(props) {
 
     function handleToolbarAction(action) {
         const actionId = typeof action === 'string' ? action : action?.id
-
-        if (actionId === 'clear') {
-            resetFilters()
-            return
-        }
 
         if (actionId === 'excel') {
             downloadReport('excel')

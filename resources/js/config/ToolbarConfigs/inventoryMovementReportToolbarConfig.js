@@ -77,16 +77,10 @@ export function getInventoryMovementReportToolbarConfig({
         ],
         actions: [
             {
-                id: 'clear',
-                label: 'Limpiar',
-                icon: 'restart_alt',
-                variant: 'slate',
-            },
-            {
                 id: 'excel',
                 label: 'Excel',
                 icon: 'table_view',
-                variant: 'green',
+                variant: 'amber',
                 permission: 'reports.movements.export.excel',
             },
             {

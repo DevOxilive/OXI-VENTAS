@@ -7,7 +7,6 @@ import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
-import AppButton from '@/Components/Buttons/AppButton.vue'
 import { ToastAlert, UniversalActionModal } from '@/Components/Modales/UniversalActionModal'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 import { usePermissions } from '@/Composables/usePermissions'
@@ -81,13 +80,6 @@ watch(() => form.search, () => {
     searchTimer = setTimeout(filter, 350)
 })
 watch([() => form.resource, () => form.period, () => form.from, () => form.to], filter)
-const clearFilters = () => {
-    form.search = ''
-    form.period = ''
-    form.from = ''
-    form.to = ''
-    filter()
-}
 async function restore(id, resource = form.resource) {
     const result = await UniversalActionModal({
         title: 'Restaurar registro original',
@@ -183,13 +175,12 @@ function handleToolbarAction(action) {
                 @action="handleToolbarAction"
             />
 
-            <form class="grid gap-3 rounded-2xl border border-secondary bg-background p-4 md:grid-cols-2 xl:grid-cols-[minmax(180px,0.7fr)_minmax(240px,1.25fr)_minmax(180px,0.7fr)_minmax(150px,0.55fr)_minmax(150px,0.55fr)_auto]" @submit.prevent="filter">
+            <form class="grid gap-3 rounded-2xl border border-secondary bg-background p-4 md:grid-cols-2 xl:grid-cols-[minmax(180px,0.7fr)_minmax(240px,1.25fr)_minmax(180px,0.7fr)_minmax(150px,0.55fr)_minmax(150px,0.55fr)]" @submit.prevent="filter">
                 <SelectField v-model="form.resource" hide-label :options="resourceOptions" />
                 <InputField v-model="form.search" hide-label placeholder="Buscar en registros eliminados" />
                 <SelectField v-model="form.period" hide-label :options="periodOptions" />
                 <InputField v-model="form.from" hide-label type="date" />
                 <InputField v-model="form.to" hide-label type="date" />
-                <AppButton type="button" variant="secondary" @click="clearFilters">Limpiar</AppButton>
             </form>
 
             <GlobalTable
