@@ -107,6 +107,66 @@ export function useProductMovementsModal(props, emit) {
         }));
     });
 
+    const movementTableColumns = computed(() => [
+        {
+            key: "displayDate",
+            label: "Fecha",
+            format: "text",
+            width: "180px",
+            mobileSecondary: true,
+        },
+        {
+            key: "displayReason",
+            label: "Motivo",
+            format: "text",
+            width: "190px",
+        },
+        {
+            key: "displayType",
+            label: "Tipo",
+            format: "badge",
+            width: "140px",
+            mobileBadge: true,
+            formatOptions: {
+                statusMap: {
+                    Entrada: "green",
+                    Salida: "red",
+                    Ajuste: "blue",
+                    Administrativo: "purple",
+                },
+            },
+        },
+        {
+            key: "displayUser",
+            label: "Usuario",
+            format: "text",
+            width: "190px",
+            mobileDisplay: true,
+        },
+        {
+            key: "displayBatches",
+            label: "Lote / nota",
+            format: "text",
+            width: "260px",
+            cellClass: "max-w-[260px]",
+            mobileDisplay: true,
+        },
+        {
+            key: "displayQuantity",
+            label: "Cantidad",
+            format: "text",
+            width: "140px",
+            mobileDisplay: true,
+        },
+        {
+            key: "displayStock",
+            label: "Stock",
+            format: "text",
+            width: "170px",
+            mobileDisplay: true,
+        },
+    ]);
+
     function formatNumber(value) {
         return formatInventoryQuantity(value, unit.value);
     }
@@ -127,6 +187,21 @@ export function useProductMovementsModal(props, emit) {
             hour: "2-digit",
             minute: "2-digit",
         }).format(parsedDate);
+    }
+
+    function groupLabel(groupKey, movement) {
+        return (
+            {
+                purchases: "Compras",
+                sales: "Ventas",
+                returns: "Devoluciones",
+                audits: "Auditorias",
+                adjustments: "Ajustes",
+                damaged: "Dañados",
+                expired: "Caducados",
+                others: "Otros",
+            }[groupKey] ?? reasonLabel(movement.reason, movement)
+        );
     }
 
     function reasonLabel(reason, movement = null) {
@@ -317,37 +392,19 @@ export function useProductMovementsModal(props, emit) {
 
         filteredMovements.value.forEach((movement) => {
             const key = resolveGroupKey(movement);
-            const label = reasonLabel(movement.reason, movement);
-            const quantity = signedQuantity(movement);
 
             if (!summaries.has(key)) {
                 summaries.set(key, {
                     key,
-                    label,
+                    label: groupLabel(key, movement),
                     count: 0,
-                    entries: 0,
-                    exits: 0,
-                    net: 0,
                 });
             }
 
-            const summary = summaries.get(key);
-            summary.count += 1;
-            summary.net += quantity;
-
-            if (quantity > 0) {
-                summary.entries += quantity;
-            } else if (quantity < 0) {
-                summary.exits += Math.abs(quantity);
-            }
+            summaries.get(key).count += 1;
         });
 
         return Array.from(summaries.values())
-            .map((item) => ({
-                ...item,
-                displayEntries: item.entries > 0 ? `+${formatNumber(item.entries)} ${unit.value}` : "",
-                displayExits: item.exits > 0 ? `-${formatNumber(item.exits)} ${unit.value}` : "",
-            }))
             .sort((a, b) => a.label.localeCompare(b.label, "es"));
     });
 
@@ -378,6 +435,7 @@ export function useProductMovementsModal(props, emit) {
         movementGroupOptions,
         userOptions,
         tableRows,
+        movementTableColumns,
         movementSummary,
         quantityClass,
         formatNumber,

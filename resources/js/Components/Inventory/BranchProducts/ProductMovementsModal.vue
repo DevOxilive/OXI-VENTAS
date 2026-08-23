@@ -1,5 +1,6 @@
 <script setup>
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
+import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import { useProductMovementsModal } from '@/Composables/Inventory/useProductMovementsModal'
 import { getProductMovementsModalConfig } from '@/config/ModalConfigs/productMovementsModalConfig'
 
@@ -23,6 +24,7 @@ const {
     movementGroupOptions,
     userOptions,
     tableRows,
+    movementTableColumns,
     movementSummary,
     quantityClass,
     formatNumber,
@@ -30,6 +32,19 @@ const {
 } = useProductMovementsModal(props, emit)
 
 const modalConfig = getProductMovementsModalConfig()
+
+function summaryTextClass(item) {
+    return {
+        purchases: 'text-emerald-700',
+        returns: 'text-emerald-700',
+        sales: 'text-rose-700',
+        damaged: 'text-rose-700',
+        expired: 'text-rose-700',
+        audits: 'text-primary',
+        adjustments: 'text-primary',
+        others: 'text-text',
+    }[item.key] ?? 'text-text'
+}
 </script>
 
 <template>
@@ -112,112 +127,55 @@ const modalConfig = getProductMovementsModalConfig()
             </section>
 
             <section class="min-h-0 flex-1 overflow-hidden">
-                <div class="hidden border-b border-secondary bg-secondary px-2 py-2 md:grid md:items-center md:gap-4"
-                    style="grid-template-columns: repeat(6, minmax(0, 1fr));">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-text opacity-50">Fecha</p>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-text opacity-50">Movimiento</p>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-text opacity-50">Usuario</p>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-text opacity-50">Lote / Nota</p>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-text opacity-50">Cantidad</p>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-text opacity-50">Stock</p>
-                </div>
+                <GlobalTable
+                    :items="tableRows"
+                    :columns="movementTableColumns"
+                    row-key="id"
+                    mobile-card-header-field="displayReason"
+                    no-data-message="No hay movimientos que coincidan con los filtros."
+                    :show-pagination="false"
+                >
+                    <template #cell-displayQuantity="{ row }">
+                        <span class="font-semibold" :class="quantityClass(row)">
+                            {{ row.displayQuantity }} {{ unit }}
+                        </span>
+                    </template>
 
-                <div class="h-full overflow-y-auto">
-                    <div v-if="tableRows.length" class="divide-y divide-secondary">
-                        <article v-for="movement in tableRows" :key="movement.id"
-                            class="px-2 py-2.5 transition hover:bg-secondary">
-                            <div class="hidden md:grid md:items-start md:gap-4"
-                                style="grid-template-columns: repeat(6, minmax(0, 1fr));">
-                                <p class="text-sm leading-5 text-text opacity-80">
-                                    {{ movement.displayDate }}
-                                </p>
-
-                                <div class="min-w-0 text-sm leading-5">
-                                    <p class="font-semibold text-text">
-                                        {{ movement.displayReason }}
-                                    </p>
-
-                                    <p class="text-primary">
-                                        {{ movement.displayType }}
-                                    </p>
-                                </div>
-
-                                <p class="text-sm leading-5 text-text opacity-80">
-                                    {{ movement.displayUser }}
-                                </p>
-
-                                <div class="min-w-0 text-sm leading-5 text-text opacity-80">
-                                    <p>{{ movement.displayBatches }}</p>
-                                    <p v-if="movement.notesText" class="text-text opacity-70">
-                                        {{ movement.notesText }}
-                                    </p>
-                                </div>
-
-                                <p class="text-sm font-semibold leading-5" :class="quantityClass(movement)">
-                                    {{ movement.displayQuantity }} {{ unit }}
-                                </p>
-
-                                <p class="text-sm leading-5 text-text opacity-80">
-                                    {{ movement.displayStock }} {{ unit }}
-                                </p>
-                            </div>
-
-                            <div class="space-y-1.5 text-sm md:hidden">
-                                <p class="font-semibold leading-5 text-text">
-                                    {{ movement.displayReason }}
-                                </p>
-
-                                <div class="flex flex-wrap gap-x-3 gap-y-1 leading-5 text-text opacity-80">
-                                    <p><span class="font-semibold text-violet-700">Fecha:</span> {{ movement.displayDate }}</p>
-                                    <p><span class="font-semibold text-violet-700">Tipo:</span> {{ movement.displayType }}</p>
-                                    <p><span class="font-semibold text-violet-700">Usuario:</span> {{ movement.displayUser }}</p>
-                                    <p><span class="font-semibold text-violet-700">Lote:</span> {{ movement.displayBatches }}</p>
-                                    <p><span class="font-semibold text-violet-700">Cantidad:</span> <span :class="quantityClass(movement)">{{ movement.displayQuantity }} {{ unit }}</span></p>
-                                    <p><span class="font-semibold text-violet-700">Stock:</span> {{ movement.displayStock }} {{ unit }}</p>
-                                </div>
-
-                                <p v-if="movement.notesText" class="leading-5 text-text opacity-70">
-                                    {{ movement.notesText }}
-                                </p>
-                            </div>
-                        </article>
-                    </div>
-
-                    <div v-else class="flex h-full items-center justify-center px-6 text-center">
-                        <div>
-                            <p class="text-sm font-semibold text-text">
-                                No hay movimientos que coincidan con los filtros.
-                            </p>
-
-                            <p class="mt-1 text-sm text-text opacity-70">
-                                Prueba con otro grupo, usuario o rango de fechas.
+                    <template #cell-displayBatches="{ row }">
+                        <div class="min-w-0 leading-5">
+                            <p class="truncate text-text">{{ row.displayBatches }}</p>
+                            <p v-if="row.notesText" class="truncate text-xs text-text opacity-60" :title="row.notesText">
+                                {{ row.notesText }}
                             </p>
                         </div>
-                    </div>
-                </div>
+                    </template>
+                </GlobalTable>
             </section>
 
         </div>
 
         <template #footer="{ close }">
             <footer class="sticky bottom-0 flex flex-col gap-3 border-t border-secondary bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text opacity-80">
-                    <span class="font-semibold text-violet-700">Resumen:</span>
+                <div class="flex min-w-0 flex-wrap items-center gap-2 text-sm text-text">
+                    <span class="mr-1 font-semibold text-violet-700">Resumen:</span>
 
                     <template v-if="movementSummary.length">
                         <span
                             v-for="item in movementSummary"
                             :key="item.key"
-                            class="inline-flex items-center gap-1"
+                            class="inline-flex items-center gap-2 rounded-full border border-secondary bg-secondary/70 px-3 py-1.5 shadow-sm"
                         >
-                            <span class="font-semibold text-violet-700">{{ item.label }}:</span>
-                            <span class="font-semibold">{{ item.count }}</span>
-                            <span v-if="item.displayEntries" class="font-semibold text-emerald-700">{{ item.displayEntries }}</span>
-                            <span v-if="item.displayExits" class="font-semibold text-rose-700">{{ item.displayExits }}</span>
+                            <span class="font-semibold" :class="summaryTextClass(item)">
+                                {{ item.label }}
+                            </span>
+
+                            <span class="inline-flex min-w-6 justify-center rounded-full bg-background px-2 py-0.5 text-xs font-bold text-text">
+                                {{ item.count }}
+                            </span>
                         </span>
                     </template>
 
-                    <span v-else>Sin movimientos para resumir.</span>
+                    <span v-else class="text-text opacity-70">Sin movimientos para resumir.</span>
                 </div>
 
                 <button
