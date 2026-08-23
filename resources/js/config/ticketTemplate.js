@@ -708,15 +708,10 @@ function buildRowsForBlock(template, printJob, block) {
       if (printJob.type === "cash_closure") {
         rows.push({ type: "text", text: "Resumen del corte", block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(84, block.size_percent), bold: true });
         rows.push({ type: "columns", left: "Ventas realizadas:", right: Number(printJob.sales_count || 0).toFixed(0), block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
-        rows.push({ type: "columns", left: "Venta total:", right: `$${Number(printJob.sales_total || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
-        rows.push({ type: "columns", left: "Efectivo sistema:", right: `$${Number(printJob.expected_cash || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
         rows.push({ type: "columns", left: "Efectivo contado:", right: `$${Number(printJob.counted_cash || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
         rows.push({ type: "columns", left: "Se deja en caja:", right: `$${Number(printJob.cash_left || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
         rows.push({ type: "columns", left: "Retiro efectivo:", right: `$${Number(printJob.cash_withdrawal || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
-        rows.push({ type: "columns", left: "Dif. efectivo:", right: `$${Number(printJob.cash_difference || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
-        rows.push({ type: "columns", left: "Tarjeta sistema:", right: `$${Number(printJob.card_total || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
         rows.push({ type: "columns", left: "Tarjeta registrada:", right: `$${Number(printJob.counted_card || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(80, block.size_percent - 15), bold: true });
-        rows.push({ type: "columns", left: "Dif. tarjeta:", right: `$${Number(printJob.card_difference || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: block.size_percent, bold: true });
         if (normalizeText(printJob.notes)) {
           rows.push({ type: "text", text: `Observaciones: ${printJob.notes}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(76, block.size_percent - 12) });
         }

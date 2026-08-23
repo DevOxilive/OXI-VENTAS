@@ -99,23 +99,13 @@ const countedCashTotal = computed(() =>
     return sum + Number(form.denomination_breakdown[item.key] || 0) * item.value;
   }, 0)
 );
-const cashDifferencePreview = computed(() => {
-  return countedCashTotal.value - Number(props.current?.expected_cash || 0);
-});
-const cardDifferencePreview = computed(() => {
-  return Number(form.counted_card || 0) - Number(props.current?.card_total || 0);
-});
 const cashToWithdraw = computed(() => Math.max(0, countedCashTotal.value - Number(form.cash_left || 0)));
-const isBalanced = computed(() => {
-  return Math.abs(cashDifferencePreview.value) < 0.01 && Math.abs(cardDifferencePreview.value) < 0.01;
-});
 const canCreateClosure = computed(() => can("sales.cash-closures.create"));
 const summaryCards = computed(() => [
-  { label: "Ventas", value: props.current?.sales_count ?? 0, tone: "neutral" },
-  { label: "Venta total", value: money(props.current?.sales_total), tone: "dark" },
-  { label: "Devoluciones", value: money(props.current?.refunds_total), tone: "danger" },
-  { label: "Efectivo", value: money(props.current?.expected_cash), tone: "success" },
-  { label: "Tarjeta", value: money(props.current?.card_total), tone: "neutral" },
+  { label: "Caja", value: `#${props.current?.cash_box_number || "1"}`, tone: "neutral" },
+  { label: "Ventas pendientes", value: props.current?.sales_count ?? 0, tone: "neutral" },
+  { label: "Devoluciones", value: props.current?.refunds_count ?? 0, tone: "danger" },
+  { label: "Corte", value: "Caja", tone: "dark" },
 ]);
 
 const toolbarConfig = computed(() => {
@@ -276,7 +266,7 @@ function openClosureModal() {
   form.cash_box_number = props.current?.cash_box_number ?? "1";
   form.counted_cash = countedCashTotal.value;
   form.cash_left = "";
-  form.counted_card = props.current?.card_total || "";
+  form.counted_card = "";
   form.denomination_breakdown = Object.fromEntries(denominations.map((item) => [item.key, ""]));
   form.notes = "";
   showClosureModal.value = true;
@@ -649,38 +639,23 @@ onMounted(() => {
 
         <aside class="space-y-4">
           <div
-            class="rounded-2xl border p-4"
-            :class="isBalanced ? 'border-accent bg-secondary' : 'border-primary bg-secondary'"
+            class="rounded-2xl border border-secondary bg-secondary p-4"
           >
             <p
-              class="text-sm font-black"
-              :class="isBalanced ? 'text-accent' : 'text-primary'"
+              class="text-sm font-black text-text"
             >
-              {{ isBalanced ? 'Corte cuadrado' : 'No esta cuadrando' }}
+              Resumen
             </p>
             <p class="mt-1 text-xs font-semibold text-text opacity-70">
-              {{ isBalanced ? 'Lo capturado coincide con el sistema.' : 'Revisa efectivo, tarjeta u observaciones.' }}
+              Revisa los importes capturados antes de guardar.
             </p>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <MetricCard label="Caja" :value="`#${form.cash_box_number}`" size="sm" />
-            <MetricCard label="Ventas" :value="current.sales_count" size="sm" />
-            <MetricCard label="Devoluciones" :value="money(current.refunds_total)" tone="danger" size="sm" />
-            <MetricCard label="Efectivo sistema" :value="money(current.expected_cash)" tone="success" size="sm" />
             <MetricCard label="Efectivo contado" :value="money(countedCashTotal)" tone="dark" size="sm" />
-            <MetricCard
-              label="Dif. efectivo"
-              :value="money(cashDifferencePreview)"
-              :tone="Math.abs(cashDifferencePreview) < 0.01 ? 'success' : 'danger'"
-              size="sm"
-            />
-            <MetricCard
-              label="Dif. tarjeta"
-              :value="money(cardDifferencePreview)"
-              :tone="Math.abs(cardDifferencePreview) < 0.01 ? 'success' : 'danger'"
-              size="sm"
-            />
+            <MetricCard label="Tarjeta capturada" :value="money(form.counted_card)" size="sm" />
+            <MetricCard label="Se deja en caja" :value="money(form.cash_left)" size="sm" />
           </div>
 
           <div class="rounded-2xl border border-secondary bg-background p-4">
