@@ -58,6 +58,20 @@ export function getSalesReportToolbarConfig({
         activeTab,
         filters: [
             {
+                key: 'dateFrom',
+                label: 'Desde',
+                type: 'date',
+                value: filters?.dateFrom ?? '',
+                visible: true,
+            },
+            {
+                key: 'dateTo',
+                label: 'Hasta',
+                type: 'date',
+                value: filters?.dateTo ?? '',
+                visible: true,
+            },
+            {
                 key: 'branchIds',
                 label: 'Sucursales',
                 placeholder: 'Todas las sucursales',
@@ -109,20 +123,6 @@ export function getSalesReportToolbarConfig({
                 optionLabel: 'name',
                 optionValue: 'id',
                 visible: !isSalesTab,
-            },
-            {
-                key: 'dateFrom',
-                label: 'Desde',
-                type: 'date',
-                value: filters?.dateFrom ?? '',
-                visible: isSalesTab,
-            },
-            {
-                key: 'dateTo',
-                label: 'Hasta',
-                type: 'date',
-                value: filters?.dateTo ?? '',
-                visible: isSalesTab,
             },
         ],
         actions: [

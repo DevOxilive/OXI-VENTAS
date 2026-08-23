@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\ProductDepartment;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class ProductDepartmentSeeder extends Seeder
 {
@@ -84,16 +84,22 @@ class ProductDepartmentSeeder extends Seeder
 
     public function run(): void
     {
-        foreach (self::CATALOG as $index => $department) {
-            ProductDepartment::updateOrCreate(
-                ['name' => $department['name']],
-                [
+        $now = now();
+
+        DB::table('product_departments')->upsert(
+            collect(self::CATALOG)
+                ->map(fn (array $department, int $index) => [
+                    'name' => $department['name'],
                     'icon' => $department['icon'],
                     'description' => $department['description'],
                     'sort_order' => $index + 1,
                     'active' => true,
-                ]
-            );
-        }
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ])
+                ->all(),
+            ['name'],
+            ['icon', 'description', 'sort_order', 'active', 'updated_at']
+        );
     }
 }

@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Category;
 use App\Models\BranchProduct;
+use App\Models\EmployeeCreditPayment;
 use App\Models\Product;
 use App\Models\ProductDepartment;
 use App\Models\Sale;
@@ -165,9 +166,13 @@ class SalesReportController extends Controller
         }
 
         $filters = $this->resolveFilters($request, $branch, $branches);
-        $rows = $this->registeredSalesQuery($filters)
+        $sales = $this->registeredSalesQuery($filters)
             ->get()
             ->map(fn (Sale $sale) => $this->mapSaleRow($sale));
+        $rows = $sales
+            ->concat($this->employeeCreditPaymentReportRows($filters))
+            ->sortBy(fn (array $row) => ($row['date_sort'] ?? '').'|'.($row['operation_sort'] ?? ''))
+            ->values();
         $fileScope = $branch ? $this->safeSegment($branch->slug ?: $branch->name) : 'global';
 
         return Excel::download(
@@ -207,7 +212,13 @@ class SalesReportController extends Controller
         $sale->loadMissing([
             'branch:id,name,slug',
             'employee:id,first_name,last_name',
+            'customer:id,name',
+            'paymentMethod:id,name',
+            'details.barcode:id,code',
+            'details.product.category:id,name',
             'details.product.barcodes:id,product_id,code',
+            'cancellation.paymentMethod:id,name',
+            'cancellation.details.product:id,name',
         ]);
 
         return Excel::download(
@@ -223,7 +234,13 @@ class SalesReportController extends Controller
         $sale->loadMissing([
             'branch:id,name,slug',
             'employee:id,first_name,last_name',
+            'customer:id,name',
+            'paymentMethod:id,name',
+            'details.barcode:id,code',
+            'details.product.category:id,name',
             'details.product.barcodes:id,product_id,code',
+            'cancellation.paymentMethod:id,name',
+            'cancellation.details.product:id,name',
         ]);
 
         $pdf = Pdf::loadView('pdf.sale-detail-report', [
@@ -296,8 +313,13 @@ class SalesReportController extends Controller
             ->with([
                 'branch:id,name,slug',
                 'employee:id,first_name,last_name',
+                'customer:id,name',
+                'paymentMethod:id,name',
+                'details.barcode:id,code',
+                'details.product.category:id,name',
                 'details.product.barcodes:id,product_id,code',
                 'cancellation.cancelledBy:id,name',
+                'cancellation.paymentMethod:id,name',
                 'cancellation.details.product:id,name',
             ])
             ->select('sales.*')
@@ -332,6 +354,32 @@ class SalesReportController extends Controller
         }
 
         return $query;
+    }
+
+    private function employeeCreditPaymentReportRows(array $filters): \Illuminate\Support\Collection
+    {
+        $query = EmployeeCreditPayment::query()
+            ->with([
+                'account.employee:id,first_name,last_name',
+                'paymentMethod:id,name',
+                'receivedBy:id,name',
+                'allocations.charge.sale.branch:id,name,slug',
+                'allocations.charge.sale.details.barcode:id,code',
+                'allocations.charge.sale.details.product.category:id,name',
+                'allocations.charge.sale.details.product.barcodes:id,product_id,code',
+            ])
+            ->whereIn('branch_id', $filters['branch_ids'])
+            ->latest('paid_at');
+
+        $this->applyDateFilters($query, $filters, 'paid_at');
+
+        return $query->get()
+            ->flatMap(function (EmployeeCreditPayment $payment) {
+                return $payment->allocations
+                    ->map(fn ($allocation) => $this->mapEmployeeCreditPaymentRow($payment, $allocation))
+                    ->filter();
+            })
+            ->values();
     }
 
     private function resolveFilters(Request $request, ?Branch $branch = null, $branches = null): array
@@ -446,10 +494,20 @@ class SalesReportController extends Controller
 
         return [
             'id' => (int) $sale->id,
+            'operation_type' => 'sale',
+            'operation_sort' => 'sale-'.str_pad((string) $sale->id, 12, '0', STR_PAD_LEFT),
             'folio' => $sale->folio ?: 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
             'date' => optional($sale->date)->toISOString(),
+            'date_sort' => optional($sale->date)->format('Y-m-d H:i:s') ?? '',
             'date_display' => optional($sale->date)->format('d/m/Y H:i') ?? '-',
+            'date_only' => optional($sale->date)->format('d/m/Y') ?? '-',
+            'time_only' => optional($sale->date)->format('H:i') ?? '-',
             'branch' => $sale->branch?->name ?? '-',
+            'customer' => $sale->customer?->name ?? 'Público en General',
+            'cash_box' => $sale->cash_box_number ? 'Caja '.$sale->cash_box_number : '-',
+            'payment_method' => $sale->paymentMethod?->name ?? 'Sin método',
+            'cash_received' => (float) ($sale->cash_received ?? 0),
+            'change_due' => (float) ($sale->change_due ?? 0),
             'seller' => $this->employeeName($sale),
             'status' => $sale->status,
             'status_label' => $sale->status === 'cancelled' ? 'Cancelada' : 'Completada',
@@ -460,12 +518,14 @@ class SalesReportController extends Controller
                 'id' => (int) $sale->cancellation->id,
                 'reason' => $sale->cancellation->reason,
                 'amount' => (float) $sale->cancellation->amount,
+                'payment_method' => $sale->cancellation->paymentMethod?->name ?? 'Sin método',
                 'cancelled_at' => optional($sale->cancellation->cancelled_at)->toISOString(),
                 'cancelled_at_display' => optional($sale->cancellation->cancelled_at)->format('d/m/Y H:i') ?? '-',
                 'cancelled_by' => $sale->cancellation->cancelledBy?->name ?? 'Sin usuario',
                 'details' => $sale->cancellation->details
                     ->map(fn ($detail) => [
                         'id' => (int) $detail->id,
+                        'sale_detail_id' => (int) $detail->sale_detail_id,
                         'product' => $detail->product?->name ?? 'Producto sin nombre',
                         'quantity' => (float) $detail->quantity,
                         'base_quantity' => (float) $detail->base_quantity,
@@ -474,30 +534,85 @@ class SalesReportController extends Controller
                     ->values()
                     ->all(),
             ] : null,
+            'items_count' => $sale->details->count(),
             'total_products_sold' => $totalProductsSold,
             'total_products_sold_display' => $this->saleTotalQuantityDisplay($sale, $totalProductsSold),
             'total' => (float) $sale->total,
             'details' => $sale->details
-                ->map(fn (SaleDetail $detail) => $this->mapSaleDetail($detail))
+                ->map(fn (SaleDetail $detail) => $this->mapSaleDetail(
+                    $detail,
+                    $sale->cancellation?->details->firstWhere('sale_detail_id', $detail->id),
+                ))
                 ->values()
                 ->all(),
         ];
     }
 
-    private function mapSaleDetail(SaleDetail $detail): array
+    private function mapEmployeeCreditPaymentRow(EmployeeCreditPayment $payment, $allocation): ?array
+    {
+        $sale = $allocation->charge?->sale;
+
+        if (! $sale) {
+            return null;
+        }
+
+        $appliedAmount = (float) $allocation->amount;
+        $saleTotal = (float) $sale->total;
+        $details = $sale->details->map(fn (SaleDetail $detail) => $this->mapSaleDetail($detail))->values();
+        $remainingAmount = $appliedAmount;
+        $lastDetailIndex = $details->count() - 1;
+
+        $details = $details->map(function (array $detail, int $index) use ($appliedAmount, $saleTotal, $lastDetailIndex, &$remainingAmount) {
+            $amount = $index === $lastDetailIndex
+                ? $remainingAmount
+                : round(((float) $detail['subtotal'] / max($saleTotal, 0.01)) * $appliedAmount, 2);
+            $remainingAmount = round($remainingAmount - $amount, 2);
+            $detail['report_amount'] = $amount;
+
+            return $detail;
+        })->all();
+
+        return [
+            'id' => 'payment-'.$payment->id.'-allocation-'.$allocation->id,
+            'operation_type' => 'payment',
+            'operation_sort' => 'payment-'.str_pad((string) $payment->id, 12, '0', STR_PAD_LEFT),
+            'folio' => $sale->folio ?: 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
+            'payment_folio' => $payment->folio,
+            'date_sort' => optional($payment->paid_at)->format('Y-m-d H:i:s') ?? '',
+            'date_display' => optional($payment->paid_at)->format('d/m/Y H:i') ?? '-',
+            'date_only' => optional($payment->paid_at)->format('d/m/Y') ?? '-',
+            'time_only' => optional($payment->paid_at)->format('H:i') ?? '-',
+            'branch' => $sale->branch?->name ?? '-',
+            'customer' => $payment->account?->employee
+                ? trim($payment->account->employee->first_name.' '.$payment->account->employee->last_name)
+                : 'Empleado sin nombre',
+            'cash_box' => $payment->cash_box_number ? 'Caja '.$payment->cash_box_number : '-',
+            'payment_method' => $payment->paymentMethod?->name ?? 'Sin método',
+            'seller' => $payment->receivedBy?->name ?? 'Sin usuario',
+            'status_label' => 'Abono aplicado',
+            'total' => $appliedAmount,
+            'details' => $details,
+        ];
+    }
+
+    private function mapSaleDetail(SaleDetail $detail, $cancellationDetail = null): array
     {
         $product = $detail->product;
         $unit = $this->baseUnit($product?->inventory_unit ?? $product?->unit ?? 'pza');
         $saleUnit = $detail->sale_unit ?: ($unit === 'kg' ? 'kilo' : 'piece');
         $baseQuantity = (float) ($detail->base_quantity ?? $detail->quantity ?? 0);
         $quantity = (float) ($detail->quantity ?? $baseQuantity);
-        $code = $product?->barcodes?->first()?->code ?? '-';
+        $code = $detail->barcode?->code ?? $product?->barcodes?->first()?->code ?? '-';
+        $category = $product?->category?->name;
 
         return [
             'id' => (int) $detail->id,
             'product' => $product?->name ?? 'Producto sin nombre',
+            'category' => $category ?? 'Sin categoría',
+            'product_report_label' => $category ? $category.' / '.($product?->name ?? 'Producto sin nombre') : ($product?->name ?? 'Producto sin nombre'),
             'code' => $code,
             'presentation' => $this->presentationLabel($saleUnit, $unit),
+            'report_unit' => $this->reportUnitLabel($saleUnit, $unit),
             'quantity' => $quantity,
             'quantity_display' => $this->visualQuantityLabel($quantity, $saleUnit, $unit),
             'base_quantity' => $baseQuantity,
@@ -507,6 +622,9 @@ class SalesReportController extends Controller
             'discount_percentage' => (float) ($detail->discount_percentage ?? 0),
             'discount_amount' => (float) ($detail->discount_amount ?? 0),
             'subtotal' => (float) $detail->subtotal,
+            'report_amount' => (float) $detail->subtotal,
+            'refunded_quantity' => (float) ($cancellationDetail?->quantity ?? 0),
+            'refunded_amount' => (float) ($cancellationDetail?->subtotal ?? 0),
         ];
     }
 
@@ -703,6 +821,15 @@ class SalesReportController extends Controller
         }
 
         return $this->quantityLabel($quantity, $baseUnit);
+    }
+
+    private function reportUnitLabel(string $saleUnit, string $baseUnit): string
+    {
+        return match ($saleUnit) {
+            'box' => 'CAJA',
+            'kilo' => 'KG',
+            default => $baseUnit === 'kg' ? 'KG' : 'PZA',
+        };
     }
 
     private function quantityLabel(float $quantity, string $unit): string

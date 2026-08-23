@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductDepartment;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ProductCategorySeeder extends Seeder
@@ -20,19 +21,51 @@ class ProductCategorySeeder extends Seeder
 
     public function run(): void
     {
-        foreach (ProductDepartmentSeeder::CATALOG as $departmentIndex => $departmentData) {
-            $department = ProductDepartment::where('name', $departmentData['name'])->first();
+        $now = now();
+        $departments = ProductDepartment::query()
+            ->whereIn('name', collect(ProductDepartmentSeeder::CATALOG)->pluck('name')->all())
+            ->pluck('id', 'name');
+        $categories = [];
 
-            if (!$department) {
+        foreach (ProductDepartmentSeeder::CATALOG as $departmentIndex => $departmentData) {
+            $departmentId = $departments[$departmentData['name']] ?? null;
+
+            if (!$departmentId) {
                 continue;
             }
 
             foreach ($departmentData['categories'] as $categoryIndex => $categoryName) {
-                $this->syncCategory(
-                    department: $department,
-                    name: $categoryName,
-                    sortOrder: ($departmentIndex * 100) + $categoryIndex + 1,
-                );
+                $categories[] = [
+                    'product_department_id' => $departmentId,
+                    'name' => $categoryName,
+                    'sort_order' => ($departmentIndex * 100) + $categoryIndex + 1,
+                    'active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+        }
+
+        if (DB::table('categories')->doesntExist() && $categories) {
+            DB::table('categories')->insert($categories);
+        } else {
+            foreach (ProductDepartmentSeeder::CATALOG as $departmentIndex => $departmentData) {
+                $departmentId = $departments[$departmentData['name']] ?? null;
+
+                if (!$departmentId) {
+                    continue;
+                }
+
+                $department = new ProductDepartment(['name' => $departmentData['name']]);
+                $department->id = $departmentId;
+
+                foreach ($departmentData['categories'] as $categoryIndex => $categoryName) {
+                    $this->syncCategory(
+                        department: $department,
+                        name: $categoryName,
+                        sortOrder: ($departmentIndex * 100) + $categoryIndex + 1,
+                    );
+                }
             }
         }
 
