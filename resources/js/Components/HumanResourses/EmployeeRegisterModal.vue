@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useEmployeeForm } from '@/Composables/HumanResources/useEmployeeForm'
 
 import FormPanel from '@/Components/Cards/FormPanel.vue'
@@ -21,6 +21,7 @@ const props = defineProps({
 
 const {
     employee,
+    age,
     frontendErrors,
     departments,
     positions,
@@ -32,6 +33,47 @@ const {
 
 const isReadOnly = computed(() => props.mode === 'view')
 const totalErrors = computed(() => errorSummary.value.length)
+const activeStep = ref('employee')
+
+const modalSections = [
+    { id: 'employee', label: 'Datos del empleado' },
+    { id: 'address', label: 'Domicilio' },
+    { id: 'labor', label: 'Laboral y fiscal' },
+]
+
+const educationLevelOptions = [
+    { value: 'Primaria', label: 'Primaria' },
+    { value: 'Secundaria', label: 'Secundaria' },
+    { value: 'Bachillerato', label: 'Bachillerato' },
+    { value: 'Carrera tecnica', label: 'Carrera tecnica' },
+    { value: 'Tecnico superior universitario', label: 'Tecnico superior universitario' },
+    { value: 'Licenciatura', label: 'Licenciatura' },
+    { value: 'Ingenieria', label: 'Ingenieria' },
+    { value: 'Especialidad', label: 'Especialidad' },
+    { value: 'Maestria', label: 'Maestria' },
+    { value: 'Doctorado', label: 'Doctorado' },
+    { value: 'Posdoctorado', label: 'Posdoctorado' },
+]
+
+const relationshipOptions = [
+    { value: 'Madre', label: 'Madre' },
+    { value: 'Padre', label: 'Padre' },
+    { value: 'Abuela', label: 'Abuela' },
+    { value: 'Abuelo', label: 'Abuelo' },
+    { value: 'Tia', label: 'Tia' },
+    { value: 'Tio', label: 'Tio' },
+    { value: 'Hija', label: 'Hija' },
+    { value: 'Hijo', label: 'Hijo' },
+    { value: 'Hermana', label: 'Hermana' },
+    { value: 'Hermano', label: 'Hermano' },
+    { value: 'Conyuge', label: 'Conyuge' },
+    { value: 'Pareja', label: 'Pareja' },
+    { value: 'Otro', label: 'Otro' },
+]
+
+const activeStepIndex = computed(() => modalSections.findIndex((section) => section.id === activeStep.value))
+const isFirstStep = computed(() => activeStepIndex.value <= 0)
+const isLastStep = computed(() => activeStepIndex.value === modalSections.length - 1)
 
 const modalConfig = computed(() => getEmployeeModalConfig({
     mode: props.mode,
@@ -62,6 +104,30 @@ const mapsUrl = computed(() => {
 
 const canOpenMaps = computed(() => Boolean(mapsUrl.value))
 
+function goToStep(step) {
+    const nextStep = modalSections.find((section) => String(section.id) === String(step))
+
+    if (nextStep) {
+        activeStep.value = nextStep.id
+    }
+}
+
+function goToNextStep() {
+    const nextStep = modalSections[activeStepIndex.value + 1]
+
+    if (nextStep) {
+        activeStep.value = nextStep.id
+    }
+}
+
+function goToPreviousStep() {
+    const previousStep = modalSections[activeStepIndex.value - 1]
+
+    if (previousStep) {
+        activeStep.value = previousStep.id
+    }
+}
+
 function openGoogleMaps() {
     if (!mapsUrl.value) return
 
@@ -80,6 +146,7 @@ watch(
 watch(
     () => [props.mode, props.employeeToEdit],
     () => {
+        activeStep.value = 'employee'
         loadEditData()
     },
     {
@@ -92,41 +159,77 @@ watch(
 <template>
     <GlobalModal
         v-bind="modalConfig"
+        :sections="modalSections"
+        :active-section="activeStep"
+        @select-section="goToStep"
         @save="saveEmployee"
         @close="$emit('close')"
     >
         <div class="space-y-6 rounded-3xl border border-secondary bg-background p-4 shadow-sm sm:p-5 md:p-6">
             <FormPanel
+                v-if="activeStep === 'employee'"
                 title="Datos del empleado"
                 centered-heading
                 :heading-border="true"
                 panel-class="p-4"
             >
-                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <InputField label="Nombre(s)" field="firstName" v-model="employee.firstName" :readonly="isReadOnly"
-                        :error="frontendErrors.firstName || employee.errors.firstName" @validate="validateField('firstName')" />
+                <div class="space-y-6">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <InputField label="Nombre(s)" field="firstName" v-model="employee.firstName" :readonly="isReadOnly"
+                            :error="frontendErrors.firstName || employee.errors.firstName" @validate="validateField('firstName')" />
 
-                    <InputField label="Apellido(s)" field="lastName" v-model="employee.lastName" :readonly="isReadOnly"
-                        :error="frontendErrors.lastName || employee.errors.lastName" @validate="validateField('lastName')" />
+                        <InputField label="Apellido(s)" field="lastName" v-model="employee.lastName" :readonly="isReadOnly"
+                            :error="frontendErrors.lastName || employee.errors.lastName" @validate="validateField('lastName')" />
 
-                    <InputField label="Correo electronico" field="email" v-model="employee.email" :readonly="isReadOnly"
-                        :error="frontendErrors.email || employee.errors.email" @validate="validateField('email')" />
+                        <InputField type="date" label="Fecha de nacimiento" field="birthDate" v-model="employee.birthDate"
+                            :readonly="isReadOnly" :error="frontendErrors.birthDate || employee.errors.birthDate"
+                            @validate="validateField('birthDate')" />
 
-                    <InputField label="Telefono" field="phone" v-model="employee.phone" :readonly="isReadOnly"
-                        :error="frontendErrors.phone || employee.errors.phone" @validate="validateField('phone')" />
+                        <InputField label="Edad" field="age" :model-value="age" readonly :show-counter="false" />
 
-                    <InputField type="date" label="Fecha de ingreso" field="startDate" v-model="employee.startDate"
-                        :readonly="isReadOnly" :error="frontendErrors.startDate || employee.errors.startDate"
-                        @validate="validateField('startDate')" />
+                        <InputField label="Correo electronico" field="email" v-model="employee.email" :readonly="isReadOnly"
+                            :error="frontendErrors.email || employee.errors.email" @validate="validateField('email')" />
 
-                    <SelectField label="Estatus" field="employmentStatus" v-model="employee.employmentStatus"
-                        :options="['Activo', 'Inactivo']" :disabled="isReadOnly"
-                        :error="frontendErrors.employmentStatus || employee.errors.employmentStatus"
-                        @validate="validateField('employmentStatus')" />
+                        <InputField label="Telefono" field="phone" v-model="employee.phone" :readonly="isReadOnly"
+                            :error="frontendErrors.phone || employee.errors.phone" @validate="validateField('phone')" />
+                    </div>
+
+                    <div class="space-y-4 border-t border-secondary pt-4">
+                        <h3 class="text-sm font-semibold text-text">Contactos de emergencia</h3>
+
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            <InputField label="Contacto principal" field="emergencyContactName" v-model="employee.emergencyContactName"
+                                :readonly="isReadOnly" :error="frontendErrors.emergencyContactName || employee.errors.emergencyContactName"
+                                @validate="validateField('emergencyContactName')" />
+
+                            <SelectField label="Parentesco" field="emergencyContactRelationship" v-model="employee.emergencyContactRelationship"
+                                :options="relationshipOptions" :disabled="isReadOnly"
+                                :error="frontendErrors.emergencyContactRelationship || employee.errors.emergencyContactRelationship"
+                                @validate="validateField('emergencyContactRelationship')" />
+
+                            <InputField label="Telefono de emergencia" field="emergencyContactPhone" v-model="employee.emergencyContactPhone"
+                                :readonly="isReadOnly" :error="frontendErrors.emergencyContactPhone || employee.errors.emergencyContactPhone"
+                                @validate="validateField('emergencyContactPhone')" />
+
+                            <InputField label="Segundo contacto" field="secondaryEmergencyContactName" v-model="employee.secondaryEmergencyContactName"
+                                :readonly="isReadOnly" :error="frontendErrors.secondaryEmergencyContactName || employee.errors.secondaryEmergencyContactName"
+                                @validate="validateField('secondaryEmergencyContactName')" />
+
+                            <SelectField label="Parentesco" field="secondaryEmergencyContactRelationship" v-model="employee.secondaryEmergencyContactRelationship"
+                                :options="relationshipOptions" :disabled="isReadOnly"
+                                :error="frontendErrors.secondaryEmergencyContactRelationship || employee.errors.secondaryEmergencyContactRelationship"
+                                @validate="validateField('secondaryEmergencyContactRelationship')" />
+
+                            <InputField label="Telefono secundario" field="secondaryEmergencyContactPhone" v-model="employee.secondaryEmergencyContactPhone"
+                                :readonly="isReadOnly" :error="frontendErrors.secondaryEmergencyContactPhone || employee.errors.secondaryEmergencyContactPhone"
+                                @validate="validateField('secondaryEmergencyContactPhone')" />
+                        </div>
+                    </div>
                 </div>
             </FormPanel>
 
             <FormPanel
+                v-if="activeStep === 'address'"
                 title="Domicilio"
                 centered-heading
                 :heading-border="true"
@@ -192,6 +295,7 @@ watch(
             </FormPanel>
 
             <FormPanel
+                v-if="activeStep === 'labor'"
                 title="Laboral y fiscal"
                 centered-heading
                 :heading-border="true"
@@ -216,10 +320,11 @@ watch(
                     ]" :disabled="isReadOnly" :error="frontendErrors.contractType || employee.errors.contractType"
                         @validate="validateField('contractType')" />
 
-                    <InputField label="Antiguedad" field="seniority" v-model="employee.seniority" readonly />
+                    <InputField v-if="isReadOnly" label="Antiguedad" field="seniority" v-model="employee.seniority" readonly />
 
-                    <InputField label="Grado de estudios" field="educationLevel" v-model="employee.educationLevel"
-                        :readonly="isReadOnly" :error="frontendErrors.educationLevel || employee.errors.educationLevel"
+                    <SelectField label="Grado de estudios" field="educationLevel" v-model="employee.educationLevel"
+                        :options="educationLevelOptions" :disabled="isReadOnly"
+                        :error="frontendErrors.educationLevel || employee.errors.educationLevel"
                         @validate="validateField('educationLevel')" />
 
                     <InputField label="Especialidad" field="specialty" v-model="employee.specialty" :readonly="isReadOnly"
@@ -231,6 +336,14 @@ watch(
                     <InputField label="Cuenta bancaria" field="accountNumber" v-model="employee.accountNumber"
                         :readonly="isReadOnly" :error="frontendErrors.accountNumber || employee.errors.accountNumber"
                         @validate="validateField('accountNumber')" />
+
+                    <InputField label="CLABE" field="bankClabe" v-model="employee.bankClabe"
+                        :readonly="isReadOnly" :error="frontendErrors.bankClabe || employee.errors.bankClabe"
+                        @validate="validateField('bankClabe')" />
+
+                    <InputField label="Numero de tarjeta" field="bankCardNumber" v-model="employee.bankCardNumber"
+                        :readonly="isReadOnly" :error="frontendErrors.bankCardNumber || employee.errors.bankCardNumber"
+                        @validate="validateField('bankCardNumber')" />
 
                     <div class="rounded-2xl border border-secondary bg-background px-4 py-3">
                         <div class="flex items-center justify-between gap-3">
@@ -254,10 +367,56 @@ watch(
                         @validate="validateField('nss')" />
 
                     <InputField label="RFC" field="rfc" v-model="employee.rfc" :readonly="isReadOnly"
-                        placeholder="El sistema autocompleta el prefijo; captura el resto"
+                        placeholder="Captura la homoclave; el sistema completa nombre y fecha"
                         :error="frontendErrors.rfc || employee.errors.rfc" @validate="validateField('rfc')" />
                 </div>
             </FormPanel>
         </div>
+
+        <template #footer>
+            <div class="flex items-center justify-between gap-3 border-t border-secondary bg-background px-4 py-4 md:px-8">
+                <button
+                    v-if="!isFirstStep"
+                    type="button"
+                    class="rounded-xl border border-secondary bg-background px-4 py-2.5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
+                    :disabled="employee.processing"
+                    @click="goToPreviousStep"
+                >
+                    Atras
+                </button>
+                <span v-else />
+
+                <div class="flex items-center gap-3">
+                    <button
+                        type="button"
+                        class="rounded-xl border border-secondary bg-background px-4 py-2.5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
+                        :disabled="employee.processing"
+                        @click="$emit('close')"
+                    >
+                        {{ isReadOnly ? 'Cerrar' : 'Cancelar' }}
+                    </button>
+
+                    <button
+                        v-if="!isLastStep"
+                        type="button"
+                        class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="employee.processing"
+                        @click="goToNextStep"
+                    >
+                        Siguiente
+                    </button>
+
+                    <button
+                        v-else-if="!isReadOnly"
+                        type="button"
+                        class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="employee.processing"
+                        @click="saveEmployee"
+                    >
+                        {{ employee.processing ? 'Guardando...' : modalConfig.saveButtonText }}
+                    </button>
+                </div>
+            </div>
+        </template>
     </GlobalModal>
 </template>

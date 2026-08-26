@@ -28,7 +28,7 @@ defineProps({
     },
 })
 
-defineEmits(['close'])
+defineEmits(['close', 'select-section'])
 </script>
 
 <template>
@@ -61,6 +61,10 @@ defineEmits(['close'])
             </button>
         </div>
 
-        <ModalSectionNavigation :sections="sections" :active-section="activeSection" />
+        <ModalSectionNavigation
+            :sections="sections"
+            :active-section="activeSection"
+            @select-section="$emit('select-section', $event)"
+        />
     </header>
 </template>

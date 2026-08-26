@@ -9,11 +9,17 @@ import { validateSingleField, validateForm } from "@/Validation/schemaBuilder";
 const employeeFields = [
     "firstName",
     "lastName",
+    "birthDate",
     "positionId",
     "departmentId",
-    "employmentStatus",
     "email",
     "phone",
+    "emergencyContactName",
+    "emergencyContactRelationship",
+    "emergencyContactPhone",
+    "secondaryEmergencyContactName",
+    "secondaryEmergencyContactRelationship",
+    "secondaryEmergencyContactPhone",
     "street",
     "externalNumber",
     "internalNumber",
@@ -22,9 +28,7 @@ const employeeFields = [
     "municipality",
     "addressState",
     "mapsUrl",
-    "startDate",
     "bank",
-    "accountNumber",
     "educationLevel",
     "specialty",
     "contractType",
@@ -36,11 +40,17 @@ export function useEmployeeForm(props, emit) {
     const employee = useForm({
         firstName: "",
         lastName: "",
+        birthDate: "",
         positionId: "",
         departmentId: "",
-        employmentStatus: "Activo",
         email: "",
         phone: "",
+        emergencyContactName: "",
+        emergencyContactRelationship: "",
+        emergencyContactPhone: "",
+        secondaryEmergencyContactName: "",
+        secondaryEmergencyContactRelationship: "",
+        secondaryEmergencyContactPhone: "",
         street: "",
         externalNumber: "",
         internalNumber: "",
@@ -50,8 +60,11 @@ export function useEmployeeForm(props, emit) {
         addressState: "",
         mapsUrl: "",
         startDate: "",
-        bank: "",
+        employmentStatus: "Activo",
+        bank: "HSBC",
         accountNumber: "",
+        bankClabe: "",
+        bankCardNumber: "",
         educationLevel: "",
         specialty: "",
         contractType: "",
@@ -127,13 +140,51 @@ export function useEmployeeForm(props, emit) {
         return prefix.slice(0, 4);
     }
 
+    function formatBirthDateForRfc(value = "") {
+        const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+        if (!match) return "";
+
+        return `${match[1].slice(2)}${match[2]}${match[3]}`;
+    }
+
+    function localDateFromInput(value = "") {
+        const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+        if (!match) return null;
+
+        return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    }
+
+    const age = computed(() => {
+        const birthDate = localDateFromInput(employee.birthDate);
+
+        if (!birthDate) return "";
+
+        const today = new Date();
+        let years = today.getFullYear() - birthDate.getFullYear();
+        const birthdayAlreadyPassed =
+            today.getMonth() > birthDate.getMonth()
+            || (
+                today.getMonth() === birthDate.getMonth()
+                && today.getDate() >= birthDate.getDate()
+            );
+
+        if (!birthdayAlreadyPassed) {
+            years--;
+        }
+
+        return years >= 0 ? `${years} años` : "";
+    });
+
     function syncRfcPrefix() {
         if (props.mode === "view") return;
 
         const prefix = buildRfcNamePrefix(employee.firstName, employee.lastName);
+        const birthDateSegment = formatBirthDateForRfc(employee.birthDate);
         const currentRfc = (employee.rfc || "").toUpperCase().replace(/[^A-Z0-9Ñ&]/g, "");
-        const suffix = currentRfc.slice(4);
-        const nextRfc = `${prefix}${suffix}`.slice(0, 13);
+        const suffix = currentRfc.slice(10);
+        const nextRfc = `${prefix}${birthDateSegment}${suffix}`.slice(0, 13);
 
         if (employee.rfc !== nextRfc) {
             employee.rfc = nextRfc;
@@ -148,15 +199,21 @@ export function useEmployeeForm(props, emit) {
         employee.defaults({
             firstName: props.employeeToEdit.firstName || "",
             lastName: props.employeeToEdit.lastName || "",
+            birthDate: props.employeeToEdit.birthDate || "",
             positionId: props.employeeToEdit.positionId
                 ? String(props.employeeToEdit.positionId)
                 : "",
             departmentId: props.employeeToEdit.departmentId
                 ? String(props.employeeToEdit.departmentId)
                 : "",
-            employmentStatus: props.employeeToEdit.employmentStatus || "Activo",
             email: props.employeeToEdit.email || "",
             phone: props.employeeToEdit.phone || "",
+            emergencyContactName: props.employeeToEdit.emergencyContactName || "",
+            emergencyContactRelationship: props.employeeToEdit.emergencyContactRelationship || "",
+            emergencyContactPhone: props.employeeToEdit.emergencyContactPhone || "",
+            secondaryEmergencyContactName: props.employeeToEdit.secondaryEmergencyContactName || "",
+            secondaryEmergencyContactRelationship: props.employeeToEdit.secondaryEmergencyContactRelationship || "",
+            secondaryEmergencyContactPhone: props.employeeToEdit.secondaryEmergencyContactPhone || "",
             street: props.employeeToEdit.street || "",
             externalNumber: props.employeeToEdit.externalNumber || "",
             internalNumber: props.employeeToEdit.internalNumber || "",
@@ -166,8 +223,11 @@ export function useEmployeeForm(props, emit) {
             addressState: props.employeeToEdit.addressState || "",
             mapsUrl: props.employeeToEdit.mapsUrl || "",
             startDate: props.employeeToEdit.startDate || "",
-            bank: props.employeeToEdit.bank || "",
+            employmentStatus: props.employeeToEdit.employmentStatus || "Activo",
+            bank: props.employeeToEdit.bank || "HSBC",
             accountNumber: props.employeeToEdit.accountNumber || "",
+            bankClabe: props.employeeToEdit.bankClabe || "",
+            bankCardNumber: props.employeeToEdit.bankCardNumber || "",
             educationLevel: props.employeeToEdit.educationLevel || "",
             specialty: props.employeeToEdit.specialty || "",
             contractType: props.employeeToEdit.contractType || "",
@@ -192,7 +252,7 @@ export function useEmployeeForm(props, emit) {
                 return;
             }
 
-            if (value.length < 12) {
+            if (value.length < 13) {
                 frontendErrors.rfc =
                     "Completa el RFC con fecha y homoclave.";
                 return;
@@ -246,32 +306,9 @@ export function useEmployeeForm(props, emit) {
     );
 
     watch(
-        () => [employee.firstName, employee.lastName],
+        () => [employee.firstName, employee.lastName, employee.birthDate],
         () => {
             syncRfcPrefix();
-        },
-    );
-
-    watch(
-        () => employee.startDate,
-        (newValue) => {
-            if (!newValue) {
-                employee.seniority = "";
-                return;
-            }
-
-            const admissionDate = new Date(newValue);
-            const today = new Date();
-
-            let years = today.getFullYear() - admissionDate.getFullYear();
-            let months = today.getMonth() - admissionDate.getMonth();
-
-            if (months < 0) {
-                years--;
-                months += 12;
-            }
-
-            employee.seniority = `${years} años ${months} meses`;
         },
     );
 
@@ -338,6 +375,7 @@ export function useEmployeeForm(props, emit) {
     }
     return {
         employee,
+        age,
         frontendErrors,
         departments,
         positions,

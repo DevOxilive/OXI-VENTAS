@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\User;
 
 class Employee extends Model
 {
@@ -15,8 +14,15 @@ class Employee extends Model
     protected $fillable = [
         'first_name',
         'last_name',
+        'birth_date',
         'email',
         'phone',
+        'emergency_contact_name',
+        'emergency_contact_relationship',
+        'emergency_contact_phone',
+        'secondary_emergency_contact_name',
+        'secondary_emergency_contact_relationship',
+        'secondary_emergency_contact_phone',
         'street',
         'external_number',
         'internal_number',
@@ -31,12 +37,18 @@ class Employee extends Model
         'position_id',
         'bank',
         'account_number',
+        'bank_clabe',
+        'bank_card_number',
         'education_level',
         'specialty',
         'contract_type',
-        'seniority',
         'nss',
         'rfc',
+    ];
+
+    protected $casts = [
+        'birth_date' => 'date',
+        'start_date' => 'date',
     ];
 
     public function user()

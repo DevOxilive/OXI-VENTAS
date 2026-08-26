@@ -99,7 +99,7 @@ const props = defineProps({
     },
 })
 
-const emit = defineEmits(['save', 'close'])
+const emit = defineEmits(['save', 'close', 'select-section'])
 const isDesktop = ref(
     typeof window !== 'undefined'
         ? window.matchMedia('(min-width: 768px)').matches
@@ -168,6 +168,7 @@ onBeforeUnmount(() => {
             v-bind="layoutProps"
             @save="$emit('save')"
             @close="closeModal"
+            @select-section="$emit('select-section', $event)"
         >
             <template v-if="$slots.header" #header="slotProps">
                 <slot name="header" v-bind="slotProps" />
@@ -189,6 +190,7 @@ onBeforeUnmount(() => {
             v-bind="layoutProps"
             @save="$emit('save')"
             @close="closeModal"
+            @select-section="$emit('select-section', $event)"
         >
             <template v-if="$slots.header" #header="slotProps">
                 <slot name="header" v-bind="slotProps" />

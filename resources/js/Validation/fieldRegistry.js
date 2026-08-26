@@ -23,6 +23,12 @@ export const fieldRegistry = {
         spamMessage: "Apellido no válido.",
     },
 
+    birthDate: {
+        type: "date",
+        required: true,
+        message: "Fecha de nacimiento no válida.",
+    },
+
     position: {
         type: "letters",
         required: true,
@@ -52,6 +58,56 @@ export const fieldRegistry = {
     phone: {
         type: "numeric",
         required: true,
+        min: 10,
+        max: 10,
+        message: "Debe contener 10 dígitos.",
+    },
+
+    emergencyContactName: {
+        type: "letters",
+        required: true,
+        min: 2,
+        max: 80,
+        titleCase: true,
+        message: "Contacto de emergencia inválido.",
+    },
+
+    emergencyContactRelationship: {
+        type: "text",
+        required: true,
+        min: 2,
+        max: 40,
+        message: "Selecciona un parentesco válido.",
+    },
+
+    emergencyContactPhone: {
+        type: "numeric",
+        required: true,
+        min: 10,
+        max: 10,
+        message: "Debe contener 10 dígitos.",
+    },
+
+    secondaryEmergencyContactName: {
+        type: "letters",
+        required: false,
+        min: 2,
+        max: 80,
+        titleCase: true,
+        message: "Segundo contacto inválido.",
+    },
+
+    secondaryEmergencyContactRelationship: {
+        type: "text",
+        required: false,
+        min: 2,
+        max: 40,
+        message: "Selecciona un parentesco válido.",
+    },
+
+    secondaryEmergencyContactPhone: {
+        type: "numeric",
+        required: false,
         min: 10,
         max: 10,
         message: "Debe contener 10 dígitos.",
@@ -173,7 +229,7 @@ export const fieldRegistry = {
         required: true,
         min: 2,
         max: 50,
-        titleCase: true,
+        preserveCase: true,
         preventSpam: true,
         message: "Solo se permiten letras.",
         spamMessage: "Banco no válido.",
@@ -181,21 +237,34 @@ export const fieldRegistry = {
 
     accountNumber: {
         type: "numeric",
-        required: true,
+        required: false,
         min: 10,
         max: 18,
         message: "Cuenta bancaria inválida.",
     },
 
+    bankClabe: {
+        type: "numeric",
+        required: false,
+        min: 18,
+        max: 18,
+        message: "CLABE inválida.",
+    },
+
+    bankCardNumber: {
+        type: "numeric",
+        required: false,
+        min: 16,
+        max: 16,
+        message: "Tarjeta inválida.",
+    },
+
     educationLevel: {
-        type: "letters",
+        type: "text",
         required: true,
         min: 2,
-        max: 40,
-        titleCase: true,
-        preventSpam: true,
-        message: "Solo se permiten letras.",
-        spamMessage: "Grado académico no válido.",
+        max: 80,
+        message: "Selecciona un grado de estudios válido.",
     },
 
     specialty: {
@@ -240,7 +309,7 @@ export const fieldRegistry = {
     rfc: {
         type: "rfc",
         required: true,
-        min: 12,
+        min: 13,
         max: 13,
         uppercase: true,
         message: "RFC inválido.",

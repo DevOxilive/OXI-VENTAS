@@ -240,7 +240,7 @@ const modalConfig = computed(() =>
 );
 
 function goToStep(step) {
-  activeStep.value = step;
+  activeStep.value = Math.min(2, Math.max(1, Number(step) || 1));
 }
 
 function goToFirstInvalidStep(errors) {
@@ -637,6 +637,7 @@ function submit() {
     :sections="modalSections"
     :active-section="activeStep"
     :show-footer="false"
+    @select-section="goToStep"
     @save="submit"
     @close="$emit('close')"
   >

@@ -90,7 +90,7 @@ defineProps({
     },
 })
 
-const emit = defineEmits(['save', 'close'])
+const emit = defineEmits(['save', 'close', 'select-section'])
 
 function closeFromBackdrop(closeOnBackdrop) {
     if (!closeOnBackdrop) return
@@ -128,6 +128,7 @@ function closeFromBackdrop(closeOnBackdrop) {
                     :sections="sections"
                     :active-section="activeSection"
                     @close="$emit('close')"
+                    @select-section="$emit('select-section', $event)"
                 />
             </slot>
 
