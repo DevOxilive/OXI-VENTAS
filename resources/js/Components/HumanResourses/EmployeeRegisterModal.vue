@@ -42,6 +42,7 @@ const modalSections = [
 ]
 
 const educationLevelOptions = [
+    { value: 'No aplica', label: 'No aplica' },
     { value: 'Primaria', label: 'Primaria' },
     { value: 'Secundaria', label: 'Secundaria' },
     { value: 'Bachillerato', label: 'Bachillerato' },
@@ -367,7 +368,7 @@ watch(
                         @validate="validateField('nss')" />
 
                     <InputField label="RFC" field="rfc" v-model="employee.rfc" :readonly="isReadOnly"
-                        placeholder="Captura la homoclave; el sistema completa nombre y fecha"
+                        placeholder="Homoclave opcional; el sistema completa nombre y fecha"
                         :error="frontendErrors.rfc || employee.errors.rfc" @validate="validateField('rfc')" />
                 </div>
             </FormPanel>

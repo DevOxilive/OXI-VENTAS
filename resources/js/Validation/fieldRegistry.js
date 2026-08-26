@@ -226,7 +226,7 @@ export const fieldRegistry = {
 
     bank: {
         type: "letters",
-        required: true,
+        required: false,
         min: 2,
         max: 50,
         preserveCase: true,
@@ -269,7 +269,7 @@ export const fieldRegistry = {
 
     specialty: {
         type: "text",
-        required: true,
+        required: false,
         min: 2,
         max: 50,
         titleCase: true,
@@ -309,7 +309,7 @@ export const fieldRegistry = {
     rfc: {
         type: "rfc",
         required: true,
-        min: 13,
+        min: 10,
         max: 13,
         uppercase: true,
         message: "RFC inválido.",

@@ -404,7 +404,9 @@ class EmployeeController extends Controller
     private function rfcNamePrefix(?string $firstName, ?string $lastName): string
     {
         $firstNameParts = preg_split('/\s+/', $this->normalizeRfcText($firstName), -1, PREG_SPLIT_NO_EMPTY);
-        $lastNameParts = preg_split('/\s+/', $this->normalizeRfcText($lastName), -1, PREG_SPLIT_NO_EMPTY);
+        $lastNameParts = $this->surnameParts(
+            preg_split('/\s+/', $this->normalizeRfcText($lastName), -1, PREG_SPLIT_NO_EMPTY)
+        );
         $ignoredNames = ['JOSE', 'J', 'MARIA', 'MA', 'MA.'];
         $relevantFirstName = collect($firstNameParts)->first(fn ($name) => ! in_array($name, $ignoredNames, true)) ?: ($firstNameParts[0] ?? '');
         $paternalSurname = $lastNameParts[0] ?? '';
@@ -433,6 +435,35 @@ class EmployeeController extends Controller
         ]);
 
         return preg_replace('/[^A-ZÑ&\s]/u', ' ', $value) ?? '';
+    }
+
+    private function surnameParts(array $words): array
+    {
+        $ignoredSurnameParticles = [
+            'DA',
+            'DAS',
+            'DE',
+            'DEL',
+            'DER',
+            'DI',
+            'DIE',
+            'EL',
+            'LA',
+            'LAS',
+            'LE',
+            'LES',
+            'LOS',
+            'MAC',
+            'MC',
+            'VAN',
+            'VON',
+            'Y',
+        ];
+
+        return array_values(array_filter(
+            $words,
+            fn ($word) => ! in_array($word, $ignoredSurnameParticles, true)
+        ));
     }
 
     private function firstInternalVowel(string $word): string
@@ -507,6 +538,7 @@ class EmployeeController extends Controller
                 'required',
                 Rule::in([
                     'Primaria',
+                    'No aplica',
                     'Secundaria',
                     'Bachillerato',
                     'Carrera tecnica',
@@ -519,10 +551,10 @@ class EmployeeController extends Controller
                     'Posdoctorado',
                 ]),
             ],
-            'specialty' => ['required', 'string', 'max:50'],
+            'specialty' => ['nullable', 'string', 'max:50'],
             'contractType' => ['required', 'string', 'max:50'],
             'nss' => ['nullable', 'digits:11'],
-            'rfc' => ['required', 'string', 'size:13', 'regex:/^[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}$/'],
+            'rfc' => ['required', 'string', 'min:10', 'max:13', 'regex:/^[A-ZÑ&]{4}\d{6}([A-Z0-9]{3})?$/'],
         ]);
     }
 }

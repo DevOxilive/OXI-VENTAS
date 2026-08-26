@@ -115,6 +115,31 @@ export function useEmployeeForm(props, emit) {
         return words.find((word) => !ignoredNames.has(word)) || words[0] || "";
     }
 
+    function getSurnameParts(words = []) {
+        const ignoredSurnameParticles = new Set([
+            "DA",
+            "DAS",
+            "DE",
+            "DEL",
+            "DER",
+            "DI",
+            "DIE",
+            "EL",
+            "LA",
+            "LAS",
+            "LE",
+            "LES",
+            "LOS",
+            "MAC",
+            "MC",
+            "VAN",
+            "VON",
+            "Y",
+        ]);
+
+        return words.filter((word) => !ignoredSurnameParticles.has(word));
+    }
+
     function buildRfcNamePrefix(firstName = "", lastName = "") {
         const normalizedFirstName = normalizeRfcText(firstName);
         const normalizedLastName = normalizeRfcText(lastName);
@@ -124,7 +149,7 @@ export function useEmployeeForm(props, emit) {
         }
 
         const firstNameParts = normalizedFirstName.split(" ").filter(Boolean);
-        const lastNameParts = normalizedLastName.split(" ").filter(Boolean);
+        const lastNameParts = getSurnameParts(normalizedLastName.split(" ").filter(Boolean));
 
         const paternalSurname = lastNameParts[0] || "";
         const maternalSurname = lastNameParts[1] || "";
@@ -252,9 +277,9 @@ export function useEmployeeForm(props, emit) {
                 return;
             }
 
-            if (value.length < 13) {
+            if (value.length < 10) {
                 frontendErrors.rfc =
-                    "Completa el RFC con fecha y homoclave.";
+                    "Completa el RFC con nombre, apellidos y fecha.";
                 return;
             }
         }
