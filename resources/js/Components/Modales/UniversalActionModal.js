@@ -1,6 +1,11 @@
-import Swal from "sweetalert2";
-
 const ALERT_Z_INDEX = 2147483647;
+let swalModulePromise = null;
+
+function getSwal() {
+    swalModulePromise ??= import("sweetalert2").then((module) => module.default);
+
+    return swalModulePromise;
+}
 
 function raiseAlertContainer() {
     document.querySelectorAll(".swal2-container").forEach((container) => {
@@ -46,7 +51,7 @@ export function UniversalActionModal({
     customClass = {},
     ...options
 } = {}) {
-    return Swal.fire(withAlertDefaults({
+    return getSwal().then((Swal) => Swal.fire(withAlertDefaults({
         title,
         ...(html
             ? { html }
@@ -61,14 +66,14 @@ export function UniversalActionModal({
         focusCancel: true,
         ...options,
         customClass,
-    }));
+    })));
 }
 
 export function SuccessAlert({
     title = "Operacion realizada",
     message = "La accion se ejecuto correctamente",
 } = {}) {
-    return Swal.fire(withAlertDefaults({
+    return getSwal().then((Swal) => Swal.fire(withAlertDefaults({
         toast: true,
         position: "top-start",
         icon: "success",
@@ -77,31 +82,31 @@ export function SuccessAlert({
         showConfirmButton: false,
         timer: 2500,
         timerProgressBar: true,
-    }));
+    })));
 }
 
 export function ErrorAlert({
     title = "Ocurrio un error",
     message = "No fue posible completar la operacion",
 } = {}) {
-    return Swal.fire(withAlertDefaults({
+    return getSwal().then((Swal) => Swal.fire(withAlertDefaults({
         icon: "error",
         title,
         html: message,
         confirmButtonColor: "#ef4444",
-    }));
+    })));
 }
 
 export function WarningAlert({
     title = "Advertencia",
     message = "Revisa esta accion antes de continuar",
 } = {}) {
-    return Swal.fire(withAlertDefaults({
+    return getSwal().then((Swal) => Swal.fire(withAlertDefaults({
         icon: "warning",
         title,
         text: message,
         confirmButtonColor: "#f59e0b",
-    }));
+    })));
 }
 
 export function BlockingWarningAlert({
@@ -110,7 +115,7 @@ export function BlockingWarningAlert({
     confirmText = "OK",
     confirmButtonColor = "#e60012",
 } = {}) {
-    return Swal.fire(withAlertDefaults({
+    return getSwal().then((Swal) => Swal.fire(withAlertDefaults({
         icon: "warning",
         title,
         html: message,
@@ -120,14 +125,14 @@ export function BlockingWarningAlert({
         allowEscapeKey: false,
         allowEnterKey: true,
         showCloseButton: false,
-    }));
+    })));
 }
 
 export function ToastAlert({
     icon = "success",
     title = "Operacion realizada",
 } = {}) {
-    return Swal.fire(withAlertDefaults({
+    return getSwal().then((Swal) => Swal.fire(withAlertDefaults({
         toast: true,
         position: "top-start",
         icon,
@@ -135,5 +140,5 @@ export function ToastAlert({
         showConfirmButton: false,
         timer: 2500,
         timerProgressBar: true,
-    }));
+    })));
 }

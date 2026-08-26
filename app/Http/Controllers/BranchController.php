@@ -1,18 +1,20 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Events\BranchChanged;
 use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Models\Branch;
-use App\Models\Product;
 use App\Models\BranchProduct;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class BranchController extends Controller
@@ -23,35 +25,36 @@ class BranchController extends Controller
     {
         $user = request()->user();
 
-        if (!$user) {
+        if (! $user) {
             abort(401);
         }
 
         $user->load(['permissions']);
 
-        if (!$user->hasPermission($permission)) {
+        if (! $user->hasPermission($permission)) {
             abort(403, 'No tienes permiso');
         }
     }
 
-  private function checkAnyPermission(array $permissions): void
-{
-    $user = request()->user();
+    private function checkAnyPermission(array $permissions): void
+    {
+        $user = request()->user();
 
-    if (!$user) {
-        abort(401);
-    }
-
-    $user->load(['permissions']);
-
-    foreach ($permissions as $permission) {
-        if ($user->hasPermission($permission)) {
-            return;
+        if (! $user) {
+            abort(401);
         }
+
+        $user->load(['permissions']);
+
+        foreach ($permissions as $permission) {
+            if ($user->hasPermission($permission)) {
+                return;
+            }
+        }
+
+        abort(403, 'No tienes permiso');
     }
 
-    abort(403, 'No tienes permiso');
-}
     public function index()
     {
         $currentUser = Auth::user();
@@ -70,7 +73,7 @@ class BranchController extends Controller
 
         return Inertia::render('Systems/Branches', [
             'branches' => Branch::query()
-                ->when(!$canManageExistingBranches, fn ($query) => $query->whereRaw('1 = 0'))
+                ->when(! $canManageExistingBranches, fn ($query) => $query->whereRaw('1 = 0'))
                 ->orderBy('name')
                 ->get(),
             'capabilities' => [
@@ -186,11 +189,12 @@ class BranchController extends Controller
             'attendance_longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'attendance_geofence_radius_meters' => ['nullable', 'integer', 'min:10', 'max:1000'],
         ]);
+        $slug = $this->validateAvailableSlug($data['name']);
 
-        $branch = DB::transaction(function () use ($data) {
+        $branch = DB::transaction(function () use ($data, $slug) {
             $branch = Branch::create([
                 'name' => $data['name'],
-                'slug' => Str::slug($data['name']),
+                'slug' => $slug,
                 'color' => $data['color'] ?? null,
                 'address' => $this->formatAddress($data),
                 'street' => $data['street'] ?? null,
@@ -257,26 +261,27 @@ class BranchController extends Controller
             'attendance_longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'attendance_geofence_radius_meters' => ['nullable', 'integer', 'min:10', 'max:1000'],
         ]);
+        $slug = $this->validateAvailableSlug($data['name'], $branch);
 
-        $branch = DB::transaction(function () use ($request, $branch, $data) {
+        $branch = DB::transaction(function () use ($request, $branch, $data, $slug) {
             $branch = $this->lockCurrentVersion($request, $branch);
             $branch->update([
-            'name' => $data['name'],
-            'slug' => Str::slug($data['name']),
-            'color' => $data['color'] ?? null,
-            'address' => $this->formatAddress($data),
-            'street' => $data['street'] ?? null,
-            'external_number' => $data['external_number'] ?? null,
-            'internal_number' => $data['internal_number'] ?? null,
-            'postal_code' => $data['postal_code'] ?? null,
-            'neighborhood' => $data['neighborhood'] ?? null,
-            'municipality' => $data['municipality'] ?? null,
-            'address_state' => $data['address_state'] ?? null,
-            'maps_url' => $data['maps_url'] ?? null,
-            'attendance_latitude' => $data['attendance_latitude'] ?? null,
-            'attendance_longitude' => $data['attendance_longitude'] ?? null,
-            'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? 100,
-            'active' => $data['active'] ?? true,
+                'name' => $data['name'],
+                'slug' => $slug,
+                'color' => $data['color'] ?? null,
+                'address' => $this->formatAddress($data),
+                'street' => $data['street'] ?? null,
+                'external_number' => $data['external_number'] ?? null,
+                'internal_number' => $data['internal_number'] ?? null,
+                'postal_code' => $data['postal_code'] ?? null,
+                'neighborhood' => $data['neighborhood'] ?? null,
+                'municipality' => $data['municipality'] ?? null,
+                'address_state' => $data['address_state'] ?? null,
+                'maps_url' => $data['maps_url'] ?? null,
+                'attendance_latitude' => $data['attendance_latitude'] ?? null,
+                'attendance_longitude' => $data['attendance_longitude'] ?? null,
+                'attendance_geofence_radius_meters' => $data['attendance_geofence_radius_meters'] ?? 100,
+                'active' => $data['active'] ?? true,
             ]);
 
             return $branch;
@@ -306,6 +311,30 @@ class BranchController extends Controller
         event(RealtimeActivityLogged::message('eliminó', 'la sucursal', $branchName, 'Sistemas', 'deleted'));
 
         return back()->with('success', 'Sucursal eliminada correctamente');
+    }
+
+    private function validateAvailableSlug(string $name, ?Branch $currentBranch = null): string
+    {
+        $slug = Str::slug($name);
+
+        if ($slug === '') {
+            throw ValidationException::withMessages([
+                'name' => 'Escribe un nombre valido para la sucursal.',
+            ]);
+        }
+
+        $exists = Branch::withTrashed()
+            ->where('slug', $slug)
+            ->when($currentBranch, fn ($query) => $query->whereKeyNot($currentBranch->id))
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'name' => 'Ya existe una sucursal registrada o eliminada con ese nombre. Cambia el nombre o recupera la sucursal eliminada.',
+            ]);
+        }
+
+        return $slug;
     }
 
     private function formatAddress(array $data): ?string

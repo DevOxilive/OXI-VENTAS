@@ -1,4 +1,4 @@
-const VERSION = 'oxi-ventas-pwa-v10';
+const VERSION = 'oxi-ventas-pwa-v11';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -10,8 +10,9 @@ const PRECACHE_URLS = [
     '/pwa/manifest.webmanifest',
 ];
 
-const CACHEABLE_DESTINATIONS = new Set(['font', 'image', 'manifest']);
+const CACHEABLE_DESTINATIONS = new Set(['font', 'image', 'manifest', 'script', 'style']);
 const CACHEABLE_PATHS = [
+    /^\/build\/assets\/.+\.(?:css|js|mjs|woff2?)$/,
     /^\/icons\/(?:icon-192|icon-512|maskable-192|maskable-512|apple-touch-icon)\.png$/,
     /^\/pwa\/manifest\.webmanifest$/,
 ];
@@ -62,10 +63,6 @@ self.addEventListener('fetch', (event) => {
     }
 
     if (url.origin !== self.location.origin) {
-        return;
-    }
-
-    if (url.pathname.startsWith('/build/')) {
         return;
     }
 

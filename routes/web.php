@@ -31,6 +31,7 @@ use App\Http\Controllers\Ventas\EmployeeCreditAccountController;
 use App\Http\Controllers\Ventas\SalesController;
 use App\Http\Controllers\Ventas\SalesReportController;
 use App\Models\Branch;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -86,12 +87,16 @@ Route::get('/pwa/manifest.webmanifest', function () {
 
     return response()->json($manifest, 200, [
         'Content-Type' => 'application/manifest+json',
-        'Cache-Control' => 'public, max-age=86400, stale-while-revalidate=604800',
+        'Cache-Control' => 'public, max-age=604800, stale-while-revalidate=2592000',
     ]);
 })->name('pwa.manifest');
 
 Route::get('/', function () {
-    return redirect('/login');
+    if (Auth::check()) {
+        return redirect()->route('dashboard');
+    }
+
+    return Inertia::render('Auth/Login');
 });
 
 Route::get('/register', function () {

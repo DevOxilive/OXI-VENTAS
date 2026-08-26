@@ -37,8 +37,6 @@ class ResolvePasskeyOrigin
 
         return $request->isSecure()
             || $host === 'trycloudflare.com'
-            || str_ends_with($host, '.trycloudflare.com')
-            || $host === 'onrender.com'
-            || str_ends_with($host, '.onrender.com');
+            || str_ends_with($host, '.trycloudflare.com');
     }
 }
