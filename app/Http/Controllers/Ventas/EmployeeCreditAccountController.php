@@ -41,7 +41,15 @@ class EmployeeCreditAccountController extends Controller
                         ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", [$like]);
                 });
             })
-            ->havingRaw('(balance - COALESCE(credit_balance, 0)) > 0')
+            ->whereRaw(
+                "((
+                    SELECT COALESCE(SUM(employee_credit_charges.outstanding_amount), 0)
+                    FROM employee_credit_charges
+                    WHERE employee_credit_charges.employee_credit_account_id = employee_credit_accounts.id
+                    AND employee_credit_charges.status = ?
+                ) - COALESCE(employee_credit_accounts.credit_balance, 0)) > 0",
+                ['open']
+            )
             ->orderByDesc('balance')
             ->paginate($perPage)
             ->withQueryString()
