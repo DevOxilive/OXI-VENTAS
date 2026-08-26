@@ -11,6 +11,7 @@ use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductBatch;
+use App\Models\ProductDepartment;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
 use Illuminate\Http\JsonResponse;
@@ -96,9 +97,18 @@ class BranchInventoryController extends Controller
                     ], $phrase, $terms);
                 });
             })
-            ->when($request->filled('category'), function ($query) use ($request) {
-                $query->whereHas('product', function ($query) use ($request) {
-                    $query->where('category_id', $request->category);
+            ->when($this->selectedIntegerIds($request->input('category')) !== [], function ($query) use ($request) {
+                $categoryIds = $this->selectedIntegerIds($request->input('category'));
+
+                $query->whereHas('product', function ($query) use ($categoryIds) {
+                    $query->whereIn('category_id', $categoryIds);
+                });
+            })
+            ->when($this->selectedIntegerIds($request->input('product_department')) !== [], function ($query) use ($request) {
+                $productDepartmentIds = $this->selectedIntegerIds($request->input('product_department'));
+
+                $query->whereHas('product.category', function ($query) use ($productDepartmentIds) {
+                    $query->whereIn('product_department_id', $productDepartmentIds);
                 });
             })
             ->when($request->filled('status'), function ($query) use ($request) {
@@ -356,10 +366,12 @@ class BranchInventoryController extends Controller
                 ->get(),
 
             'categoriesDB' => $this->categoryOptions($branch),
+            'productDepartmentsDB' => $this->productDepartmentOptions($branch),
 
             'filters' => [
                 'search' => $request->search,
-                'category' => $request->category,
+                'product_department' => $this->selectedIntegerIds($request->input('product_department')),
+                'category' => $this->selectedIntegerIds($request->input('category')),
                 'status' => $request->status,
                 'stock' => $request->stock,
                 'expiration_status' => $request->expiration_status,
@@ -379,6 +391,31 @@ class BranchInventoryController extends Controller
             ->distinct()
             ->orderBy('categories.name')
             ->get();
+    }
+
+    private function productDepartmentOptions(?Branch $branch)
+    {
+        return ProductDepartment::query()
+            ->select(['product_departments.id', 'product_departments.name', 'product_departments.icon'])
+            ->join('categories', 'categories.product_department_id', '=', 'product_departments.id')
+            ->join('products', 'products.category_id', '=', 'categories.id')
+            ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
+            ->where('product_departments.active', true)
+            ->when($branch, fn ($query) => $query->where('branch_products.branch_id', $branch->id))
+            ->distinct()
+            ->orderBy('product_departments.name')
+            ->get();
+    }
+
+    private function selectedIntegerIds($value): array
+    {
+        return collect(is_array($value) ? $value : (filled($value) ? [$value] : []))
+            ->filter(fn ($id) => filled($id))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function details(Request $request, BranchProduct $branchProduct): JsonResponse

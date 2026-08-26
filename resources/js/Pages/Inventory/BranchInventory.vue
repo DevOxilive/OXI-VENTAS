@@ -43,6 +43,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    productDepartmentsDB: {
+        type: Array,
+        default: () => [],
+    },
     inventoryStats: {
         type: Object,
         default: () => ({
@@ -59,6 +63,7 @@ const props = defineProps({
         type: Object,
         default: () => ({
             search: '',
+            product_department: [],
             category: '',
             stock: '',
             status: '',
@@ -86,6 +91,7 @@ const { can } = usePermissions()
 
 const {
     categories,
+    productDepartments,
     currentBranch,
 
     showEntryModal,
@@ -102,6 +108,7 @@ const {
     adjustBatch,
 
     search,
+    productDepartmentFilter,
     categoryFilter,
     stockFilter,
     statusFilter,
@@ -149,10 +156,24 @@ const {
     saveEditedBatch,
 } = useBranchInventory(props)
 
+const toolbarCategories = computed(() => {
+    if (!productDepartmentFilter.value.length) {
+        return categories.value
+    }
+
+    const selectedDepartmentIds = productDepartmentFilter.value.map(String)
+
+    return categories.value.filter((category) => {
+        return selectedDepartmentIds.includes(String(category.product_department_id))
+    })
+})
+
 const inventoryToolbarConfig = computed(() =>
     getInventoryToolbarConfig({
         branch: currentBranch.value,
-        categories: categories.value,
+        productDepartments: productDepartments.value,
+        productDepartmentFilter: productDepartmentFilter.value,
+        categories: toolbarCategories.value,
         categoryFilter: categoryFilter.value,
         stockFilter: stockFilter.value,
         statusFilter: statusFilter.value,
@@ -162,6 +183,18 @@ const inventoryToolbarConfig = computed(() =>
 )
 
 function handleInventoryToolbarFilter({ key, value }) {
+    if (key === 'productDepartmentFilter') {
+        productDepartmentFilter.value = value
+
+        if (value.length) {
+            categoryFilter.value = categoryFilter.value.filter((categoryId) => {
+                const category = categories.value.find((item) => String(item.id) === String(categoryId))
+
+                return category && value.map(String).includes(String(category.product_department_id))
+            })
+        }
+    }
+
     if (key === 'categoryFilter') categoryFilter.value = value
     if (key === 'stockFilter') stockFilter.value = value
     if (key === 'statusFilter') statusFilter.value = value

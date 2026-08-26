@@ -61,6 +61,12 @@ function cloneArray(items) {
     return Array.isArray(items) ? items.map((item) => ({ ...item })) : [];
 }
 
+function normalizeFilterIds(value) {
+    return (Array.isArray(value) ? value : value ? [value] : [])
+        .map((item) => String(item))
+        .filter(Boolean);
+}
+
 function cloneInventoryAlerts(alerts) {
     return {
         ...(alerts ?? {}),
@@ -98,7 +104,10 @@ export function useBranchInventory(props) {
     const selectedAlertType = ref(null);
 
     const search = ref(props.filters?.search ?? "");
-    const categoryFilter = ref(props.filters?.category ?? "");
+    const productDepartmentFilter = ref(
+        normalizeFilterIds(props.filters?.product_department),
+    );
+    const categoryFilter = ref(normalizeFilterIds(props.filters?.category));
     const stockFilter = ref(props.filters?.stock ?? "");
     const statusFilter = ref(props.filters?.status ?? "");
     const expirationStatusFilter = ref(props.filters?.expiration_status ?? "");
@@ -116,6 +125,7 @@ export function useBranchInventory(props) {
 
     const products = computed(() => props.productsDB ?? []);
     const branches = computed(() => props.branchesDB ?? []);
+    const productDepartments = computed(() => props.productDepartmentsDB ?? []);
     const categories = computed(() => props.categoriesDB ?? []);
     const currentBranch = computed(() => props.currentBranch ?? null);
     const inventoryAlerts = computed(() => inventoryAlertsState.value ?? {});
@@ -401,7 +411,12 @@ export function useBranchInventory(props) {
             window.location.pathname,
             {
                 search: search.value || undefined,
-                category: categoryFilter.value || undefined,
+                product_department: productDepartmentFilter.value.length
+                    ? productDepartmentFilter.value
+                    : undefined,
+                category: categoryFilter.value.length
+                    ? categoryFilter.value
+                    : undefined,
                 stock: stockFilter.value || undefined,
                 status: statusFilter.value || undefined,
                 expiration_status: expirationStatusFilter.value || undefined,
@@ -698,6 +713,7 @@ export function useBranchInventory(props) {
     });
 
     watch(recordsToShow, reloadInventory);
+    watch(productDepartmentFilter, reloadInventory);
     watch(categoryFilter, reloadInventory);
     watch(stockFilter, reloadInventory);
     watch(statusFilter, reloadInventory);
@@ -770,6 +786,7 @@ export function useBranchInventory(props) {
     return {
         products,
         branches,
+        productDepartments,
         categories,
         currentBranch,
         inventoryStats: computed(() => inventoryStatsState.value),
@@ -789,6 +806,7 @@ export function useBranchInventory(props) {
         liveSelectedConfigProduct,
 
         search,
+        productDepartmentFilter,
         categoryFilter,
         stockFilter,
         statusFilter,

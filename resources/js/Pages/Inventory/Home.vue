@@ -33,6 +33,12 @@ function sortProducts(items) {
   })
 }
 
+function normalizeFilterIds(value) {
+  return (Array.isArray(value) ? value : value ? [value] : [])
+    .map((item) => String(item))
+    .filter(Boolean)
+}
+
 const { can } = usePermissions()
 
 const props = defineProps({
@@ -81,8 +87,8 @@ watch(
 )
 
 const search = ref(props.filters.search ?? '')
-const productDepartmentFilter = ref(props.filters.product_department_id ?? '')
-const categoryFilter = ref(props.filters.category_id ?? '')
+const productDepartmentFilter = ref(normalizeFilterIds(props.filters.product_department_id))
+const categoryFilter = ref(normalizeFilterIds(props.filters.category_id))
 const recordsToShow = ref(Number(props.filters.per_page ?? 25))
 const { handlePageChange } = useGlobalTablePagination({
   only: ['productsDB', 'filters', 'categoriesDB', 'productDepartmentsDB'],
@@ -92,12 +98,14 @@ const products = computed(() => productsState.value?.data ?? [])
 const currentPage = computed(() => productsState.value?.current_page ?? 1)
 const totalProducts = computed(() => productsState.value?.total ?? products.value.length)
 const toolbarCategories = computed(() => {
-  if (!productDepartmentFilter.value) {
+  if (!productDepartmentFilter.value.length) {
     return categoriesDB.value
   }
 
+  const selectedDepartmentIds = productDepartmentFilter.value.map(String)
+
   return categoriesDB.value.filter((category) => {
-    return Number(category.product_department_id) === Number(productDepartmentFilter.value)
+    return selectedDepartmentIds.includes(String(category.product_department_id))
   })
 })
 
@@ -115,7 +123,14 @@ const productToolbarConfig = computed(() =>
 function handleProductToolbarFilter({ key, value }) {
   if (key === 'productDepartmentFilter') {
     productDepartmentFilter.value = value
-    categoryFilter.value = ''
+
+    if (value.length) {
+      categoryFilter.value = categoryFilter.value.filter((categoryId) => {
+        const category = categoriesDB.value.find((item) => String(item.id) === String(categoryId))
+
+        return category && value.map(String).includes(String(category.product_department_id))
+      })
+    }
   }
 
   if (key === 'categoryFilter') {
@@ -154,8 +169,8 @@ function reloadProducts(pageOrUrl = 1) {
     ? {}
     : {
       search: search.value,
-      product_department_id: productDepartmentFilter.value || undefined,
-      category_id: categoryFilter.value || undefined,
+      product_department_id: productDepartmentFilter.value.length ? productDepartmentFilter.value : undefined,
+      category_id: categoryFilter.value.length ? categoryFilter.value : undefined,
       per_page: recordsToShow.value,
       page: pageOrUrl,
     }

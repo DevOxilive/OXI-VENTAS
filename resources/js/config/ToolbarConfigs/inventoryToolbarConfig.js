@@ -1,8 +1,16 @@
 // resources/js/Config/Toolbars/inventoryToolbarConfig.js
 
+function normalizeMultiValue(value) {
+    return (Array.isArray(value) ? value : value ? [value] : [])
+        .map((item) => String(item))
+        .filter(Boolean);
+}
+
 export function getInventoryToolbarConfig({
     branch,
-    categories,
+    productDepartments = [],
+    productDepartmentFilter,
+    categories = [],
     categoryFilter,
     stockFilter,
     statusFilter,
@@ -18,10 +26,21 @@ export function getInventoryToolbarConfig({
         showRecordsPerPage: true,
         filters: [
             {
+                key: "productDepartmentFilter",
+                label: "Departamento",
+                placeholder: "Todos los departamentos",
+                type: "multiselect",
+                value: normalizeMultiValue(productDepartmentFilter),
+                options: productDepartments,
+                optionLabel: "name",
+                optionValue: "id",
+            },
+            {
                 key: "categoryFilter",
-                label: "Categoría",
-                placeholder: "Categoría",
-                value: categoryFilter,
+                label: "Categorías",
+                placeholder: "Todas las categorías",
+                type: "multiselect",
+                value: normalizeMultiValue(categoryFilter),
                 options: categories,
                 optionLabel: "name",
                 optionValue: "id",

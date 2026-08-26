@@ -70,12 +70,6 @@ class ProductController extends Controller
             ? $this->calculateMarginPercentage($costPerBox, $data['sale_price_per_box'])
             : null;
 
-        if ($hasBoxPresentation && $pieceMargin !== null && $boxMargin !== null && abs($pieceMargin - $boxMargin) > 0.01) {
-            throw ValidationException::withMessages([
-                'sale_price_per_box' => 'El porcentaje de ganancia de caja debe coincidir con el de pieza.',
-            ]);
-        }
-
         $margins = array_filter([$pieceMargin, $boxMargin], fn ($margin) => $margin !== null);
 
         if ($margins !== [] && min($margins) < 10 && !($canManagePricing && ($data['allow_low_margin'] ?? false))) {
@@ -134,15 +128,18 @@ class ProductController extends Controller
             ->where('status', BranchProduct::STATUS_ACTIVE)
             ->orderByDesc('id');
 
-        if ($request->filled('category_id')) {
-            $query->whereHas('product', function ($productQuery) use ($request) {
-                $productQuery->where('category_id', $request->category_id);
+        $categoryIds = $this->selectedIntegerIds($request->input('category_id'));
+        $productDepartmentIds = $this->selectedIntegerIds($request->input('product_department_id'));
+
+        if ($categoryIds !== []) {
+            $query->whereHas('product', function ($productQuery) use ($categoryIds) {
+                $productQuery->whereIn('category_id', $categoryIds);
             });
         }
 
-        if ($request->filled('product_department_id')) {
-            $query->whereHas('product.category', function ($categoryQuery) use ($request) {
-                $categoryQuery->where('product_department_id', $request->product_department_id);
+        if ($productDepartmentIds !== []) {
+            $query->whereHas('product.category', function ($categoryQuery) use ($productDepartmentIds) {
+                $categoryQuery->whereIn('product_department_id', $productDepartmentIds);
             });
         }
 
@@ -208,8 +205,8 @@ class ProductController extends Controller
                 ->get(),
             'filters' => [
                 'search' => $request->search,
-                'product_department_id' => $request->product_department_id,
-                'category_id' => $request->category_id,
+                'product_department_id' => $productDepartmentIds,
+                'category_id' => $categoryIds,
                 'per_page' => $perPage,
             ],
             'canManagePricing' => $this->canManagePricing($request),
@@ -288,11 +285,11 @@ class ProductController extends Controller
             'category_name' => ['nullable', 'required_without:category_id', 'string', 'max:255'],
             'cost_per_piece' => ['required', 'numeric', 'min:0'],
             'sale_price_per_piece' => $canManagePricing
-                ? ['required', 'numeric', 'min:0', 'gte:cost_per_piece']
+                ? ['required', 'numeric', 'min:0']
                 : ['nullable', 'numeric', 'min:0'],
             'cost_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0'],
             'sale_price_per_box' => $canManagePricing
-                ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0', 'gte:cost_per_box']
+                ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0']
                 : ['nullable', 'numeric', 'min:0'],
             'allow_low_margin' => ['nullable', 'boolean'],
             'entry_date' => ['required', 'date'],
@@ -409,11 +406,11 @@ class ProductController extends Controller
             'category_name' => ['nullable', 'required_without:category_id', 'string', 'max:255'],
             'cost_per_piece' => ['required', 'numeric', 'min:0'],
             'sale_price_per_piece' => $canManagePricing
-                ? ['required', 'numeric', 'min:0', 'gte:cost_per_piece']
+                ? ['required', 'numeric', 'min:0']
                 : ['nullable', 'numeric', 'min:0'],
             'cost_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0'],
             'sale_price_per_box' => $canManagePricing
-                ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0', 'gte:cost_per_box']
+                ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0']
                 : ['nullable', 'numeric', 'min:0'],
             'allow_low_margin' => ['nullable', 'boolean'],
             'entry_date' => ['required', 'date'],
@@ -821,6 +818,17 @@ class ProductController extends Controller
                 'department_name' => $category->productDepartment?->name,
             ])
             ->values();
+    }
+
+    private function selectedIntegerIds($value): array
+    {
+        return collect(is_array($value) ? $value : (filled($value) ? [$value] : []))
+            ->filter(fn ($id) => filled($id))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function resolveCategoryId(array $data): int

@@ -1,10 +1,16 @@
 // resources/js/config/TableConfigs/productToolbarConfig.js
 
+function normalizeMultiValue(value) {
+    return (Array.isArray(value) ? value : value ? [value] : [])
+        .map((item) => String(item))
+        .filter(Boolean);
+}
+
 export function getProductToolbarConfig({
     branch,
-    productDepartments,
+    productDepartments = [],
     productDepartmentFilter,
-    categories,
+    categories = [],
     categoryFilter,
     canCreate,
 }) {
@@ -24,20 +30,20 @@ export function getProductToolbarConfig({
         filters: [
             {
                 key: "productDepartmentFilter",
-                label: "Departamento",
-                placeholder: "Departamento",
-                value: productDepartmentFilter,
-                emptyValue: "",
+                label: "Departamentos",
+                placeholder: "Todos los departamentos",
+                type: "multiselect",
+                value: normalizeMultiValue(productDepartmentFilter),
                 options: productDepartments,
                 optionLabel: "name",
                 optionValue: "id",
             },
             {
                 key: "categoryFilter",
-                label: "Categoria",
-                placeholder: "Categoria",
-                value: categoryFilter,
-                emptyValue: "",
+                label: "Categorias",
+                placeholder: "Todas las categorias",
+                type: "multiselect",
+                value: normalizeMultiValue(categoryFilter),
                 options: categories,
                 optionLabel: "name",
                 optionValue: "id",

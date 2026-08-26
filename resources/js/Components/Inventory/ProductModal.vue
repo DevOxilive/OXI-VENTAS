@@ -72,6 +72,7 @@ const syncingPricing = ref(false);
 const fileInput = ref(null);
 const isDragActive = ref(false);
 const filePreviewUrl = ref(null);
+const pendingFormSnapshot = ref(null);
 
 function parseDecimal(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -165,9 +166,78 @@ function handleBoxSalePriceChange(value) {
   form.sale_price_per_box = value;
 }
 
+function hasServerErrors() {
+  return Object.keys(form.errors || {}).length > 0;
+}
+
+function captureFormSnapshot() {
+  return {
+    barcodes: [...form.barcodes],
+    branch_ids: [...form.branch_ids],
+    inventory_unit: form.inventory_unit,
+    has_box_presentation: form.has_box_presentation,
+    pieces_per_box: form.pieces_per_box,
+    name: form.name,
+    min_stock: form.min_stock,
+    product_department_id: form.product_department_id,
+    category_id: form.category_id,
+    category_name: form.category_name,
+    cost_per_piece: form.cost_per_piece,
+    sale_price_per_piece: form.sale_price_per_piece,
+    cost_per_box: form.cost_per_box,
+    sale_price_per_box: form.sale_price_per_box,
+    allow_low_margin: form.allow_low_margin,
+    entry_date: form.entry_date,
+    active: form.active,
+    image: form.image,
+    quantity: form.quantity,
+    kilos: form.kilos,
+    grams: form.grams,
+    liters: form.liters,
+    record_version: form.record_version,
+    marginPercentage: marginPercentage.value,
+    pricingDriver: pricingDriver.value,
+    activeStep: activeStep.value,
+  };
+}
+
+function restoreFormSnapshot(snapshot) {
+  if (!snapshot) return;
+
+  form.barcodes = [...snapshot.barcodes];
+  form.branch_ids = [...snapshot.branch_ids];
+  form.inventory_unit = snapshot.inventory_unit;
+  form.has_box_presentation = snapshot.has_box_presentation;
+  form.pieces_per_box = snapshot.pieces_per_box;
+  form.name = snapshot.name;
+  form.min_stock = snapshot.min_stock;
+  form.product_department_id = snapshot.product_department_id;
+  form.category_id = snapshot.category_id;
+  form.category_name = snapshot.category_name;
+  form.cost_per_piece = snapshot.cost_per_piece;
+  form.sale_price_per_piece = snapshot.sale_price_per_piece;
+  form.cost_per_box = snapshot.cost_per_box;
+  form.sale_price_per_box = snapshot.sale_price_per_box;
+  form.allow_low_margin = snapshot.allow_low_margin;
+  form.entry_date = snapshot.entry_date;
+  form.active = snapshot.active;
+  form.image = snapshot.image;
+  form.quantity = snapshot.quantity;
+  form.kilos = snapshot.kilos;
+  form.grams = snapshot.grams;
+  form.liters = snapshot.liters;
+  form.record_version = snapshot.record_version;
+
+  marginPercentage.value = snapshot.marginPercentage;
+  pricingDriver.value = snapshot.pricingDriver;
+  activeStep.value = snapshot.activeStep;
+}
+
 watch(
   () => props.product,
   (product) => {
+    if (props.mode === "create" || form.processing || hasServerErrors()) return;
+
     form.reset();
     activeStep.value = 1;
 
@@ -321,15 +391,6 @@ function handleDrop(event) {
   assignImageFile(file);
 }
 
-const invalidPrice = computed(() => {
-  const pieceCost = Number(form.cost_per_piece || 0);
-  const piecePrice = Number(form.sale_price_per_piece || 0);
-  const boxCost = Number(form.cost_per_box || 0);
-  const boxPrice = Number(form.sale_price_per_box || 0);
-
-  return (piecePrice > 0 && pieceCost > 0 && piecePrice < pieceCost)
-    || (hasBoxPresentation.value && boxPrice > 0 && boxCost > 0 && boxPrice < boxCost);
-});
 function addBarcode() {
   form.barcodes.push("");
 }
@@ -509,15 +570,6 @@ function submit() {
     return;
   }
 
-  if (invalidPrice.value) {
-    ErrorAlert({
-      title: "Precio inválido",
-      message: "El precio de venta no puede ser menor al precio inicial.",
-    });
-
-    return;
-  }
-
   if (marginBelowMinimum.value && !form.allow_low_margin) {
     ErrorAlert({
       title: "Porcentaje de ganancia menor al permitido",
@@ -527,7 +579,8 @@ function submit() {
     return;
   }
   ensureCurrentBranchSelected();
-  form.category_name = "";
+  pendingFormSnapshot.value = captureFormSnapshot();
+
   if (props.mode === "create") {
     form.post(
       route("inventory.branches.products.store", {
@@ -535,8 +588,11 @@ function submit() {
       }),
       {
         forceFormData: true,
+        preserveState: true,
         preserveScroll: true,
         onSuccess: () => {
+          pendingFormSnapshot.value = null;
+
           ToastAlert({
             title: "Producto creado correctamente",
           });
@@ -544,6 +600,8 @@ function submit() {
           emit("close");
         },
         onError: (errors) => {
+          restoreFormSnapshot(pendingFormSnapshot.value);
+          pendingFormSnapshot.value = null;
           goToFirstInvalidStep(errors);
 
           const barcodeError = form.errors["barcodes.0"];
@@ -581,8 +639,11 @@ function submit() {
         }),
         {
           forceFormData: true,
+          preserveState: true,
           preserveScroll: true,
           onSuccess: () => {
+            pendingFormSnapshot.value = null;
+
             ToastAlert({
               title: "Producto actualizado correctamente",
             });
@@ -590,6 +651,8 @@ function submit() {
             emit("close");
           },
           onError: (errors) => {
+            restoreFormSnapshot(pendingFormSnapshot.value);
+            pendingFormSnapshot.value = null;
             goToFirstInvalidStep(errors);
 
             const barcodeError =
@@ -905,11 +968,7 @@ function submit() {
                 :model-value="form.sale_price_per_piece"
                 @update:modelValue="handleSalePriceChange"
                 prefix="$"
-                :error="
-                  invalidPrice
-                    ? 'El precio de venta no puede ser menor al precio de compra'
-                    : form.errors.sale_price_per_piece
-                "
+                :error="form.errors.sale_price_per_piece"
                 type="text"
                 step="0.01"
                 :readonly="mode === 'view'"
@@ -923,7 +982,7 @@ function submit() {
                   :model-value="form.sale_price_per_box"
                   @update:modelValue="handleBoxSalePriceChange"
                   prefix="$"
-                  :error="invalidPrice ? 'El precio de venta no puede ser menor al precio de compra' : form.errors.sale_price_per_box"
+                  :error="form.errors.sale_price_per_box"
                   type="text"
                   step="0.01"
                   :readonly="mode === 'view'"
