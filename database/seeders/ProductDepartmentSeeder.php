@@ -11,8 +11,8 @@ class ProductDepartmentSeeder extends Seeder
         [
             'name' => 'Alimentos',
             'icon' => '🍞',
-            'description' => 'Abarrotes, enlatados, cereales, pastas, harinas, botanas, aceites, condimentos, semillas y productos basicos.',
-            'categories' => ['Abarrotes', 'Enlatados', 'Cereales', 'Pastas', 'Harinas', 'Botanas', 'Aceites', 'Condimentos', 'Semillas', 'Productos basicos'],
+            'description' => 'Abarrotes, enlatados, cereales, pastas, harinas, botanas, dulceria, aceites, condimentos, semillas y productos basicos.',
+            'categories' => ['Abarrotes', 'Enlatados', 'Cereales', 'Pastas', 'Harinas', 'Botanas', 'Dulceria', 'Aceites', 'Condimentos', 'Semillas', 'Productos basicos'],
         ],
         [
             'name' => 'Lacteos y Frescos',
