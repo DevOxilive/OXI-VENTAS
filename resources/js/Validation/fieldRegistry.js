@@ -65,7 +65,7 @@ export const fieldRegistry = {
 
     emergencyContactName: {
         type: "letters",
-        required: true,
+        required: false,
         min: 2,
         max: 80,
         titleCase: true,
@@ -74,7 +74,7 @@ export const fieldRegistry = {
 
     emergencyContactRelationship: {
         type: "text",
-        required: true,
+        required: false,
         min: 2,
         max: 40,
         message: "Selecciona un parentesco válido.",
@@ -82,7 +82,7 @@ export const fieldRegistry = {
 
     emergencyContactPhone: {
         type: "numeric",
-        required: true,
+        required: false,
         min: 10,
         max: 10,
         message: "Debe contener 10 dígitos.",
