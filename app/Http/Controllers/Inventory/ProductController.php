@@ -7,6 +7,7 @@ use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Http\Controllers\Controller;
+use App\Models\Barcode;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
@@ -272,7 +273,7 @@ class ProductController extends Controller
 
         $data = $request->validate([
             'barcodes' => ['nullable', 'array'],
-            'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct', 'unique:barcodes,code'],
+            'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct'],
             'inventory_unit' => ['required', Rule::in(['pza', 'kg'])],
             'has_box_presentation' => ['nullable', 'boolean'],
             'pieces_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
@@ -313,6 +314,7 @@ class ProductController extends Controller
         $barcodes = collect($data['barcodes'] ?? [])
             ->filter(fn ($code) => filled($code))
             ->values();
+        $reusableDeletedProduct = $this->resolveReusableDeletedProduct($barcodes);
 
         $requestedBranchIds = collect($data['branch_ids'] ?? [])
             ->push($branch->id)
@@ -327,61 +329,68 @@ class ProductController extends Controller
             $imagePath = $request->file('image')->store('products', self::PRODUCT_IMAGE_PRIVATE_DISK);
         }
 
-        try {
-            [$product, $branchIds] = DB::transaction(function () use ($data, $imagePath, $barcodes, $requestedBranchIds) {
-                $product = Product::create([
-                'name' => $data['name'],
-                'description' => null,
-                'image' => $imagePath,
-                'cost' => $data['cost'],
-                'sale_price' => $data['sale_price'],
-                'margin_percentage' => $data['margin_percentage'],
-                'unit' => $data['inventory_unit'],
-                'inventory_unit' => $data['inventory_unit'],
-                'has_box_presentation' => (bool) $data['has_box_presentation'],
-                'inventory_quantity_mode' => 'base',
-                'pieces_per_box' => $data['has_box_presentation'] ? $data['pieces_per_box'] : null,
-                'cost_per_piece' => $data['cost_per_piece'],
-                'sale_price_per_piece' => $data['sale_price_per_piece'],
-                'cost_per_box' => $data['has_box_presentation'] ? $data['cost_per_box'] : null,
-                'sale_price_per_box' => $data['has_box_presentation'] ? $data['sale_price_per_box'] : null,
-                'category_id' => $data['category_id'],
-                'active' => $data['active'] ?? true,
-            ]);
+        $previousImagePath = $reusableDeletedProduct?->image;
 
-                foreach ($barcodes as $index => $code) {
-                    DB::table('barcodes')->insert([
-                    'product_id' => $product->id,
-                    'code' => $code,
-                    'type' => $index === 0 ? 'PRINCIPAL' : 'ALTERNO',
-                    'base_quantity' => 1,
-                    'active' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+        try {
+            [$product, $branchIds, $activityAction] = DB::transaction(function () use ($data, $imagePath, $barcodes, $requestedBranchIds, $reusableDeletedProduct) {
+                $product = $reusableDeletedProduct
+                    ? Product::withTrashed()->lockForUpdate()->findOrFail($reusableDeletedProduct->id)
+                    : new Product();
+                $activityAction = $product->exists ? 'restored' : 'created';
+
+                if ($product->trashed()) {
+                    $product->restore();
                 }
+
+                $product->fill([
+                    'name' => $data['name'],
+                    'description' => null,
+                    'image' => $imagePath ?? ($product->exists ? $product->image : null),
+                    'cost' => $data['cost'],
+                    'sale_price' => $data['sale_price'],
+                    'margin_percentage' => $data['margin_percentage'],
+                    'unit' => $data['inventory_unit'],
+                    'inventory_unit' => $data['inventory_unit'],
+                    'has_box_presentation' => (bool) $data['has_box_presentation'],
+                    'inventory_quantity_mode' => 'base',
+                    'pieces_per_box' => $data['has_box_presentation'] ? $data['pieces_per_box'] : null,
+                    'cost_per_piece' => $data['cost_per_piece'],
+                    'sale_price_per_piece' => $data['sale_price_per_piece'],
+                    'cost_per_box' => $data['has_box_presentation'] ? $data['cost_per_box'] : null,
+                    'sale_price_per_box' => $data['has_box_presentation'] ? $data['sale_price_per_box'] : null,
+                    'category_id' => $data['category_id'],
+                    'active' => $data['active'] ?? true,
+                ]);
+                $product->save();
+
+                $this->syncProductBarcodes($product, $barcodes);
 
                 foreach ($requestedBranchIds as $branchId) {
-                    BranchProduct::create([
-                    'branch_id' => $branchId,
-                    'product_id' => $product->id,
-                    'min_stock' => $data['min_stock'] ?? 0,
-                    'status' => BranchProduct::STATUS_ACTIVE,
-                    'tracks_batches' => false,
-                    'tracks_expiration' => false,
-                    'entry_date' => $data['entry_date'],
-                ]);
+                    $this->activateProductForBranch($product, $branchId, [
+                        ...$data,
+                        'stock' => $data['stock'] ?? 0,
+                    ]);
                 }
 
-                return [$product, $requestedBranchIds->all()];
+                return [$product, $requestedBranchIds->all(), $activityAction];
             });
         } catch (Throwable $exception) {
             $this->deleteProductImage($imagePath);
             throw $exception;
         }
 
-        broadcast(new ProductChanged('created', $product->id, $branchIds))->toOthers();
-        event(RealtimeActivityLogged::message('creó', 'el producto', $product->name, 'Inventario', 'created'));
+        if ($imagePath && $previousImagePath && $imagePath !== $previousImagePath) {
+            $this->deleteProductImage($previousImagePath);
+        }
+
+        broadcast(new ProductChanged($activityAction, $product->id, $branchIds))->toOthers();
+        event(RealtimeActivityLogged::message(
+            $activityAction === 'restored' ? 'reactivó' : 'creó',
+            'el producto',
+            $product->name,
+            'Inventario',
+            $activityAction,
+        ));
 
         return back()->with('success', 'Producto creado correctamente');
     }
@@ -434,17 +443,7 @@ class ProductController extends Controller
         $barcodes = collect($data['barcodes'] ?? [])
             ->filter(fn ($code) => filled($code))
             ->values();
-
-        $duplicatedBarcode = DB::table('barcodes')
-            ->whereIn('code', $barcodes)
-            ->where('product_id', '!=', $product->id)
-            ->first();
-
-        if ($duplicatedBarcode) {
-            return back()->withErrors([
-                'barcodes.0' => 'Este código de barras ya pertenece a otro producto.',
-            ]);
-        }
+        $this->assertBarcodesAreAvailableForProduct($barcodes, $product->id);
 
         $branchIds = collect($data['branch_ids'] ?? [])
             ->push($branch->id)
@@ -536,21 +535,7 @@ class ProductController extends Controller
                 'active' => $data['active'] ?? true,
             ]);
 
-            DB::table('barcodes')
-                ->where('product_id', $product->id)
-                ->delete();
-
-            foreach ($barcodes as $index => $code) {
-                DB::table('barcodes')->insert([
-                    'product_id' => $product->id,
-                    'code' => $code,
-                    'type' => $index === 0 ? 'PRINCIPAL' : 'ALTERNO',
-                    'base_quantity' => 1,
-                    'active' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
+            $this->syncProductBarcodes($product, $barcodes);
 
             foreach ($branchIds as $branchId) {
                 $this->activateProductForBranch($product, $branchId, $data);
@@ -690,6 +675,7 @@ class ProductController extends Controller
             $branchProduct->stock = $data['stock'] ?? 0;
             $branchProduct->tracks_batches = false;
             $branchProduct->tracks_expiration = false;
+            $branchProduct->entry_date = $data['entry_date'] ?? now()->toDateString();
         }
 
         $branchProduct->min_stock = $data['min_stock'] ?? 0;
@@ -697,6 +683,132 @@ class ProductController extends Controller
         $branchProduct->save();
 
         return $branchProduct;
+    }
+
+    private function resolveReusableDeletedProduct($barcodes): ?Product
+    {
+        if ($barcodes->isEmpty()) {
+            return null;
+        }
+
+        $matchingBarcodes = Barcode::withTrashed()
+            ->with(['product' => fn ($query) => $query->withTrashed()])
+            ->whereIn('code', $barcodes->all())
+            ->get();
+
+        $activeBarcode = $matchingBarcodes->first(function (Barcode $barcode) {
+            return ! $barcode->trashed() && ! $barcode->product?->trashed();
+        });
+
+        if ($activeBarcode) {
+            throw ValidationException::withMessages([
+                $this->barcodeErrorField($barcodes, $activeBarcode->code) => $this->barcodeAlreadyInUseMessage($activeBarcode),
+            ]);
+        }
+
+        $blockedBarcode = $matchingBarcodes->first(function (Barcode $barcode) {
+            return ! $barcode->product?->trashed();
+        });
+
+        if ($blockedBarcode) {
+            throw ValidationException::withMessages([
+                $this->barcodeErrorField($barcodes, $blockedBarcode->code) => 'Este código de barras pertenece a un producto activo. Reactívalo desde la edición del producto.',
+            ]);
+        }
+
+        $deletedProductIds = $matchingBarcodes
+            ->filter(fn (Barcode $barcode) => $barcode->product?->trashed())
+            ->pluck('product_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($deletedProductIds->count() > 1) {
+            throw ValidationException::withMessages([
+                'barcodes.0' => 'Estos códigos pertenecen a productos eliminados diferentes. Registra solo los códigos del mismo producto.',
+            ]);
+        }
+
+        if ($deletedProductIds->isEmpty()) {
+            return null;
+        }
+
+        return Product::withTrashed()->find($deletedProductIds->first());
+    }
+
+    private function assertBarcodesAreAvailableForProduct($barcodes, int $productId): void
+    {
+        if ($barcodes->isEmpty()) {
+            return;
+        }
+
+        $conflictingBarcode = Barcode::withTrashed()
+            ->with(['product' => fn ($query) => $query->withTrashed()])
+            ->whereIn('code', $barcodes->all())
+            ->where('product_id', '!=', $productId)
+            ->get()
+            ->first(fn (Barcode $barcode) => ! $barcode->trashed() || ! $barcode->product?->trashed());
+
+        if (! $conflictingBarcode) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            $this->barcodeErrorField($barcodes, $conflictingBarcode->code) => $this->barcodeAlreadyInUseMessage($conflictingBarcode),
+        ]);
+    }
+
+    private function syncProductBarcodes(Product $product, $barcodes): void
+    {
+        $codes = $barcodes->values();
+        $existingBarcodes = Barcode::withTrashed()
+            ->where('product_id', $product->id)
+            ->get()
+            ->keyBy('code');
+
+        $staleBarcodeQuery = Barcode::withTrashed()
+            ->where('product_id', $product->id)
+            ->when($codes->isNotEmpty(), fn ($query) => $query->whereNotIn('code', $codes->all()));
+
+        $staleBarcodeQuery->get()
+            ->each
+            ->forceDelete();
+
+        foreach ($codes as $index => $code) {
+            $barcode = $existingBarcodes->get($code) ?? new Barcode([
+                'product_id' => $product->id,
+                'code' => $code,
+            ]);
+
+            if ($barcode->exists && $barcode->trashed()) {
+                $barcode->restore();
+            }
+
+            $barcode->fill([
+                'product_id' => $product->id,
+                'code' => $code,
+                'type' => $index === 0 ? 'PRINCIPAL' : 'ALTERNO',
+                'base_quantity' => 1,
+                'active' => true,
+            ]);
+            $barcode->save();
+        }
+    }
+
+    private function barcodeErrorField($barcodes, string $code): string
+    {
+        $index = $barcodes->search(fn ($barcode) => (string) $barcode === (string) $code);
+
+        return 'barcodes.'.($index === false ? 0 : $index);
+    }
+
+    private function barcodeAlreadyInUseMessage(Barcode $barcode): string
+    {
+        $productName = $barcode->product?->name;
+
+        return $productName
+            ? "Este código de barras ya pertenece a {$productName}."
+            : 'Este código de barras ya pertenece a otro producto.';
     }
 
     private function normalizeProductPayload(Request $request): void

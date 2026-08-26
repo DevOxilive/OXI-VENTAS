@@ -166,6 +166,22 @@ function handleBoxSalePriceChange(value) {
   form.sale_price_per_box = value;
 }
 
+function barcodeFieldError(index) {
+  return form.errors[`barcodes.${index}`] || (index === 0 ? form.errors.barcodes : null);
+}
+
+function clearBarcodeError(index) {
+  form.clearErrors(`barcodes.${index}`);
+
+  if (index === 0) {
+    form.clearErrors("barcodes");
+  }
+}
+
+function clearFieldErrors(...fields) {
+  form.clearErrors(...fields);
+}
+
 function hasServerErrors() {
   return Object.keys(form.errors || {}).length > 0;
 }
@@ -617,7 +633,26 @@ function submit() {
             });
 
             form.clearErrors("barcodes.0");
+            form.clearErrors("barcodes");
+            return;
           }
+
+          ErrorAlert({
+            title: "Error al crear producto",
+            message:
+              errors.name ||
+              errors.product_department_id ||
+              errors.category_id ||
+              errors.category_name ||
+              errors.inventory_unit ||
+              errors.cost_per_piece ||
+              errors.cost_per_box ||
+              errors.sale_price_per_piece ||
+              errors.sale_price_per_box ||
+              errors.branch_ids ||
+              errors.product ||
+              "Revisa los datos capturados",
+          });
         },
       }
     );
@@ -821,11 +856,13 @@ function submit() {
                 <div class="flex-1">
                   <InputField
                     :label="index === 0 ? 'Código principal' : `Alterno ${index}`"
-                    field="barcode"
+                    :field="`barcodes.${index}`"
+                    validation-field="barcode"
                     v-model="form.barcodes[index]"
                     icon="barcode_scanner"
-                    :error="null"
+                    :error="barcodeFieldError(index)"
                     :readonly="mode === 'view'"
+                    @validate="clearBarcodeError(index)"
                   />
                 </div>
 
@@ -854,6 +891,7 @@ function submit() {
               :preserve-case="true"
               :readonly="mode === 'view'"
               class="md:col-span-2 2xl:col-span-3"
+              @validate="clearFieldErrors('name')"
             />
 
             <SelectField
@@ -864,6 +902,8 @@ function submit() {
               placeholder="Selecciona un departamento"
               :disabled="mode === 'view'"
               :error="form.errors.product_department_id"
+              @validate="clearFieldErrors('product_department_id')"
+              @change="clearFieldErrors('product_department_id')"
             />
 
             <SelectField
@@ -873,7 +913,9 @@ function submit() {
               :options="categoriesForDepartment"
               placeholder="Selecciona una categoría"
               :disabled="mode === 'view' || !form.product_department_id"
-              :error="form.errors.category_id"
+              :error="form.errors.category_id || form.errors.category_name"
+              @validate="clearFieldErrors('category_id', 'category_name')"
+              @change="clearFieldErrors('category_id', 'category_name')"
             />
 
             <SelectField
@@ -883,6 +925,8 @@ function submit() {
               :options="units"
               placeholder="Selecciona unidad base"
               :disabled="mode === 'view'"
+              @validate="clearFieldErrors('inventory_unit')"
+              @change="clearFieldErrors('inventory_unit')"
             />
 
             <div
@@ -912,6 +956,7 @@ function submit() {
               inputmode="numeric"
               placeholder="Ej. 12"
               :readonly="mode === 'view'"
+              @validate="clearFieldErrors('pieces_per_box')"
             />
 
             <InputField
@@ -923,6 +968,7 @@ function submit() {
               type="text"
               inputmode="decimal"
               :readonly="mode === 'view'"
+              @validate="clearFieldErrors('min_stock')"
             />
             <InputField
               :label="isKilogramUnit ? 'Precio compra por kilogramo' : 'Precio compra por pieza'"
@@ -934,6 +980,7 @@ function submit() {
               type="text"
               step="0.01"
               :readonly="mode === 'view'"
+              @validate="clearFieldErrors('cost_per_piece')"
             />
 
             <InputField
@@ -947,6 +994,7 @@ function submit() {
               type="text"
               step="0.01"
               :readonly="mode === 'view'"
+              @validate="clearFieldErrors('cost_per_box')"
             />
 
             <template v-if="canManagePricing">
@@ -959,6 +1007,7 @@ function submit() {
                 type="text"
                 step="0.01"
                 :readonly="mode === 'view'"
+                @validate="clearFieldErrors('sale_price_per_piece')"
               />
 
               <InputField
@@ -986,6 +1035,7 @@ function submit() {
                   type="text"
                   step="0.01"
                   :readonly="mode === 'view'"
+                  @validate="clearFieldErrors('sale_price_per_box')"
                 />
               </template>
 
