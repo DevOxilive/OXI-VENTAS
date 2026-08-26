@@ -7,6 +7,7 @@ import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import { getEmployeeModalConfig } from '@/config/ModalConfigs/employeeModalConfig'
+import { normalizeGoogleMapsUrl } from '@/utils/googleMaps'
 
 const emit = defineEmits(['close'])
 
@@ -97,10 +98,7 @@ const fullAddress = computed(() => {
 const mapsUrl = computed(() => {
     const registeredUrl = employee.mapsUrl?.trim()
 
-    if (registeredUrl) return registeredUrl
-    if (!fullAddress.value) return ''
-
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress.value)}`
+    return normalizeGoogleMapsUrl(registeredUrl, fullAddress.value)
 })
 
 const canOpenMaps = computed(() => Boolean(mapsUrl.value))

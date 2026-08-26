@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
+import { normalizeGoogleMapsUrl } from '@/utils/googleMaps'
 
 const props = defineProps({
     employee: Object,
@@ -44,10 +45,7 @@ const fullAddress = computed(() => {
 const mapsUrl = computed(() => {
     const registeredUrl = props.employee?.mapsUrl?.trim()
 
-    if (registeredUrl) return registeredUrl
-    if (!fullAddress.value) return ''
-
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress.value)}`
+    return normalizeGoogleMapsUrl(registeredUrl, fullAddress.value)
 })
 
 const canOpenMaps = computed(() => Boolean(mapsUrl.value))
