@@ -74,6 +74,14 @@ export const productTableConfig = {
 
     actions: [
         {
+            id: "stock-entry",
+            label: "Añadir stock",
+            icon: "add",
+            variant: "green",
+            permission: "inventory.branches.stock-in",
+            mobile: "button",
+        },
+        {
             id: "view",
             label: "Ver",
             icon: "visibility",

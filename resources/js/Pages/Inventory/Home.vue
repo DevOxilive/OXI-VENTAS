@@ -5,6 +5,7 @@ import { router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ProductModal from '@/Components/Inventory/ProductModal.vue'
 import ProductTable from '@/Components/Inventory/ProductTable.vue'
+import StockEntryModal from '@/Components/Inventory/BranchProducts/StockEntryModal.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import { useProductActions } from '@/Composables/Inventory/useProductActions'
@@ -73,6 +74,8 @@ const props = defineProps({
 })
 
 const productsState = ref(cloneProductsPayload(props.productsDB))
+const showStockEntryModal = ref(false)
+const selectedStockProduct = ref(null)
 const branch = computed(() => props.branch ?? {})
 const categoriesDB = computed(() => props.categoriesDB ?? [])
 const productDepartmentsDB = computed(() => props.productDepartmentsDB ?? [])
@@ -145,6 +148,10 @@ function handleProductToolbarAction(action) {
 }
 
 function handleProductAction({ action, row }) {
+  if (action === 'stock-entry' && can('inventory.branches.stock-in')) {
+    openStockEntryModal(row)
+  }
+
   if (action === 'view' && can('inventory.products.view')) {
     openViewModal(row)
   }
@@ -156,6 +163,28 @@ function handleProductAction({ action, row }) {
   if (action === 'delete' && can('inventory.products.delete')) {
     deleteProduct(row)
   }
+}
+
+function buildStockEntryProduct(product) {
+  return {
+    ...product,
+    id: product.branch_product_id,
+    product_id: product.id,
+    assigned_branch_ids: product.branch_ids ?? [product.branch_id].filter(Boolean),
+  }
+}
+
+function openStockEntryModal(product) {
+  if (!product?.branch_product_id) return
+
+  selectedStockProduct.value = buildStockEntryProduct(product)
+  showStockEntryModal.value = true
+}
+
+function closeStockEntryModal() {
+  showStockEntryModal.value = false
+  selectedStockProduct.value = null
+  reloadProducts(currentPage.value)
 }
 
 function reloadProducts(pageOrUrl = 1) {
@@ -331,6 +360,9 @@ onBeforeUnmount(() => {
 
     <ProductTable :items="products" :pagination="productsState" @page-change="handlePageChange"
       @action="handleProductAction" />
+
+    <StockEntryModal v-if="showStockEntryModal && selectedStockProduct && can('inventory.branches.stock-in')"
+      :product="selectedStockProduct" :branches="branchesDB" :current-branch="branch" @close="closeStockEntryModal" />
 
     <ProductModal v-if="
       showModal &&
