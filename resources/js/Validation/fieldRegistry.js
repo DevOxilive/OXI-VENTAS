@@ -365,7 +365,7 @@ export const fieldRegistry = {
         min: 3,
         max: 255,
         preserveCase: true,
-        message: "El nombre permite letras, numeros, espacios, puntos, comas, barras y guiones.",
+        message: "El nombre permite letras, numeros, espacios y simbolos comerciales seguros.",
     },
 
     kilogram_quantity: {

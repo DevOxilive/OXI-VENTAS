@@ -277,7 +277,7 @@ class ProductController extends Controller
             'inventory_unit' => ['required', Rule::in(['pza', 'kg'])],
             'has_box_presentation' => ['nullable', 'boolean'],
             'pieces_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
-            'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\pN\s.,\/_-]+$/u'],
+            'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\pN\s.,\/_%&+()#°-]+$/u'],
             'image' => ['nullable', 'image', 'max:2048'],
 
             'min_stock' => $this->minimumStockRules((string) $request->input('inventory_unit')),
@@ -407,7 +407,7 @@ class ProductController extends Controller
             'inventory_unit' => ['required', Rule::in(['pza', 'kg'])],
             'has_box_presentation' => ['nullable', 'boolean'],
             'pieces_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
-            'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\pN\s.,\/_-]+$/u'],
+            'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\pN\s.,\/_%&+()#°-]+$/u'],
             'image' => ['nullable', 'image', 'max:2048'],
             'min_stock' => $this->minimumStockRules((string) $request->input('inventory_unit')),
             'product_department_id' => ['nullable', 'required_with:category_name', 'exists:product_departments,id'],
