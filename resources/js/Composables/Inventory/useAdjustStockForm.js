@@ -340,7 +340,7 @@ export function useAdjustStockForm(props, emit) {
     }
 
     function saveAdjustment(transformPayload = null, options = {}) {
-        const { skipValidation = false } = options;
+        const { skipValidation = false, onSuccess = null } = options;
 
         if (!skipValidation && !validateCompleteForm()) {
             WarningAlert({
@@ -364,6 +364,7 @@ export function useAdjustStockForm(props, emit) {
             errorMessage: "No fue posible registrar el movimiento de stock",
             onSuccess: () => {
                 resetForm();
+                onSuccess?.();
             },
         }));
     }

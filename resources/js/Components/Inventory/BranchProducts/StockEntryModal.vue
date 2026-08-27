@@ -420,7 +420,11 @@ function saveEntry() {
             quantity: entryQuantityInPieces(batch.quantity),
         })),
         branch_allocations: payloadAllocations,
-    }))
+    }), {
+        onSuccess: () => {
+            goToSection(1)
+        },
+    })
     focusFirstErrorSection()
 }
 
@@ -463,6 +467,7 @@ onMounted(() => {
         :sections="modalSections"
         :active-section="activeSection"
         :show-footer="false"
+        @select-section="goToSection"
         @save="saveEntry"
         @close="closeModal"
     >
