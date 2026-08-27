@@ -4,7 +4,7 @@ const patterns = {
     letters: /[^\p{L}\s]/gu,
     numeric: /[^0-9]/g,
     decimal: /[^0-9.]/g,
-    product_name: /[^\p{L}\p{N}\s.,/_%&+()#°-]/gu,
+    product_name: /[\p{C}]/gu,
     alphanumeric: /[^\p{L}\p{N}\-_\s]/gu,
     email: /[\s]/g,
     address: /[^\p{L}\p{N}\s#.,\-]/gu,

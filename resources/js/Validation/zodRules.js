@@ -6,7 +6,7 @@ const regex = {
     letters: /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/,
     numeric: /^[0-9]+$/,
     decimal: /^\d+(\.\d{1,2})?$/,
-    product_name: /^[\p{L}\p{N}\s.,/_%&+()#°-]+$/u,
+    product_name: /^[^\p{C}]+$/u,
     alphanumeric: /^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\-_\s]+$/,
     address: /^[A-Za-zÁÉÍÓÚáéíóúÑñ0-9\s#.,\-]+$/,
     rfc: /^[A-ZÑ&]{4}\d{6}([A-Z0-9]{3})?$/,
