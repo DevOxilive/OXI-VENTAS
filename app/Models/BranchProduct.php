@@ -26,6 +26,7 @@ class BranchProduct extends Model
         'tracks_batches',
         'unit',
         'tracks_expiration',
+        'entry_date',
         'season_start_date',
         'season_end_date',
     ];
@@ -35,6 +36,7 @@ class BranchProduct extends Model
         'min_stock' => 'decimal:3',
         'tracks_batches' => 'boolean',
         'tracks_expiration' => 'boolean',
+        'entry_date' => 'date',
         'last_restocked_at' => 'datetime',
         'inactive_candidate_after_days' => 'integer',
         'season_start_date' => 'date',
