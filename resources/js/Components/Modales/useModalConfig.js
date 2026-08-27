@@ -98,6 +98,7 @@ export function getModalRequestOptions({
     errorMessage,
     showSuccess = true,
     showError = true,
+    closeOnSuccess = true,
     ...options
 } = {}) {
     const messages = getModalActionMessages({
@@ -112,7 +113,9 @@ export function getModalRequestOptions({
         preserveScroll,
         ...options,
         onSuccess: (...args) => {
-            close?.()
+            if (closeOnSuccess) {
+                close?.()
+            }
 
             if (showSuccess) {
                 ToastAlert({

@@ -134,6 +134,7 @@ export function useEditBranchProductConfig(product) {
             getModalRequestOptions({
                 mode: "edit",
                 entityName: "Configuración",
+                closeOnSuccess: false,
                 successTitle: "Configuración actualizada correctamente",
                 errorTitle: "Error al actualizar configuración",
                 errorMessage: "No fue posible guardar la configuración del producto.",

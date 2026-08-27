@@ -420,6 +420,11 @@ function removeBarcode(index) {
 }
 
 function setCreateDefaults() {
+  revokeFilePreview();
+  if (fileInput.value) {
+    fileInput.value.value = "";
+  }
+
   form.barcodes = [""];
   form.branch_ids = [];
   ensureCurrentBranchSelected();
@@ -613,7 +618,9 @@ function submit() {
             title: "Producto creado correctamente",
           });
 
-          emit("close");
+          form.clearErrors();
+          activeStep.value = 1;
+          setCreateDefaults();
         },
         onError: (errors) => {
           restoreFormSnapshot(pendingFormSnapshot.value);
@@ -682,8 +689,6 @@ function submit() {
             ToastAlert({
               title: "Producto actualizado correctamente",
             });
-
-            emit("close");
           },
           onError: (errors) => {
             restoreFormSnapshot(pendingFormSnapshot.value);

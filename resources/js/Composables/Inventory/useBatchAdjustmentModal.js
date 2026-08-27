@@ -349,6 +349,7 @@ export function useBatchAdjustmentModal(products) {
                     mode: "update",
                     entityName: "Lote",
                     close: clearSelectedBatch,
+                    closeOnSuccess: false,
                     successTitle: "Lote actualizado",
                     errorTitle: "No se pudo actualizar",
                     errorMessage:

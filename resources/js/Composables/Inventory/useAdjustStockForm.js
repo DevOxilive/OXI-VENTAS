@@ -358,7 +358,7 @@ export function useAdjustStockForm(props, emit) {
         requestForm.post(route("inventory.stock-movements.store"), getModalRequestOptions({
             mode: "create",
             entityName: "Movimiento de stock",
-            close: () => emit("close"),
+            closeOnSuccess: false,
             successTitle: "Movimiento registrado correctamente",
             errorTitle: "Error en la operación",
             errorMessage: "No fue posible registrar el movimiento de stock",

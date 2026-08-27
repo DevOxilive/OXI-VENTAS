@@ -151,9 +151,16 @@ function submit() {
         mode: 'create',
         entityName: modalConfig.value.alerts.entityName,
         close: closeModal,
+        closeOnSuccess: false,
         successTitle: modalConfig.value.alerts.create.successTitle,
         errorTitle: modalConfig.value.alerts.create.errorTitle,
         errorMessage: modalConfig.value.alerts.create.errorMessage,
+        onSuccess: () => {
+            form.reset()
+            productSearch.value = ''
+            productOptions.value = []
+            selectedProduct.value = null
+        },
     }))
 }
 
