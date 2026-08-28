@@ -59,7 +59,7 @@ jobs:
           mkdir -p public
           cp -R /tmp/oxi-ventas-build/build public/build
 
-          git add -A public/build
+            git add -A -f public/build
 
           if git diff --cached --quiet; then
             echo "No hay cambios en public/build"
