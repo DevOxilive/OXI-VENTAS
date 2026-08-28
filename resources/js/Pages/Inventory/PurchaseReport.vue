@@ -430,6 +430,7 @@ function selectBranch(branchId) {
                                         :value="item.requested_quantity"
                                         :aria-label="`Cantidad solicitada de ${item.name}`"
                                         :allow-decimal="item.presentation === 'kilo'"
+                                        :validation-field="item.presentation === 'kilo' ? 'kilogram_quantity' : 'product_piece_quantity'"
                                         :decrease-disabled="Number(item.requested_quantity || 0) <= (item.presentation === 'kilo' ? 0.001 : 1)"
                                         @decrease="report.decreaseQuantity(item.branch_product_id)"
                                         @increase="report.increaseQuantity(item.branch_product_id)"

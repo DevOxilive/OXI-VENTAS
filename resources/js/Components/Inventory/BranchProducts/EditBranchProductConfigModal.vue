@@ -87,9 +87,10 @@ function submitConfig() {
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <InputField
                             v-model="form.min_stock"
+                            data-modal-autofocus
                             :label="`Stock minimo (${unit})`"
                             field="min_stock"
-                            :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'quantity'"
+                            :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'product_piece_quantity'"
                             type="text"
                             :inputmode="isKilogramUnit ? 'decimal' : 'numeric'"
                             :readonly="form.processing"

@@ -267,6 +267,7 @@ function quantity(value) {
                                     <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
                                         <InputField
                                             v-model="form.lot_number"
+                                            data-modal-autofocus
                                             label="Numero de lote"
                                             placeholder="Ej. AX-3-2026-07-08"
                                             field="lot_number"
@@ -391,7 +392,7 @@ function quantity(value) {
                                         v-model="form.adjustment_amount"
                                         label="Cantidad"
                                         field="adjustment_amount"
-                                        :validation-field="isKilogramUnit ? 'kilogram_quantity' : undefined"
+                                        :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'product_piece_quantity'"
                                         type="text"
                                         :inputmode="isKilogramUnit ? 'decimal' : 'numeric'"
                                         placeholder="Ej. 2"

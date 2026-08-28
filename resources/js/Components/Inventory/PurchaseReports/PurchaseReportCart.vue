@@ -124,6 +124,7 @@ function allowsDecimalQuantity(item) {
                         :value="item.requested_quantity"
                         :aria-label="`Cantidad solicitada de ${item.name}`"
                         :allow-decimal="allowsDecimalQuantity(item)"
+                        :validation-field="allowsDecimalQuantity(item) ? 'kilogram_quantity' : 'product_piece_quantity'"
                         :decrease-disabled="Number(item.requested_quantity || 0) <= 1"
                         @decrease="decreaseQuantity(item)"
                         @increase="increaseQuantity(item)"

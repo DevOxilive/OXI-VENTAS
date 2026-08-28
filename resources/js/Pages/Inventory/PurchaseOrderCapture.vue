@@ -372,6 +372,7 @@ async function completeOrder() {
                                             :value="item.package_quantity"
                                             :aria-label="quantityLabel(item)"
                                             :allow-decimal="allowsDecimalQuantity(item)"
+                                            :validation-field="allowsDecimalQuantity(item) ? 'kilogram_quantity' : 'product_piece_quantity'"
                                             :disabled="item.unavailable"
                                             :decrease-disabled="quantityInput(item.package_quantity, allowsDecimalQuantity(item)) <= 1"
                                             @decrease="decreaseItemQuantity(item, 'package_quantity')"
