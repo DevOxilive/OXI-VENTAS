@@ -1,0 +1,60 @@
+name: Build production
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - public/build/**
+
+permissions:
+  contents: write
+
+jobs:
+  build-production:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar build
+        run: npm run build
+
+      - name: Guardar build generado
+        run: |
+          mkdir -p /tmp/oxi-ventas-build
+          cp -R public/build /tmp/oxi-ventas-build/build
+
+      - name: Preparar rama production
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin production
+          git checkout production
+          git reset --hard ${{ github.sha }}
+
+          rm -rf public/build
+          mkdir -p public
+          cp -R /tmp/oxi-ventas-build/build public/build
+
+          git add -A public/build
+
+          if git diff --cached --quiet; then
+            echo "No hay cambios en public/build"
+          else
+            git commit -m "chore: actualiza build de producción"
+            git push origin production --force-with-lease
+          fi
