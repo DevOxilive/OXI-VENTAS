@@ -364,7 +364,7 @@ export const fieldRegistry = {
         type: "product_name",
         min: 3,
         max: 255,
-        preserveCase: true,
+        titleCase: true,
         message: "El nombre permite caracteres especiales visibles.",
     },
 
@@ -374,6 +374,7 @@ export const fieldRegistry = {
         max: 7,
         maxIntegerDigits: 3,
         maxDecimalDigits: 3,
+        autoDecimalAfterIntegerDigits: true,
         message: "La cantidad permite hasta 999.999 kilogramos.",
     },
 
@@ -396,6 +397,7 @@ export const fieldRegistry = {
     cost: {
         required: true,
         type: "decimal",
+        format: "currency",
         max: 10,
         message: "El costo debe ser un número válido con máximo 2 decimales.",
     },
@@ -403,6 +405,7 @@ export const fieldRegistry = {
     product_price: {
         required: true,
         type: "decimal",
+        format: "currency",
         max: 7,
         maxIntegerDigits: 4,
         maxDecimalDigits: 2,
@@ -412,6 +415,7 @@ export const fieldRegistry = {
     sale_price: {
         required: true,
         type: "decimal",
+        format: "currency",
         max: 10,
         message:
             "El precio de venta debe ser un número válido con máximo 2 decimales.",
@@ -627,6 +631,7 @@ export const fieldRegistry = {
     purchase_order_cost: {
         required: true,
         type: "decimal",
+        format: "currency",
         max: 7,
         maxIntegerDigits: 4,
         maxDecimalDigits: 2,
@@ -636,6 +641,7 @@ export const fieldRegistry = {
     purchase_order_discount: {
         required: false,
         type: "decimal",
+        format: "currency",
         max: 7,
         maxIntegerDigits: 4,
         maxDecimalDigits: 2,
@@ -654,6 +660,7 @@ export const fieldRegistry = {
         required: false,
         type: "text",
         max: 500,
+        titleCase: true,
         message: "Las notas contienen caracteres no permitidos.",
     },
 

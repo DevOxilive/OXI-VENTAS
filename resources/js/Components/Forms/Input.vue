@@ -65,18 +65,11 @@ const fieldConfig = computed(() => fieldRegistry[props.validationField || props.
 const normalizedFieldConfig = computed(() => {
     const config = fieldConfig.value;
     const effectiveType = config.type ?? props.type;
-    const shouldAutoTitleCase =
-        effectiveType === 'text'
-        && !config.uppercase
-        && !config.preserveCase
-        && !props.preserveCase
-        && !props.notUpper;
-
     return {
         ...config,
         type: effectiveType,
         preserveCase: props.preserveCase || props.notUpper || config.preserveCase,
-        titleCase: config.titleCase ?? shouldAutoTitleCase,
+        titleCase: config.titleCase ?? false,
     };
 });
 

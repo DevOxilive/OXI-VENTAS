@@ -20,12 +20,53 @@ function toTitleCase(text) {
         ));
 }
 
+function normalizeDecimalSeparators(value, config = {}) {
+    const rawValue = String(value ?? "");
+
+    if (config.format === "currency") {
+        return rawValue.replace(/,/g, "");
+    }
+
+    if (!rawValue.includes(".") && rawValue.includes(",")) {
+        return rawValue.replace(",", ".");
+    }
+
+    return rawValue.replace(/,/g, "");
+}
+
+function sanitizeDecimal(value, config = {}) {
+    let clean = normalizeDecimalSeparators(value, config).replace(patterns.decimal, "");
+    clean = clean.replace(/(\..*)\./g, "$1");
+
+    if (
+        config.autoDecimalAfterIntegerDigits
+        && config.maxIntegerDigits
+        && !clean.includes(".")
+        && clean.length > config.maxIntegerDigits
+    ) {
+        clean = `${clean.slice(0, config.maxIntegerDigits)}.${clean.slice(config.maxIntegerDigits)}`;
+    }
+
+    const hasDecimalPoint = clean.includes(".");
+    const [integerPart = "", decimalPart = ""] = clean.split(".");
+    const boundedInteger = config.maxIntegerDigits
+        ? integerPart.slice(0, config.maxIntegerDigits)
+        : integerPart;
+    const boundedDecimal = config.maxDecimalDigits !== undefined
+        ? decimalPart.slice(0, config.maxDecimalDigits)
+        : decimalPart;
+
+    return hasDecimalPoint
+        ? `${boundedInteger || "0"}.${boundedDecimal}`
+        : boundedInteger;
+}
+
 export function sanitizeField(value, config = {}, options = {}) {
     if (value === null || value === undefined) return "";
 
     let clean = value.toString();
 
-    const pattern = patterns[config.type];
+    const pattern = config.type === "decimal" ? null : patterns[config.type];
 
     if (pattern) {
         clean = clean.replace(pattern, "");
@@ -35,20 +76,7 @@ export function sanitizeField(value, config = {}, options = {}) {
     clean = clean.trimStart();
 
     if (config.type === "decimal") {
-        clean = clean.replace(/(\..*)\./g, "$1");
-
-        const hasDecimalPoint = clean.includes(".");
-        const [integerPart = "", decimalPart = ""] = clean.split(".");
-        const boundedInteger = config.maxIntegerDigits
-            ? integerPart.slice(0, config.maxIntegerDigits)
-            : integerPart;
-        const boundedDecimal = config.maxDecimalDigits !== undefined
-            ? decimalPart.slice(0, config.maxDecimalDigits)
-            : decimalPart;
-
-        clean = hasDecimalPoint
-            ? `${boundedInteger || "0"}.${boundedDecimal}`
-            : boundedInteger;
+        clean = sanitizeDecimal(clean, config);
     }
 
     if (options.formatCase !== false && config.uppercase && !config.preserveCase) {
@@ -70,7 +98,10 @@ export function sanitizeFieldWithCursor(value, config = {}, selectionStart = 0, 
     const rawValue = String(value ?? '');
     const safeStart = Math.max(0, Math.min(selectionStart, rawValue.length));
     const safeEnd = Math.max(safeStart, Math.min(selectionEnd, rawValue.length));
-    const options = { formatCase: false, enforceMax: false };
+    const options = {
+        formatCase: config.formatCaseOnInput !== false,
+        enforceMax: config.enforceMaxOnInput === true,
+    };
     const sanitized = sanitizeField(rawValue, config, options);
 
     return {
@@ -82,6 +113,57 @@ export function sanitizeFieldWithCursor(value, config = {}, selectionStart = 0, 
         selectionEnd: Math.min(
             sanitizeField(rawValue.slice(0, safeEnd), config, options).length,
             sanitized.length,
+        ),
+    };
+}
+
+export function formatCurrencyValue(value, config = {}, options = {}) {
+    const clean = sanitizeField(value, {
+        ...config,
+        type: "decimal",
+        format: "currency",
+    });
+
+    if (!clean) return "";
+
+    const hasDecimalPoint = clean.includes(".");
+    const [integerPart = "", decimalPart = ""] = clean.split(".");
+    const groupedInteger = (integerPart || "0").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const decimalDigits = config.maxDecimalDigits ?? 2;
+
+    if (options.fixedDecimals) {
+        return `${groupedInteger}.${decimalPart.padEnd(decimalDigits, "0").slice(0, decimalDigits)}`;
+    }
+
+    return hasDecimalPoint
+        ? `${groupedInteger}.${decimalPart}`
+        : groupedInteger;
+}
+
+export function sanitizeCurrencyWithCursor(value, config = {}, selectionStart = 0, selectionEnd = selectionStart) {
+    const rawValue = String(value ?? "");
+    const safeStart = Math.max(0, Math.min(selectionStart, rawValue.length));
+    const safeEnd = Math.max(safeStart, Math.min(selectionEnd, rawValue.length));
+    const currencyConfig = {
+        ...config,
+        type: "decimal",
+        format: "currency",
+    };
+    const clean = sanitizeField(rawValue, currencyConfig);
+    const cleanBeforeStart = sanitizeField(rawValue.slice(0, safeStart), currencyConfig);
+    const cleanBeforeEnd = sanitizeField(rawValue.slice(0, safeEnd), currencyConfig);
+    const displayValue = formatCurrencyValue(clean, currencyConfig);
+
+    return {
+        value: displayValue,
+        rawValue: clean,
+        selectionStart: Math.min(
+            formatCurrencyValue(cleanBeforeStart, currencyConfig).length,
+            displayValue.length,
+        ),
+        selectionEnd: Math.min(
+            formatCurrencyValue(cleanBeforeEnd, currencyConfig).length,
+            displayValue.length,
         ),
     };
 }

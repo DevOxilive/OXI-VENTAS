@@ -1,4 +1,5 @@
 <script setup>
+import { ref } from 'vue'
 import ModalContent from './ModalContent.vue'
 import ModalFooter from './ModalFooter.vue'
 import ModalHeader from './ModalHeader.vue'
@@ -91,12 +92,17 @@ defineProps({
 })
 
 const emit = defineEmits(['save', 'close', 'select-section'])
+const panelEl = ref(null)
 
 function closeFromBackdrop(closeOnBackdrop) {
     if (!closeOnBackdrop) return
 
     emit('close')
 }
+
+defineExpose({
+    getPanelElement: () => panelEl.value,
+})
 </script>
 
 <template>
@@ -110,11 +116,14 @@ function closeFromBackdrop(closeOnBackdrop) {
         />
 
         <section
+            ref="panelEl"
             class="relative my-4 flex w-full flex-col overflow-hidden overscroll-contain rounded-3xl border border-secondary bg-background shadow-2xl"
             :class="panelClass"
             :style="getModalPanelStyle({ size, height })"
             role="dialog"
             aria-modal="true"
+            data-global-modal-panel
+            tabindex="-1"
             :aria-label="title"
             @click.stop
         >
