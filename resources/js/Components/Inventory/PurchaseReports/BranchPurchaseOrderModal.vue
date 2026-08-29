@@ -144,8 +144,10 @@ async function completeReceipt() {
 
                     <QuantityStepper
                         v-if="isEditing"
+                        data-modal-autofocus
                         :value="item.received_quantity"
                         :allow-decimal="itemUnit(item) === 'kg'"
+                        :validation-field="itemUnit(item) === 'kg' ? 'kilogram_quantity' : 'product_piece_quantity'"
                         :aria-label="`Cantidad recibida de ${sourceItem(item).product_name || 'producto'}`"
                         :decrease-disabled="Number(item.received_quantity) <= 0"
                         @decrease="decrease(item)"

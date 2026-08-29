@@ -47,7 +47,7 @@ const normalizedFieldConfig = computed(() => {
         ...config,
         type: config.type ?? 'text',
         preserveCase: props.preserveCase || config.preserveCase,
-        titleCase: props.titleCase ?? config.titleCase ?? (!config.uppercase && !config.preserveCase && !props.preserveCase),
+        titleCase: props.titleCase ?? config.titleCase ?? false,
     }
 })
 

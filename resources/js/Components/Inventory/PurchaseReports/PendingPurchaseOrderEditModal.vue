@@ -115,7 +115,7 @@ function save() {
 
                 <div class="text-sm text-text"><span class="lg:hidden text-xs opacity-55">Solicitadas: </span><strong>{{ quantity(item.requested_quantity, item) }} {{ unitLabel(item) }}</strong></div>
 
-                <div><span class="mb-1 block text-xs opacity-55 lg:hidden">Ajustar cantidad</span><QuantityStepper :value="item.requested_quantity" :allow-decimal="itemUnit(item) === 'kg'" :aria-label="`Cantidad solicitada de ${item.product_name}`" :decrease-disabled="Number(item.requested_quantity) <= 1" @decrease="decrease(item)" @increase="increase(item)" @update="updateQuantity(item, $event)" /></div>
+                <div><span class="mb-1 block text-xs opacity-55 lg:hidden">Ajustar cantidad</span><QuantityStepper :data-modal-autofocus="index === 0 ? '' : null" :value="item.requested_quantity" :allow-decimal="itemUnit(item) === 'kg'" :validation-field="itemUnit(item) === 'kg' ? 'kilogram_quantity' : 'product_piece_quantity'" :aria-label="`Cantidad solicitada de ${item.product_name}`" :decrease-disabled="Number(item.requested_quantity) <= 1" @decrease="decrease(item)" @increase="increase(item)" @update="updateQuantity(item, $event)" /></div>
 
                 <ActionIconButton
                     icon="delete"

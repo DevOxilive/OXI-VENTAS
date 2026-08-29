@@ -242,6 +242,7 @@ function selectProduct(product) {
                     <div class="relative">
                         <InputField
                             v-model="productSearch"
+                            data-modal-autofocus
                             label="Producto / Sucursal"
                             field="movement-product-search"
                             validation-field="toolbar_search"

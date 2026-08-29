@@ -1,7 +1,12 @@
 <script setup>
-import { computed, nextTick, ref, useAttrs } from 'vue'
+import { computed, nextTick, ref, useAttrs, watch } from 'vue'
 import { fieldRegistry } from '@/Validation/fieldRegistry'
-import { sanitizeField, sanitizeFieldWithCursor } from '@/Validation/sanitizers'
+import {
+    formatCurrencyValue,
+    sanitizeCurrencyWithCursor,
+    sanitizeField,
+    sanitizeFieldWithCursor,
+} from '@/Validation/sanitizers'
 
 defineOptions({
     inheritAttrs: false,
@@ -37,6 +42,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'validate', 'keydown'])
 const inputEl = ref(null)
+const displayValue = ref('')
 const attrs = useAttrs()
 
 const inputId = computed(() =>
@@ -47,17 +53,11 @@ const fieldConfig = computed(() => fieldRegistry[props.validationField || props.
 const normalizedFieldConfig = computed(() => {
     const config = fieldConfig.value ?? {}
     const effectiveType = config.type ?? props.type
-    const shouldAutoTitleCase =
-        ['text', 'textarea'].includes(effectiveType) &&
-        !config.uppercase &&
-        !config.preserveCase &&
-        !props.preserveCase
-
     return {
         ...config,
         type: effectiveType,
         preserveCase: props.preserveCase || config.preserveCase,
-        titleCase: props.titleCase ?? config.titleCase ?? shouldAutoTitleCase,
+        titleCase: props.titleCase ?? config.titleCase ?? false,
     }
 })
 
@@ -70,6 +70,17 @@ const hasRightAddon = computed(() => props.suffix
 )
 const isDisabled = computed(() => Boolean(attrs.disabled))
 const isTextarea = computed(() => props.type === 'textarea')
+const isCurrencyField = computed(() => normalizedFieldConfig.value.format === 'currency')
+
+watch(
+    [() => props.modelValue, normalizedFieldConfig],
+    ([value, config]) => {
+        displayValue.value = config.format === 'currency'
+            ? formatCurrencyValue(value, config)
+            : String(value ?? '')
+    },
+    { immediate: true },
+)
 
 function preventNumberWheel(e) {
     if (props.type !== 'number') return
@@ -84,6 +95,25 @@ function handleInput(e) {
     if (isDateField.value) {
         emit('update:modelValue', e.target.value)
         emit('validate', props.field)
+        return
+    }
+
+    if (isCurrencyField.value) {
+        const sanitized = sanitizeCurrencyWithCursor(
+            e.target.value,
+            config,
+            e.target.selectionStart ?? 0,
+            e.target.selectionEnd ?? 0,
+        )
+
+        displayValue.value = sanitized.value
+        e.target.value = sanitized.value
+        emit('update:modelValue', sanitized.rawValue)
+        emit('validate', props.field)
+
+        nextTick(() => {
+            e.target.setSelectionRange?.(sanitized.selectionStart, sanitized.selectionEnd)
+        })
         return
     }
 
@@ -110,6 +140,19 @@ function handleInput(e) {
 }
 
 function handleBlur(e) {
+    if (isCurrencyField.value) {
+        const value = sanitizeField(e.target.value, normalizedFieldConfig.value)
+        const formattedValue = formatCurrencyValue(value, normalizedFieldConfig.value, {
+            fixedDecimals: Boolean(value),
+        })
+
+        displayValue.value = formattedValue
+        e.target.value = formattedValue
+        emit('update:modelValue', value)
+        emit('validate', props.field)
+        return
+    }
+
     if (!isDateField.value) {
         const value = sanitizeField(e.target.value, normalizedFieldConfig.value)
 
@@ -154,8 +197,9 @@ defineExpose({
                     readonly || isDisabled ? 'cursor-not-allowed border-secondary bg-secondary text-text opacity-60' : 'bg-background text-text',
                     error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'
                 ]" />
-            <input v-else ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="type" :placeholder="placeholder" :value="modelValue"
-                :maxlength="isDateField ? undefined : (normalizedFieldConfig?.max || undefined)"
+            <input v-else ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="type" :placeholder="placeholder"
+                :value="isCurrencyField ? displayValue : modelValue"
+                :maxlength="isDateField || isCurrencyField ? undefined : (normalizedFieldConfig?.max || undefined)"
                 :readonly="readonly" @keydown="emit('keydown', $event)"
                 @wheel="preventNumberWheel" @input="handleInput" @blur="handleBlur" :class="[
                     'w-full rounded-xl border py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',

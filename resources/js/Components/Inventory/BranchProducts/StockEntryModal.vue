@@ -489,10 +489,12 @@ onMounted(() => {
                                 Cantidad total ({{ entryQuantityLabel }})
                             </label>
                             <QuantityStepper
+                                data-modal-autofocus
                                 :value="entry.quantity"
                                 :aria-label="`Cantidad total en ${entryQuantityLabel}`"
                                 :disabled="form.processing"
                                 :allow-decimal="isKilogramUnit"
+                                :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'product_piece_quantity'"
                                 :max-integer-digits="3"
                                 :max-decimal-digits="3"
                                 :decrease-disabled="quantityNumber(entry.quantity) <= quantityStep"
@@ -604,6 +606,7 @@ onMounted(() => {
                                 :aria-label="`Cantidad de ${distributionQuantityLabel} para ${branch.name}`"
                                 :disabled="form.processing || !branchSelected(branch.id)"
                                 :allow-decimal="isKilogramUnit"
+                                :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'product_piece_quantity'"
                                 :max-integer-digits="3"
                                 :max-decimal-digits="3"
                                 :decrease-disabled="quantityNumber(findAllocation(branch.id)?.quantity) <= 0"
@@ -687,6 +690,7 @@ onMounted(() => {
                         v-if="activeSection < 3"
                         type="button"
                         class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                        :data-modal-autofocus="activeSection === 2 ? '' : null"
                         :disabled="form.processing"
                         @click="goToSection(activeSection + 1)"
                     >
@@ -696,6 +700,7 @@ onMounted(() => {
                         v-else
                         type="button"
                         class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+                        data-modal-autofocus
                         :disabled="form.processing"
                         @click="saveEntry"
                     >

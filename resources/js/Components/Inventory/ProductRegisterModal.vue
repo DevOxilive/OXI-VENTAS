@@ -134,13 +134,13 @@ watch(
                     </h3>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
-                        <InputField label="Código interno" field="code" validation-field="codigoProducto" v-model="product.code" :readonly="isReadOnly"
+                        <InputField data-modal-autofocus label="Código interno" field="code" validation-field="codigoProducto" v-model="product.code" :readonly="isReadOnly"
                             :error="frontendErrors.code || product.errors?.code" @validate="validate('code')" />
 
                         <InputField label="Código de barras" field="barcode" v-model="product.barcode" :readonly="isReadOnly"
                             :error="frontendErrors.barcode || product.errors?.barcode" @validate="validate('barcode')" />
 
-                        <InputField label="Nombre del producto" field="name" v-model="product.name" :readonly="isReadOnly"
+                        <InputField label="Nombre del producto" field="name" validation-field="product_name" v-model="product.name" :readonly="isReadOnly"
                             :error="frontendErrors.name || product.errors?.name" @validate="validate('name')" />
 
                         <SelectField label="Categoría" field="category" v-model="product.category" :options="categories"
@@ -167,15 +167,15 @@ watch(
                             :disabled="isReadOnly" :error="frontendErrors.status || product.errors?.status"
                             @validate="validate('status')" />
 
-                        <InputField label="Stock actual" field="stock" type="number" v-model="product.stock"
+                        <InputField label="Stock actual" field="stock" validation-field="product_piece_quantity" type="text" inputmode="numeric" v-model="product.stock"
                             :readonly="isReadOnly" :error="frontendErrors.stock || product.errors?.stock"
                             @validate="validate('stock')" />
 
-                        <InputField label="Stock mínimo" field="minStock" type="number" v-model="product.minStock"
+                        <InputField label="Stock mínimo" field="minStock" validation-field="product_piece_quantity" type="text" inputmode="numeric" v-model="product.minStock"
                             :readonly="isReadOnly" :error="frontendErrors.minStock || product.errors?.minStock"
                             @validate="validate('minStock')" />
 
-                        <InputField label="Lote" field="lot" v-model="product.lot" :readonly="isReadOnly"
+                        <InputField label="Lote" field="lot" validation-field="lot_number" v-model="product.lot" :readonly="isReadOnly"
                             :error="frontendErrors.lot || product.errors?.lot" @validate="validate('lot')" />
 
                         <InputField label="Fecha de caducidad" field="expirationDate" type="date"
@@ -191,12 +191,12 @@ watch(
                     </h3>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
-                        <InputField label="Precio de compra" field="purchasePrice" type="number"
+                        <InputField label="Precio de compra" field="purchasePrice" validation-field="product_price" type="text" inputmode="decimal"
                             v-model="product.purchasePrice" :readonly="isReadOnly"
                             :error="frontendErrors.purchasePrice || product.errors?.purchasePrice"
                             @validate="validate('purchasePrice')" />
 
-                        <InputField label="Precio de venta" field="salePrice" type="number" v-model="product.salePrice"
+                        <InputField label="Precio de venta" field="salePrice" validation-field="sale_price" type="text" inputmode="decimal" v-model="product.salePrice"
                             :readonly="isReadOnly" :error="frontendErrors.salePrice || product.errors?.salePrice"
                             @validate="validate('salePrice')" />
 

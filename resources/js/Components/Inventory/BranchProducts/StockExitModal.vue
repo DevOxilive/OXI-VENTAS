@@ -64,9 +64,10 @@ const isKilogramUnit = computed(() => String(unit.value).toLowerCase() === 'kg')
                 >
                     <InputField
                         v-model="form.quantity"
+                        data-modal-autofocus
                         :label="`Cantidad a retirar (${unit})`"
                         field="quantity"
-                        :validation-field="isKilogramUnit ? 'kilogram_quantity' : undefined"
+                        :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'product_piece_quantity'"
                         type="text"
                         :inputmode="isKilogramUnit ? 'decimal' : 'numeric'"
                         :readonly="form.processing"

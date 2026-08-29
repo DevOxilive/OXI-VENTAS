@@ -865,6 +865,7 @@ function submit() {
                     validation-field="barcode"
                     v-model="form.barcodes[index]"
                     icon="barcode_scanner"
+                    :data-modal-autofocus="index === 0 ? '' : null"
                     :error="barcodeFieldError(index)"
                     :readonly="mode === 'view'"
                     @validate="clearBarcodeError(index)"
@@ -893,7 +894,6 @@ function submit() {
               validation-field="product_name"
               v-model="form.name"
               :error="form.errors.name"
-              :preserve-case="true"
               :readonly="mode === 'view'"
               class="md:col-span-2 2xl:col-span-3"
               @validate="clearFieldErrors('name')"
@@ -1155,6 +1155,7 @@ function submit() {
             v-else-if="mode !== 'view'"
             type="button"
             class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+            data-modal-autofocus
             :disabled="form.processing"
             @click="submit"
           >
