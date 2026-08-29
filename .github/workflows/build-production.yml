@@ -15,9 +15,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Descargar código
+      - name: Descargar main
         uses: actions/checkout@v4
         with:
+          path: source
+          fetch-depth: 0
+
+      - name: Descargar production
+        uses: actions/checkout@v4
+        with:
+          ref: production
+          path: deploy
           fetch-depth: 0
 
       - name: Preparar Node
@@ -25,6 +33,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: source/package-lock.json
 
       - name: Preparar PHP
         uses: shivammathur/setup-php@v2
@@ -33,37 +42,38 @@ jobs:
           extensions: mbstring, dom, fileinfo, mysql, zip
 
       - name: Instalar dependencias PHP
+        working-directory: source
         run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
-      - name: Instalar dependencias
+      - name: Instalar dependencias Node
+        working-directory: source
         run: npm ci
 
       - name: Compilar build
+        working-directory: source
         run: npm run build
 
-      - name: Guardar build generado
-        run: |
-          mkdir -p /tmp/oxi-ventas-build
-          cp -R public/build /tmp/oxi-ventas-build/build
-
       - name: Preparar rama production
+        working-directory: deploy
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git fetch origin production
-          git checkout production
-          git reset --hard ${{ github.sha }}
+          git fetch origin main production
+
+          git reset --hard origin/main
 
           rm -rf public/build
           mkdir -p public
-          cp -R /tmp/oxi-ventas-build/build public/build
+          cp -R ../source/public/build public/build
 
-            git add -A -f public/build
+          git add -A
+          git add -A -f public/build
 
           if git diff --cached --quiet; then
-            echo "No hay cambios en public/build"
+            echo "No hay cambios para production"
           else
             git commit -m "chore: actualiza build de producción"
-            git push origin production --force-with-lease
           fi
+
+          git push origin HEAD:production --force-with-lease
