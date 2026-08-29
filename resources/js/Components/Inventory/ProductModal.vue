@@ -893,6 +893,7 @@ function submit() {
               field="name"
               validation-field="product_name"
               v-model="form.name"
+              preserve-case
               :error="form.errors.name"
               :readonly="mode === 'view'"
               class="md:col-span-2 2xl:col-span-3"
