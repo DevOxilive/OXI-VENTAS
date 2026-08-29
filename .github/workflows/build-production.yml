@@ -61,7 +61,8 @@ jobs:
 
           git fetch origin main production
 
-          git reset --hard origin/main
+          git reset --hard origin/production
+          git merge --no-edit origin/main
 
           rm -rf public/build
           mkdir -p public
@@ -76,4 +77,4 @@ jobs:
             git commit -m "chore: actualiza build de producción"
           fi
 
-          git push origin HEAD:production --force-with-lease
+          git push origin HEAD:production
