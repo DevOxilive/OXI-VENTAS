@@ -140,7 +140,7 @@ watch(
                         <InputField label="Código de barras" field="barcode" v-model="product.barcode" :readonly="isReadOnly"
                             :error="frontendErrors.barcode || product.errors?.barcode" @validate="validate('barcode')" />
 
-                        <InputField label="Nombre del producto" field="name" validation-field="product_name" v-model="product.name" :readonly="isReadOnly"
+                        <InputField label="Nombre del producto" field="name" validation-field="product_name" v-model="product.name" preserve-case :readonly="isReadOnly"
                             :error="frontendErrors.name || product.errors?.name" @validate="validate('name')" />
 
                         <SelectField label="Categoría" field="category" v-model="product.category" :options="categories"
