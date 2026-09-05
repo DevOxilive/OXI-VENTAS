@@ -247,6 +247,8 @@ class InventoryReportService
                 'branch_products.stock',
                 'branch_products.min_stock',
                 'products.cost',
+                'products.cost_per_piece',
+                'stock_movements.unit_cost',
                 'stock_movements.type',
                 'stock_movements.reason',
                 'stock_movements.previous_stock',
