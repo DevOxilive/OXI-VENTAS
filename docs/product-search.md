@@ -20,7 +20,7 @@ Las variables estan documentadas en `.env.example`:
 
 ```dotenv
 SCOUT_DRIVER=meilisearch
-SCOUT_PREFIX=oxi_ventas_
+SCOUT_PREFIX=super_kay_
 SCOUT_QUEUE=true
 MEILISEARCH_HOST=http://127.0.0.1:7700
 MEILISEARCH_KEY=
