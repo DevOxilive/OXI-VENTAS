@@ -17,6 +17,8 @@ use App\Models\ProductBatch;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use App\Models\User;
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
 use App\Services\PhysicalCountSnapshotService;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
@@ -35,7 +37,8 @@ class PhysicalCountController extends Controller
     use AuthorizesBranchAccess;
 
     public function __construct(
-        private PhysicalCountSnapshotService $snapshotService
+        private PhysicalCountSnapshotService $snapshotService,
+        private ProductSearchService $productSearch,
     ) {}
 
     public function index(Request $request)
@@ -134,6 +137,12 @@ class PhysicalCountController extends Controller
 
         $allowedBranchProductIds = $snapshotRows->pluck('branch_product_id')->unique()->values()->all();
         $auditIds = $audits->pluck('id');
+        $matchingProductIds = $filters['search']
+            ? $this->productSearch->ids(
+                $filters['search'],
+                new ProductSearchOptions(limit: (int) config('product_search.max_results', 10000)),
+            )
+            : collect();
 
         $entries = PhysicalCountEntry::with([
             'user:id,name',
@@ -144,28 +153,27 @@ class PhysicalCountController extends Controller
         ])
             ->whereIn('physical_count_id', $auditIds)
             ->when($filters['user_id'], fn ($query, $userId) => $query->where('user_id', $userId))
-            ->when($filters['search'], function ($query, $search) {
-                FlexibleSearch::apply($query, $search, function ($subQuery, $phrase, $terms) {
-                    FlexibleSearch::orWhereColumns($subQuery, [
-                        'scanned_code',
-                        'notes',
-                    ], $phrase, $terms);
+            ->when($filters['search'], function ($query, $search) use ($matchingProductIds) {
+                $query->where(function ($searchQuery) use ($matchingProductIds, $search) {
+                    if ($matchingProductIds->isEmpty()) {
+                        $searchQuery->whereRaw('1 = 0');
+                    } else {
+                        $searchQuery->whereHas('branchProduct', fn ($branchProductQuery) => $branchProductQuery
+                            ->whereIntegerInRaw('product_id', $matchingProductIds->all()));
+                    }
 
-                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct', [
-                        'barcode',
-                    ], $phrase, $terms);
+                    $searchQuery->orWhere(function ($extraQuery) use ($search) {
+                        FlexibleSearch::applyAllTerms($extraQuery, $search, function ($termQuery, $phrase, $terms) {
+                            FlexibleSearch::orWhereColumns($termQuery, [
+                                'scanned_code',
+                                'notes',
+                            ], $phrase, $terms);
 
-                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct.product', [
-                        'name',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($subQuery, 'branchProduct.product.barcodes', [
-                        'code',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($subQuery, 'user', [
-                        'name',
-                    ], $phrase, $terms);
+                            FlexibleSearch::orWhereHasColumns($termQuery, 'user', [
+                                'name',
+                            ], $phrase, $terms);
+                        });
+                    });
                 });
             })
             ->when($allowedBranchProductIds !== [], fn ($query) => $query->whereIn('branch_product_id', $allowedBranchProductIds))
@@ -602,25 +610,32 @@ class PhysicalCountController extends Controller
 
         $products = BranchProduct::with('product')
             ->where('branch_id', $physicalCount->branch_id)
-            ->when($physicalCount->recapture_scope === 'zero_stock', fn ($query) => $query->where('stock', '<=', 0))
-            ->where(function ($query) use ($search) {
-                $terms = FlexibleSearch::terms($search);
+            ->when($physicalCount->recapture_scope === 'zero_stock', fn ($query) => $query->where('stock', '<=', 0));
 
-                FlexibleSearch::orWhereColumns($query, ['branch_products.barcode'], $search, $terms);
-                FlexibleSearch::orWhereHasColumns($query, 'product', ['name'], $search, $terms);
+        $productIds = $this->productSearch->constrainBranchProducts(
+            $products,
+            $search,
+            'branch_products.product_id',
+            'batches',
+            new ProductSearchOptions(
+                branchIds: [$physicalCount->branch_id],
+                limit: 50,
+                includeLotNumbers: true,
+            ),
+        );
 
-                FlexibleSearch::orWhereExists($query, function ($subQuery) use ($search, $terms) {
-                    $subQuery->select(DB::raw(1))
-                        ->from('barcodes')
-                        ->whereColumn('barcodes.product_id', 'branch_products.product_id')
-                        ->where('barcodes.active', 1)
-                        ->where(function ($barcodeQuery) use ($search, $terms) {
-                            FlexibleSearch::orWhereColumns($barcodeQuery, ['barcodes.code'], $search, $terms);
-                        });
-                });
-            })
-            ->limit(10)
-            ->get()
+        if ($productIds->isEmpty()) {
+            return response()->json([]);
+        }
+
+        $matches = $products
+            ->limit(50)
+            ->get();
+        $matches = $this->productSearch
+            ->sortByRelevance($matches, $productIds)
+            ->take(10);
+
+        return $matches
             ->map(function ($branchProduct) use ($search, $canViewStock) {
                 $branchProduct->loadMissing('product.barcodes');
                 $codes = collect([$branchProduct->barcode])
@@ -700,9 +715,22 @@ class PhysicalCountController extends Controller
         }
 
         if (! $branchProduct && $code !== '') {
+            $productIds = $this->productSearch->ids(
+                $code,
+                new ProductSearchOptions(
+                    branchIds: [$physicalCount->branch_id],
+                    limit: 1,
+                    includeLotNumbers: true,
+                ),
+            );
+
             $branchProduct = BranchProduct::with('product')
                 ->where('branch_id', $physicalCount->branch_id)
-                ->whereHas('product', fn ($query) => $query->where('name', 'LIKE', "%{$code}%"))
+                ->when(
+                    $productIds->isNotEmpty(),
+                    fn ($query) => $query->whereIntegerInRaw('product_id', $productIds->all()),
+                    fn ($query) => $query->whereRaw('1 = 0'),
+                )
                 ->first();
         }
 

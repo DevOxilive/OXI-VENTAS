@@ -2,15 +2,20 @@
 
 namespace App\Models;
 
+use App\Search\ProductSearchDocumentBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
+use Laravel\Scout\Searchable;
 
 class Product extends Model
 {
-    use SoftDeletes;
+    use Searchable, SoftDeletes;
 
     protected $fillable = [
         'name',
+        'search_aliases',
         'description',
         'image',
         'cost',
@@ -31,6 +36,7 @@ class Product extends Model
     ];
 
     protected $casts = [
+        'search_aliases' => 'array',
         'cost' => 'decimal:2',
         'sale_price' => 'decimal:2',
         'margin_percentage' => 'decimal:2',
@@ -70,5 +76,33 @@ class Product extends Model
     public function branchProducts()
     {
         return $this->hasMany(BranchProduct::class);
+    }
+
+    public function searchableAs(): string
+    {
+        return (string) config('scout.prefix', '').'products';
+    }
+
+    public function toSearchableArray(): array
+    {
+        return app(ProductSearchDocumentBuilder::class)->build($this);
+    }
+
+    public function makeSearchableUsing(Collection $models): Collection
+    {
+        return $models->loadMissing([
+            'category.productDepartment',
+            'barcodes',
+            'branchProducts',
+        ]);
+    }
+
+    protected function makeAllSearchableUsing(Builder $query): Builder
+    {
+        return $query->with([
+            'category.productDepartment',
+            'barcodes',
+            'branchProducts',
+        ]);
     }
 }

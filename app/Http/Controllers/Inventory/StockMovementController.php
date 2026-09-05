@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\BranchProduct;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
 use App\Services\StockMovementService;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
@@ -216,7 +218,7 @@ class StockMovementController extends Controller
         ]);
     }
 
-    public function index(Request $request)
+    public function index(Request $request, ProductSearchService $productSearch)
     {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
@@ -273,12 +275,31 @@ class StockMovementController extends Controller
             ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
             ->when($filters['reason'] ?? null, fn ($query, $reason) => $query->where('reason', $reason));
 
-        FlexibleSearch::apply($movements, $filters['search'], function ($query, $phrase, $terms) {
-            FlexibleSearch::orWhereHasColumns($query, 'branchProduct', ['barcode'], $phrase, $terms);
-            FlexibleSearch::orWhereHasColumns($query, 'branchProduct.product', ['name'], $phrase, $terms);
-            FlexibleSearch::orWhereHasColumns($query, 'branchProduct.product.barcodes', ['code'], $phrase, $terms);
-            FlexibleSearch::orWhereHasColumns($query, 'branchProduct.branch', ['name'], $phrase, $terms);
-        });
+        if (filled($filters['search'])) {
+            $search = (string) $filters['search'];
+            $productIds = $productSearch->ids(
+                $search,
+                new ProductSearchOptions(
+                    branchIds: $accessibleBranchIds,
+                    limit: (int) config('product_search.max_results'),
+                ),
+            );
+
+            $movements->where(function ($searchQuery) use ($productIds, $search) {
+                if ($productIds->isEmpty()) {
+                    $searchQuery->whereRaw('1 = 0');
+                } else {
+                    $searchQuery->whereHas('branchProduct', fn ($branchProductQuery) => $branchProductQuery
+                        ->whereIntegerInRaw('product_id', $productIds->all()));
+                }
+
+                $searchQuery->orWhereHas('branchProduct.branch', function ($branchQuery) use ($search) {
+                    FlexibleSearch::applyAllTerms($branchQuery, $search, function ($termQuery, $phrase, $terms) {
+                        FlexibleSearch::orWhereColumns($termQuery, ['name'], $phrase, $terms);
+                    });
+                });
+            });
+        }
 
         return Inertia::render('Inventory/Movements', [
             'movementsDB' => $movements
@@ -292,7 +313,7 @@ class StockMovementController extends Controller
         ]);
     }
 
-    public function searchProducts(Request $request): JsonResponse
+    public function searchProducts(Request $request, ProductSearchService $productSearch): JsonResponse
     {
         $data = $request->validate([
             'search' => ['required', 'string', 'max:100'],
@@ -323,23 +344,31 @@ class StockMovementController extends Controller
             ->where('status', BranchProduct::STATUS_ACTIVE)
             ->whereHas('product', fn ($query) => $query->where('active', true));
 
-        FlexibleSearch::apply($products, $term, function ($query, $phrase, $terms) {
-            FlexibleSearch::orWhereColumns($query, ['branch_products.barcode'], $phrase, $terms);
-            FlexibleSearch::orWhereHasColumns($query, 'product', ['name'], $phrase, $terms);
-            FlexibleSearch::orWhereHasColumns($query, 'product.barcodes', ['code'], $phrase, $terms);
-            FlexibleSearch::orWhereHasColumns($query, 'branch', ['name'], $phrase, $terms);
-        });
+        $productIds = $productSearch->constrainBranchProducts(
+            $products,
+            $term,
+            'branch_products.product_id',
+            'batches',
+            new ProductSearchOptions(
+                branchIds: $accessibleBranchIds,
+                onlyActiveProducts: true,
+                onlyActiveBranchProducts: true,
+                limit: 100,
+                includeLotNumbers: true,
+            ),
+        );
+
+        if ($productIds->isEmpty()) {
+            return response()->json(['products' => []]);
+        }
+
+        $matches = $products
+            ->limit(200)
+            ->get();
+        $matches = $productSearch->sortByRelevance($matches, $productIds)->take(20);
 
         return response()->json([
-            'products' => $products
-                ->orderBy(
-                    \App\Models\Product::query()
-                        ->select('name')
-                        ->whereColumn('products.id', 'branch_products.product_id')
-                        ->limit(1)
-                )
-                ->limit(20)
-                ->get()
+            'products' => $matches
                 ->map(fn (BranchProduct $branchProduct) => [
                     'id' => $branchProduct->id,
                     'name' => $branchProduct->product?->name ?? 'Producto sin nombre',
@@ -373,7 +402,7 @@ class StockMovementController extends Controller
             default => [],
         };
 
-        if (!in_array($reason, $allowedReasons, true)) {
+        if (! in_array($reason, $allowedReasons, true)) {
             throw ValidationException::withMessages([
                 'reason' => 'El motivo seleccionado no corresponde al tipo de movimiento.',
             ]);
@@ -391,7 +420,7 @@ class StockMovementController extends Controller
             default => null,
         };
 
-        if (!$requiredPermission || !$user?->hasPermission($requiredPermission)) {
+        if (! $requiredPermission || ! $user?->hasPermission($requiredPermission)) {
             throw new AuthorizationException('No tienes permisos para registrar este movimiento.');
         }
     }

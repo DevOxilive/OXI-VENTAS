@@ -121,6 +121,8 @@ return [
         'status' => 'estado',
         'branch_id' => 'sucursal',
         'product_id' => 'producto',
+        'search_aliases' => 'alias de búsqueda',
+        'search_aliases.*' => 'alias de búsqueda',
         'user_id' => 'usuario',
         'role_id' => 'rol',
         'image' => 'imagen',

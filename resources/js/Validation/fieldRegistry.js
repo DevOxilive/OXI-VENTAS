@@ -368,6 +368,14 @@ export const fieldRegistry = {
         message: "El nombre permite caracteres especiales visibles.",
     },
 
+    search_alias: {
+        required: false,
+        type: "product_name",
+        max: 60,
+        titleCase: false,
+        message: "El alias permite caracteres especiales visibles.",
+    },
+
     kilogram_quantity: {
         required: true,
         type: "decimal",

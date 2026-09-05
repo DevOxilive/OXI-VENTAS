@@ -49,6 +49,9 @@ const props = defineProps({
 const blockCatalog = getLabelBlockCatalog();
 const selectedProductId = ref(props.products[0]?.id || props.sampleProduct?.id || "");
 const productSearch = ref("");
+const remoteProductIds = ref(null);
+let productSearchTimer = null;
+let productSearchRequest = 0;
 const dragIndex = ref(null);
 const previewLabel = ref(null);
 const activePointerBlockKey = ref(null);
@@ -129,10 +132,49 @@ const filteredProductOptions = computed(() => {
     return productOptions.value;
   }
 
+  if (Array.isArray(remoteProductIds.value)) {
+    const optionsById = new Map(productOptions.value.map((option) => [String(option.value), option]));
+    const matches = remoteProductIds.value
+      .map((id) => optionsById.get(String(id)))
+      .filter(Boolean);
+    const selected = optionsById.get(String(selectedProductId.value));
+
+    if (selected && !matches.some((option) => String(option.value) === String(selected.value))) {
+      matches.push(selected);
+    }
+
+    return matches;
+  }
+
   return productOptions.value.filter((option) => (
     option.searchText.includes(query)
     || String(option.value) === String(selectedProductId.value)
   ));
+});
+
+watch(productSearch, (value) => {
+  clearTimeout(productSearchTimer);
+  const query = value.trim();
+  const requestId = ++productSearchRequest;
+  remoteProductIds.value = null;
+
+  if (!query) return;
+
+  productSearchTimer = setTimeout(async () => {
+    try {
+      const { data } = await window.axios.get(route("printers.labels.products.search"), {
+        params: { search: query },
+      });
+
+      if (requestId === productSearchRequest) {
+        remoteProductIds.value = Array.isArray(data?.product_ids) ? data.product_ids : [];
+      }
+    } catch {
+      if (requestId === productSearchRequest) {
+        remoteProductIds.value = null;
+      }
+    }
+  }, 150);
 });
 
 const printerOptions = computed(() => availablePrinters.value.map((printerName) => ({
@@ -153,6 +195,8 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  clearTimeout(productSearchTimer);
+  productSearchRequest += 1;
   stopHorizontalAdjust();
 });
 

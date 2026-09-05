@@ -14,6 +14,8 @@ use App\Models\Product;
 use App\Models\ProductDepartment;
 use App\Models\Sale;
 use App\Models\SaleDetail;
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
 use App\Services\Reports\SalesReplenishmentReportService;
 use App\Support\TablePagination;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -27,6 +29,10 @@ use Maatwebsite\Excel\Facades\Excel;
 class SalesReportController extends Controller
 {
     use AuthorizesBranchAccess;
+
+    public function __construct(
+        private readonly ProductSearchService $productSearch,
+    ) {}
 
     private const TAB_PRODUCTS = 'products';
     private const TAB_SALES = 'sales';
@@ -368,20 +374,21 @@ class SalesReportController extends Controller
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
             $like = '%'.$this->likeValue($search).'%';
+            $productIds = $this->matchingProductIds($search);
 
-            $query->where(function (Builder $subQuery) use ($like) {
+            $query->where(function (Builder $subQuery) use ($like, $productIds) {
                 $subQuery
                     ->where('folio', 'like', $like)
                     ->orWhereHas('employee', function (Builder $employeeQuery) use ($like) {
                         $employeeQuery
                             ->where('first_name', 'like', $like)
                             ->orWhere('last_name', 'like', $like);
-                    })
-                    ->orWhereHas('details.product', function (Builder $productQuery) use ($like) {
-                        $productQuery
-                            ->where('name', 'like', $like)
-                            ->orWhereHas('barcodes', fn (Builder $barcodeQuery) => $barcodeQuery->where('code', 'like', $like));
                     });
+
+                if ($productIds->isNotEmpty()) {
+                    $subQuery->orWhereHas('details', fn (Builder $detailQuery) => $detailQuery
+                        ->whereIntegerInRaw('product_id', $productIds->all()));
+                }
             });
         }
 
@@ -426,8 +433,9 @@ class SalesReportController extends Controller
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
             $like = '%'.$this->likeValue($search).'%';
+            $productIds = $this->matchingProductIds($search);
 
-            $query->where(function (Builder $subQuery) use ($like) {
+            $query->where(function (Builder $subQuery) use ($like, $productIds) {
                 $subQuery
                     ->where('folio', 'like', $like)
                     ->orWhereHas('account.employee', function (Builder $employeeQuery) use ($like) {
@@ -436,19 +444,19 @@ class SalesReportController extends Controller
                             ->orWhere('last_name', 'like', $like);
                     })
                     ->orWhereHas('receivedBy', fn (Builder $userQuery) => $userQuery->where('name', 'like', $like))
-                    ->orWhereHas('allocations.charge.sale', function (Builder $saleQuery) use ($like) {
+                    ->orWhereHas('allocations.charge.sale', function (Builder $saleQuery) use ($like, $productIds) {
                         $saleQuery
                             ->where('folio', 'like', $like)
                             ->orWhereHas('employee', function (Builder $employeeQuery) use ($like) {
                                 $employeeQuery
                                     ->where('first_name', 'like', $like)
                                     ->orWhere('last_name', 'like', $like);
-                            })
-                            ->orWhereHas('details.product', function (Builder $productQuery) use ($like) {
-                                $productQuery
-                                    ->where('name', 'like', $like)
-                                    ->orWhereHas('barcodes', fn (Builder $barcodeQuery) => $barcodeQuery->where('code', 'like', $like));
                             });
+
+                        if ($productIds->isNotEmpty()) {
+                            $saleQuery->orWhereHas('details', fn (Builder $detailQuery) => $detailQuery
+                                ->whereIntegerInRaw('product_id', $productIds->all()));
+                        }
                     });
             });
         }
@@ -826,23 +834,24 @@ class SalesReportController extends Controller
             return;
         }
 
-        $like = '%'.$this->likeValue($search).'%';
+        $this->productSearch->constrain(
+            $query,
+            $search,
+            'products.id',
+            new ProductSearchOptions(
+                limit: (int) config('product_search.max_results', 10000),
+            ),
+        );
+    }
 
-        $query->where(function ($subQuery) use ($like) {
-            $subQuery
-                ->where('products.name', 'like', $like)
-                ->orWhere('categories.name', 'like', $like)
-                ->orWhere('branch_products.barcode', 'like', $like)
-                ->orWhere('sale_barcodes.code', 'like', $like)
-                ->orWhereExists(function ($barcodeQuery) use ($like) {
-                    $barcodeQuery
-                        ->selectRaw('1')
-                        ->from('barcodes')
-                        ->whereColumn('barcodes.product_id', 'products.id')
-                        ->where('barcodes.code', 'like', $like)
-                        ->whereNull('barcodes.deleted_at');
-                });
-        });
+    private function matchingProductIds(string $search): \Illuminate\Support\Collection
+    {
+        return $this->productSearch->ids(
+            $search,
+            new ProductSearchOptions(
+                limit: (int) config('product_search.max_results', 10000),
+            ),
+        );
     }
 
     private function primaryCodeSubquery(string $productColumn): string

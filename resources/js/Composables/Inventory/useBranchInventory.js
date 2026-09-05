@@ -4,45 +4,6 @@ import { useBatchAdjustmentModal } from "@/Composables/Inventory/useBatchAdjustm
 import { useGlobalTablePagination } from "@/Composables/useGlobalTablePagination";
 import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from "@/realtime";
 
-function normalizeSearchValue(value) {
-    return String(value ?? "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .trim();
-}
-
-function buildProductSearchText(product) {
-    const batches = Array.isArray(product.batches) ? product.batches : [];
-    const batchText = batches
-        .flatMap((batch) => [
-            batch?.lot_number,
-            batch?.formatted_expiration_date,
-            batch?.expiration_date,
-        ])
-        .filter(Boolean)
-        .join(" ");
-
-    return normalizeSearchValue(
-        [
-            product.name,
-            product.code,
-            ...(product.barcodes ?? []),
-            product.category_name,
-            product.category,
-            product.branch,
-            product.status,
-            product.administrativeStatus,
-            product.stockLabel,
-            product.minStockLabel,
-            product.unit,
-            product.expirationDate,
-            product.lastRestockedAt,
-            batchText,
-        ].join(" "),
-    );
-}
-
 function cloneBranchProductsPayload(payload) {
     if (Array.isArray(payload)) {
         return payload.map((item) => ({ ...item }));
@@ -335,17 +296,9 @@ export function useBranchInventory(props) {
         );
     });
 
-    const filteredProducts = computed(() => {
-        const searchValue = normalizeSearchValue(search.value);
-
-        if (!searchValue) {
-            return visualProducts.value;
-        }
-
-        return visualProducts.value.filter((product) =>
-            buildProductSearchText(product).includes(searchValue),
-        );
-    });
+    // La lista ya llega filtrada desde el motor central. Volver a aplicar aqui
+    // una coincidencia literal ocultaria resultados validos como "coc 600".
+    const filteredProducts = computed(() => visualProducts.value);
 
     const expiredBatchesList = computed(() => {
         return inventoryAlerts.value.expired_batches_list ?? [];
@@ -709,7 +662,7 @@ export function useBranchInventory(props) {
 
         searchTimeout = setTimeout(() => {
             reloadInventory();
-        }, 400);
+        }, 150);
     });
 
     watch(recordsToShow, reloadInventory);

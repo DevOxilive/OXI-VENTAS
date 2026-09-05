@@ -528,6 +528,10 @@ Route::middleware([
             ->middleware($labelsAccess)
             ->name('labels.index');
 
+        Route::get('/labels/products/search', [TicketTemplateController::class, 'searchLabelProducts'])
+            ->middleware($labelsAccess)
+            ->name('labels.products.search');
+
         Route::put('/labels/{ticketTemplate}', [TicketTemplateController::class, 'updateLabel'])
             ->middleware('permission:systems.labels.update')
             ->name('labels.update');

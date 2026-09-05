@@ -17,6 +17,8 @@ use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use App\Models\TicketTemplate;
 use App\Models\User;
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
 use App\Services\SaleCancellationService;
 use App\Services\StockMovementService;
 use App\Support\SystemPermission;
@@ -141,16 +143,24 @@ class SalesController extends Controller
             ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereDate('date', '<=', $date))
             ->when($search !== '', function ($query) use ($search) {
                 $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+                $productIds = app(ProductSearchService::class)->ids(
+                    $search,
+                    new ProductSearchOptions(
+                        limit: (int) config('product_search.max_results', 10000),
+                    ),
+                );
 
-                $query->where(function ($subQuery) use ($like) {
+                $query->where(function ($subQuery) use ($like, $productIds) {
                     $subQuery
                         ->where('folio', 'like', $like)
                         ->orWhereHas('employee', fn ($employeeQuery) => $employeeQuery
                             ->where('first_name', 'like', $like)
-                            ->orWhere('last_name', 'like', $like))
-                        ->orWhereHas('details.product', fn ($productQuery) => $productQuery
-                            ->where('name', 'like', $like)
-                            ->orWhereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery->where('code', 'like', $like)));
+                            ->orWhere('last_name', 'like', $like));
+
+                    if ($productIds->isNotEmpty()) {
+                        $subQuery->orWhereHas('details', fn ($detailQuery) => $detailQuery
+                            ->whereIntegerInRaw('product_id', $productIds->all()));
+                    }
                 });
             })
             ->latest('date')
@@ -179,7 +189,7 @@ class SalesController extends Controller
         ]);
     }
 
-    public function searchProducts(Request $request)
+    public function searchProducts(Request $request, ProductSearchService $productSearch)
     {
         $data = $request->validate([
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
@@ -189,7 +199,6 @@ class SalesController extends Controller
         $user = $request->user()->loadMissing(['branches', 'role']);
         $branch = $this->resolveBranchById($data['branch_id'], $user);
         $term = trim($data['search']);
-        $pattern = "%{$term}%";
 
         $products = BranchProduct::query()
             ->with([
@@ -201,40 +210,29 @@ class SalesController extends Controller
             ->where('status', BranchProduct::STATUS_ACTIVE)
             ->whereHas('product', fn ($query) => $query
                 ->where('active', true)
-                ->where('inventory_quantity_mode', '!=', 'legacy_presentation'))
-            ->where(function ($query) use ($term, $pattern) {
-                $query->where('branch_products.barcode', 'like', $pattern)
-                    ->orWhereHas('product', function ($productQuery) use ($term, $pattern) {
-                        $productQuery->where('name', 'like', $pattern)
-                            ->orWhereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery
-                                ->where('code', $term)
-                                ->orWhere('code', 'like', $pattern));
-                    });
-            })
-            ->orderByRaw(
-                'CASE
-                    WHEN branch_products.barcode = ? OR EXISTS (
-                        SELECT 1 FROM barcodes
-                        WHERE barcodes.product_id = branch_products.product_id
-                        AND barcodes.code = ?
-                    ) THEN 0
-                    WHEN EXISTS (
-                        SELECT 1 FROM products
-                        WHERE products.id = branch_products.product_id
-                        AND LOWER(products.name) = LOWER(?)
-                    ) THEN 1
-                    ELSE 2
-                END',
-                [$term, $term, $term]
-            )
-            ->orderBy(
-                \App\Models\Product::query()
-                    ->select('name')
-                    ->whereColumn('products.id', 'branch_products.product_id')
-                    ->limit(1)
-            )
-            ->limit(10)
-            ->get()
+                ->where('inventory_quantity_mode', '!=', 'legacy_presentation'));
+
+        $productIds = $productSearch->ids(
+            $term,
+            new ProductSearchOptions(
+                branchIds: [$branch->id],
+                onlyActiveProducts: true,
+                onlyActiveBranchProducts: true,
+                limit: 50,
+            ),
+        );
+
+        if ($productIds->isEmpty()) {
+            return response()->json(['products' => []]);
+        }
+
+        $matches = $products
+            ->whereIntegerInRaw('branch_products.product_id', $productIds->all())
+            ->limit(50)
+            ->get();
+        $products = $productSearch
+            ->sortByRelevance($matches, $productIds)
+            ->take(10)
             ->map(fn (BranchProduct $branchProduct) => $this->mapBranchProduct($branchProduct, false))
             ->values();
 

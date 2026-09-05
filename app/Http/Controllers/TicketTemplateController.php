@@ -6,6 +6,8 @@ use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Models\Branch;
 use App\Models\Product;
 use App\Models\TicketTemplate;
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -78,6 +80,20 @@ class TicketTemplateController extends Controller
             ],
             'products' => $products,
             'sampleProduct' => $products->first() ?? $this->sampleProduct(),
+        ]);
+    }
+
+    public function searchLabelProducts(Request $request, ProductSearchService $productSearch)
+    {
+        $data = $request->validate([
+            'search' => ['required', 'string', 'max:100'],
+        ]);
+
+        return response()->json([
+            'product_ids' => $productSearch->ids(
+                trim($data['search']),
+                new ProductSearchOptions(limit: 100),
+            )->all(),
         ]);
     }
 
