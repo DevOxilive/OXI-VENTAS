@@ -12,7 +12,8 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductBatch;
 use App\Models\ProductDepartment;
-use App\Support\FlexibleSearch;
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
 use App\Support\TablePagination;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,10 @@ use Inertia\Inertia;
 class BranchInventoryController extends Controller
 {
     use AuthorizesBranchAccess;
+
+    public function __construct(
+        private readonly ProductSearchService $productSearch,
+    ) {}
 
     public function landing(Request $request)
     {
@@ -73,29 +78,21 @@ class BranchInventoryController extends Controller
                 'branch_products.tracks_batches',
                 'branch_products.tracks_expiration',
             ])
-            ->when($branch, fn($query) => $query->where('branch_id', $branch->id))
-            ->when($request->filled('search'), function ($query) use ($request) {
-                FlexibleSearch::apply($query, $request->search, function ($searchQuery, $phrase, $terms) {
-                    FlexibleSearch::orWhereColumns($searchQuery, [
-                        'branch_products.barcode',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product', [
-                        'name',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
-                        'code',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($searchQuery, 'product.category.productDepartment', [
-                        'name',
-                    ], $phrase, $terms);
-
-                    FlexibleSearch::orWhereHasColumns($searchQuery, 'activeBatches', [
-                        'lot_number',
-                    ], $phrase, $terms);
-                });
+            ->when($branch, fn ($query) => $query->where('branch_id', $branch->id))
+            ->when($request->filled('search'), function ($query) use ($request, $branch) {
+                $this->productSearch->constrainBranchProducts(
+                    $query,
+                    (string) $request->search,
+                    'branch_products.product_id',
+                    'batches',
+                    new ProductSearchOptions(
+                        branchIds: $branch ? [$branch->id] : [],
+                        limit: (int) config('product_search.max_results'),
+                        includeLotNumbers: true,
+                        lotStatuses: [ProductBatch::STATUS_ACTIVE],
+                        onlyLotsWithStock: true,
+                    ),
+                );
             })
             ->when($this->selectedIntegerIds($request->input('category')) !== [], function ($query) use ($request) {
                 $categoryIds = $this->selectedIntegerIds($request->input('category'));
@@ -124,17 +121,17 @@ class BranchInventoryController extends Controller
             })
             ->when($request->filled('expiration_status'), function ($query) use ($request, $today, $nearExpirationLimit) {
                 match ($request->expiration_status) {
-                    'expired' => $query->whereHas('activeBatches', fn($query) => $query
+                    'expired' => $query->whereHas('activeBatches', fn ($query) => $query
                         ->whereDate('expiration_date', '<', $today)),
 
-                    'near_expiration' => $query->whereHas('activeBatches', fn($query) => $query
+                    'near_expiration' => $query->whereHas('activeBatches', fn ($query) => $query
                         ->whereDate('expiration_date', '>=', $today)
                         ->whereDate('expiration_date', '<=', $nearExpirationLimit)),
 
-                    'valid' => $query->whereHas('activeBatches', fn($query) => $query
+                    'valid' => $query->whereHas('activeBatches', fn ($query) => $query
                         ->whereDate('expiration_date', '>', $nearExpirationLimit)),
 
-                    'without_expiration' => $query->whereDoesntHave('activeBatches', fn($query) => $query
+                    'without_expiration' => $query->whereDoesntHave('activeBatches', fn ($query) => $query
                         ->whereNotNull('expiration_date')),
 
                     default => null,
@@ -162,14 +159,14 @@ class BranchInventoryController extends Controller
 
         $baseStatsQuery = BranchProduct::query()
             ->where('status', BranchProduct::STATUS_ACTIVE)
-            ->when($branch, fn($query) => $query->where('branch_id', $branch->id));
+            ->when($branch, fn ($query) => $query->where('branch_id', $branch->id));
 
         $batchAlertsQuery = ProductBatch::query()
             ->where('status', ProductBatch::STATUS_ACTIVE)
             ->where('quantity', '>', 0)
             ->whereHas('branchProduct', function ($query) use ($branch) {
                 $query->where('status', BranchProduct::STATUS_ACTIVE)
-                    ->when($branch, fn($query) => $query->where('branch_id', $branch->id));
+                    ->when($branch, fn ($query) => $query->where('branch_id', $branch->id));
             });
 
         $inactiveCandidateProductsQuery = (clone $baseStatsQuery)
@@ -201,13 +198,13 @@ class BranchInventoryController extends Controller
             $productName = collect([
                 $product?->name,
                 $product?->barcodes?->first()?->code,
-            ])->first(fn($value) => filled($value));
+            ])->first(fn ($value) => filled($value));
 
             $productCode = collect([
                 $product?->barcodes?->first()?->code,
                 $product?->barcodes?->first()?->code,
                 "BP-{$batch->branch_product_id}",
-            ])->first(fn($value) => filled($value));
+            ])->first(fn ($value) => filled($value));
 
             return [
                 'id' => $batch->id,
@@ -235,13 +232,13 @@ class BranchInventoryController extends Controller
             $productName = collect([
                 $product?->name,
                 $product?->barcodes?->first()?->code,
-            ])->first(fn($value) => filled($value));
+            ])->first(fn ($value) => filled($value));
 
             $productCode = collect([
                 $product?->barcodes?->first()?->code,
                 $product?->barcodes?->first()?->code,
                 "BP-{$branchProduct->id}",
-            ])->first(fn($value) => filled($value));
+            ])->first(fn ($value) => filled($value));
 
             return [
                 'id' => $branchProduct->id,
@@ -355,7 +352,7 @@ class BranchInventoryController extends Controller
                     'category_id' => $product->category_id,
                     'category_name' => $product->category?->name,
                     'main_barcode' => $product->barcodes?->first()?->code,
-                    'label' => trim($product->name . ' - ' . ($product->barcodes?->first()?->code ?? 'Sin codigo')),
+                    'label' => trim($product->name.' - '.($product->barcodes?->first()?->code ?? 'Sin codigo')),
                 ])
                 ->values(),
 
@@ -584,7 +581,7 @@ class BranchInventoryController extends Controller
             'product.category:id,product_department_id,name',
             'product.category.productDepartment:id,name',
             'product.barcodes:id,product_id,code',
-            'batches' => fn($query) => $query
+            'batches' => fn ($query) => $query
                 ->select([
                     'id',
                     'branch_product_id',
@@ -602,7 +599,7 @@ class BranchInventoryController extends Controller
                 ->orderByRaw('expiration_date IS NULL')
                 ->orderBy('expiration_date')
                 ->orderBy('id'),
-            'movements' => fn($query) => $query
+            'movements' => fn ($query) => $query
                 ->select([
                     'id',
                     'branch_product_id',

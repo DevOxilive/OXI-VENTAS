@@ -14,7 +14,8 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductBatch;
 use App\Models\ProductDepartment;
-use App\Support\FlexibleSearch;
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
 use App\Support\SystemPermission;
 use App\Support\TablePagination;
 use Illuminate\Http\JsonResponse;
@@ -30,7 +31,12 @@ class ProductController extends Controller
 {
     use AuthorizesBranchAccess, ValidatesRecordVersion;
 
+    public function __construct(
+        private readonly ProductSearchService $productSearch,
+    ) {}
+
     private const PRODUCT_IMAGE_PRIVATE_DISK = 'local';
+
     private const PRODUCT_IMAGE_LEGACY_DISK = 'public';
 
     private function calculateMarginPercentage($cost, $salePrice): ?float
@@ -59,7 +65,7 @@ class ProductController extends Controller
         $costPerPiece = (float) $data['cost_per_piece'];
         $costPerBox = $hasBoxPresentation ? (float) $data['cost_per_box'] : null;
 
-        if (!$canManagePricing) {
+        if (! $canManagePricing) {
             $data['sale_price_per_piece'] = round($costPerPiece * 1.10, 2);
             $data['sale_price_per_box'] = $hasBoxPresentation
                 ? round($costPerBox * 1.10, 2)
@@ -73,7 +79,7 @@ class ProductController extends Controller
 
         $margins = array_filter([$pieceMargin, $boxMargin], fn ($margin) => $margin !== null);
 
-        if ($margins !== [] && min($margins) < 10 && !($canManagePricing && ($data['allow_low_margin'] ?? false))) {
+        if ($margins !== [] && min($margins) < 10 && ! ($canManagePricing && ($data['allow_low_margin'] ?? false))) {
             throw ValidationException::withMessages([
                 'sale_price_per_piece' => 'El porcentaje de ganancia no puede ser menor al 10%. Un administrador debe autorizar esta excepción.',
             ]);
@@ -91,18 +97,18 @@ class ProductController extends Controller
      */
     private function resolvePricing(array &$data, bool $canManagePricing, ?Product $currentProduct = null): void
     {
-        if (!$canManagePricing) {
+        if (! $canManagePricing) {
             $data['sale_price'] = $currentProduct
                 ? (float) $currentProduct->sale_price
                 : round(((float) $data['cost']) * 1.10, 2);
         }
 
         $margin = $this->calculateMarginPercentage($data['cost'], $data['sale_price']);
-        $pricingChanged = !$currentProduct
+        $pricingChanged = ! $currentProduct
             || (float) $currentProduct->cost !== (float) $data['cost']
             || (float) $currentProduct->sale_price !== (float) $data['sale_price'];
 
-        if ($pricingChanged && $margin !== null && $margin < 10 && !($canManagePricing && ($data['allow_low_margin'] ?? false))) {
+        if ($pricingChanged && $margin !== null && $margin < 10 && ! ($canManagePricing && ($data['allow_low_margin'] ?? false))) {
             throw ValidationException::withMessages([
                 'sale_price' => 'El porcentaje de ganancia no puede ser menor al 10%. Un administrador debe autorizar esta excepción.',
             ]);
@@ -120,7 +126,7 @@ class ProductController extends Controller
         $query = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
-                'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at,updated_at',
+                'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at,updated_at',
                 'product.category:id,product_department_id,name',
                 'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
@@ -145,25 +151,20 @@ class ProductController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
-
-            FlexibleSearch::apply($query, $search, function ($searchQuery, $phrase, $terms) {
-                FlexibleSearch::orWhereColumns($searchQuery, [
-                    'branch_products.barcode',
-                ], $phrase, $terms);
-
-                FlexibleSearch::orWhereHasColumns($searchQuery, 'product', [
-                    'name',
-                ], $phrase, $terms);
-
-                FlexibleSearch::orWhereHasColumns($searchQuery, 'product.barcodes', [
-                    'code',
-                ], $phrase, $terms);
-
-                FlexibleSearch::orWhereHasColumns($searchQuery, 'product.category.productDepartment', [
-                    'name',
-                ], $phrase, $terms);
-            });
+            $this->productSearch->constrainBranchProducts(
+                $query,
+                (string) $request->search,
+                'branch_products.product_id',
+                'batches',
+                new ProductSearchOptions(
+                    branchIds: [$branch->id],
+                    onlyActiveBranchProducts: true,
+                    limit: (int) config('product_search.max_results'),
+                    includeLotNumbers: true,
+                ),
+                orderByRelevance: true,
+                resetExistingOrder: true,
+            );
         }
 
         $productsDB = $query->paginate($perPage)->withQueryString();
@@ -221,7 +222,7 @@ class ProductController extends Controller
         $branchProduct = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
-                'product:id,name,image,description,category_id,cost,sale_price,margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at',
+                'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at',
                 'product.category:id,product_department_id,name',
                 'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
@@ -231,7 +232,7 @@ class ProductController extends Controller
             ->where('status', BranchProduct::STATUS_ACTIVE)
             ->first();
 
-        if (!$branchProduct) {
+        if (! $branchProduct) {
             return response()->json([
                 'product' => null,
             ]);
@@ -252,13 +253,13 @@ class ProductController extends Controller
 
     public function image(Product $product)
     {
-        if (!$product->image) {
+        if (! $product->image) {
             abort(404);
         }
 
         $disk = $this->resolveImageDisk($product->image);
 
-        if (!$disk) {
+        if (! $disk) {
             abort(404);
         }
 
@@ -278,6 +279,8 @@ class ProductController extends Controller
             'has_box_presentation' => ['nullable', 'boolean'],
             'pieces_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
             'name' => ['required', 'string', 'max:255', 'regex:/^[^\p{C}]+$/u'],
+            'search_aliases' => ['nullable', 'array', 'max:30'],
+            'search_aliases.*' => ['nullable', 'string', 'max:60', 'regex:/^[^\p{C}]+$/u', 'distinct:ignore_case'],
             'image' => ['nullable', 'image', 'max:2048'],
 
             'min_stock' => $this->minimumStockRules((string) $request->input('inventory_unit')),
@@ -300,6 +303,7 @@ class ProductController extends Controller
         ]);
 
         $data['has_box_presentation'] = $request->boolean('has_box_presentation');
+        $data['search_aliases'] = $this->normalizeSearchAliases($data['search_aliases'] ?? []);
 
         $this->resolvePresentationPricing($data, $canManagePricing);
 
@@ -335,7 +339,7 @@ class ProductController extends Controller
             [$product, $branchIds, $activityAction] = DB::transaction(function () use ($data, $imagePath, $barcodes, $requestedBranchIds, $reusableDeletedProduct) {
                 $product = $reusableDeletedProduct
                     ? Product::withTrashed()->lockForUpdate()->findOrFail($reusableDeletedProduct->id)
-                    : new Product();
+                    : new Product;
                 $activityAction = $product->exists ? 'restored' : 'created';
 
                 if ($product->trashed()) {
@@ -344,6 +348,7 @@ class ProductController extends Controller
 
                 $product->fill([
                     'name' => $data['name'],
+                    'search_aliases' => $data['search_aliases'],
                     'description' => null,
                     'image' => $imagePath ?? ($product->exists ? $product->image : null),
                     'cost' => $data['cost'],
@@ -408,6 +413,8 @@ class ProductController extends Controller
             'has_box_presentation' => ['nullable', 'boolean'],
             'pieces_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
             'name' => ['required', 'string', 'max:255', 'regex:/^[^\p{C}]+$/u'],
+            'search_aliases' => ['nullable', 'array', 'max:30'],
+            'search_aliases.*' => ['nullable', 'string', 'max:60', 'regex:/^[^\p{C}]+$/u', 'distinct:ignore_case'],
             'image' => ['nullable', 'image', 'max:2048'],
             'min_stock' => $this->minimumStockRules((string) $request->input('inventory_unit')),
             'product_department_id' => ['nullable', 'required_with:category_name', 'exists:product_departments,id'],
@@ -429,6 +436,7 @@ class ProductController extends Controller
         ]);
 
         $data['has_box_presentation'] = $request->boolean('has_box_presentation');
+        $data['search_aliases'] = $this->normalizeSearchAliases($data['search_aliases'] ?? []);
 
         $this->resolvePresentationPricing($data, $canManagePricing);
 
@@ -476,6 +484,7 @@ class ProductController extends Controller
 
         $changesGlobalProduct = $request->hasFile('image')
             || (string) $product->name !== (string) $data['name']
+            || array_values($product->search_aliases ?? []) !== $data['search_aliases']
             || (int) $product->category_id !== (int) $data['category_id']
             || (float) $product->cost_per_piece !== (float) $data['cost_per_piece']
             || (float) $product->sale_price_per_piece !== (float) $data['sale_price_per_piece']
@@ -514,38 +523,39 @@ class ProductController extends Controller
         try {
             $branchIds = DB::transaction(function () use ($request, $data, $product, $barcodes, $branchIds, $newImagePath, $storageUnit, $isLegacyPresentationProduct) {
 
-            $product = $this->lockCurrentVersion($request, $product);
+                $product = $this->lockCurrentVersion($request, $product);
 
-            $product->update([
-                'name' => $data['name'],
-                'image' => $newImagePath,
-                'category_id' => $data['category_id'],
-                'cost' => $data['cost'],
-                'sale_price' => $data['sale_price'],
-                'margin_percentage' => $data['margin_percentage'],
-                'unit' => $storageUnit,
-                'inventory_unit' => $data['inventory_unit'],
-                'has_box_presentation' => (bool) $data['has_box_presentation'],
-                'inventory_quantity_mode' => $isLegacyPresentationProduct ? 'legacy_presentation' : 'base',
-                'pieces_per_box' => $data['has_box_presentation'] ? $data['pieces_per_box'] : null,
-                'cost_per_piece' => $data['cost_per_piece'],
-                'sale_price_per_piece' => $data['sale_price_per_piece'],
-                'cost_per_box' => $data['has_box_presentation'] ? $data['cost_per_box'] : null,
-                'sale_price_per_box' => $data['has_box_presentation'] ? $data['sale_price_per_box'] : null,
-                'active' => $data['active'] ?? true,
-            ]);
-
-            $this->syncProductBarcodes($product, $barcodes);
-
-            foreach ($branchIds as $branchId) {
-                $this->activateProductForBranch($product, $branchId, $data);
-            }
-
-            BranchProduct::where('product_id', $product->id)
-                ->whereNotIn('branch_id', $branchIds->all())
-                ->update([
-                    'status' => BranchProduct::STATUS_INACTIVE,
+                $product->update([
+                    'name' => $data['name'],
+                    'search_aliases' => $data['search_aliases'],
+                    'image' => $newImagePath,
+                    'category_id' => $data['category_id'],
+                    'cost' => $data['cost'],
+                    'sale_price' => $data['sale_price'],
+                    'margin_percentage' => $data['margin_percentage'],
+                    'unit' => $storageUnit,
+                    'inventory_unit' => $data['inventory_unit'],
+                    'has_box_presentation' => (bool) $data['has_box_presentation'],
+                    'inventory_quantity_mode' => $isLegacyPresentationProduct ? 'legacy_presentation' : 'base',
+                    'pieces_per_box' => $data['has_box_presentation'] ? $data['pieces_per_box'] : null,
+                    'cost_per_piece' => $data['cost_per_piece'],
+                    'sale_price_per_piece' => $data['sale_price_per_piece'],
+                    'cost_per_box' => $data['has_box_presentation'] ? $data['cost_per_box'] : null,
+                    'sale_price_per_box' => $data['has_box_presentation'] ? $data['sale_price_per_box'] : null,
+                    'active' => $data['active'] ?? true,
                 ]);
+
+                $this->syncProductBarcodes($product, $barcodes);
+
+                foreach ($branchIds as $branchId) {
+                    $this->activateProductForBranch($product, $branchId, $data);
+                }
+
+                BranchProduct::where('product_id', $product->id)
+                    ->whereNotIn('branch_id', $branchIds->all())
+                    ->update([
+                        'status' => BranchProduct::STATUS_INACTIVE,
+                    ]);
 
                 return $branchIds->all();
             });
@@ -605,7 +615,7 @@ class ProductController extends Controller
                 $lockedBranchProduct = BranchProduct::query()->whereKey($branchProduct->id)->lockForUpdate()->firstOrFail();
 
                 if ($this->hasProtectedInventory($lockedBranchProduct)) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         'product' => 'No se puede retirar este producto porque el inventario cambio mientras confirmabas la operacion.',
                     ]);
                 }
@@ -835,6 +845,21 @@ class ProductController extends Controller
         }
     }
 
+    private function normalizeSearchAliases(array $aliases): array
+    {
+        return collect($aliases)
+            ->filter(fn ($alias) => is_string($alias))
+            ->map(function (string $alias) {
+                $alias = trim($alias);
+
+                return preg_replace('/\s+/u', ' ', $alias) ?? $alias;
+            })
+            ->filter()
+            ->unique(fn (string $alias) => mb_strtolower($alias))
+            ->values()
+            ->all();
+    }
+
     private function abortIfAnyBranchIsInaccessible(Request $request, $branchIds): void
     {
         $hasInaccessibleBranch = collect($branchIds)
@@ -874,7 +899,7 @@ class ProductController extends Controller
 
     private function resolveImageDisk(?string $path): ?string
     {
-        if (!$path) {
+        if (! $path) {
             return null;
         }
 
@@ -1004,6 +1029,7 @@ class ProductController extends Controller
             'has_box_presentation' => (bool) ($product?->has_box_presentation ?? $product?->unit === 'cj'),
             'inventory_quantity_mode' => $product?->inventory_quantity_mode ?? 'base',
             'name' => $product?->name ?? 'Producto sin nombre',
+            'search_aliases' => $product?->search_aliases ?? [],
             'image' => $imageUrl,
             'image_path' => $product?->image,
             'product_department_id' => $product?->category?->product_department_id,

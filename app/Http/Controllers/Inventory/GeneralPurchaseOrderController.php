@@ -12,6 +12,8 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseOrderTransfer;
 use App\Models\User;
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
 use App\Services\PurchaseCycleService;
 use App\Services\PendingPurchaseOrderEditor;
 use App\Services\SystemAuditService;
@@ -26,7 +28,10 @@ class GeneralPurchaseOrderController extends Controller
 {
     use AuthorizesBranchAccess;
 
-    public function __construct(private readonly PurchaseCycleService $cycles) {}
+    public function __construct(
+        private readonly PurchaseCycleService $cycles,
+        private readonly ProductSearchService $productSearch,
+    ) {}
 
     public function index(Request $request, Branch $branch)
     {
@@ -142,12 +147,29 @@ class GeneralPurchaseOrderController extends Controller
             ->withCount('items')
             ->where('status', $status);
 
-        FlexibleSearch::apply($orders, $filters['search'], function ($query, $phrase, $terms) {
-            FlexibleSearch::orWhereColumns($query, ['general_purchase_orders.folio'], $phrase, $terms);
-            FlexibleSearch::orWhereHasColumns($query, 'items', ['product_name', 'product_code'], $phrase, $terms);
-            FlexibleSearch::orWhereHasColumns($query, 'items.product.barcodes', ['code'], $phrase, $terms);
-            FlexibleSearch::orWhereHasColumns($query, 'branchOrders.branch', ['name'], $phrase, $terms);
-        });
+        if ($filters['search'] !== '') {
+            $matchingProductIds = $this->productSearch->ids(
+                $filters['search'],
+                new ProductSearchOptions(limit: (int) config('product_search.max_results', 10000)),
+            );
+
+            $orders->where(function ($searchQuery) use ($filters, $matchingProductIds) {
+                if ($matchingProductIds->isEmpty()) {
+                    $searchQuery->whereRaw('1 = 0');
+                } else {
+                    $searchQuery->whereHas('items', fn ($itemQuery) => $itemQuery
+                        ->whereIntegerInRaw('product_id', $matchingProductIds->all()));
+                }
+
+                $searchQuery->orWhere(function ($historicalQuery) use ($filters) {
+                    FlexibleSearch::applyAllTerms($historicalQuery, $filters['search'], function ($termQuery, $phrase, $terms) {
+                        FlexibleSearch::orWhereColumns($termQuery, ['general_purchase_orders.folio'], $phrase, $terms);
+                        FlexibleSearch::orWhereHasColumns($termQuery, 'items', ['product_name', 'product_code'], $phrase, $terms);
+                        FlexibleSearch::orWhereHasColumns($termQuery, 'branchOrders.branch', ['name'], $phrase, $terms);
+                    });
+                });
+            });
+        }
 
         $orders = $orders
             ->latest('id')

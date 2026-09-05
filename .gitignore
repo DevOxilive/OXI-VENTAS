@@ -19,6 +19,8 @@
 /public/report_screenshots/
 /public/storage
 /report_screenshots/
+/outputs/
+~$*
 /tools/cloudflared.exe
 /storage/*.key
 /storage/framework/app-tunnel.json

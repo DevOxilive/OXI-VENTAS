@@ -2,12 +2,18 @@
 
 namespace App\Services\Reports;
 
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class SalesReplenishmentReportService
 {
+    public function __construct(
+        private readonly ProductSearchService $productSearch,
+    ) {}
+
     public function build(Collection $branches, array $filters): array
     {
         $branchIds = collect($filters['branch_ids'] ?? [])
@@ -100,21 +106,15 @@ class SalesReplenishmentReportService
         $search = trim((string) ($filters['search'] ?? ''));
 
         if ($search !== '') {
-            $like = '%'.$this->likeValue($search).'%';
-            $query->where(function ($subQuery) use ($like) {
-                $subQuery
-                    ->where('products.name', 'like', $like)
-                    ->orWhere('categories.name', 'like', $like)
-                    ->orWhere('product_departments.name', 'like', $like)
-                    ->orWhereExists(function ($barcodeQuery) use ($like) {
-                        $barcodeQuery
-                            ->selectRaw('1')
-                            ->from('barcodes')
-                            ->whereColumn('barcodes.product_id', 'products.id')
-                            ->where('barcodes.code', 'like', $like)
-                            ->whereNull('barcodes.deleted_at');
-                    });
-            });
+            $this->productSearch->constrain(
+                $query,
+                $search,
+                'products.id',
+                new ProductSearchOptions(
+                    onlyActiveProducts: true,
+                    limit: (int) config('product_search.max_results', 10000),
+                ),
+            );
         }
 
         $departmentIds = collect($filters['department_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->values();
@@ -476,11 +476,6 @@ class SalesReplenishmentReportService
     private function baseUnit(string $unit): string
     {
         return strtolower($unit) === 'kg' ? 'kg' : 'pza';
-    }
-
-    private function likeValue(string $value): string
-    {
-        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 
     private function emptyReport(Collection $branches): array

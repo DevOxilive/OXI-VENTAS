@@ -11,13 +11,16 @@
     "require": {
         "php": "^8.3",
         "barryvdh/laravel-dompdf": "^3.1",
+        "http-interop/http-factory-guzzle": "^1.2",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/framework": "^12.0",
         "laravel/jetstream": "^5.3",
         "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.3",
+        "laravel/scout": "^11.6",
         "laravel/tinker": "^2.10.1",
         "maatwebsite/excel": "^3.1",
+        "meilisearch/meilisearch-php": "^1.17",
         "phpoffice/phpspreadsheet": "*",
         "tightenco/ziggy": "^2.0"
     },

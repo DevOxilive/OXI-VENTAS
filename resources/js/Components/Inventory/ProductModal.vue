@@ -44,6 +44,7 @@ const form = useForm({
   has_box_presentation: false,
   pieces_per_box: "",
   name: "",
+  search_aliases: [""],
   min_stock: 0,
   product_department_id: "",
   category_id: "",
@@ -178,6 +179,36 @@ function clearBarcodeError(index) {
   }
 }
 
+function searchAliasFieldError(index) {
+  return form.errors[`search_aliases.${index}`]
+    || (index === 0 ? form.errors.search_aliases : null);
+}
+
+function clearSearchAliasError(index) {
+  form.clearErrors(`search_aliases.${index}`);
+
+  if (index === 0) {
+    form.clearErrors("search_aliases");
+  }
+}
+
+function addSearchAlias() {
+  if (form.search_aliases.length >= 30) {
+    form.setError("search_aliases", "Puedes registrar hasta 30 alias por producto.");
+    return;
+  }
+
+  form.search_aliases.push("");
+  form.clearErrors("search_aliases");
+}
+
+function removeSearchAlias(index) {
+  if (form.search_aliases.length === 1) return;
+
+  form.search_aliases.splice(index, 1);
+  form.clearErrors("search_aliases", `search_aliases.${index}`);
+}
+
 function clearFieldErrors(...fields) {
   form.clearErrors(...fields);
 }
@@ -194,6 +225,7 @@ function captureFormSnapshot() {
     has_box_presentation: form.has_box_presentation,
     pieces_per_box: form.pieces_per_box,
     name: form.name,
+    search_aliases: [...form.search_aliases],
     min_stock: form.min_stock,
     product_department_id: form.product_department_id,
     category_id: form.category_id,
@@ -226,6 +258,7 @@ function restoreFormSnapshot(snapshot) {
   form.has_box_presentation = snapshot.has_box_presentation;
   form.pieces_per_box = snapshot.pieces_per_box;
   form.name = snapshot.name;
+  form.search_aliases = [...snapshot.search_aliases];
   form.min_stock = snapshot.min_stock;
   form.product_department_id = snapshot.product_department_id;
   form.category_id = snapshot.category_id;
@@ -267,6 +300,9 @@ watch(
     form.has_box_presentation = Boolean(product.has_box_presentation ?? product.unit === "cj");
     form.pieces_per_box = product.pieces_per_box ?? "";
     form.name = product.name ?? "";
+    form.search_aliases = product.search_aliases?.length
+      ? [...product.search_aliases]
+      : [""];
     form.branch_ids = product?.branch_ids?.length
       ? product.branch_ids.map(Number)
       : [product.branch_id].filter(Boolean).map(Number);
@@ -432,6 +468,7 @@ function setCreateDefaults() {
   form.has_box_presentation = false;
   form.pieces_per_box = "";
   form.name = "";
+  form.search_aliases = [""];
   form.min_stock = 0;
   form.product_department_id = "";
   form.category_id = "";
@@ -648,6 +685,7 @@ function submit() {
             title: "Error al crear producto",
             message:
               errors.name ||
+              errors.search_aliases ||
               errors.product_department_id ||
               errors.category_id ||
               errors.category_name ||
@@ -716,6 +754,7 @@ function submit() {
               title: "Error al crear producto",
               message:
                 errors.name ||
+                errors.search_aliases ||
                 errors.product_department_id ||
                 errors.category_id ||
                 errors.category_name ||
@@ -839,47 +878,94 @@ function submit() {
         <div class="min-w-0 space-y-4">
         <section class="space-y-3">
           <div class="border-y border-secondary py-4">
-            <div class="mb-3 flex items-center justify-between gap-3">
-              <span aria-hidden="true"></span>
-
-              <button
-                v-if="mode !== 'view'"
-                type="button"
-                @click="addBarcode"
-                class="inline-flex items-center justify-center rounded-xl border border-secondary bg-background px-3 py-2 text-xs font-semibold text-text transition hover:border-primary hover:text-primary"
-              >
-                Agregar código
-              </button>
-            </div>
-
-            <div class="max-h-[152px] space-y-2 overflow-y-auto pr-1">
-              <div
-                v-for="(barcode, index) in form.barcodes"
-                :key="index"
-                class="flex items-start gap-2"
-              >
-                <div class="flex-1">
-                  <InputField
-                    :label="index === 0 ? 'Código principal' : `Alterno ${index}`"
-                    :field="`barcodes.${index}`"
-                    validation-field="barcode"
-                    v-model="form.barcodes[index]"
-                    icon="barcode_scanner"
-                    :data-modal-autofocus="index === 0 ? '' : null"
-                    :error="barcodeFieldError(index)"
-                    :readonly="mode === 'view'"
-                    @validate="clearBarcodeError(index)"
-                  />
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div class="min-w-0">
+                <div class="mb-3 flex min-h-9 items-center justify-end">
+                  <button
+                    v-if="mode !== 'view'"
+                    type="button"
+                    @click="addBarcode"
+                    class="inline-flex items-center justify-center rounded-xl border border-secondary bg-background px-3 py-2 text-xs font-semibold text-text transition hover:border-primary hover:text-primary"
+                  >
+                    Agregar código
+                  </button>
                 </div>
 
-                <ActionIconButton
-                  v-if="form.barcodes.length > 1 && mode !== 'view'"
-                  class="mt-7 shrink-0"
-                  icon="delete"
-                  title="Eliminar código"
-                  variant="red"
-                  @click="removeBarcode(index)"
-                />
+                <div class="max-h-[152px] space-y-2 overflow-y-auto pr-1">
+                  <div
+                    v-for="(barcode, index) in form.barcodes"
+                    :key="index"
+                    class="flex items-start gap-2"
+                  >
+                    <div class="min-w-0 flex-1">
+                      <InputField
+                        :label="index === 0 ? 'Código principal' : `Alterno ${index}`"
+                        :field="`barcodes.${index}`"
+                        validation-field="barcode"
+                        v-model="form.barcodes[index]"
+                        icon="barcode_scanner"
+                        :data-modal-autofocus="index === 0 ? '' : null"
+                        :error="barcodeFieldError(index)"
+                        :readonly="mode === 'view'"
+                        @validate="clearBarcodeError(index)"
+                      />
+                    </div>
+
+                    <ActionIconButton
+                      v-if="form.barcodes.length > 1 && mode !== 'view'"
+                      class="mt-7 shrink-0"
+                      icon="delete"
+                      title="Eliminar código"
+                      variant="red"
+                      @click="removeBarcode(index)"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="min-w-0 border-t border-secondary pt-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+                <div class="mb-3 flex min-h-9 items-center justify-end">
+                  <button
+                    v-if="mode !== 'view'"
+                    type="button"
+                    @click="addSearchAlias"
+                    class="inline-flex items-center justify-center rounded-xl border border-secondary bg-background px-3 py-2 text-xs font-semibold text-text transition hover:border-primary hover:text-primary"
+                  >
+                    Agregar alias
+                  </button>
+                </div>
+
+                <div class="max-h-[152px] space-y-2 overflow-y-auto pr-1">
+                  <div
+                    v-for="(alias, index) in form.search_aliases"
+                    :key="index"
+                    class="flex items-start gap-2"
+                  >
+                    <div class="min-w-0 flex-1">
+                      <InputField
+                        :label="index === 0 ? 'Alias de búsqueda' : `Alias ${index + 1}`"
+                        :field="`search_aliases.${index}`"
+                        validation-field="search_alias"
+                        v-model="form.search_aliases[index]"
+                        icon="manage_search"
+                        preserve-case
+                        placeholder="Ej. skw"
+                        :error="searchAliasFieldError(index)"
+                        :readonly="mode === 'view'"
+                        @validate="clearSearchAliasError(index)"
+                      />
+                    </div>
+
+                    <ActionIconButton
+                      v-if="form.search_aliases.length > 1 && mode !== 'view'"
+                      class="mt-7 shrink-0"
+                      icon="delete"
+                      title="Eliminar alias"
+                      variant="red"
+                      @click="removeSearchAlias(index)"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>

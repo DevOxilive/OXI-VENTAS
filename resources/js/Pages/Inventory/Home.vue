@@ -283,7 +283,7 @@ watch(search, () => {
 
   searchTimer = setTimeout(() => {
     reloadProducts(1)
-  }, 400)
+  }, 150)
 })
 
 watch([productDepartmentFilter, categoryFilter, recordsToShow], () => {

@@ -9,6 +9,12 @@ use Illuminate\Auth\Events\Failed;
 use App\Services\SystemAuditService;
 use App\Actions\GeneratePlatformPasskeyRegistrationOptions;
 use Laravel\Passkeys\Actions\GenerateRegistrationOptions;
+use App\Models\Barcode;
+use App\Models\BranchProduct;
+use App\Models\Category;
+use App\Models\ProductDepartment;
+use App\Observers\ProductSearchRelationObserver;
+use App\Observers\ProductSearchTaxonomyObserver;
 use App\Observers\SystemAuditObserver;
 use App\Models\{CashRegisterClosure, PhysicalCount, PhysicalCountEntry};
 use App\Support\TrashRegistry;
@@ -62,6 +68,14 @@ class AppServiceProvider extends ServiceProvider
         foreach ([...TrashRegistry::modelClasses(), CashRegisterClosure::class, PhysicalCount::class, PhysicalCountEntry::class] as $model) {
             $model::observe($observer);
         }
+
+        $searchRelationObserver = app(ProductSearchRelationObserver::class);
+        Barcode::observe($searchRelationObserver);
+        BranchProduct::observe($searchRelationObserver);
+
+        $searchTaxonomyObserver = app(ProductSearchTaxonomyObserver::class);
+        Category::observe($searchTaxonomyObserver);
+        ProductDepartment::observe($searchTaxonomyObserver);
 
         \Illuminate\Support\Facades\Event::listen(Login::class, function (Login $event) use ($audit) {
             $audit->record('authentication', 'login', 'success', request(), ['actor' => $event->user]);

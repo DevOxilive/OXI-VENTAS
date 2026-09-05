@@ -21,6 +21,24 @@ class FlexibleSearch
         });
     }
 
+    public static function applyAllTerms($query, ?string $search, Closure $callback): void
+    {
+        $phrase = trim((string) $search);
+
+        if ($phrase === '') {
+            return;
+        }
+
+        $terms = self::terms($phrase);
+        $matchTerms = $terms !== [] ? $terms : [$phrase];
+
+        foreach ($matchTerms as $term) {
+            $query->where(function ($nestedQuery) use ($callback, $term) {
+                $callback($nestedQuery, $term, []);
+            });
+        }
+    }
+
     public static function terms(string $phrase): array
     {
         return collect(preg_split('/\s+/u', mb_strtolower(trim($phrase))) ?: [])

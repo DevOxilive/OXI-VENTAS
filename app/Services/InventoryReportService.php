@@ -6,11 +6,18 @@ use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\ProductBatch;
 use App\Models\StockMovement;
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
 use App\Support\FlexibleSearch;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class InventoryReportService
 {
+    public function __construct(
+        private readonly ProductSearchService $productSearch,
+    ) {}
+
     public function rows(Branch $branch, array $filters, bool $paginate = false)
     {
         if (in_array($filters['status'] ?? null, ['low_stock', 'out_of_stock'], true)) {
@@ -124,12 +131,12 @@ class InventoryReportService
             ->orderBy('products.name');
 
         $this->applyProductFilters($query, $filters);
-        $this->applySearchFilter($query, $filters, [
-            'products.name',
-            'product_departments.name',
-            'categories.name',
-            'product_batches.lot_number',
-        ]);
+        $this->applySearchFilter(
+            $query,
+            $filters,
+            (int) $branch->id,
+            ['product_batches.lot_number'],
+        );
         $this->applyBatchExpirationPeriod($query, $filters);
 
         match ($filters['status'] ?? null) {
@@ -162,11 +169,11 @@ class InventoryReportService
                 ->unique()
                 ->count(),
             'expired_batches' => $rows
-                ->filter(fn ($row) => $row->expiration_date && \Carbon\Carbon::parse($row->expiration_date)->lt($today))
+                ->filter(fn ($row) => $row->expiration_date && Carbon::parse($row->expiration_date)->lt($today))
                 ->count(),
             'near_expiration_batches' => $rows
                 ->filter(fn ($row) => $row->expiration_date
-                    && \Carbon\Carbon::parse($row->expiration_date)->betweenIncluded($today, $nearLimit))
+                    && Carbon::parse($row->expiration_date)->betweenIncluded($today, $nearLimit))
                 ->count(),
             'attention_products' => 0,
         ];
@@ -252,25 +259,27 @@ class InventoryReportService
 
         $this->applyPeriod($query, $filters, 'stock_movements.created_at');
         $this->applyProductFilters($query, $filters);
-        $this->applySearchFilter($query, $filters, [
-            'products.name',
-            'product_departments.name',
-            'categories.name',
-            'product_batches.lot_number',
-            'users.name',
-            'stock_movements.reason',
-            'stock_movements.notes',
-        ]);
+        $this->applySearchFilter(
+            $query,
+            $filters,
+            (int) $branch->id,
+            [
+                'users.name',
+                'product_batches.lot_number',
+                'stock_movements.reason',
+                'stock_movements.notes',
+            ],
+        );
 
-        if (!empty($filters['user_id'])) {
+        if (! empty($filters['user_id'])) {
             $query->where('stock_movements.user_id', $filters['user_id']);
         }
 
-        if (!empty($filters['movement_type'])) {
+        if (! empty($filters['movement_type'])) {
             $query->where('stock_movements.type', $filters['movement_type']);
         }
 
-        if (!empty($filters['movement_reason'])) {
+        if (! empty($filters['movement_reason'])) {
             $query->where('stock_movements.reason', $filters['movement_reason']);
         }
 
@@ -355,11 +364,7 @@ class InventoryReportService
             ]);
 
         $this->applyProductFilters($query, $filters);
-        $this->applySearchFilter($query, $filters, [
-            'products.name',
-            'product_departments.name',
-            'categories.name',
-        ]);
+        $this->applySearchFilter($query, $filters, (int) $branch->id);
 
         return $this->resolveTableResult($query, $filters, $paginate);
     }
@@ -456,11 +461,7 @@ class InventoryReportService
             ]);
 
         $this->applyProductFilters($query, $filters);
-        $this->applySearchFilter($query, $filters, [
-            'products.name',
-            'product_departments.name',
-            'categories.name',
-        ]);
+        $this->applySearchFilter($query, $filters, (int) $branch->id);
 
         match ($filters['status'] ?? null) {
             'out_of_stock' => $query->where('branch_products.stock', '<=', 0),
@@ -490,36 +491,50 @@ class InventoryReportService
 
     private function applyProductFilters($query, array $filters): void
     {
-        if (!empty($filters['product_id'])) {
+        if (! empty($filters['product_id'])) {
             $query->where('branch_products.id', $filters['product_id']);
         }
 
-        if (!empty($filters['category_id'])) {
+        if (! empty($filters['category_id'])) {
             $query->where('products.category_id', $filters['category_id']);
         }
     }
 
-    private function applySearchFilter($query, array $filters, array $columns): void
-    {
+    private function applySearchFilter(
+        $query,
+        array $filters,
+        int $branchId,
+        array $extraColumns = [],
+    ): void {
         if (empty($filters['search'])) {
             return;
         }
 
-        FlexibleSearch::apply($query, $filters['search'], function ($searchQuery, $phrase, $terms) use ($columns) {
-            FlexibleSearch::orWhereColumns($searchQuery, array_merge($columns, [
-                'branch_products.barcode',
-            ]), $phrase, $terms);
+        $search = (string) $filters['search'];
+        $terms = FlexibleSearch::terms($search);
+        $terms = $terms !== [] ? $terms : [$search];
 
-            FlexibleSearch::orWhereExists($searchQuery, function ($subQuery) use ($phrase, $terms) {
-                $subQuery
-                    ->select(DB::raw(1))
-                    ->from('barcodes')
-                    ->whereColumn('barcodes.product_id', 'products.id')
-                    ->where(function ($barcodeQuery) use ($phrase, $terms) {
-                        FlexibleSearch::orWhereColumns($barcodeQuery, ['barcodes.code'], $phrase, $terms);
-                    });
+        foreach ($terms as $term) {
+            $productIds = $this->productSearch->ids(
+                $term,
+                new ProductSearchOptions(
+                    branchIds: [$branchId],
+                    limit: (int) config('product_search.max_results'),
+                ),
+            );
+
+            $query->where(function ($termQuery) use ($productIds, $term, $extraColumns) {
+                if ($productIds->isEmpty()) {
+                    $termQuery->whereRaw('1 = 0');
+                } else {
+                    $termQuery->whereIntegerInRaw('products.id', $productIds->all());
+                }
+
+                if ($extraColumns !== []) {
+                    FlexibleSearch::orWhereColumns($termQuery, $extraColumns, $term);
+                }
             });
-        });
+        }
     }
 
     private function productCodeExpression(): string
@@ -537,15 +552,15 @@ class InventoryReportService
 
     private function applyPeriod($query, array $filters, string $column = 'created_at'): void
     {
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->whereDate($column, '>=', $filters['date_from']);
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $query->whereDate($column, '<=', $filters['date_to']);
         }
 
-        if (!empty($filters['date_from']) || !empty($filters['date_to'])) {
+        if (! empty($filters['date_from']) || ! empty($filters['date_to'])) {
             return;
         }
 
@@ -561,11 +576,11 @@ class InventoryReportService
 
     private function applyBatchExpirationPeriod($query, array $filters): void
     {
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->whereDate('product_batches.expiration_date', '>=', $filters['date_from']);
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $query->whereDate('product_batches.expiration_date', '<=', $filters['date_to']);
         }
     }
@@ -574,7 +589,7 @@ class InventoryReportService
     {
         $query->whereDate('product_batches.expiration_date', '>=', today());
 
-        if (!empty($filters['date_from']) || !empty($filters['date_to'])) {
+        if (! empty($filters['date_from']) || ! empty($filters['date_to'])) {
             return;
         }
 

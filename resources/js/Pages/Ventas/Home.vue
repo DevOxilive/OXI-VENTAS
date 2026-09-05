@@ -83,7 +83,7 @@ const props = defineProps({
 const page = usePage();
 const { can } = usePermissions();
 const CASH_BOX_STORAGE_KEY = "ventas_cash_box_by_branch";
-const PRODUCT_SEARCH_DEBOUNCE_MS = 300;
+const PRODUCT_SEARCH_DEBOUNCE_MS = 120;
 const PRODUCT_SEARCH_CACHE_TTL_MS = 5000;
 const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
 
@@ -267,6 +267,10 @@ const searchSuggestions = computed(() => {
   const query = search.value.trim().toLowerCase();
 
   if (!query) return [];
+
+  if (remoteSearchProducts.value.length) {
+    return filteredProducts.value.slice(0, 20);
+  }
 
   return filteredProducts.value
     .slice()

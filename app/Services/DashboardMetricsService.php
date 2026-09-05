@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Branch;
 use App\Models\Sale;
 use App\Models\StockMovement;
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -16,6 +18,10 @@ use Illuminate\Support\Facades\DB;
  */
 class DashboardMetricsService
 {
+    public function __construct(
+        private readonly ProductSearchService $productSearch,
+    ) {}
+
     public function payload(Collection $branchIds, Carbon $start, Carbon $end): array
     {
         return $this->summaryPayload($branchIds, $start, $end) + [
@@ -57,25 +63,34 @@ class DashboardMetricsService
             return collect();
         }
 
-        return DB::table('products')
+        $productIds = $this->productSearch->ids(
+            $term,
+            new ProductSearchOptions(
+                branchIds: $branchIds->all(),
+                onlyActiveProducts: true,
+                onlyActiveBranchProducts: true,
+                limit: 50,
+            ),
+        );
+
+        if ($productIds->isEmpty()) {
+            return collect();
+        }
+
+        $matches = DB::table('products')
             ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
             ->whereIn('branch_products.branch_id', $branchIds)
             ->where('products.active', true)
-            ->where(function (Builder $query) use ($term) {
-                $query->where('products.name', 'like', "%{$term}%")
-                    ->orWhereExists(function (Builder $barcodeQuery) use ($term) {
-                        $barcodeQuery->selectRaw('1')
-                            ->from('barcodes')
-                            ->whereColumn('barcodes.product_id', 'products.id')
-                            ->where('barcodes.code', 'like', "%{$term}%");
-                    });
-            })
+            ->whereIntegerInRaw('products.id', $productIds->all())
             ->select('products.id', 'products.name')
             ->selectRaw('MIN((SELECT code FROM barcodes WHERE barcodes.product_id = products.id ORDER BY id LIMIT 1)) as code')
             ->groupBy('products.id', 'products.name')
-            ->orderBy('products.name')
-            ->limit(10)
-            ->get()
+            ->limit(50)
+            ->get();
+
+        return $this->productSearch
+            ->sortByRelevance($matches, $productIds, 'id')
+            ->take(10)
             ->map(fn ($row) => [
                 'id' => (int) $row->id,
                 'name' => $row->name,
