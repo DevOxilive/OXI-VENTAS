@@ -54,7 +54,7 @@ class StockMovementController extends Controller
                 ]),
             ],
 
-            'quantity' => ['required', 'numeric', 'min:0.001'],
+            'quantity' => ['required', 'numeric', $request->input('type') === StockMovement::TYPE_ADJUSTMENT ? 'not_in:0' : 'min:0.001'],
             'notes' => ['nullable', 'string', 'max:500'],
 
             /*
@@ -460,14 +460,14 @@ class StockMovementController extends Controller
             $value = (float) $quantity;
 
             if ($unit === 'kg') {
-                if ($value > 999.999 || abs($value - round($value, 3)) > 0.0000001) {
+                if (abs($value) > 999.999 || abs($value - round($value, 3)) > 0.0000001) {
                     $errors[$field] = 'Los kilogramos permiten hasta 999.999 con un máximo de tres decimales.';
                 }
 
                 continue;
             }
 
-            if ($value > 999 || abs($value - round($value)) > 0.0000001) {
+            if (abs($value) > 999 || abs($value - round($value)) > 0.0000001) {
                 $errors[$field] = 'La cantidad debe ser un número entero entre 1 y 999.';
             }
         }

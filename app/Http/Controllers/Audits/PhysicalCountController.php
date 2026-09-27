@@ -996,12 +996,6 @@ class PhysicalCountController extends Controller
                 $difference = $countedBatchQuantity - $snapshotBatchQuantity;
                 $newBatchQuantity = $currentBatchQuantity + $difference;
 
-                if ($newBatchQuantity < 0) {
-                    throw ValidationException::withMessages([
-                        'stock' => "El lote {$batch->lot_number} cambio despues del conteo y la diferencia dejaria stock negativo.",
-                    ]);
-                }
-
                 if ($difference === 0.0) {
                     continue;
                 }
@@ -1064,7 +1058,6 @@ class PhysicalCountController extends Controller
                 ProductBatch::STATUS_ACTIVE,
                 ProductBatch::STATUS_SEASONAL,
             ])
-            ->where('quantity', '>', 0)
             ->sum('quantity');
 
         $branchProduct->update([
@@ -1368,7 +1361,7 @@ class PhysicalCountController extends Controller
     {
         return ProductBatch::where('branch_product_id', $branchProduct->id)
             ->where(function ($query) {
-                $query->where('quantity', '>', 0)
+                $query->where('quantity', '!=', 0)
                     ->orWhere(function ($pendingQuery) {
                         $pendingQuery
                             ->where('quantity', 0)

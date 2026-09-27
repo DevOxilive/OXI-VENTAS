@@ -14,7 +14,6 @@ use App\Models\ProductBatch;
 use App\Models\Sale;
 use App\Models\SaleDetail;
 use App\Models\StockMovement;
-use App\Models\StockMovementBatch;
 use App\Models\TicketTemplate;
 use App\Models\User;
 use App\Search\ProductSearchOptions;
@@ -363,7 +362,6 @@ class SalesController extends Controller
                 $discountPercentage = round((float) ($item['discount_percentage'] ?? 0), 2);
                 $unitPrice = round($originalUnitPrice * (1 - ($discountPercentage / 100)), 2);
                 $discountAmount = round(($originalUnitPrice - $unitPrice) * $quantity, 2);
-                $availableStock = (float) $branchProduct->stock;
 
                 if ($discountPercentage < 0 || $discountPercentage > 100) {
                     throw ValidationException::withMessages([
@@ -376,25 +374,6 @@ class SalesController extends Controller
                         'items' => 'El precio final no puede ser mayor al precio original del producto.',
                     ]);
                 }
-
-                if ($availableStock < $baseQuantity) {
-                    throw ValidationException::withMessages([
-                        'items' => sprintf(
-                            'No hay stock suficiente para %s. Disponible: %s',
-                            $branchProduct->product?->name ?? 'el producto',
-                            number_format($availableStock, 2)
-                        ),
-                    ]);
-                }
-
-                $useBatches = (bool) $branchProduct->tracks_batches
-                    && ProductBatch::where('branch_product_id', $branchProduct->id)
-                        ->whereIn('status', [
-                            ProductBatch::STATUS_ACTIVE,
-                            ProductBatch::STATUS_SEASONAL,
-                        ])
-                        ->where('quantity', '>', 0)
-                        ->exists();
 
                 $subtotal = round($quantity * $unitPrice, 2);
                 $total += $subtotal;
@@ -418,46 +397,16 @@ class SalesController extends Controller
                     'subtotal' => $subtotal,
                 ]);
 
-                if ($useBatches) {
-                    $manualBatches = $this->allocateBatchesForSale($branchProduct, $baseQuantity);
-
-                    $stockService->move(
-                        branchProduct: $branchProduct,
-                        type: StockMovement::TYPE_OUT,
-                        reason: StockMovement::REASON_SALE,
-                        quantity: $baseQuantity,
-                        notes: 'Venta generada desde punto de venta',
-                        userId: $user->id,
-                        batches: [],
-                        batchAllocationMethod: StockMovementBatch::ALLOCATION_MANUAL,
-                        manualBatches: $manualBatches,
-                        saleId: $sale->id,
-                        saleDetailId: $saleDetail->id
-                    );
-                } else {
-                    $previousStock = (float) $branchProduct->stock;
-                    $newStock = $previousStock - $baseQuantity;
-
-                    $branchProduct->update([
-                        'stock' => $newStock,
-                    ]);
-
-                    StockMovement::create([
-                        'branch_product_id' => $branchProduct->id,
-                        'sale_id' => $sale->id,
-                        'sale_detail_id' => $saleDetail->id,
-                        'type' => StockMovement::TYPE_OUT,
-                        'reason' => StockMovement::REASON_SALE,
-                        'quantity' => $baseQuantity,
-                        'unit_cost' => $presentation === 'box'
-                            ? ($product?->cost_per_box ?? 0)
-                            : ($product?->cost_per_piece ?? $product?->cost ?? 0),
-                        'previous_stock' => $previousStock,
-                        'new_stock' => $newStock,
-                        'user_id' => $user->id,
-                        'notes' => 'Venta generada desde punto de venta',
-                    ]);
-                }
+                $stockService->move(
+                    branchProduct: $branchProduct,
+                    type: StockMovement::TYPE_OUT,
+                    reason: StockMovement::REASON_SALE,
+                    quantity: $baseQuantity,
+                    notes: 'Venta generada desde punto de venta',
+                    userId: $user->id,
+                    saleId: $sale->id,
+                    saleDetailId: $saleDetail->id,
+                );
             }
 
             $total = round($total, 2);
@@ -744,53 +693,6 @@ class SalesController extends Controller
         }
 
         return $query->firstOrFail();
-    }
-
-    private function allocateBatchesForSale(BranchProduct $branchProduct, float $quantity): array
-    {
-        $remaining = $quantity;
-
-        $allocation = ProductBatch::query()
-            ->where('branch_product_id', $branchProduct->id)
-            ->whereIn('status', [
-                ProductBatch::STATUS_ACTIVE,
-                ProductBatch::STATUS_SEASONAL,
-            ])
-            ->where('quantity', '>', 0)
-            ->orderByRaw('CASE WHEN expiration_date IS NULL THEN 1 ELSE 0 END')
-            ->orderBy('expiration_date')
-            ->orderBy('received_at')
-            ->orderBy('id')
-            ->get()
-            ->reduce(function (array $allocation, ProductBatch $batch) use (&$remaining) {
-                if ($remaining <= 0) {
-                    return $allocation;
-                }
-
-                $available = (float) $batch->quantity;
-                $take = min($available, $remaining);
-
-                if ($take <= 0) {
-                    return $allocation;
-                }
-
-                $allocation[] = [
-                    'id' => $batch->id,
-                    'quantity' => $take,
-                ];
-
-                $remaining -= $take;
-
-                return $allocation;
-            }, []);
-
-        if ($remaining > 0) {
-            throw ValidationException::withMessages([
-                'items' => 'No hay stock suficiente en lotes para completar la venta.',
-            ]);
-        }
-
-        return $allocation;
     }
 
     private function mapNearExpirationBatch(BranchProduct $branchProduct): ?array

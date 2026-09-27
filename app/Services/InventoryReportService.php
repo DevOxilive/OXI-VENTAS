@@ -66,7 +66,9 @@ class InventoryReportService
             'out_of_stock' => (int) ($productSummary->out_of_stock ?? 0),
             'expired_batches' => (int) ($batchSummary->expired_batches ?? 0),
             'near_expiration_batches' => (int) ($batchSummary->near_expiration_batches ?? 0),
-            'attention_products' => $this->attentionProducts($branch)->count(),
+            // Count in MySQL. Loading every attention row just to count it
+            // made the report grow with the full inventory of the branch.
+            'attention_products' => $this->attentionProducts($branch, [], false, true),
         ];
     }
 
@@ -90,7 +92,7 @@ class InventoryReportService
                 ProductBatch::STATUS_ACTIVE,
                 ProductBatch::STATUS_SEASONAL,
             ])
-            ->where('product_batches.quantity', '>', 0)
+            ->where('product_batches.quantity', '!=', 0)
             ->select([
                 'product_batches.id',
                 DB::raw($this->productCodeExpression().' as code'),
@@ -120,6 +122,7 @@ class InventoryReportService
                 DB::raw('NULL as notes'),
                 DB::raw('
                     CASE
+                        WHEN product_batches.quantity < 0 THEN "Stock negativo"
                         WHEN product_batches.expiration_date < CURDATE() THEN "Caducado"
                         WHEN product_batches.expiration_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN "Proximo a caducar"
                         ELSE "Vigente"
@@ -138,6 +141,10 @@ class InventoryReportService
             ['product_batches.lot_number'],
         );
         $this->applyBatchExpirationPeriod($query, $filters);
+
+        if (($filters['report'] ?? null) === 'expirations' || in_array($filters['status'] ?? null, ['expired', 'near_expiration'], true)) {
+            $query->where('product_batches.quantity', '>', 0);
+        }
 
         match ($filters['status'] ?? null) {
             'expired' => $query->whereDate('product_batches.expiration_date', '<', today()),
@@ -169,10 +176,10 @@ class InventoryReportService
                 ->unique()
                 ->count(),
             'expired_batches' => $rows
-                ->filter(fn ($row) => $row->expiration_date && Carbon::parse($row->expiration_date)->lt($today))
+                ->filter(fn ($row) => (float) ($row->quantity ?? 0) > 0 && $row->expiration_date && Carbon::parse($row->expiration_date)->lt($today))
                 ->count(),
             'near_expiration_batches' => $rows
-                ->filter(fn ($row) => $row->expiration_date
+                ->filter(fn ($row) => (float) ($row->quantity ?? 0) > 0 && $row->expiration_date
                     && Carbon::parse($row->expiration_date)->betweenIncluded($today, $nearLimit))
                 ->count(),
             'attention_products' => 0,
@@ -290,7 +297,7 @@ class InventoryReportService
 
     public function expirations(Branch $branch, array $filters)
     {
-        return $this->inventoryLots($branch, $filters);
+        return $this->inventoryLots($branch, [...$filters, 'report' => 'expirations']);
     }
 
     public function rotation(Branch $branch, array $filters, bool $paginate = false)
@@ -371,7 +378,12 @@ class InventoryReportService
         return $this->resolveTableResult($query, $filters, $paginate);
     }
 
-    public function attentionProducts(Branch $branch, array $filters = [], bool $paginate = false)
+    public function attentionProducts(
+        Branch $branch,
+        array $filters = [],
+        bool $paginate = false,
+        bool $countOnly = false,
+    )
     {
         $lastMovementSubquery = StockMovement::query()
             ->select('branch_product_id', DB::raw('MAX(created_at) as last_out_at'))
@@ -474,6 +486,10 @@ class InventoryReportService
             'near_expiration' => $query->whereRaw('COALESCE(near_expiration_batches.near_expiration_batches, 0) > 0'),
             default => null,
         };
+
+        if ($countOnly) {
+            return $query->count();
+        }
 
         return $this->resolveTableResult($query, $filters, $paginate);
     }

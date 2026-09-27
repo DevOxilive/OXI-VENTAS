@@ -836,7 +836,7 @@ function setCartPresentation(index, presentation) {
     ? Number(item.sale_price_per_box || 0)
     : Number(item.sale_price_per_piece || item.price || 0);
   item.available_quantity = cartItemAvailableQuantity(item);
-  item.quantity = Math.max(1, Math.min(Number(item.quantity || 1), item.available_quantity));
+  item.quantity = Math.max(1, Number(item.quantity || 1));
 }
 
 function saleQuantityStep(item) {
@@ -854,7 +854,7 @@ function updateCartQuantity(index, value) {
   const normalized = step === 1
     ? Math.floor(raw)
     : Math.round(raw * 1000) / 1000;
-  item.quantity = Math.max(step, Math.min(normalized, cartItemAvailableQuantity(item)));
+  item.quantity = Math.max(step, normalized);
 }
 
 function addProduct(product) {
@@ -873,25 +873,9 @@ function addProduct(product) {
   );
 
   if (existing) {
-    if (Number(existing.quantity) >= cartItemAvailableQuantity(existing)) {
-      ErrorAlert({
-        title: "Stock agotado",
-        message: `Solo hay ${product.stock} unidad(es) disponibles de ${product.name}.`,
-      });
-      return;
-    }
-
     existing.quantity += 1;
     search.value = "";
     focusSearch();
-    return;
-  }
-
-  if (Number(product.stock || 0) <= 0) {
-    ErrorAlert({
-      title: "Sin stock",
-      message: `El producto ${product.name} no tiene existencias.`,
-    });
     return;
   }
 
@@ -1122,8 +1106,6 @@ async function handleSearchKeydown(event) {
 function increaseQuantity(index) {
   const item = cart.value[index];
   if (!item) return;
-
-  if (Number(item.quantity) >= cartItemAvailableQuantity(item)) return;
 
   item.quantity = Number((Number(item.quantity) + saleQuantityStep(item)).toFixed(3));
 }

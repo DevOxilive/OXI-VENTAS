@@ -870,14 +870,14 @@ class ProductController extends Controller
 
     private function hasProtectedInventory(BranchProduct $branchProduct): bool
     {
-        if ((float) $branchProduct->stock > 0) {
+        if ((float) $branchProduct->stock !== 0.0) {
             return true;
         }
 
         return $branchProduct->batches()
             ->where(function ($query) {
                 $query
-                    ->where('quantity', '>', 0)
+                    ->where('quantity', '!=', 0)
                     ->orWhere('status', ProductBatch::STATUS_ACTIVE);
             })
             ->exists();

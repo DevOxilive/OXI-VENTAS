@@ -37,7 +37,7 @@ export function useStockExitModal(props, emit) {
 
     const activeBatches = computed(() => {
         return (props.product?.batches ?? []).filter((batch) => {
-            return Number(batch.quantity || 0) > 0;
+            return ["ACTIVE", "SEASONAL"].includes(batch.status);
         });
     });
 
@@ -143,7 +143,7 @@ export function useStockExitModal(props, emit) {
     }
 
     function selectSource(source) {
-        if (form.processing || Number(source.quantity || 0) <= 0) return;
+        if (form.processing) return;
 
         selectedSourceKey.value = source.key;
         form.batch_allocation_method = "MANUAL";
@@ -179,33 +179,16 @@ export function useStockExitModal(props, emit) {
         clearExitErrors();
         syncManualBatch();
 
-        if (
-            !selectedSource.value ||
-            Number(selectedSource.value.quantity) <= 0
-        ) {
-            frontendErrors.manual_batches =
-                "Selecciona una entrada disponible.";
+        if (availableSources.value.length && !selectedSource.value) {
+            frontendErrors.manual_batches = "Selecciona una entrada o lote.";
         }
 
         if (!form.quantity || Number(form.quantity) <= 0) {
             frontendErrors.quantity = "La cantidad debe ser mayor a cero.";
         }
 
-        if (
-            selectedSource.value &&
-            Number(form.quantity) > Number(selectedSource.value.quantity)
-        ) {
-            frontendErrors.quantity =
-                "La cantidad supera la existencia disponible.";
-        }
-
         if (!allowedReasons.includes(form.reason)) {
             frontendErrors.reason = "Selecciona un motivo.";
-        }
-
-        if (Number(form.quantity || 0) > currentStock.value) {
-            frontendErrors.stock =
-                "La salida no puede ser mayor al stock actual.";
         }
 
         syncManualBatch();

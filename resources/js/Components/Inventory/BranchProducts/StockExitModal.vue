@@ -99,12 +99,15 @@ const isKilogramUnit = computed(() => String(unit.value).toLowerCase() === 'kg')
                     description="Selecciona de donde saldra el producto para registrar correctamente la salida."
                     panel-class="min-w-0 bg-background shadow-sm"
                 >
+                    <p v-if="!availableSources.length" class="mb-3 text-sm text-text opacity-70">
+                        La salida se registrará sin número de lote y podrá dejar existencias negativas.
+                    </p>
                     <div class="grid max-h-[380px] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
                         <button
                             v-for="source in availableSources"
                             :key="source.key"
                             type="button"
-                            :disabled="form.processing || source.quantity <= 0"
+                            :disabled="form.processing"
                             class="rounded-2xl border px-3 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
                             :class="expirationClass(
                                 source.expiration_date,
