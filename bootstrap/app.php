@@ -4,6 +4,9 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Support\Header;
+use Illuminate\Auth\AuthenticationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -27,6 +30,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_X_FORWARDED_PROTO
         );
 
+        $middleware->web(prepend: [
+            \App\Http\Middleware\NormalizeInertiaDocumentRequest::class,
+        ]);
+
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \App\Http\Middleware\AuditSystemActions::class,
@@ -43,6 +50,13 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (\Throwable $exception, Request $request) {
+            $isAuthenticationFailure = $exception instanceof AuthenticationException
+                || ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 401);
+
+            if ($isAuthenticationFailure && $request->header(Header::INERTIA)) {
+                return Inertia::location(route('login'));
+            }
+
             if ($request->expectsJson()) {
                 return null;
             }
