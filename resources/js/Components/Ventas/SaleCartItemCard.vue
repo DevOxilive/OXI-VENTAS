@@ -1,7 +1,6 @@
 <script setup>
 import InputField from "@/Components/Forms/InputField.vue"
 import QuantityStepper from "@/Components/Forms/QuantityStepper.vue"
-import ToggleSwitch from "@/Components/Forms/ToggleSwitch.vue"
 import MetricCard from "@/Components/Cards/MetricCard.vue"
 
 defineProps({
@@ -31,11 +30,11 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
 </script>
 
 <template>
-  <article class="rounded-2xl border border-secondary bg-secondary p-4">
-    <div class="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_120px_120px_140px_56px] md:items-start">
+  <article class="rounded-xl border border-secondary bg-secondary p-3">
+    <div class="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_120px_120px_140px_48px] md:items-start">
       <div class="min-w-0">
         <div class="flex gap-3">
-          <div class="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-secondary bg-background">
+          <div class="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-secondary bg-background">
             <img
               v-if="item.image"
               :src="item.image"
@@ -53,12 +52,12 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
             <p class="truncate text-sm font-semibold text-text">
               {{ item.name }}
             </p>
-            <p class="mt-1 truncate text-xs text-text opacity-70">
-              {{ item.barcode || "Sin codigo" }}
+            <p class="mt-0.5 truncate text-xs text-text opacity-70">
+              {{ item.barcode || "Sin codigo" }} · Stock: {{ Number(item.available_quantity ?? item.stock).toFixed(3) }} {{ item.presentation === 'box' ? 'cajas' : item.inventory_unit }}
             </p>
             <div
               v-if="item.has_box_presentation"
-              class="mt-2 inline-flex rounded-lg border border-secondary bg-background p-1"
+              class="mt-2 inline-flex rounded-lg border border-secondary bg-background p-0.5"
             >
               <button
                 type="button"
@@ -77,14 +76,11 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
                 Cajas
               </button>
             </div>
-            <p class="mt-2 text-xs text-text opacity-70">
-              Stock disponible: {{ Number(item.available_quantity ?? item.stock).toFixed(3) }} {{ item.presentation === 'box' ? 'cajas' : item.inventory_unit }}
-            </p>
           </div>
         </div>
       </div>
 
-      <div class="rounded-xl bg-background px-3 py-3 md:bg-transparent md:px-0 md:py-0">
+      <div class="rounded-lg bg-background px-3 py-2 md:bg-transparent md:px-0 md:py-0">
         <p class="text-[11px] uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
           Precio
         </p>
@@ -99,7 +95,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
         </p>
       </div>
 
-      <div class="rounded-xl bg-background px-3 py-3 md:bg-transparent md:px-0 md:py-0">
+      <div class="rounded-lg bg-background px-3 py-2 md:bg-transparent md:px-0 md:py-0">
         <p class="text-[11px] uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
           Cantidad
         </p>
@@ -115,7 +111,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
         />
       </div>
 
-      <div class="rounded-xl bg-background px-3 py-3 md:bg-transparent md:px-0 md:py-0">
+      <div class="rounded-lg bg-background px-3 py-2 md:bg-transparent md:px-0 md:py-0">
         <p class="text-[11px] uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
           Importe
         </p>
@@ -130,38 +126,35 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
         </p>
       </div>
 
-      <div class="flex items-start justify-end">
+      <div class="flex items-start justify-end gap-2">
         <button
           type="button"
-          class="h-10 w-10 rounded-xl bg-background text-text transition hover:bg-secondary"
+          class="flex h-9 w-9 items-center justify-center rounded-lg border border-secondary bg-background text-text transition hover:border-primary"
+          :class="item.discount_enabled ? 'border-primary text-primary' : ''"
+          title="Aplicar descuento"
+          @click="$emit('toggle-discount')"
+        >
+          <span class="material-symbols-outlined text-[18px]">
+            sell
+          </span>
+        </button>
+        <button
+          type="button"
+          class="flex h-9 w-9 items-center justify-center rounded-lg bg-background text-text transition hover:bg-secondary"
+          title="Quitar producto"
           @click="$emit('remove')"
         >
-          x
+          <span class="material-symbols-outlined text-[18px]">
+            close
+          </span>
         </button>
       </div>
     </div>
 
-    <div class="mt-4 rounded-2xl border border-secondary bg-background p-3">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <p class="text-sm font-semibold text-text">
-            Descuento
-          </p>
-          <p class="text-xs text-text opacity-70">
-            Activalo solo si este producto lleva rebaja.
-          </p>
-        </div>
-
-        <ToggleSwitch
-          :model-value="item.discount_enabled"
-          @change="$emit('toggle-discount')"
-        />
-      </div>
-
-      <div
-        v-if="item.discount_enabled"
-        class="mt-3 grid gap-3 lg:grid-cols-[180px_minmax(0,1fr)]"
-      >
+    <div
+      v-if="item.discount_enabled"
+      class="mt-3 grid gap-3 rounded-xl border border-secondary bg-background p-3 lg:grid-cols-[180px_minmax(0,1fr)]"
+    >
         <InputField
           v-model="item.discount_percentage"
           label="Porcentaje"
@@ -186,7 +179,6 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
             size="sm"
           />
         </div>
-      </div>
     </div>
   </article>
 </template>

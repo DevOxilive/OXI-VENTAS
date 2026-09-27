@@ -8,7 +8,6 @@ import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
 import EmptyStateCard from "@/Components/Cards/EmptyStateCard.vue";
-import InfoCard from "@/Components/Cards/InfoCard.vue";
 import MetricCard from "@/Components/Cards/MetricCard.vue";
 import SaleCartItemCard from "@/Components/Ventas/SaleCartItemCard.vue";
 import SaleBranchSelectorCard from "@/Components/Ventas/SaleBranchSelectorCard.vue";
@@ -1548,163 +1547,6 @@ function submitCreditSale() {
     </template>
 
     <template v-else>
-      <div v-if="false" class="border-b border-secondary bg-background px-5 py-4 md:px-8">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-text opacity-50">
-              Punto de venta
-            </p>
-            <h1 class="mt-1 text-2xl font-black text-text">
-              Ventas
-            </h1>
-            <p class="mt-1 text-sm text-text opacity-70">
-              {{ currentBranchLabel }} · Escanea, agrega productos y cobra una venta real.
-            </p>
-          </div>
-
-          <div class="flex flex-col gap-3 xl:flex-row xl:items-start">
-            <div class="relative flex justify-end xl:order-2">
-              <button
-                type="button"
-                class="relative flex h-12 w-12 items-center justify-center rounded-2xl border transition"
-                :class="[
-                  expirationAlertCount
-                    ? 'border-accent bg-secondary text-accent shadow-sm hover:brightness-95'
-                    : 'border-secondary bg-secondary text-text opacity-70 hover:bg-background',
-                  expirationAlertPulse ? 'scale-105 ring-4 ring-secondary' : '',
-                ]"
-                @click="toggleExpirationAlerts"
-              > 
-                <span class="material-symbols-outlined text-[24px]">
-                  notifications
-                </span>
-                <span
-                  v-if="expirationAlertCount"
-                  class="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-black text-white shadow"
-                >
-                  {{ expirationAlertCount }}
-                </span>
-              </button>
-
-              <div
-                v-if="expirationAlertPanelOpen"
-                class="absolute right-0 top-[calc(100%+0.75rem)] z-30 w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-secondary bg-background shadow-2xl"
-              >
-                <div class="border-b border-secondary bg-primary px-4 py-4 text-white">
-
-                  
-                  
-                  <div class="flex items-start justify-between gap-3">
-                    <div>
-                      <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-white/80">
-                        Alertas de caducidad
-                      </p>
-                      <h3 class="mt-1 text-lg font-black">
-                        {{ expirationAlertCount ? `${expirationAlertCount} lote(s) por atender` : "Sin alertas" }}
-                      </h3>
-                      <p v-if="urgentExpirationAlertCount" class="mt-1 text-xs text-white/80">
-                        {{ urgentExpirationAlertCount }} urgente(s) en 7 dias o menos.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
-                      @click="closeExpirationAlerts"
-                    >
-                      <span class="material-symbols-outlined text-[18px]">close</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div v-if="expirationAlertCount" class="max-h-[360px] space-y-2 overflow-y-auto bg-secondary p-3">
-                  <article
-                    v-for="alert in topExpirationAlerts"
-                    :key="expirationAlertKey(alert)"
-                    class="rounded-2xl border bg-background p-3 shadow-sm"
-                    :class="expirationTone(alert)"
-                  >
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0">
-                        <p class="truncate text-sm font-black text-text">
-                          {{ alert.product_name }}
-                        </p>
-                        <p class="mt-1 text-xs font-semibold text-text opacity-70">
-                          Lote {{ alert.lot_number || "sin lote" }} · {{ Number(alert.quantity || 0).toFixed(0) }} pza(s)
-                        </p>
-                      </div>
-
-                      <span class="shrink-0 rounded-full bg-background px-2.5 py-1 text-[11px] font-black shadow-sm">
-                        {{ expirationBadgeLabel(alert) }}
-                      </span>
-                    </div>
-
-                    <div class="mt-3 rounded-xl bg-secondary px-3 py-2 text-xs font-semibold text-text">
-                      <p>{{ alert.message || "Producto proximo a vencer" }}</p>
-                      <p v-if="alert.formatted_expiration_date || alert.expiration_date" class="mt-1 text-text opacity-70">
-                        Caduca: {{ alert.formatted_expiration_date || alert.expiration_date }}
-                      </p>
-                    </div>
-                  </article>
-                </div>
-
-                <div v-else class="bg-secondary px-5 py-8 text-center">
-                  <span class="material-symbols-outlined text-4xl text-accent">
-                    task_alt
-                  </span>
-                  <p class="mt-2 text-sm font-bold text-text">
-                    Todo tranquilo
-                  </p>
-                  <p class="mt-1 text-xs text-text opacity-70">
-                    No hay lotes por caducar en esta sucursal.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 lg:min-w-[760px]">
-            <SelectField
-              v-if="branchesDB.length > 1"
-              label="Sucursal"
-              field="branch_id"
-              :model-value="selectedBranchId"
-              :options="branchesDB"
-              placeholder="Selecciona una sucursal"
-              @update:modelValue="handleBranchChange"
-            />
-
-            <SelectField
-              label="Forma de pago"
-              field="payment_method_id"
-              :model-value="saleForm.payment_method_id"
-              :options="paymentMethodsDB"
-              placeholder="Selecciona pago"
-              @update:modelValue="handlePaymentMethodChange"
-            />
-
-            <SelectField
-              label="Caja"
-              field="cash_box"
-              :model-value="selectedCashBoxNumber"
-              :options="cashBoxOptions"
-              placeholder="Selecciona caja"
-              @update:modelValue="handleCashBoxChange"
-            />
-
-            <SelectField
-              label="Impresora"
-              field="ticket_printer"
-              :model-value="selectedPrinterName"
-              :options="printerOptions"
-              :disabled="!printerOptions.length"
-              :placeholder="printerBridgeReady ? 'Selecciona impresora' : 'QZ Tray no conectado'"
-              @update:modelValue="handlePrinterChange"
-            />
-            </div>
-          </div>
-        </div>
-      </div>
-
       <GlobalModal
           v-if="expirationAlertPanelOpen"
           title="Alertas de caducidad"
@@ -1787,9 +1629,9 @@ function submitCreditSale() {
           </div>
       </GlobalModal>
 
-      <div class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_480px]">
-        <section class="rounded-2xl border border-secondary bg-background p-4 shadow-sm">
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div class="grid min-h-0 gap-4 lg:h-[calc(100dvh-17rem)] lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_390px]">
+        <section class="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-secondary bg-background p-3 shadow-sm md:p-4">
+          <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end">
             <div class="min-w-0 flex-1">
               <div class="relative">
                 <InputField
@@ -1845,44 +1687,17 @@ function submitCreditSale() {
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 sm:min-w-[280px]">
-              <MetricCard
-                label="Capturados"
-                :value="totalLines"
-                suffix="articulos"
-                size="sm"
-              />
-
-              <MetricCard
-                label="Coincidencias"
-                :value="filteredProducts.length"
-                suffix="disponibles"
-                size="sm"
-              />
-            </div>
-          </div>
-
-          <div class="mt-4 flex items-center justify-between rounded-2xl border border-secondary bg-secondary px-4 py-3 text-sm">
-            <div>
-              <p class="font-semibold text-text">
-                Productos en la venta actual
-              </p>
-              <p class="text-xs text-text opacity-70">
-                Escanea un codigo o escribe el nombre. Al agregarlo, se captura aqui mismo.
-              </p>
-            </div>
-
             <button
               type="button"
-              class="rounded-xl border border-secondary bg-background px-3 py-2 text-sm font-semibold text-text transition hover:border-primary hover:bg-secondary"
+              class="h-[46px] shrink-0 rounded-lg border border-secondary bg-background px-4 text-sm font-semibold text-text transition hover:border-primary hover:bg-secondary"
               @click="clearCart"
             >
               Limpiar
             </button>
           </div>
 
-          <div class="mt-4 min-h-0 overflow-hidden rounded-2xl border border-secondary">
-            <div class="hidden grid-cols-[minmax(0,1.4fr)_120px_120px_140px_56px] gap-3 border-b border-secondary bg-secondary px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-text opacity-70 md:grid">
+          <div class="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-secondary">
+            <div class="hidden grid-cols-[minmax(0,1.4fr)_120px_120px_140px_48px] gap-3 border-b border-secondary bg-secondary px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-text opacity-70 md:grid">
               <span>Producto</span>
               <span>Precio</span>
               <span>Cantidad</span>
@@ -1890,7 +1705,7 @@ function submitCreditSale() {
               <span></span>
             </div>
 
-            <div class="max-h-[calc(100vh-20.5rem)] space-y-3 overflow-y-auto bg-background p-3">
+            <div class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-background p-3">
               <SaleCartItemCard
                 v-for="(item, index) in cart"
                 :key="`${item.branch_product_id}-${index}`"
@@ -1913,33 +1728,51 @@ function submitCreditSale() {
                 title="Todavia no hay productos capturados"
                 description="Escanea o busca uno para empezar."
                 icon="shopping_cart"
-                min-height-class="min-h-[340px]"
+                min-height-class="min-h-[260px]"
               />
             </div>
           </div>
         </section>
 
-        <aside class="flex min-h-0 flex-col rounded-2xl border border-secondary bg-background p-5 shadow-sm">
-          <div class="flex items-center justify-between">
+        <aside class="flex min-h-0 flex-col rounded-xl border border-secondary bg-background p-3 shadow-sm lg:overflow-hidden 2xl:p-4">
+          <div class="flex shrink-0 items-start justify-between gap-3">
             <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-text opacity-50">
+              <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-text opacity-50">
                 Resumen
               </p>
-              <h2 class="text-xl font-bold text-text">
+              <h2 class="text-base font-bold text-text 2xl:text-lg">
                 Venta actual
               </h2>
             </div>
+            <div class="text-right text-xs font-semibold leading-5 text-text opacity-70">
+              <p>{{ selectedPaymentMethodLabel }}</p>
+              <p>Caja #{{ selectedCashBoxNumber }}</p>
+            </div>
           </div>
 
-          <div class="mt-5 flex min-h-0 flex-1 flex-col">
-            <div class="grid grid-cols-2 gap-3">
-              <MetricCard label="Articulos" :value="totalLines" />
+          <div class="mt-3 flex min-h-0 flex-1 flex-col lg:overflow-y-auto lg:pr-1">
+            <div class="grid grid-cols-2 divide-x divide-secondary rounded-lg bg-secondary px-3 py-2 text-sm">
+              <div class="pr-3">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-text opacity-50">
+                  Articulos
+                </p>
+                <p class="mt-0.5 text-lg font-bold text-text">
+                  {{ totalLines }}
+                </p>
+              </div>
 
-              <MetricCard label="Piezas" :value="totalItems" />
+              <div class="pl-3">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-text opacity-50">
+                  Piezas
+                </p>
+                <p class="mt-0.5 text-lg font-bold text-text">
+                  {{ totalItems }}
+                </p>
+              </div>
             </div>
 
-            <div class="mt-4 flex flex-1 flex-col">
-              <div class="space-y-4">
+            <div class="mt-3 flex flex-1 flex-col">
+              <div class="space-y-2.5">
                 <template v-if="isCashPayment">
                   <InputField
                     v-model="saleForm.cash_received"
@@ -1951,34 +1784,31 @@ function submitCreditSale() {
                     prefix="$"
                   />
 
-                  <div class="grid grid-cols-2 gap-3">
-                    <MetricCard
-                      label="Cambio"
-                      :value="formatMoney(changeDue)"
-                      tone="success"
-                      size="sm"
-                    />
+                  <div class="grid grid-cols-2 gap-2 rounded-lg bg-secondary px-3 py-2 text-sm">
+                    <div>
+                      <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
+                        Cambio
+                      </p>
+                      <p class="mt-0.5 font-bold text-accent">
+                        {{ formatMoney(changeDue) }}
+                      </p>
+                    </div>
 
-                    <MetricCard
-                      label="Falta"
-                      :value="formatMoney(missingAmount)"
-                      tone="danger"
-                      size="sm"
-                    />
+                    <div>
+                      <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+                        Falta
+                      </p>
+                      <p class="mt-0.5 font-bold text-primary">
+                        {{ formatMoney(missingAmount) }}
+                      </p>
+                    </div>
                   </div>
                 </template>
 
-                <div v-else class="grid grid-cols-1 gap-3">
-                  <MetricCard
-                    label="Total en tarjeta"
-                    :value="formatMoney(cartTotal)"
-                    tone="neutral"
-                    size="sm"
-                  />
-
+                <div v-else class="grid grid-cols-1 gap-2">
                   <button
                     type="button"
-                    class="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition"
+                    class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition"
                     :class="cardPaymentConfirmed
                       ? 'border-accent bg-secondary text-accent'
                       : 'border-primary bg-secondary text-primary hover:bg-background'"
@@ -1992,7 +1822,7 @@ function submitCreditSale() {
                         {{ cardPaymentConfirmed ? 'task_alt' : 'credit_score' }}
                       </span>
                       <span class="min-w-0">
-                        <span class="block text-sm font-black">
+                        <span class="block text-sm font-bold">
                           Terminal aprobada
                         </span>
                         <span class="block text-xs font-semibold opacity-75">
@@ -2011,41 +1841,45 @@ function submitCreditSale() {
                   </button>
                 </div>
 
-                <InfoCard
-                  label="Forma de pago"
-                  :value="selectedPaymentMethodLabel"
-                />
-
-                <InfoCard
-                  label="Impresora"
-                  :value="selectedPrinterName || 'Sin seleccionar'"
-                  :description="printerBridgeMessage"
-                >
-                  <template #action>
+                <div class="rounded-lg bg-secondary px-3 py-2 text-sm">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-text opacity-50">
+                        Impresora
+                      </p>
+                      <p class="mt-0.5 truncate font-semibold text-text">
+                        {{ selectedPrinterName || 'Sin seleccionar' }}
+                      </p>
+                      <p class="mt-0.5 line-clamp-2 text-xs text-text opacity-65">
+                        {{ printerBridgeMessage }}
+                      </p>
+                    </div>
                     <button
                       v-if="!printerBridgeReady"
                       type="button"
-                      class="text-[11px] font-semibold text-text opacity-80 underline underline-offset-2"
+                      class="shrink-0 rounded-lg border border-secondary bg-background px-3 py-2 text-xs font-semibold text-text transition hover:border-primary"
                       @click="initializePrinterBridge({ silent: false })"
                     >
                       Reconectar
                     </button>
-                  </template>
-                </InfoCard>
+                  </div>
+                </div>
 
-                <MetricCard
-                  label="Total venta"
-                  :value="formatMoney(cartTotal)"
-                  tone="dark"
-                  size="lg"
-                />
+                <div class="rounded-lg bg-primary px-4 py-3 text-white">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.12em] opacity-80">
+                    Total venta
+                  </p>
+                  <p class="mt-1 text-2xl font-black leading-none">
+                    {{ formatMoney(cartTotal) }}
+                  </p>
+                </div>
               </div>
 
-              <div class="mt-auto space-y-3 pt-6">
+              <div class="mt-auto space-y-2 pt-3">
                 <button
                   v-if="can('sales.employee-credit.create')"
                   type="button"
-                  class="inline-flex w-full items-center justify-center rounded-2xl border border-primary bg-background px-4 py-3 text-base font-bold text-primary transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                  class="inline-flex w-full items-center justify-center rounded-lg border border-primary bg-background px-4 py-2.5 text-sm font-bold text-primary transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
                   :disabled="saleSubmitting || !cart.length"
                   @click="openCreditModal"
                 >
@@ -2054,7 +1888,7 @@ function submitCreditSale() {
                 <button
                   v-if="lastPrintJob"
                   type="button"
-                  class="inline-flex w-full items-center justify-center rounded-2xl border border-secondary bg-background px-4 py-3.5 text-base font-bold text-text transition hover:border-primary hover:bg-secondary"
+                  class="inline-flex w-full items-center justify-center rounded-lg border border-secondary bg-background px-4 py-2.5 text-sm font-bold text-text transition hover:border-primary hover:bg-secondary"
                   @click="reprintLastTicket"
                 >
                   Reimprimir ticket
@@ -2062,7 +1896,7 @@ function submitCreditSale() {
 
                 <button
                   type="button"
-                  class="inline-flex w-full items-center justify-center rounded-2xl border border-primary bg-primary px-4 py-4 text-base font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="inline-flex w-full items-center justify-center rounded-lg border border-primary bg-primary px-4 py-3 text-base font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                   :disabled="saleSubmitting || !canCharge"
                   @click="submitSale()"
                 >
