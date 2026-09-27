@@ -306,10 +306,6 @@ class StockMovementService
                 throw new InvalidArgumentException('La cantidad por entrada/lote debe ser mayor a 0.');
             }
 
-            if ((float) $batch->quantity < $quantityToConsume) {
-                throw new InvalidArgumentException('No hay suficiente stock en una de las entradas/lotes seleccionadas.');
-            }
-
             $previousBatchQuantity = (float) $batch->quantity;
             $newBatchQuantity = $previousBatchQuantity - $quantityToConsume;
 
@@ -356,6 +352,7 @@ class StockMovementService
                         'expiration_date' => null,
                         'quantity' => $quantity,
                         'supplier' => null,
+                        'received_at' => now()->toDateString(),
                     ]],
                 expectedQuantity: $quantity
             );
@@ -368,8 +365,7 @@ class StockMovementService
             ->whereIn('status', [
                 ProductBatch::STATUS_ACTIVE,
                 ProductBatch::STATUS_SEASONAL,
-            ])
-            ->where('quantity', '>', 0);
+            ]);
 
         $hasTrackedInventory = (bool) $branchProduct->tracks_batches
             || ProductBatch::where('branch_product_id', $branchProduct->id)->exists();
@@ -408,6 +404,12 @@ class StockMovementService
 
         $this->validateMovement($type, $reason, $quantity);
 
+        // Conserva el saldo previo cuando un producto empieza a manejar lotes,
+        // incluso si ya tiene existencias negativas.
+        if (! $branchProduct->batches()->exists() && (float) $branchProduct->stock !== 0.0) {
+            $this->createUnnumberedBatch($branchProduct, (float) $branchProduct->stock);
+        }
+
         $previousStock = $this->getCurrentBranchProductStock($branchProduct);
 
         if ($type === StockMovement::TYPE_IN) {
@@ -429,12 +431,12 @@ class StockMovementService
             }
 
             if (count($manualBatches) === 0) {
-                throw new InvalidArgumentException('Debes seleccionar al menos una entrada/lote para la salida.');
+                $manualBatches = $this->allocateOutgoingBatches($branchProduct, $quantity);
             }
         }
 
         if ($type === StockMovement::TYPE_ADJUSTMENT && $quantity < 0 && count($manualBatches) === 0) {
-            throw new InvalidArgumentException('Debes seleccionar al menos una entrada/lote para el ajuste negativo.');
+            $manualBatches = $this->allocateOutgoingBatches($branchProduct, abs($quantity));
         }
 
         $projectedStock = match ($type) {
@@ -443,10 +445,6 @@ class StockMovementService
             StockMovement::TYPE_ADJUSTMENT => $previousStock + $quantity,
             default => throw new InvalidArgumentException('Tipo de movimiento invalido.'),
         };
-
-        if ($projectedStock < 0) {
-            throw new InvalidArgumentException('No hay stock suficiente para realizar este movimiento.');
-        }
 
         $movement = StockMovement::create([
             'branch_product_id' => $branchProduct->id,
@@ -504,6 +502,58 @@ class StockMovementService
         }
 
         return $movement;
+    }
+
+    private function createUnnumberedBatch(BranchProduct $branchProduct, float $quantity = 0): ProductBatch
+    {
+        $branchProduct->update(['tracks_batches' => true]);
+
+        return ProductBatch::create([
+            'branch_product_id' => $branchProduct->id,
+            'lot_number' => null,
+            'initial_quantity' => $quantity,
+            'quantity' => $quantity,
+            'received_at' => now()->toDateString(),
+            'status' => ProductBatch::STATUS_ACTIVE,
+            'has_real_lot' => false,
+        ]);
+    }
+
+    /** Consume primero las existencias; conserva el faltante en un lote vinculado al movimiento. */
+    private function allocateOutgoingBatches(BranchProduct $branchProduct, float $quantity): array
+    {
+        $batches = $branchProduct->batches()
+            ->whereIn('status', [ProductBatch::STATUS_ACTIVE, ProductBatch::STATUS_SEASONAL])
+            ->orderByRaw('CASE WHEN expiration_date IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('expiration_date')
+            ->orderBy('received_at')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $remaining = round($quantity, 3);
+        $allocations = [];
+        foreach ($batches as $batch) {
+            $take = min(max(0, (float) $batch->quantity), $remaining);
+            if ($take > 0) {
+                $allocations[$batch->id] = ['id' => $batch->id, 'quantity' => $take];
+                $remaining = round($remaining - $take, 3);
+            }
+            if ($remaining <= 0) {
+                break;
+            }
+        }
+
+        if ($remaining > 0) {
+            // Sin un lote conocido se registra un saldo sin número de lote real.
+            $batch = $batches->first() ?? $this->createUnnumberedBatch($branchProduct);
+            $allocations[$batch->id] = [
+                'id' => $batch->id,
+                'quantity' => round(($allocations[$batch->id]['quantity'] ?? 0) + $remaining, 3),
+            ];
+        }
+
+        return array_values($allocations);
     }
 
     private function broadcastInventoryRefresh(

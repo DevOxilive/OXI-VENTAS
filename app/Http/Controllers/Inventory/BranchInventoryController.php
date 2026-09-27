@@ -90,7 +90,7 @@ class BranchInventoryController extends Controller
                         limit: (int) config('product_search.max_results'),
                         includeLotNumbers: true,
                         lotStatuses: [ProductBatch::STATUS_ACTIVE],
-                        onlyLotsWithStock: true,
+                        onlyLotsWithStock: false,
                     ),
                 );
             })
@@ -461,7 +461,7 @@ class BranchInventoryController extends Controller
         $validated = $request->validate([
             'branch_id' => ['required', 'exists:branches,id'],
             'product_id' => ['required', 'exists:products,id'],
-            'stock' => ['required', 'numeric', 'min:0'],
+            'stock' => ['required', 'numeric'],
             'min_stock' => ['required', 'numeric', 'min:0'],
             'status' => ['nullable', 'in:active,inactive,seasonal'],
         ]);
@@ -595,7 +595,6 @@ class BranchInventoryController extends Controller
                     'season_start_date',
                     'season_end_date',
                 ])
-                ->where('quantity', '>', 0)
                 ->orderByRaw('expiration_date IS NULL')
                 ->orderBy('expiration_date')
                 ->orderBy('id'),

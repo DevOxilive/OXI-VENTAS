@@ -247,16 +247,7 @@ export function useBatchAdjustmentModal(products) {
                 return;
             }
 
-            if (calculatedQuantity.value < 0) {
-                frontendErrors.adjustment_amount =
-                    "No puedes eliminar mas unidades de las disponibles.";
-            }
-
             return;
-        }
-
-        if (field === "lot_number" && !form.lot_number) {
-            frontendErrors.lot_number = "El numero de lote es obligatorio.";
         }
 
         if (field === "status" && !form.status) {

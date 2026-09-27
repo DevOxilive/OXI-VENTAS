@@ -17,7 +17,7 @@ final readonly class ProductSearchOptions
         public int $limit = 1000,
         public bool $includeLotNumbers = false,
         public array $lotStatuses = [ProductBatch::STATUS_ACTIVE],
-        public bool $onlyLotsWithStock = true,
+        public bool $onlyLotsWithStock = false,
     ) {}
 
     /**

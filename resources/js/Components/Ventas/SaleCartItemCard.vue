@@ -109,7 +109,6 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
           :max-integer-digits="3"
           :max-decimal-digits="3"
           :decrease-disabled="Number(item.quantity) <= 0"
-          :increase-disabled="Number(item.quantity) >= Number(item.available_quantity ?? item.stock)"
           @decrease="$emit('decrease')"
           @increase="$emit('increase')"
           @update="$emit('update-quantity', $event)"

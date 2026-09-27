@@ -126,6 +126,27 @@ class SaleCancellationService
         if ($originalBatches->isNotEmpty()) {
             $this->restoreOriginalBatches($movement, $detail, $branchProduct, $originalBatches, $quantity);
             $movement->update(['new_stock' => (float) ProductBatch::query()->where('branch_product_id', $branchProduct->id)->whereIn('status', [ProductBatch::STATUS_ACTIVE, ProductBatch::STATUS_SEASONAL])->sum('quantity')]);
+        } elseif ($branchProduct->batches()->exists()) {
+            // Las ventas antiguas sin lote también deben quedar representadas
+            // en los lotes si el producto empezó a manejarlos después de venderse.
+            $batch = ProductBatch::create([
+                'branch_product_id' => $branchProduct->id,
+                'lot_number' => null,
+                'initial_quantity' => $quantity,
+                'quantity' => $quantity,
+                'received_at' => now()->toDateString(),
+                'status' => ProductBatch::STATUS_ACTIVE,
+                'has_real_lot' => false,
+            ]);
+            StockMovementBatch::create([
+                'stock_movement_id' => $movement->id,
+                'product_batch_id' => $batch->id,
+                'quantity' => $quantity,
+                'previous_batch_quantity' => 0,
+                'new_batch_quantity' => $quantity,
+                'allocation_method' => StockMovementBatch::ALLOCATION_MANUAL,
+            ]);
+            $movement->update(['new_stock' => (float) $branchProduct->batches()->whereIn('status', [ProductBatch::STATUS_ACTIVE, ProductBatch::STATUS_SEASONAL])->sum('quantity')]);
         }
         $branchProduct->update(['stock' => $movement->new_stock]);
 

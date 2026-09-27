@@ -29,7 +29,7 @@ class ProductBatchController extends Controller
             'expiration_date' => ['nullable', 'date'],
             'supplier' => ['nullable', 'string', 'max:255'],
             'received_at' => ['nullable', 'date'],
-            'quantity' => ['required', 'numeric', 'min:0'],
+            'quantity' => ['required', 'numeric'],
             'season_start_date' => ['nullable', 'date'],
             'season_end_date' => ['nullable', 'date', 'after_or_equal:season_start_date'],
             'status' => [
@@ -189,7 +189,6 @@ class ProductBatchController extends Controller
                     'season_start_date',
                     'season_end_date',
                 ])
-                ->where('quantity', '>', 0)
                 ->orderByRaw('expiration_date IS NULL')
                 ->orderBy('expiration_date')
                 ->orderBy('id'),
@@ -234,21 +233,21 @@ class ProductBatchController extends Controller
         $value = (float) $quantity;
 
         if ($unit === 'kg') {
-            if ($value <= 999.999 && abs($value - round($value, 3)) <= 0.0000001) {
+            if (abs($value) <= 999999999.999 && abs($value - round($value, 3)) <= 0.0000001) {
                 return;
             }
 
             throw ValidationException::withMessages([
-                'quantity' => 'Los kilogramos permiten hasta 999.999 con un máximo de tres decimales.',
+                'quantity' => 'El saldo en kilogramos debe estar entre -999999999.999 y 999999999.999, con un máximo de tres decimales.',
             ]);
         }
 
-        if ($value <= 999 && abs($value - round($value)) <= 0.0000001) {
+        if (abs($value) <= 999999999 && abs($value - round($value)) <= 0.0000001) {
             return;
         }
 
         throw ValidationException::withMessages([
-            'quantity' => 'La cantidad debe ser un número entero entre 0 y 999.',
+            'quantity' => 'El saldo debe ser un número entero entre -999999999 y 999999999.',
         ]);
     }
 }

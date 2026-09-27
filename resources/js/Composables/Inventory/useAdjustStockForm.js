@@ -200,7 +200,9 @@ export function useAdjustStockForm(props, emit) {
             frontendErrors[field] = message;
         });
 
-        const rawQuantity = String(form.quantity ?? "");
+        const rawQuantity = isAdjustmentMovement.value
+            ? String(form.quantity ?? "").replace(/^-/, "")
+            : String(form.quantity ?? "");
         const quantityPattern = isKilogramUnit.value
             ? /^\d{1,3}(\.\d{1,3})?$/
             : /^\d{1,3}$/;
@@ -275,23 +277,10 @@ export function useAdjustStockForm(props, emit) {
         }
     }
 
-    function validateOutgoingStock() {
-        if (!isOutgoingMovement.value && !isNegativeAdjustment.value) return;
-
-        if (absoluteMovementQuantity.value > currentStock.value) {
-            frontendErrors.stock =
-                "La salida no puede ser mayor al stock actual.";
-        }
-    }
-
     function validateManualBatchSelection() {
         if (!requiresManualBatchSelection.value) return;
 
-        if (!form.manual_batches.length) {
-            frontendErrors.manual_batches =
-                "Selecciona al menos un lote o stock general.";
-            return;
-        }
+        if (!form.manual_batches.length) return;
 
         if (
             Math.round(totalManualBatchQuantity.value * 1000) !== Math.round(manualBatchTargetQuantity.value * 1000)
@@ -305,11 +294,6 @@ export function useAdjustStockForm(props, emit) {
                 frontendErrors[`manual_batch_${index}`] =
                     "La cantidad debe ser mayor a cero.";
             }
-
-            if (Number(batch.quantity) > Number(batch.available_quantity)) {
-                frontendErrors[`manual_batch_${index}`] =
-                    "No puedes tomar más unidades de las disponibles.";
-            }
         });
     }
 
@@ -318,7 +302,6 @@ export function useAdjustStockForm(props, emit) {
 
         validateBaseFields();
         validateIncomingBatches();
-        validateOutgoingStock();
         validateManualBatchSelection();
 
         return Object.values(frontendErrors).every((error) => !error);
