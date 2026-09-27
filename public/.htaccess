@@ -29,7 +29,11 @@
         Header set Cache-Control "public, max-age=31536000, immutable"
     </FilesMatch>
 
-    <FilesMatch "^(?:manifest\.webmanifest|sw\.js|offline\.html)$">
+    <Files "sw.js">
+        Header always set Cache-Control "no-cache, no-store, must-revalidate"
+    </Files>
+
+    <FilesMatch "^(?:manifest\.webmanifest|offline\.html)$">
         Header set Cache-Control "public, max-age=3600, stale-while-revalidate=86400"
     </FilesMatch>
 </IfModule>
