@@ -32,7 +32,6 @@ use App\Http\Controllers\Ventas\SalesController;
 use App\Http\Controllers\Ventas\SalesReportController;
 use App\Models\Branch;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -101,11 +100,6 @@ Route::get('/', function () {
 
 Route::get('/register', function () {
     return Inertia::render('Auth/Register', [
-        'roles' => DB::table('roles')
-            ->whereNotIn('name', ['Administrador', 'Super Administrador'])
-            ->orderBy('name')
-            ->get(),
-
         'branches' => Branch::where('active', true)
             ->orderBy('name')
             ->get(),

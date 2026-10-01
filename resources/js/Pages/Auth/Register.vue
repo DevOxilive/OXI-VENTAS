@@ -8,7 +8,6 @@ const form = useForm({
     email: '',
     password: '',
     password_confirmation: '',
-    role_id: '',
     branch_id: '',
     terms: false,
 });
@@ -42,7 +41,6 @@ const limpiar = () => {
     form.reset();
 };
 
-const roles = usePage().props.roles;
 const branches = usePage().props.branches;
 </script>
 
@@ -88,23 +86,6 @@ const branches = usePage().props.branches;
                         hide-label
                         required
                     />
-
-                    <!-- ROL -->
-                    <select
-                        v-model="form.role_id"
-                        class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-                        required
-                    >
-                        <option value="">Seleccionar rol</option>
-
-                        <option
-                            v-for="role in roles"
-                            :key="role.id"
-                            :value="role.id"
-                        >
-                            {{ role.name }}
-                        </option>
-                    </select>
 
                     <!-- BRANCH -->
                     <div>

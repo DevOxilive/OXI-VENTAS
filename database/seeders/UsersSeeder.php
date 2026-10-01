@@ -14,17 +14,18 @@ class UsersSeeder extends Seeder
 
     public function run(): void
     {
-        $password = Hash::make(self::BASE_PASSWORD);
+        $basePassword = env('SEED_BASE_USER_PASSWORD');
+
+        if (! $basePassword) {
+            if (app()->isProduction()) {
+                throw new \RuntimeException('SEED_BASE_USER_PASSWORD es obligatorio para ejecutar UsersSeeder en produccion.');
+            }
+
+            $basePassword = self::BASE_PASSWORD;
+        }
+
+        $password = Hash::make((string) $basePassword);
         $users = [
-            [
-                'name' => 'Sistemas',
-                'email' => 'sistemas@oxilive.com.mx',
-                'role' => 'Super Administrador',
-                'first_name' => 'Sistemas',
-                'last_name' => 'OXI',
-                'department' => 'Sistemas',
-                'position' => 'Sistemas',
-            ],
             [
                 'name' => 'Doctor Carlos',
                 'email' => 'carlos@oxilive.com.mx',
@@ -44,36 +45,33 @@ class UsersSeeder extends Seeder
                 'position' => 'Auxiliar RH',
             ],
         ];
+
+        $privateSuperAdministrator = $this->privateSuperAdministrator();
+
+        if ($privateSuperAdministrator) {
+            $users[] = $privateSuperAdministrator;
+        }
+
         $roleIdsByName = DB::table('roles')
             ->whereIn('name', collect($users)->pluck('role')->unique()->all())
             ->pluck('id', 'name');
 
-        $allowedEmails = collect($users)->pluck('email')->all();
-
-        User::query()
-            ->whereNotIn('email', $allowedEmails)
-            ->get()
-            ->each(function (User $user): void {
-                $user->permissions()->sync([]);
-                $user->branches()->sync([]);
-                $user->delete();
-            });
-
         foreach ($users as $userData) {
             $roleId = $roleIdsByName[$userData['role']] ?? null;
 
-            if (!$roleId) {
+            if (! $roleId) {
                 throw new \RuntimeException("No existe el rol base {$userData['role']}.");
             }
 
             $employee = $this->employeeFor($userData);
+            $userPassword = $userData['password'] ?? $password;
 
             $user = User::withTrashed()->updateOrCreate(
                 ['email' => $userData['email']],
                 [
                     'employee_id' => $employee->id,
                     'name' => $userData['name'],
-                    'password' => $password,
+                    'password' => $userPassword,
                     'role_id' => $roleId,
                     'branch_id' => null,
                     'is_active' => true,
@@ -88,6 +86,31 @@ class UsersSeeder extends Seeder
             $user->permissions()->sync([]);
             $user->branches()->sync([]);
         }
+    }
+
+    private function privateSuperAdministrator(): ?array
+    {
+        $email = env('PRIVATE_SUPER_ADMIN_EMAIL');
+        $password = env('PRIVATE_SUPER_ADMIN_PASSWORD');
+
+        if (! $email && ! $password) {
+            return null;
+        }
+
+        if (! $email || ! $password || strlen((string) $password) < 12) {
+            throw new \RuntimeException('PRIVATE_SUPER_ADMIN_EMAIL y PRIVATE_SUPER_ADMIN_PASSWORD son obligatorios para sembrar un Super Administrador privado; la contraseña debe tener al menos 12 caracteres.');
+        }
+
+        return [
+            'name' => env('PRIVATE_SUPER_ADMIN_NAME') ?: 'Super Administrador',
+            'email' => $email,
+            'role' => 'Super Administrador',
+            'first_name' => env('PRIVATE_SUPER_ADMIN_FIRST_NAME') ?: 'Super',
+            'last_name' => env('PRIVATE_SUPER_ADMIN_LAST_NAME') ?: 'Administrador',
+            'department' => env('PRIVATE_SUPER_ADMIN_DEPARTMENT') ?: 'Sistemas',
+            'position' => env('PRIVATE_SUPER_ADMIN_POSITION') ?: 'Super Administrador',
+            'password' => Hash::make((string) $password),
+        ];
     }
 
     private function employeeFor(array $userData): Employee
