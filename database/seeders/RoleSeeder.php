@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Support\SystemPermission;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -52,7 +53,12 @@ class RoleSeeder extends Seeder
 
         $rolePermissions = [];
 
-        $this->collectRolePermissions($rolePermissions, $roles['Administrador']->id, $allPermissionNames, $permissionIdsByName);
+        $administratorPermissionNames = collect($allPermissionNames)
+            ->reject(fn (string $permissionName) => $permissionName === SystemPermission::SUPER_ADMINISTRATORS_MANAGE)
+            ->values()
+            ->all();
+
+        $this->collectRolePermissions($rolePermissions, $roles['Administrador']->id, $administratorPermissionNames, $permissionIdsByName);
         $this->collectRolePermissions($rolePermissions, $roles['Super Administrador']->id, $allPermissionNames, $permissionIdsByName);
 
         $this->collectRolePermissions(

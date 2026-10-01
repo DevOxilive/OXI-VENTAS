@@ -56,7 +56,6 @@ class RegistrationTest extends TestCase
             'password_confirmation' => 'password',
             'terms' => Jetstream::hasTermsAndPrivacyPolicyFeature(),
             'branch_id' => $branch->id,
-            'role_id' => $role->id,
         ]);
 
         $this->assertGuest();
@@ -67,5 +66,36 @@ class RegistrationTest extends TestCase
         ]);
         $response->assertRedirect(route('register', absolute: false));
         $response->assertSessionHas('success', 'Usuario registrado correctamente');
+    }
+
+    public function test_public_registration_rejects_role_id_tampering(): void
+    {
+        if (! Features::enabled(Features::registration())) {
+            $this->markTestSkipped('Registration support is not enabled.');
+        }
+
+        $branch = Branch::create([
+            'name' => 'Sucursal de prueba',
+            'slug' => 'sucursal-de-prueba',
+            'active' => true,
+        ]);
+        Role::create(['name' => 'Vendedor']);
+        $superAdministrator = Role::create(['name' => 'Super Administrador']);
+
+        $response = $this->from('/register')->post('/register', [
+            'name' => 'Malicious User',
+            'email' => 'malicious@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'terms' => Jetstream::hasTermsAndPrivacyPolicyFeature(),
+            'branch_id' => $branch->id,
+            'role_id' => $superAdministrator->id,
+        ]);
+
+        $response->assertRedirect('/register');
+        $response->assertSessionHasErrors('role_id');
+        $this->assertDatabaseMissing(User::class, [
+            'email' => 'malicious@example.com',
+        ]);
     }
 }
