@@ -422,7 +422,7 @@ function saveEntry() {
         branch_allocations: payloadAllocations,
     }), {
         onSuccess: () => {
-            goToSection(1)
+            emit('close')
         },
     })
     focusFirstErrorSection()

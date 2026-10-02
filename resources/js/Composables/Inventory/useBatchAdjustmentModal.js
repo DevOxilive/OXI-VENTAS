@@ -313,7 +313,7 @@ export function useBatchAdjustmentModal(products) {
         selectedBatchId.value = null;
     }
 
-    function saveEditedBatch() {
+    function saveEditedBatch(closeModal = null) {
         if (!validateForm()) return;
 
         processing.value = true;
@@ -339,8 +339,7 @@ export function useBatchAdjustmentModal(products) {
                 ...getModalRequestOptions({
                     mode: "update",
                     entityName: "Lote",
-                    close: clearSelectedBatch,
-                    closeOnSuccess: false,
+                    close: closeModal,
                     successTitle: "Lote actualizado",
                     errorTitle: "No se pudo actualizar",
                     errorMessage:

@@ -182,6 +182,10 @@ const inventoryToolbarConfig = computed(() =>
     })
 )
 
+function saveBatchChanges() {
+    saveEditedBatch(closeProductBatchesModal)
+}
+
 function handleInventoryToolbarFilter({ key, value }) {
     if (key === 'productDepartmentFilter') {
         productDepartmentFilter.value = value
@@ -255,7 +259,7 @@ function handleInventoryAction({ action, row }) {
             :is-seasonal="batchAdjustmentIsSeasonal" :calculated-quantity="batchAdjustmentCalculatedQuantity"
             :adjustment-text="batchAdjustmentText" :quantity-result-color="batchAdjustmentQuantityResultColor"
             :set-adjustment-type="setBatchAdjustmentType"
-            :validate-field="validateBatchAdjustmentField" @select-batch="adjustBatch" @save="saveEditedBatch"
+            :validate-field="validateBatchAdjustmentField" @select-batch="adjustBatch" @save="saveBatchChanges"
             @close="closeProductBatchesModal" />
 
         <InventoryAlertsModal v-if="showAlertModal" :title="selectedAlertTitle" :type="selectedAlertType"

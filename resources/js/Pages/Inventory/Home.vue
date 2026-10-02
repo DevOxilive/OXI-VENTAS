@@ -184,7 +184,6 @@ function openStockEntryModal(product) {
 function closeStockEntryModal() {
   showStockEntryModal.value = false
   selectedStockProduct.value = null
-  reloadProducts(currentPage.value)
 }
 
 function reloadProducts(pageOrUrl = 1) {

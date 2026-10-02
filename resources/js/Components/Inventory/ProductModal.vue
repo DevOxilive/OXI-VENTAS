@@ -658,6 +658,7 @@ function submit() {
           form.clearErrors();
           activeStep.value = 1;
           setCreateDefaults();
+          emit("close");
         },
         onError: (errors) => {
           restoreFormSnapshot(pendingFormSnapshot.value);
@@ -727,6 +728,8 @@ function submit() {
             ToastAlert({
               title: "Producto actualizado correctamente",
             });
+
+            emit("close");
           },
           onError: (errors) => {
             restoreFormSnapshot(pendingFormSnapshot.value);
