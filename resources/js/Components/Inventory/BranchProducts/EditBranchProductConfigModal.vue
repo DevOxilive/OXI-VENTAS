@@ -48,7 +48,7 @@ function closeModal() {
 }
 
 function submitConfig() {
-    saveConfig(props.product.id)
+    saveConfig(props.product.id, () => emit('close'))
 }
 </script>
 
