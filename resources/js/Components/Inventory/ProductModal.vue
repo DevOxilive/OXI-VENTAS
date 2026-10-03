@@ -53,6 +53,10 @@ const form = useForm({
   sale_price_per_piece: "",
   cost_per_box: "",
   sale_price_per_box: "",
+  piece_pricing_mode: "manual",
+  box_pricing_mode: "manual",
+  piece_margin_percentage: "",
+  box_margin_percentage: "",
   allow_low_margin: false,
   entry_date: new Date().toISOString().slice(0, 10),
   active: true,
@@ -67,9 +71,6 @@ const modalSections = [
   { id: 1, label: "Datos y precios" },
   { id: 2, label: "Sucursales activas" },
 ];
-const marginPercentage = ref("");
-const pricingDriver = ref("percentage");
-const syncingPricing = ref(false);
 const fileInput = ref(null);
 const isDragActive = ref(false);
 const filePreviewUrl = ref(null);
@@ -97,74 +98,53 @@ function displayDecimal(value) {
   return String(value).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 }
 
-function syncSalePriceFromPercentage() {
-  const cost = parseDecimal(form.cost_per_piece);
-  const percentage = parseDecimal(marginPercentage.value);
-
-  if (cost === null || percentage === null) return;
-
-  syncingPricing.value = true;
-  form.sale_price_per_piece = formatDecimal(cost * (1 + percentage / 100));
-
-  if (hasBoxPresentation.value) {
-    const boxCost = parseDecimal(form.cost_per_box);
-
-    form.sale_price_per_box = boxCost === null
-      ? ""
-      : formatDecimal(boxCost * (1 + percentage / 100));
+function initializePricingFields() {
+  const product = props.mode === "create" ? null : props.product;
+  for (const presentation of ["piece", "box"]) {
+    form[`${presentation}_pricing_mode`] = product?.[`${presentation}_pricing_mode`] ?? "manual";
+    form[`${presentation}_margin_percentage`] = product?.[`${presentation}_margin_percentage`] ?? "";
   }
-
-  syncingPricing.value = false;
 }
 
-function syncPercentageFromSalePrice(costValue, salePriceValue) {
-  const cost = parseDecimal(costValue);
-  const salePrice = parseDecimal(salePriceValue);
+function actualMargin(presentation) {
+  const cost = parseDecimal(form[`cost_per_${presentation}`]);
+  const price = parseDecimal(form[`sale_price_per_${presentation}`]);
+  return cost > 0 && price !== null ? ((price - cost) / cost) * 100 : null;
+}
 
-  if (cost === null || salePrice === null || cost <= 0) {
-    syncingPricing.value = true;
-    marginPercentage.value = "";
-    syncingPricing.value = false;
+function displayedMargin(presentation) {
+  if (form[`${presentation}_pricing_mode`] === "percentage") {
+    return form[`${presentation}_margin_percentage`];
+  }
+  const margin = actualMargin(presentation);
+  return margin === null ? "" : formatDecimal(margin);
+}
+
+function syncPresentationPrice(presentation) {
+  if (props.mode === "view" || !props.canManagePricing) return;
+  if (form[`${presentation}_pricing_mode`] !== "percentage") return;
+  const cost = parseDecimal(form[`cost_per_${presentation}`]);
+  const margin = parseDecimal(form[`${presentation}_margin_percentage`]);
+  if (cost === 0) {
+    form[`${presentation}_pricing_mode`] = "manual";
+    form[`${presentation}_margin_percentage`] = "";
     return;
   }
-
-  syncingPricing.value = true;
-  marginPercentage.value = formatDecimal(((salePrice - cost) / cost) * 100);
-  syncingPricing.value = false;
-}
-
-function initializePricingFields() {
-  syncingPricing.value = true;
-
-  const cost = parseDecimal(form.cost_per_piece);
-  const salePrice = parseDecimal(form.sale_price_per_piece);
-  const storedMargin = parseDecimal(props.product?.margin_percentage);
-
-  if (storedMargin !== null) {
-    marginPercentage.value = formatDecimal(storedMargin);
-  } else if (cost !== null && salePrice !== null && cost > 0) {
-    marginPercentage.value = formatDecimal(((salePrice - cost) / cost) * 100);
-  } else {
-    marginPercentage.value = "";
+  if (cost > 0 && margin !== null) {
+    form[`sale_price_per_${presentation}`] = formatDecimal(cost * (1 + margin / 100));
   }
-
-  pricingDriver.value = "percentage";
-  syncingPricing.value = false;
 }
 
-function handleMarginPercentageChange(value) {
-  pricingDriver.value = "percentage";
-  marginPercentage.value = value;
+function handlePresentationMargin(presentation, value) {
+  form[`${presentation}_margin_percentage`] = value;
+  form[`${presentation}_pricing_mode`] = "percentage";
+  syncPresentationPrice(presentation);
 }
 
-function handleSalePriceChange(value) {
-  pricingDriver.value = "piece_price";
-  form.sale_price_per_piece = value;
-}
-
-function handleBoxSalePriceChange(value) {
-  pricingDriver.value = "box_price";
-  form.sale_price_per_box = value;
+function handlePresentationSalePrice(presentation, value) {
+  form[`${presentation}_pricing_mode`] = "manual";
+  form[`${presentation}_margin_percentage`] = "";
+  form[`sale_price_per_${presentation}`] = value;
 }
 
 function barcodeFieldError(index) {
@@ -243,8 +223,10 @@ function captureFormSnapshot() {
     grams: form.grams,
     liters: form.liters,
     record_version: form.record_version,
-    marginPercentage: marginPercentage.value,
-    pricingDriver: pricingDriver.value,
+    piece_pricing_mode: form.piece_pricing_mode,
+    box_pricing_mode: form.box_pricing_mode,
+    piece_margin_percentage: form.piece_margin_percentage,
+    box_margin_percentage: form.box_margin_percentage,
     activeStep: activeStep.value,
   };
 }
@@ -277,8 +259,10 @@ function restoreFormSnapshot(snapshot) {
   form.liters = snapshot.liters;
   form.record_version = snapshot.record_version;
 
-  marginPercentage.value = snapshot.marginPercentage;
-  pricingDriver.value = snapshot.pricingDriver;
+  form.piece_pricing_mode = snapshot.piece_pricing_mode;
+  form.box_pricing_mode = snapshot.box_pricing_mode;
+  form.piece_margin_percentage = snapshot.piece_margin_percentage;
+  form.box_margin_percentage = snapshot.box_margin_percentage;
   activeStep.value = snapshot.activeStep;
 }
 
@@ -348,9 +332,11 @@ const categoriesForDepartment = computed(() => {
   });
 });
 const marginBelowMinimum = computed(() => {
-  const margin = parseDecimal(marginPercentage.value);
-
-  return margin !== null && margin < 10;
+  const presentations = hasBoxPresentation.value ? ["piece", "box"] : ["piece"];
+  return presentations.some((presentation) => {
+    const margin = actualMargin(presentation);
+    return margin !== null && Math.round(margin * 100) / 100 < 10;
+  });
 });
 
 const modalConfig = computed(() =>
@@ -525,49 +511,12 @@ watch(
   { immediate: true }
 );
 
-watch(
-  () => [form.cost_per_piece, form.cost_per_box, form.has_box_presentation],
-  () => {
-    if (syncingPricing.value) return;
-
-    if (pricingDriver.value === "piece_price") {
-      syncPercentageFromSalePrice(form.cost_per_piece, form.sale_price_per_piece);
-      syncSalePriceFromPercentage();
-      return;
-    }
-
-    if (pricingDriver.value === "box_price") {
-      syncPercentageFromSalePrice(form.cost_per_box, form.sale_price_per_box);
-      syncSalePriceFromPercentage();
-      return;
-    }
-
-    syncSalePriceFromPercentage();
-  }
-);
-
-watch(marginPercentage, () => {
-  if (syncingPricing.value || pricingDriver.value !== "percentage") return;
-  syncSalePriceFromPercentage();
-});
-
-watch(
-  () => form.sale_price_per_piece,
-  () => {
-    if (syncingPricing.value || pricingDriver.value !== "piece_price") return;
-    syncPercentageFromSalePrice(form.cost_per_piece, form.sale_price_per_piece);
-    syncSalePriceFromPercentage();
-  }
-);
-
-watch(
-  () => form.sale_price_per_box,
-  () => {
-    if (syncingPricing.value || pricingDriver.value !== "box_price") return;
-    syncPercentageFromSalePrice(form.cost_per_box, form.sale_price_per_box);
-    syncSalePriceFromPercentage();
-  }
-);
+for (const presentation of ["piece", "box"]) {
+  watch(
+    () => [form[`cost_per_${presentation}`], form[`${presentation}_margin_percentage`], form[`${presentation}_pricing_mode`]],
+    () => syncPresentationPrice(presentation)
+  );
+}
 
 watch(
   () => form.product_department_id,
@@ -1067,6 +1016,7 @@ function submit() {
               @validate="clearFieldErrors('min_stock')"
             />
             <InputField
+              v-if="!canManagePricing"
               :label="isKilogramUnit ? 'Precio compra por kilogramo' : 'Precio compra por pieza'"
               field="cost_per_piece"
               validation-field="product_price"
@@ -1080,7 +1030,7 @@ function submit() {
             />
 
             <InputField
-              v-if="hasBoxPresentation"
+              v-if="hasBoxPresentation && !canManagePricing"
               label="Precio compra por caja"
               field="cost_per_box"
               validation-field="product_price"
@@ -1094,46 +1044,58 @@ function submit() {
             />
 
             <template v-if="canManagePricing">
-              <InputField
-                label="Porcentaje de ganancia"
-                field="margin_percentage"
-                :model-value="marginPercentage"
-                @update:modelValue="handleMarginPercentageChange"
-                suffix="%"
-                type="text"
-                step="0.01"
-                :readonly="mode === 'view'"
-                @validate="clearFieldErrors('sale_price_per_piece')"
-              />
-
-              <InputField
-                :label="isKilogramUnit ? 'Precio venta por kilogramo' : 'Precio venta por pieza'"
-                field="sale_price_per_piece"
-                validation-field="product_price"
-                :model-value="form.sale_price_per_piece"
-                @update:modelValue="handleSalePriceChange"
-                prefix="$"
-                :error="form.errors.sale_price_per_piece"
-                type="text"
-                step="0.01"
-                :readonly="mode === 'view'"
-              />
-
-              <template v-if="hasBoxPresentation">
+              <section
+                v-for="presentation in (hasBoxPresentation ? ['piece', 'box'] : ['piece'])"
+                :key="presentation"
+                class="grid gap-3 rounded-xl border border-secondary p-3 md:col-span-2 2xl:col-span-3 md:grid-cols-3"
+              >
+                <h3 class="text-sm font-semibold md:col-span-3">
+                  {{ presentation === 'box' ? 'Precios por caja' : isKilogramUnit ? 'Precios por kilogramo' : 'Precios por pieza' }}
+                </h3>
                 <InputField
-                  label="Precio venta por caja"
-                  field="sale_price_per_box"
+                  label="Precio de compra"
+                  :field="`cost_per_${presentation}`"
                   validation-field="product_price"
-                  :model-value="form.sale_price_per_box"
-                  @update:modelValue="handleBoxSalePriceChange"
+                  v-model="form[`cost_per_${presentation}`]"
                   prefix="$"
-                  :error="form.errors.sale_price_per_box"
+                  :error="form.errors[`cost_per_${presentation}`]"
                   type="text"
                   step="0.01"
                   :readonly="mode === 'view'"
-                  @validate="clearFieldErrors('sale_price_per_box')"
+                  @validate="clearFieldErrors(`cost_per_${presentation}`)"
                 />
-              </template>
+                <div>
+                  <InputField
+                    label="Ganancia sobre el costo"
+                    validation-field="margin_percentage"
+                    :field="`${presentation}_margin_percentage`"
+                    :model-value="displayedMargin(presentation)"
+                    @update:modelValue="handlePresentationMargin(presentation, $event)"
+                    suffix="%"
+                    type="text"
+                    inputmode="decimal"
+                    :error="form.errors[`${presentation}_margin_percentage`]"
+                    :readonly="mode === 'view' || !(Number(form[`cost_per_${presentation}`]) > 0)"
+                    @validate="clearFieldErrors(`${presentation}_margin_percentage`)"
+                  />
+                  <p v-if="Number(form[`cost_per_${presentation}`]) <= 0" class="mt-1 text-xs text-text opacity-70">
+                    Con costo cero, el porcentaje no aplica. Captura el precio de venta.
+                  </p>
+                </div>
+                <InputField
+                  label="Precio de venta"
+                  :field="`sale_price_per_${presentation}`"
+                  validation-field="product_price"
+                  :model-value="form[`sale_price_per_${presentation}`]"
+                  @update:modelValue="handlePresentationSalePrice(presentation, $event)"
+                  prefix="$"
+                  :error="form.errors[`sale_price_per_${presentation}`]"
+                  type="text"
+                  step="0.01"
+                  :readonly="mode === 'view'"
+                  @validate="clearFieldErrors(`sale_price_per_${presentation}`)"
+                />
+              </section>
 
               <div
                 v-if="marginBelowMinimum && mode !== 'view'"
