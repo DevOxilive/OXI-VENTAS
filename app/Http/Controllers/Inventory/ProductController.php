@@ -131,6 +131,7 @@ class ProductController extends Controller
                 'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
             ])
+            ->withCount(['activeBatches as active_batches_count'])
             ->where('branch_id', $branch->id)
             ->where('status', BranchProduct::STATUS_ACTIVE)
             ->orderByDesc('id');
@@ -227,6 +228,7 @@ class ProductController extends Controller
                 'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
             ])
+            ->withCount(['activeBatches as active_batches_count'])
             ->where('branch_id', $branch->id)
             ->where('product_id', $productId)
             ->where('status', BranchProduct::STATUS_ACTIVE)
@@ -1057,6 +1059,7 @@ class ProductController extends Controller
             'status' => $branchProduct->status,
             'tracks_batches' => $branchProduct->tracks_batches,
             'tracks_expiration' => $branchProduct->tracks_expiration,
+            'active_batches_count' => (int) ($branchProduct->active_batches_count ?? 0),
             'entry_date' => $branchProduct->entry_date
                 ?? optional($branchProduct->created_at)->format('Y-m-d')
                 ?? 'Sin fecha',

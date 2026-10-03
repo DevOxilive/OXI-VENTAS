@@ -82,6 +82,16 @@ export const productTableConfig = {
             mobile: "button",
         },
         {
+            id: "batches",
+            label: "Editar lotes",
+            icon: "inventory_2",
+            variant: "blue",
+            permission: "inventory.branches.batches.update",
+            mobile: "button",
+            hidden: (row) =>
+                Number(row.active_batches_count ?? row.activeBatchesCount ?? 0) <= 0,
+        },
+        {
             id: "view",
             label: "Ver",
             icon: "visibility",
