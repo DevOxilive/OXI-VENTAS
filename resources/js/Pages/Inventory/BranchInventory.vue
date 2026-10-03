@@ -231,6 +231,7 @@ function handleInventoryAction({ action, row }) {
                 <InventoryStatsCards :alerts="alerts" @open-alert="openAlertModal" />
 
                 <GlobalToolbar v-bind="inventoryToolbarConfig" :search="search" :records-per-page="recordsToShow"
+                    select-search-on-enter
                     :filtered-records="filteredProducts.length" :total-records="visualProducts.length"
                     @update:search="search = $event" @update:filter="handleInventoryToolbarFilter"
                     @update:records-per-page="recordsToShow = $event" />

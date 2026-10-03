@@ -907,6 +907,7 @@ function submit() {
                         validation-field="barcode"
                         v-model="form.barcodes[index]"
                         icon="barcode_scanner"
+                        select-on-enter
                         :data-modal-autofocus="index === 0 ? '' : null"
                         :error="barcodeFieldError(index)"
                         :readonly="mode === 'view'"

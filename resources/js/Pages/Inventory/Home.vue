@@ -352,6 +352,7 @@ onBeforeUnmount(() => {
   <PageLayout>
     <template #toolbar>
       <GlobalToolbar v-bind="productToolbarConfig" :search="search" :records-per-page="recordsToShow"
+        select-search-on-enter
         :filtered-records="products.length" :total-records="totalProducts"
         @update:search="search = $event" @update:filter="handleProductToolbarFilter"
         @update:records-per-page="recordsToShow = $event" @action="handleProductToolbarAction" />

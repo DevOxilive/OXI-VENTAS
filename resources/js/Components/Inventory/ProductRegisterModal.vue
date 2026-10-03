@@ -137,7 +137,7 @@ watch(
                         <InputField data-modal-autofocus label="Código interno" field="code" validation-field="codigoProducto" v-model="product.code" :readonly="isReadOnly"
                             :error="frontendErrors.code || product.errors?.code" @validate="validate('code')" />
 
-                        <InputField label="Código de barras" field="barcode" v-model="product.barcode" :readonly="isReadOnly"
+                        <InputField label="Código de barras" field="barcode" v-model="product.barcode" select-on-enter :readonly="isReadOnly"
                             :error="frontendErrors.barcode || product.errors?.barcode" @validate="validate('barcode')" />
 
                         <InputField label="Nombre del producto" field="name" validation-field="product_name" v-model="product.name" preserve-case :readonly="isReadOnly"
