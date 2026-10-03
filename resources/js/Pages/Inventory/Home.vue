@@ -6,8 +6,11 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ProductModal from '@/Components/Inventory/ProductModal.vue'
 import ProductTable from '@/Components/Inventory/ProductTable.vue'
 import StockEntryModal from '@/Components/Inventory/BranchProducts/StockEntryModal.vue'
+import ProductBatchesModal from '@/Components/Inventory/BranchProducts/ProductBatchesModal.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
+import { ErrorAlert } from '@/Components/Modales/UniversalActionModal'
+import { useBatchAdjustmentModal } from '@/Composables/Inventory/useBatchAdjustmentModal'
 import { useProductActions } from '@/Composables/Inventory/useProductActions'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { usePermissions } from '@/Composables/usePermissions'
@@ -100,6 +103,27 @@ const { handlePageChange } = useGlobalTablePagination({
 const products = computed(() => productsState.value?.data ?? [])
 const currentPage = computed(() => productsState.value?.current_page ?? 1)
 const totalProducts = computed(() => productsState.value?.total ?? products.value.length)
+const showProductBatchesModal = ref(false)
+const selectedBatchesProduct = ref(null)
+const selectedBatchProducts = computed(() => selectedBatchesProduct.value
+  ? [selectedBatchesProduct.value]
+  : [])
+const {
+  liveSelectedBatch,
+  processing: batchAdjustmentProcessing,
+  form: batchAdjustmentForm,
+  frontendErrors: batchAdjustmentErrors,
+  totalErrors: batchAdjustmentTotalErrors,
+  isSeasonal: batchAdjustmentIsSeasonal,
+  calculatedQuantity: batchAdjustmentCalculatedQuantity,
+  adjustmentText: batchAdjustmentText,
+  quantityResultColor: batchAdjustmentQuantityResultColor,
+  adjustBatch,
+  clearSelectedBatch,
+  setAdjustmentType: setBatchAdjustmentType,
+  validateField: validateBatchAdjustmentField,
+  saveEditedBatch,
+} = useBatchAdjustmentModal(selectedBatchProducts)
 const toolbarCategories = computed(() => {
   if (!productDepartmentFilter.value.length) {
     return categoriesDB.value
@@ -156,6 +180,10 @@ function handleProductAction({ action, row }) {
     openViewModal(row)
   }
 
+  if (action === 'batches' && can('inventory.branches.batches.update')) {
+    openProductBatchesModal(row)
+  }
+
   if (action === 'edit' && can('inventory.products.update')) {
     openEditModal(row)
   }
@@ -163,6 +191,47 @@ function handleProductAction({ action, row }) {
   if (action === 'delete' && can('inventory.products.delete')) {
     deleteProduct(row)
   }
+}
+
+async function openProductBatchesModal(product) {
+  if (!product?.branch_product_id) return
+
+  try {
+    const { data } = await window.axios.get(
+      route('inventory.branch-inventory.details', {
+        branchProduct: product.branch_product_id,
+      })
+    )
+
+    clearSelectedBatch()
+    selectedBatchesProduct.value = {
+      ...product,
+      ...data,
+      id: product.id,
+      branch_product_id: product.branch_product_id,
+      name: product.name ?? data?.product?.name ?? 'Producto',
+      inventory_unit: data?.product?.inventory_unit ?? product.inventory_unit ?? 'pza',
+      unit: data?.product?.unit ?? product.unit ?? 'pza',
+      batches: data?.batches ?? [],
+    }
+    showProductBatchesModal.value = true
+  } catch (error) {
+    console.error('No se pudieron cargar los lotes del producto', error)
+    ErrorAlert({
+      title: 'No se pudieron cargar los lotes',
+      message: 'Actualiza la página e intenta nuevamente.',
+    })
+  }
+}
+
+function closeProductBatchesModal() {
+  clearSelectedBatch()
+  showProductBatchesModal.value = false
+  selectedBatchesProduct.value = null
+}
+
+function saveBatchChanges() {
+  saveEditedBatch(closeProductBatchesModal)
 }
 
 function buildStockEntryProduct(product) {
@@ -363,6 +432,16 @@ onBeforeUnmount(() => {
 
     <StockEntryModal v-if="showStockEntryModal && selectedStockProduct && can('inventory.branches.stock-in')"
       :product="selectedStockProduct" :branches="branchesDB" :current-branch="branch" @close="closeStockEntryModal" />
+
+    <ProductBatchesModal
+      v-if="showProductBatchesModal && selectedBatchesProduct && can('inventory.branches.batches.update')"
+      :product="selectedBatchesProduct" :selected-batch="liveSelectedBatch" :form="batchAdjustmentForm"
+      :frontend-errors="batchAdjustmentErrors" :total-errors="batchAdjustmentTotalErrors"
+      :processing="batchAdjustmentProcessing" :is-seasonal="batchAdjustmentIsSeasonal"
+      :calculated-quantity="batchAdjustmentCalculatedQuantity" :adjustment-text="batchAdjustmentText"
+      :quantity-result-color="batchAdjustmentQuantityResultColor" :set-adjustment-type="setBatchAdjustmentType"
+      :validate-field="validateBatchAdjustmentField" @select-batch="adjustBatch" @save="saveBatchChanges"
+      @close="closeProductBatchesModal" />
 
     <ProductModal v-if="
       showModal &&
