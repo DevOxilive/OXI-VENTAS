@@ -120,6 +120,20 @@ class NegativeStockTest extends TestCase
         $this->assertStock(-24.125);
     }
 
+    public function test_independent_box_and_piece_prices_charge_and_deduct_the_correct_quantities(): void
+    {
+        $this->inventory->product->update([
+            'has_box_presentation' => true, 'pieces_per_box' => 16,
+            'cost_per_piece' => 0, 'sale_price_per_piece' => 18,
+            'cost_per_box' => 180, 'sale_price_per_box' => 234,
+        ]);
+        $pieceSale = $this->sell(1);
+        $this->assertEquals(18, $pieceSale->total);
+        $boxSale = $this->sell(1, 'box');
+        $this->assertEquals(234, $boxSale->total);
+        $this->assertStock(-17);
+    }
+
     public function test_entry_and_distribution_preserve_previous_untracked_negative_stock(): void
     {
         $this->inventory->update(['stock' => -5, 'tracks_batches' => false]);

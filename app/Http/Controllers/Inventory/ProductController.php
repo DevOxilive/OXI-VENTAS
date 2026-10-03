@@ -59,17 +59,50 @@ class ProductController extends Controller
         ], true);
     }
 
-    private function resolvePresentationPricing(array &$data, bool $canManagePricing): void
+    private function resolvePresentationPricing(array &$data, bool $canManagePricing, ?Product $currentProduct = null): void
     {
         $hasBoxPresentation = (bool) ($data['has_box_presentation'] ?? false);
         $costPerPiece = (float) $data['cost_per_piece'];
         $costPerBox = $hasBoxPresentation ? (float) $data['cost_per_box'] : null;
 
-        if (! $canManagePricing) {
-            $data['sale_price_per_piece'] = round($costPerPiece * 1.10, 2);
-            $data['sale_price_per_box'] = $hasBoxPresentation
-                ? round($costPerBox * 1.10, 2)
-                : null;
+        foreach (['piece', 'box'] as $presentation) {
+            $modeKey = "{$presentation}_pricing_mode";
+            $marginKey = "{$presentation}_margin_percentage";
+            $priceKey = "sale_price_per_{$presentation}";
+            $cost = (float) ($data["cost_per_{$presentation}"] ?? 0);
+
+            if ($presentation === 'box' && ! $hasBoxPresentation) {
+                $data[$modeKey] = 'manual';
+                $data[$marginKey] = null;
+                continue;
+            }
+
+            if (! $canManagePricing) {
+                $data[$modeKey] = $currentProduct?->$modeKey ?? 'percentage';
+                $data[$marginKey] = $currentProduct ? $currentProduct->$marginKey : 10;
+                $data[$priceKey] = $currentProduct
+                    ? ($currentProduct->$priceKey ?? ($presentation === 'piece' ? $currentProduct->sale_price : 0))
+                    : round($cost * 1.10, 2);
+                if ($data[$modeKey] === 'percentage' && $data[$marginKey] !== null && $cost > 0) {
+                    $data[$priceKey] = round($cost * (1 + ((float) $data[$marginKey] / 100)), 2);
+                } elseif ($cost <= 0) {
+                    $data[$modeKey] = 'manual';
+                    $data[$marginKey] = null;
+                }
+                continue;
+            }
+
+            $data[$modeKey] = $data[$modeKey] ?? 'manual';
+            if ($data[$modeKey] === 'percentage') {
+                if ($cost <= 0 || ! isset($data[$marginKey])) {
+                    throw ValidationException::withMessages([
+                        $marginKey => 'Para calcular por porcentaje, captura un costo mayor a cero y un porcentaje. Con costo cero, usa precio manual.',
+                    ]);
+                }
+                $data[$priceKey] = round($cost * (1 + ((float) $data[$marginKey] / 100)), 2);
+            } else {
+                $data[$marginKey] = null;
+            }
         }
 
         $pieceMargin = $this->calculateMarginPercentage($costPerPiece, $data['sale_price_per_piece']);
@@ -81,7 +114,7 @@ class ProductController extends Controller
 
         if ($margins !== [] && min($margins) < 10 && ! ($canManagePricing && ($data['allow_low_margin'] ?? false))) {
             throw ValidationException::withMessages([
-                'sale_price_per_piece' => 'El porcentaje de ganancia no puede ser menor al 10%. Un administrador debe autorizar esta excepción.',
+                ($pieceMargin !== null && $pieceMargin < 10 ? 'sale_price_per_piece' : 'sale_price_per_box') => 'El porcentaje de ganancia no puede ser menor al 10%. Un administrador debe autorizar esta excepción.',
             ]);
         }
 
@@ -126,7 +159,7 @@ class ProductController extends Controller
         $query = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
-                'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at,updated_at',
+                'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at,updated_at',
                 'product.category:id,product_department_id,name',
                 'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
@@ -223,7 +256,7 @@ class ProductController extends Controller
         $branchProduct = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
-                'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at',
+                'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at',
                 'product.category:id,product_department_id,name',
                 'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
@@ -297,6 +330,10 @@ class ProductController extends Controller
             'sale_price_per_box' => $canManagePricing
                 ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0']
                 : ['nullable', 'numeric', 'min:0'],
+            'piece_pricing_mode' => ['sometimes', Rule::in(['manual', 'percentage'])],
+            'box_pricing_mode' => ['sometimes', Rule::in(['manual', 'percentage'])],
+            'piece_margin_percentage' => ['nullable', 'numeric', 'min:0', 'max:999999'],
+            'box_margin_percentage' => ['nullable', 'numeric', 'min:0', 'max:999999'],
             'allow_low_margin' => ['nullable', 'boolean'],
             'entry_date' => ['required', 'date'],
             'active' => ['boolean'],
@@ -355,6 +392,10 @@ class ProductController extends Controller
                     'image' => $imagePath ?? ($product->exists ? $product->image : null),
                     'cost' => $data['cost'],
                     'sale_price' => $data['sale_price'],
+                    'piece_pricing_mode' => $data['piece_pricing_mode'],
+                    'box_pricing_mode' => $data['box_pricing_mode'],
+                    'piece_margin_percentage' => $data['piece_margin_percentage'],
+                    'box_margin_percentage' => $data['box_margin_percentage'],
                     'margin_percentage' => $data['margin_percentage'],
                     'unit' => $data['inventory_unit'],
                     'inventory_unit' => $data['inventory_unit'],
@@ -430,6 +471,10 @@ class ProductController extends Controller
             'sale_price_per_box' => $canManagePricing
                 ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0']
                 : ['nullable', 'numeric', 'min:0'],
+            'piece_pricing_mode' => ['sometimes', Rule::in(['manual', 'percentage'])],
+            'box_pricing_mode' => ['sometimes', Rule::in(['manual', 'percentage'])],
+            'piece_margin_percentage' => ['nullable', 'numeric', 'min:0', 'max:999999'],
+            'box_margin_percentage' => ['nullable', 'numeric', 'min:0', 'max:999999'],
             'allow_low_margin' => ['nullable', 'boolean'],
             'entry_date' => ['required', 'date'],
             'active' => ['boolean'],
@@ -440,7 +485,7 @@ class ProductController extends Controller
         $data['has_box_presentation'] = $request->boolean('has_box_presentation');
         $data['search_aliases'] = $this->normalizeSearchAliases($data['search_aliases'] ?? []);
 
-        $this->resolvePresentationPricing($data, $canManagePricing);
+        $this->resolvePresentationPricing($data, $canManagePricing, $product);
 
         if ($data['inventory_unit'] === 'kg' && $data['has_box_presentation']) {
             throw ValidationException::withMessages([
@@ -485,6 +530,10 @@ class ProductController extends Controller
         }
 
         $changesGlobalProduct = $request->hasFile('image')
+            || ($product->piece_pricing_mode ?? 'manual') !== $data['piece_pricing_mode']
+            || ($product->box_pricing_mode ?? 'manual') !== $data['box_pricing_mode']
+            || $product->piece_margin_percentage != $data['piece_margin_percentage']
+            || $product->box_margin_percentage != $data['box_margin_percentage']
             || (string) $product->name !== (string) $data['name']
             || array_values($product->search_aliases ?? []) !== $data['search_aliases']
             || (int) $product->category_id !== (int) $data['category_id']
@@ -534,6 +583,10 @@ class ProductController extends Controller
                     'category_id' => $data['category_id'],
                     'cost' => $data['cost'],
                     'sale_price' => $data['sale_price'],
+                    'piece_pricing_mode' => $data['piece_pricing_mode'],
+                    'box_pricing_mode' => $data['box_pricing_mode'],
+                    'piece_margin_percentage' => $data['piece_margin_percentage'],
+                    'box_margin_percentage' => $data['box_margin_percentage'],
                     'margin_percentage' => $data['margin_percentage'],
                     'unit' => $storageUnit,
                     'inventory_unit' => $data['inventory_unit'],
@@ -1043,6 +1096,10 @@ class ProductController extends Controller
             'cost' => $product?->cost ?? 0,
             'cost_per_piece' => $product?->cost_per_piece ?? $product?->cost ?? 0,
             'cost_per_box' => $product?->cost_per_box,
+            'piece_pricing_mode' => $product?->piece_pricing_mode ?? 'manual',
+            'box_pricing_mode' => $product?->box_pricing_mode ?? 'manual',
+            'piece_margin_percentage' => $product?->piece_margin_percentage,
+            'box_margin_percentage' => $product?->box_margin_percentage,
             'price' => $product?->sale_price ?? 0,
             'sale_price' => $product?->sale_price ?? 0,
             'salePrice' => $product?->sale_price ?? 0,

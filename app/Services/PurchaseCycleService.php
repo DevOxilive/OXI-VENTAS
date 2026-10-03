@@ -293,22 +293,26 @@ class PurchaseCycleService
 
             if ($item->purchase_presentation === 'Caja') {
                 $boxCost = (float) $item->purchase_price;
-                $boxSalePrice = round($boxCost * (1 + ((float) $product->margin_percentage / 100)), 4);
-                $product->update([
-                    'cost_per_box' => $boxCost,
-                    'sale_price_per_box' => $boxSalePrice,
-                ]);
+                $prices = ['cost_per_box' => $boxCost];
+                if ($product->box_pricing_mode === 'percentage' && $product->box_margin_percentage !== null) {
+                    $prices['sale_price_per_box'] = round($boxCost * (1 + ((float) $product->box_margin_percentage / 100)), 2);
+                }
+                $product->update($prices);
                 continue;
             }
 
             $pieceCost = (float) $item->purchase_price;
-            $pieceSalePrice = round($pieceCost * (1 + ((float) $product->margin_percentage / 100)), 4);
-            $product->update([
+            $prices = [
                 'cost_per_piece' => $pieceCost,
-                'sale_price_per_piece' => $pieceSalePrice,
                 'cost' => $pieceCost,
-                'sale_price' => $pieceSalePrice,
-            ]);
+            ];
+            if ($product->piece_pricing_mode === 'percentage' && $product->piece_margin_percentage !== null) {
+                $prices['sale_price_per_piece'] = round($pieceCost * (1 + ((float) $product->piece_margin_percentage / 100)), 2);
+                $prices['sale_price'] = $prices['sale_price_per_piece'];
+            }
+            $pieceSalePrice = $prices['sale_price_per_piece'] ?? $product->sale_price_per_piece ?? $product->sale_price;
+            $prices['margin_percentage'] = round((((float) $pieceSalePrice - $pieceCost) / $pieceCost) * 100, 2);
+            $product->update($prices);
         }
     }
 
