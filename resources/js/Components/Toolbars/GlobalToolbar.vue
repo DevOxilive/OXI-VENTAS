@@ -81,6 +81,10 @@ defineProps({
         type: Boolean,
         default: true,
     },
+    selectSearchOnEnter: {
+        type: Boolean,
+        default: false,
+    },
 })
 
 defineEmits([
@@ -99,6 +103,7 @@ defineEmits([
             :search="search" :search-placeholder="searchPlaceholder" :show-search="showSearch" :filters="filters"
             :actions="actions" :tabs="tabs" :active-tab="activeTab" :records-per-page="recordsPerPage"
             :compact-filters="compactFilters"
+            :select-search-on-enter="selectSearchOnEnter"
             :records-per-page-options="RECORDS_PER_PAGE_OPTIONS" :show-records-per-page="showRecordsPerPage"
             :total-records="totalRecords" :filtered-records="filteredRecords" :show-counter="showCounter"
             @back="$emit('back')" @update:search="$emit('update:search', $event)"
@@ -112,6 +117,7 @@ defineEmits([
             :search="search" :search-placeholder="searchPlaceholder" :show-search="showSearch" :filters="filters"
             :actions="actions" :tabs="tabs" :active-tab="activeTab" :records-per-page="recordsPerPage"
             :compact-filters="compactFilters"
+            :select-search-on-enter="selectSearchOnEnter"
             :records-per-page-options="RECORDS_PER_PAGE_OPTIONS" :show-records-per-page="showRecordsPerPage"
             :total-records="totalRecords" :filtered-records="filteredRecords" :show-counter="showCounter"
             @back="$emit('back')" @update:search="$emit('update:search', $event)"

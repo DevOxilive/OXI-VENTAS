@@ -342,6 +342,7 @@ async function deleteProduct(selectedProduct) {
   <PageLayout>
     <template #toolbar>
       <GlobalToolbar v-bind="productToolbarConfig" :search="search" :records-per-page="recordsToShow"
+        select-search-on-enter
         :filtered-records="filteredProducts.length" :total-records="localProducts.length" @update:search="search = $event"
         @update:filter="handleProductToolbarFilter" @update:records-per-page="recordsToShow = $event"
         @action="handleProductToolbarAction" />

@@ -38,6 +38,10 @@ const props = defineProps({
         type: Boolean,
         default: true,
     },
+    selectOnEnter: {
+        type: Boolean,
+        default: false,
+    },
 })
 
 const emit = defineEmits(['update:modelValue', 'validate', 'keydown'])
@@ -165,6 +169,14 @@ function handleBlur(e) {
     emit('validate', props.field)
 }
 
+function handleKeydown(e) {
+    emit('keydown', e)
+
+    if (e.key !== 'Enter' || !props.selectOnEnter || props.readonly || isDisabled.value) return
+
+    nextTick(() => e.target.select?.())
+}
+
 defineExpose({
     focus: () => inputEl.value?.focus(),
 })
@@ -189,7 +201,7 @@ defineExpose({
             </span>
             <textarea v-if="isTextarea" ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :placeholder="placeholder" :value="modelValue"
                 :maxlength="normalizedFieldConfig?.max || undefined"
-                :readonly="readonly" @keydown="emit('keydown', $event)"
+                :readonly="readonly" @keydown="handleKeydown"
                 @input="handleInput" @blur="handleBlur" :class="[
                     'min-h-28 w-full resize-y rounded-xl border py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
                     hasLeftAddon ? 'pl-11 pr-4' : 'px-4',
@@ -200,7 +212,7 @@ defineExpose({
             <input v-else ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="type" :placeholder="placeholder"
                 :value="isCurrencyField ? displayValue : modelValue"
                 :maxlength="isDateField || isCurrencyField ? undefined : (normalizedFieldConfig?.max || undefined)"
-                :readonly="readonly" @keydown="emit('keydown', $event)"
+                :readonly="readonly" @keydown="handleKeydown"
                 @wheel="preventNumberWheel" @input="handleInput" @blur="handleBlur" :class="[
                     'w-full rounded-xl border py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
                     hasLeftAddon ? 'pl-11 pr-4' : 'px-4',

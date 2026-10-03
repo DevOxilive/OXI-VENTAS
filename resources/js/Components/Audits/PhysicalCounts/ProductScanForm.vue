@@ -76,6 +76,7 @@ function scan() {
         preserveScroll: true,
         onSuccess: () => {
             results.value = []
+            form.reset('code')
             focusInput()
         },
     })

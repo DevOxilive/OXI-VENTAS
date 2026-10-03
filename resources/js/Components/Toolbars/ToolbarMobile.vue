@@ -41,6 +41,7 @@ const props = defineProps({
     totalRecords: Number,
     filteredRecords: Number,
     showCounter: Boolean,
+    selectSearchOnEnter: Boolean,
 })
 
 const emit = defineEmits([
@@ -90,6 +91,12 @@ function handleSearchInput(event) {
     event.target.value = result.value
     nextTick(() => event.target.setSelectionRange?.(result.selectionStart, result.selectionEnd))
     return result.value
+}
+
+function handleSearchKeydown(event) {
+    if (event.key !== 'Enter' || !props.selectSearchOnEnter) return
+
+    nextTick(() => event.target.select?.())
 }
 
 function handleTextFilterInput(event, filter) {
@@ -187,6 +194,7 @@ function updateMultiFilter(filter, value) {
             <input v-if="hasSearch" :value="search" type="text" :placeholder="searchPlaceholder"
                 maxlength="120"
                 class="h-11 w-full rounded-xl border border-secondary bg-background px-4 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                @keydown="handleSearchKeydown"
                 @input="$emit('update:search', handleSearchInput($event))" />
 
             <div v-if="hasRecordsPerPage"
