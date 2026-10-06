@@ -7,6 +7,7 @@ import { GlobalToolbar } from "@/Components/Toolbars";
 import GlobalModal from "@/Components/Modales/GlobalModal.vue";
 import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
+import SearchableSelectField from "@/Components/Forms/SearchableSelectField.vue";
 import EmptyStateCard from "@/Components/Cards/EmptyStateCard.vue";
 import MetricCard from "@/Components/Cards/MetricCard.vue";
 import SaleCartItemCard from "@/Components/Ventas/SaleCartItemCard.vue";
@@ -76,7 +77,7 @@ const props = defineProps({
     type: Object,
     default: null,
   },
-  creditEmployees: { type: Array, default: () => [] },
+  creditAccounts: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -111,6 +112,7 @@ const productSearchCache = new Map();
 const productSearchRequests = new Map();
 let unsubscribeStockUpdated = null;
 let unsubscribeProductChanged = null;
+let unsubscribeCustomerChanged = null;
 let realtimeMounted = false;
 let ticketLogoDataUrlPromise = null;
 const ticketHeaderDataUrlPromises = new Map();
@@ -121,13 +123,17 @@ const saleForm = useForm({
   payment_method_id: props.defaultPaymentMethodId ?? "",
   cash_received: "",
   items: [],
-  credit_employee_id: null,
+  credit_holder_type: null,
+  credit_holder_id: null,
   estimated_payment_date: null,
 });
 const saleSubmitting = ref(false);
 const showCreditModal = ref(false);
-const creditEmployeeId = ref("");
+const creditHolder = ref("");
 const creditDueDate = ref("");
+const showChangeModal = ref(false);
+const completedSaleChange = ref(0);
+const completedSaleFolio = ref("");
 
 function formatMoney(value) {
   return new Intl.NumberFormat("es-MX", {
@@ -223,6 +229,12 @@ onMounted(() => {
     subscribeSalesBranchRealtime(props.currentBranch?.id);
     void initializePrinterBridge({ silent: true });
   }
+
+  unsubscribeCustomerChanged = subscribeRealtime(
+    REALTIME_CHANNELS.systems,
+    REALTIME_EVENTS.customerChanged,
+    () => refreshRealtimeProps(page, ["creditAccounts"]),
+  );
 });
 
 onBeforeUnmount(() => {
@@ -230,6 +242,7 @@ onBeforeUnmount(() => {
   clearPendingProductSearch();
   unsubscribeStockUpdated?.();
   unsubscribeProductChanged?.();
+  unsubscribeCustomerChanged?.();
 });
 
 watch(
@@ -1130,9 +1143,10 @@ function clearCart() {
   cart.value = [];
   search.value = "";
   saleForm.cash_received = "";
-  saleForm.credit_employee_id = null;
+  saleForm.credit_holder_type = null;
+  saleForm.credit_holder_id = null;
   saleForm.estimated_payment_date = null;
-  creditEmployeeId.value = "";
+  creditHolder.value = "";
   creditDueDate.value = "";
   showCreditModal.value = false;
   cardPaymentConfirmed.value = false;
@@ -1356,7 +1370,7 @@ function showExpirationAlert(alerts) {
   });
 }
 
-function handleSaleRegistered(payload = {}) {
+function handleSaleRegistered(payload = {}, completion = {}) {
   const printJob = payload.print_job ? resolvePrintJob(payload.print_job) : null;
 
   if (printJob) {
@@ -1369,6 +1383,12 @@ function handleSaleRegistered(payload = {}) {
       ? `Venta registrada: ${payload.sale_folio}`
       : "Venta registrada correctamente",
   });
+
+  if (completion.showChange) {
+    completedSaleChange.value = Number(printJob?.change_due ?? completion.change ?? 0);
+    completedSaleFolio.value = payload.sale_folio || printJob?.folio || "";
+    showChangeModal.value = true;
+  }
 
   replaceExpirationAlerts(payload.expiration_alerts || []);
 
@@ -1407,15 +1427,19 @@ function handleSaleRegistered(payload = {}) {
 
 function openCreditModal() {
   if (!cart.value.length) return ErrorAlert({ title: "Venta vacía", message: "Agrega productos antes de registrar un fiado." });
-  creditEmployeeId.value = "";
+  creditHolder.value = "";
   creditDueDate.value = "";
   showCreditModal.value = true;
 }
 
-async function submitSale(creditEmployee = null, estimatedPaymentDate = null) {
-  const selectedCreditEmployee = Number.isFinite(Number(creditEmployee)) && Number(creditEmployee) > 0
-    ? Number(creditEmployee)
+async function submitSale(creditSelection = null, estimatedPaymentDate = null) {
+  const [selectedCreditType, selectedCreditIdText] = String(creditSelection || "").split(":");
+  const selectedCreditId = Number.isFinite(Number(selectedCreditIdText)) && Number(selectedCreditIdText) > 0
+    ? Number(selectedCreditIdText)
     : null;
+  const hasCreditHolder = ["employee", "customer"].includes(selectedCreditType) && selectedCreditId;
+  const shouldShowChange = !hasCreditHolder && isCashPayment.value;
+  const expectedChange = changeDue.value;
 
   if (!canCreateSale.value) {
     WarningAlert({
@@ -1433,7 +1457,7 @@ async function submitSale(creditEmployee = null, estimatedPaymentDate = null) {
     return;
   }
 
-  if (!saleForm.payment_method_id && !selectedCreditEmployee) {
+  if (!saleForm.payment_method_id && !hasCreditHolder) {
     ErrorAlert({
       title: "Forma de pago requerida",
       message: "Selecciona efectivo o pago con tarjeta antes de cobrar.",
@@ -1441,7 +1465,7 @@ async function submitSale(creditEmployee = null, estimatedPaymentDate = null) {
     return;
   }
 
-  if (!selectedCreditEmployee && isCashPayment.value && receivedAmount.value < cartTotal.value) {
+  if (!hasCreditHolder && isCashPayment.value && receivedAmount.value < cartTotal.value) {
     ErrorAlert({
       title: "Efectivo insuficiente",
       message: "El monto recibido debe cubrir el total de la venta.",
@@ -1449,7 +1473,7 @@ async function submitSale(creditEmployee = null, estimatedPaymentDate = null) {
     return;
   }
 
-  if (!selectedCreditEmployee && !isCashPayment.value && !cardPaymentConfirmed.value) {
+  if (!hasCreditHolder && !isCashPayment.value && !cardPaymentConfirmed.value) {
     ErrorAlert({
       title: "Confirma el cobro",
       message: "Marca la confirmación del cobro.",
@@ -1459,11 +1483,12 @@ async function submitSale(creditEmployee = null, estimatedPaymentDate = null) {
 
   saleForm.branch_id = selectedBranchId.value || props.currentBranch?.id || "";
   saleForm.cash_box_number = String(selectedCashBoxNumber.value || "1");
-  saleForm.cash_received = selectedCreditEmployee ? 0 : (isCashPayment.value
+  saleForm.cash_received = hasCreditHolder ? 0 : (isCashPayment.value
     ? Number(saleForm.cash_received || 0)
     : Number(cartTotal.value || 0));
-  saleForm.credit_employee_id = selectedCreditEmployee;
-  saleForm.estimated_payment_date = selectedCreditEmployee ? (estimatedPaymentDate || null) : null;
+  saleForm.credit_holder_type = hasCreditHolder ? selectedCreditType : null;
+  saleForm.credit_holder_id = hasCreditHolder ? selectedCreditId : null;
+  saleForm.estimated_payment_date = hasCreditHolder ? (estimatedPaymentDate || null) : null;
   saleForm.items = cart.value.map((item) => ({
     branch_product_id: item.branch_product_id,
     product_id: item.product_id,
@@ -1488,7 +1513,10 @@ async function submitSale(creditEmployee = null, estimatedPaymentDate = null) {
       },
     });
 
-    handleSaleRegistered(data || {});
+    handleSaleRegistered(data || {}, {
+      showChange: shouldShowChange,
+      change: expectedChange,
+    });
   } catch (error) {
     if (error?.response?.status === 422 && error.response.data?.errors) {
       saleForm.setError(error.response.data.errors);
@@ -1507,9 +1535,16 @@ async function submitSale(creditEmployee = null, estimatedPaymentDate = null) {
 }
 
 function submitCreditSale() {
-  if (!creditEmployeeId.value) return ErrorAlert({ title: "Empleado requerido", message: "Selecciona a quién se cargará la compra." });
+  if (!creditHolder.value) return ErrorAlert({ title: "Persona requerida", message: "Selecciona a quién se cargará la compra." });
   showCreditModal.value = false;
-  void submitSale(Number(creditEmployeeId.value), creditDueDate.value || null);
+  void submitSale(creditHolder.value, creditDueDate.value || null);
+}
+
+function closeChangeModal() {
+  showChangeModal.value = false;
+  completedSaleChange.value = 0;
+  completedSaleFolio.value = "";
+  focusSearch();
 }
 </script>
 
@@ -1908,11 +1943,38 @@ function submitCreditSale() {
         </aside>
       </div>
 
-    <GlobalModal v-if="showCreditModal" title="Venta a crédito" subtitle="Selecciona el empleado para registrar la venta." size="2xl" :columns="1" save-button-text="Registrar fiado" close-button-text="Cancelar" @close="showCreditModal = false" @save="submitCreditSale">
+    <GlobalModal v-if="showCreditModal" title="Venta a crédito" subtitle="Selecciona un empleado o un cliente independiente para registrar la venta." size="2xl" :columns="1" save-button-text="Registrar fiado" close-button-text="Cancelar" @close="showCreditModal = false" @save="submitCreditSale">
       <div class="space-y-4">
-        <SelectField v-model="creditEmployeeId" label="Empleado" field="credit_employee_id" :options="creditEmployees" option-label="name" option-value="id" placeholder="Selecciona al empleado" />
+        <SearchableSelectField v-model="creditHolder" label="Cliente o empleado" field="credit_holder_id" :options="creditAccounts" option-label="name" option-value="value" placeholder="Escribe el nombre del cliente o empleado" empty-message="No se encontró ningún cliente o empleado." :error="saleForm.errors.credit_holder_id" />
         <InputField v-model="creditDueDate" label="Fecha estimada de pago (opcional)" field="estimated_payment_date" type="date" />
         <MetricCard label="Cargo a cuenta" :value="formatMoney(cartTotal)" tone="dark" size="lg" />
+      </div>
+    </GlobalModal>
+
+    <GlobalModal
+      v-if="showChangeModal"
+      title="Cambio a devolver"
+      :subtitle="completedSaleFolio ? `Venta ${completedSaleFolio} registrada correctamente` : 'Venta registrada correctamente'"
+      size="lg"
+      height="compact"
+      :columns="1"
+      :show-save="false"
+      close-button-text="Entendido"
+      :close-on-backdrop="false"
+      :close-on-esc="false"
+      @close="closeChangeModal"
+    >
+      <div class="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-primary bg-secondary px-6 py-10 text-center">
+        <span class="material-symbols-outlined mb-3 text-6xl text-primary">payments</span>
+        <p class="text-sm font-black uppercase tracking-[0.2em] text-text opacity-65">
+          Entrega al cliente
+        </p>
+        <p class="mt-3 text-6xl font-black leading-none text-primary sm:text-7xl">
+          {{ formatMoney(completedSaleChange) }}
+        </p>
+        <p class="mt-5 max-w-md text-base font-semibold text-text opacity-75">
+          Confirma este importe antes de atender la siguiente venta.
+        </p>
       </div>
     </GlobalModal>
 

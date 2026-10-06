@@ -28,6 +28,7 @@ const permissionModuleOrder = [
     "inventory.general-purchase-orders",
     "audits",
     "sales",
+    "sales.customers",
     "sales.employee-credit",
     "sales.attendance",
     "sales.purchase-lists",
@@ -139,6 +140,10 @@ const permissionModules = {
     },
     "sales.employee-credit": {
         label: "Estados de cuenta",
+        section: "sales",
+    },
+    "sales.customers": {
+        label: "Clientes",
         section: "sales",
     },
     "reports.sales": {
@@ -257,10 +262,14 @@ const permissionLabels = {
     "sales.update": "Editar ventas",
     "sales.delete": "Eliminar ventas",
     "sales.reports": "Ver reportes de ventas",
-    "sales.employee-credit.view": "Ver estados de cuenta de empleados",
+    "sales.employee-credit.view": "Ver estados de cuenta",
     "sales.employee-credit.create": "Dar crédito desde el punto de venta",
-    "sales.employee-credit.collect": "Registrar abonos de empleados",
+    "sales.employee-credit.collect": "Registrar abonos de clientes y empleados",
     "sales.employee-credit.print": "Imprimir y reimprimir tickets de estado de cuenta",
+    "sales.customers.view": "Ver clientes",
+    "sales.customers.create": "Crear clientes",
+    "sales.customers.update": "Editar clientes",
+    "sales.customers.delete": "Eliminar clientes",
     "reports.sales.view": "Ver reportes de ventas",
     "reports.sales.export.excel": "Exportar reportes de ventas en Excel",
     "reports.sales.export.pdf": "Exportar reportes de ventas en PDF",
@@ -419,6 +428,10 @@ export function getPermissionModule(permissionName = "") {
 
     if (permissionName.startsWith("sales.employee-credit.")) {
         return "sales.employee-credit";
+    }
+
+    if (permissionName.startsWith("sales.customers.")) {
+        return "sales.customers";
     }
 
     if (permissionName === "attendance.register") {

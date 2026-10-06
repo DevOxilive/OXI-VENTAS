@@ -27,6 +27,7 @@ use App\Http\Controllers\SystemTrashController;
 use App\Http\Controllers\TicketTemplateController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Ventas\CashRegisterClosureController;
+use App\Http\Controllers\Ventas\CustomerController;
 use App\Http\Controllers\Ventas\EmployeeCreditAccountController;
 use App\Http\Controllers\Ventas\SalesController;
 use App\Http\Controllers\Ventas\SalesReportController;
@@ -424,6 +425,19 @@ Route::middleware([
             Route::post('/', [SalesController::class, 'store'])
                 ->middleware(['permission:sales.create', 'idempotent'])
                 ->name('store');
+
+            Route::get('/clientes', [CustomerController::class, 'index'])
+                ->middleware('permission:sales.customers.view')
+                ->name('customers.index');
+            Route::post('/clientes', [CustomerController::class, 'store'])
+                ->middleware('permission:sales.customers.create')
+                ->name('customers.store');
+            Route::put('/clientes/{customer}', [CustomerController::class, 'update'])
+                ->middleware('permission:sales.customers.update')
+                ->name('customers.update');
+            Route::delete('/clientes/{customer}', [CustomerController::class, 'destroy'])
+                ->middleware('permission:sales.customers.delete')
+                ->name('customers.destroy');
 
             Route::post('/{sale}/cancelar', [SalesController::class, 'cancel'])
                 ->middleware(['permission:sales.update', 'idempotent'])
