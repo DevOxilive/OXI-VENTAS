@@ -28,6 +28,8 @@ export const REALTIME_CHANNELS = Object.freeze({
 export const REALTIME_EVENTS = Object.freeze({
     activityLogged: '.realtime.activity',
     branchChanged: '.branch.changed',
+    creditAccountChanged: '.credit-account.changed',
+    customerChanged: '.customer.changed',
     employeeChanged: '.employee.changed',
     organizationStructureChanged: '.organization-structure.changed',
     physicalCountChanged: '.PhysicalCountChanged',

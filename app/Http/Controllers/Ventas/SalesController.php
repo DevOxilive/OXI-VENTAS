@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Ventas;
 
+use App\Events\CreditAccountChanged;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
+use App\Models\Customer;
 use App\Models\Employee;
 use App\Models\EmployeeCreditAccount;
 use App\Models\EmployeeCreditCharge;
@@ -24,6 +26,7 @@ use App\Support\SystemPermission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -64,8 +67,8 @@ class SalesController extends Controller
             'productsDB' => [],
             'paymentMethodsDB' => $paymentMethods,
             'defaultPaymentMethodId' => $this->defaultPaymentMethodId($paymentMethods),
-            'creditEmployees' => $user->hasPermission('sales.employee-credit.create')
-                ? $this->creditEmployeeOptions()
+            'creditAccounts' => $user->hasPermission('sales.employee-credit.create')
+                ? $this->creditAccountOptions()
                 : [],
             'nearExpirationAlerts' => $selectorMode
                 ? []
@@ -79,9 +82,9 @@ class SalesController extends Controller
         ]);
     }
 
-    private function creditEmployeeOptions(): array
+    private function creditAccountOptions(): array
     {
-        return User::query()
+        $employees = User::query()
             ->with('employee:id,first_name,last_name,employment_status')
             ->where('is_active', true)
             ->whereNotNull('employee_id')
@@ -93,12 +96,22 @@ class SalesController extends Controller
                 $displayName = $employeeName ?: $user->name;
 
                 return [
-                    'id' => $user->employee_id,
-                    'name' => $user->email ? "{$displayName} - {$user->email}" : $displayName,
+                    'value' => 'employee:'.$user->employee_id,
+                    'name' => $user->email ? "Empleado · {$displayName} - {$user->email}" : "Empleado · {$displayName}",
                 ];
             })
-            ->values()
-            ->all();
+            ->values();
+
+        $customers = Customer::query()
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'name', 'first_name', 'last_name'])
+            ->map(fn (Customer $customer): array => [
+                'value' => 'customer:'.$customer->id,
+                'name' => 'Cliente · '.$customer->name,
+            ]);
+
+        return $employees->concat($customers)->values()->all();
     }
 
     public function history(Request $request)
@@ -244,7 +257,8 @@ class SalesController extends Controller
             'branch_id' => ['required', 'exists:branches,id'],
             'cash_box_number' => ['nullable', 'string', 'max:10'],
             'payment_method_id' => ['nullable', 'exists:payment_methods,id'],
-            'credit_employee_id' => ['nullable', 'integer', 'exists:employees,id'],
+            'credit_holder_type' => ['nullable', Rule::in(['employee', 'customer'])],
+            'credit_holder_id' => ['nullable', 'integer', 'min:1'],
             'estimated_payment_date' => ['nullable', 'date'],
             'cash_received' => ['required', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
@@ -261,12 +275,15 @@ class SalesController extends Controller
 
         $user = $request->user()->loadMissing(['branches', 'role']);
         $branch = $this->resolveBranchById($data['branch_id'], $user);
-        $isEmployeeCredit = filled($data['credit_employee_id'] ?? null);
-        if ($isEmployeeCredit && ! $user->hasPermission('sales.employee-credit.create')) {
+        $isAccountCredit = filled($data['credit_holder_type'] ?? null) || filled($data['credit_holder_id'] ?? null);
+        if ($isAccountCredit && (! filled($data['credit_holder_type'] ?? null) || ! filled($data['credit_holder_id'] ?? null))) {
+            throw ValidationException::withMessages(['credit_holder_id' => 'Selecciona una persona para registrar la venta a crédito.']);
+        }
+        if ($isAccountCredit && ! $user->hasPermission('sales.employee-credit.create')) {
             abort(403);
         }
 
-        if ($isEmployeeCredit) {
+        if ($isAccountCredit) {
             $paymentMethod = PaymentMethod::query()->updateOrCreate(
                 ['name' => 'Crédito empleado'],
                 ['active' => true]
@@ -293,11 +310,29 @@ class SalesController extends Controller
             ->values()
             ->all();
 
-        $sale = DB::transaction(function () use ($data, $user, $branch, $paymentMethod, $stockService, $isEmployeeCredit) {
+        $accountId = null;
+        $sale = DB::transaction(function () use ($data, $user, $branch, $paymentMethod, $stockService, $isAccountCredit, &$accountId) {
+            $creditEmployeeId = null;
+            $creditCustomerId = null;
+
+            if ($isAccountCredit && $data['credit_holder_type'] === 'employee') {
+                $creditEmployeeId = Employee::query()->whereKey($data['credit_holder_id'])->value('id');
+                if (! $creditEmployeeId) {
+                    throw ValidationException::withMessages(['credit_holder_id' => 'El empleado seleccionado ya no está disponible.']);
+                }
+            }
+
+            if ($isAccountCredit && $data['credit_holder_type'] === 'customer') {
+                $creditCustomerId = Customer::query()->whereKey($data['credit_holder_id'])->value('id');
+                if (! $creditCustomerId) {
+                    throw ValidationException::withMessages(['credit_holder_id' => 'El cliente seleccionado ya no está disponible.']);
+                }
+            }
+
             $sale = Sale::create([
                 'date' => now(),
                 'employee_id' => $user->employee_id,
-                'customer_id' => null,
+                'customer_id' => $creditCustomerId,
                 'branch_id' => $branch->id,
                 'cash_box_number' => (string) ($data['cash_box_number'] ?? '1'),
                 'payment_method_id' => $paymentMethod->id,
@@ -410,10 +445,10 @@ class SalesController extends Controller
             }
 
             $total = round($total, 2);
-            $isCashPayment = ! $isEmployeeCredit && $this->isCashPaymentMethod($paymentMethod->name);
+            $isCashPayment = ! $isAccountCredit && $this->isCashPaymentMethod($paymentMethod->name);
             $cashReceived = $isCashPayment
                 ? round((float) $data['cash_received'], 2)
-                : ($isEmployeeCredit ? 0 : $total);
+                : ($isAccountCredit ? 0 : $total);
 
             if ($isCashPayment && $cashReceived < $total) {
                 throw ValidationException::withMessages([
@@ -428,17 +463,20 @@ class SalesController extends Controller
                 'change_due' => $isCashPayment ? round($cashReceived - $total, 2) : 0,
             ]);
 
-            if ($isEmployeeCredit) {
+            if ($isAccountCredit) {
                 $account = EmployeeCreditAccount::query()->firstOrCreate(
-                    ['employee_id' => (int) $data['credit_employee_id']],
+                    $creditCustomerId
+                        ? ['customer_id' => $creditCustomerId]
+                        : ['employee_id' => $creditEmployeeId],
                     ['active' => true]
                 );
+                $accountId = $account->id;
                 if (! $account->active) {
-                    throw ValidationException::withMessages(['credit_employee_id' => 'El crédito de este empleado no está habilitado.']);
+                    throw ValidationException::withMessages(['credit_holder_id' => 'El crédito de esta persona no está habilitado.']);
                 }
                 $currentBalance = (float) $account->charges()->where('status', 'open')->sum('outstanding_amount');
                 if ($account->credit_limit !== null && $currentBalance + $total > (float) $account->credit_limit) {
-                    throw ValidationException::withMessages(['credit_employee_id' => 'La compra excede el límite de crédito del empleado.']);
+                    throw ValidationException::withMessages(['credit_holder_id' => 'La compra excede el límite de crédito disponible.']);
                 }
                 EmployeeCreditCharge::create([
                     'employee_credit_account_id' => $account->id,
@@ -453,6 +491,10 @@ class SalesController extends Controller
 
             return $sale;
         }, 3);
+
+        if ($accountId) {
+            broadcast(new CreditAccountChanged('charge_created', $accountId))->toOthers();
+        }
 
         $expirationAlerts = $this->buildRemainingNearExpirationAlertsAfterSale($sale);
 
@@ -488,6 +530,13 @@ class SalesController extends Controller
             reason: $data['reason'],
             items: $data['items'],
         );
+
+        $creditAccountId = EmployeeCreditCharge::query()
+            ->where('sale_id', $sale->id)
+            ->value('employee_credit_account_id');
+        if ($creditAccountId) {
+            broadcast(new CreditAccountChanged('charge_adjusted', (int) $creditAccountId))->toOthers();
+        }
 
         return back()->with([
             'success' => 'Devolucion del ticket '.$sale->folio.' registrada correctamente.',

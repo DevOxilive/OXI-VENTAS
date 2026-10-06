@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
@@ -24,6 +24,7 @@ import {
   buildEscPosTicketData,
   normalizeTicketTemplate,
 } from '@/config/ticketTemplate'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
 
@@ -50,6 +51,8 @@ const printerBridgeMessage = ref('Conecta QZ Tray para imprimir tickets.')
 const TICKET_LOGO_URL = '/icons/super-kay-ticket-bw.png'
 let ticketLogoDataUrlPromise = null
 const ticketHeaderDataUrlPromises = new Map()
+let unsubscribeCreditAccountChanged = null
+let unsubscribeCustomerChanged = null
 
 const payment = useForm({
   payment_method_id: props.paymentMethods[0]?.id || '',
@@ -69,7 +72,7 @@ const money = (value) => new Intl.NumberFormat('es-MX', { style: 'currency', cur
 const compactNumber = (value) => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 3 }).format(Number(value || 0))
 
 const columns = [
-  { key: 'employee', label: 'Empleado', format: 'text', minWidth: '240px' },
+  { key: 'holder', label: 'Cliente o empleado', format: 'text', subKey: 'holder_type', minWidth: '240px' },
   { key: 'balance', label: 'Adeudo', format: 'currency', minWidth: '140px', mobileBadge: true },
   { key: 'credit_limit_label', label: 'Límite', format: 'text', minWidth: '140px' },
   { key: 'estimated_payment_date', label: 'Pago estimado', format: 'text', minWidth: '150px' },
@@ -86,7 +89,7 @@ const toolbarConfig = computed(() => ({
   title: 'Estados de Cuenta',
   subtitle: 'Adeudos vigentes, cargos por ticket y abonos recibidos.',
   search: search.value,
-  searchPlaceholder: 'Buscar empleado por nombre...',
+  searchPlaceholder: 'Buscar cliente o empleado...',
   showSearch: true,
   filters: [],
   recordsPerPage: recordsPerPage.value,
@@ -204,6 +207,34 @@ function reloadAccounts() {
     preserveScroll: true,
     preserveState: true,
     replace: true,
+  })
+}
+
+async function refreshOpenAccount() {
+  if (!selected.value?.id) return
+
+  try {
+    const { data } = await window.axios.get(route('ventas.employee-credit.show', { account: selected.value.id }))
+    const paying = Boolean(selected.value.paying)
+    const availableIds = new Set((data.account.charges || []).map((charge) => String(charge.id)))
+    selected.value = { ...data.account, paying }
+
+    if (paying) {
+      payment.selected_charge_ids = payment.selected_charge_ids.filter((id) => availableIds.has(String(id)))
+      payment.amount = Number(selectedTicketsTotal.value || 0).toFixed(2)
+    }
+  } catch (error) {
+    if (error?.response?.status === 404) selected.value = null
+  }
+}
+
+function refreshAccountsRealtime(event = null) {
+  refreshRealtimeProps(page, ['accounts'], {
+    onSuccess: () => {
+      if (!selected.value?.id) return
+      if (event?.accountId && Number(event.accountId) !== Number(selected.value.id)) return
+      void refreshOpenAccount()
+    },
   })
 }
 
@@ -414,7 +445,7 @@ function buildAccountPrintJob(account) {
     type: 'employee_credit_statement',
     folio: `EDO-${String(account.id).padStart(6, '0')}`,
     date: new Date().toLocaleDateString('es-MX'),
-    branch_name: account.employee,
+    branch_name: account.holder,
     cash_box_number: '1',
     cash_box_text: 'EDO. CTA.',
     user_name: page.props.auth?.user?.name || '',
@@ -493,9 +524,25 @@ function submitLimit() {
 }
 
 onMounted(() => {
+  unsubscribeCreditAccountChanged = subscribeRealtime(
+    REALTIME_CHANNELS.systems,
+    REALTIME_EVENTS.creditAccountChanged,
+    refreshAccountsRealtime,
+  )
+  unsubscribeCustomerChanged = subscribeRealtime(
+    REALTIME_CHANNELS.systems,
+    REALTIME_EVENTS.customerChanged,
+    refreshAccountsRealtime,
+  )
+
   if (canPrintEmployeeCredit.value) {
     void initializePrinterBridge({ silent: true })
   }
+})
+
+onBeforeUnmount(() => {
+  unsubscribeCreditAccountChanged?.()
+  unsubscribeCustomerChanged?.()
 })
 </script>
 
@@ -517,8 +564,8 @@ onMounted(() => {
       :actions="actions"
       :pagination="accounts"
       row-key="id"
-      mobile-card-header-field="employee"
-      no-data-message="No hay empleados con adeudo."
+      mobile-card-header-field="holder"
+      no-data-message="No hay clientes ni empleados con adeudo."
       @page-change="handlePageChange"
       @action="handleTableAction"
     >
@@ -531,7 +578,7 @@ onMounted(() => {
 
     <GlobalModal
       v-if="selected"
-      :title="selected.employee"
+      :title="selected.holder"
       :subtitle="`Saldo pendiente: ${money(selected.balance)}`"
       size="lg"
       height="compact"
@@ -709,8 +756,8 @@ onMounted(() => {
 
     <GlobalModal
       v-if="selectedLimit"
-      :title="`Límite de ${selectedLimit.employee}`"
-      subtitle="Deja el campo vacío si el empleado puede comprar sin límite."
+      :title="`Límite de ${selectedLimit.holder}`"
+      subtitle="Deja el campo vacío si la persona puede comprar sin límite."
       size="md"
       :columns="1"
       save-button-text="Guardar límite"

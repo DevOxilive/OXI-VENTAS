@@ -25,7 +25,7 @@ final class TrashRegistry
         'users' => ['model' => User::class, 'label' => 'Usuarios', 'searchable' => ['name', 'email']],
         'employees' => ['model' => Employee::class, 'label' => 'Empleados', 'searchable' => ['first_name', 'last_name', 'email']],
         'branches' => ['model' => Branch::class, 'label' => 'Sucursales', 'searchable' => ['name', 'slug']],
-        'customers' => ['model' => Customer::class, 'label' => 'Clientes', 'searchable' => ['name', 'email']],
+        'customers' => ['model' => Customer::class, 'label' => 'Clientes', 'searchable' => ['first_name', 'last_name', 'name']],
         'products' => ['model' => Product::class, 'label' => 'Productos', 'searchable' => ['name']],
         'categories' => ['model' => Category::class, 'label' => 'Categorías', 'searchable' => ['name']],
         'purchase-reports' => ['model' => PurchaseReport::class, 'label' => 'Listas de compra', 'searchable' => ['folio']],

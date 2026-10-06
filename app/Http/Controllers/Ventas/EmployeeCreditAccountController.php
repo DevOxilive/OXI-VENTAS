@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Ventas;
 
+use App\Events\CreditAccountChanged;
+use App\Events\CustomerChanged;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
@@ -30,15 +32,28 @@ class EmployeeCreditAccountController extends Controller
         $ticketTemplate = TicketTemplate::employeeCreditStatementTemplate();
 
         $accounts = EmployeeCreditAccount::query()
-            ->with('employee:id,first_name,last_name')
+            ->with([
+                'employee:id,first_name,last_name',
+                'customer:id,name,first_name,last_name',
+            ])
             ->withSum(['charges as balance' => fn ($query) => $query->where('status', 'open')], 'outstanding_amount')
             ->when($search !== '', function ($query) use ($search) {
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
-                $query->whereHas('employee', function ($employeeQuery) use ($like) {
-                    $employeeQuery
-                        ->where('first_name', 'like', $like)
-                        ->orWhere('last_name', 'like', $like)
-                        ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", [$like]);
+                $query->where(function ($holderQuery) use ($like) {
+                    $holderQuery
+                        ->whereHas('employee', function ($employeeQuery) use ($like) {
+                            $employeeQuery
+                                ->where('first_name', 'like', $like)
+                                ->orWhere('last_name', 'like', $like)
+                                ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", [$like]);
+                        })
+                        ->orWhereHas('customer', function ($customerQuery) use ($like) {
+                            $customerQuery
+                                ->where('name', 'like', $like)
+                                ->orWhere('first_name', 'like', $like)
+                                ->orWhere('last_name', 'like', $like)
+                                ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", [$like]);
+                        });
                 });
             })
             ->whereRaw(
@@ -77,6 +92,7 @@ class EmployeeCreditAccountController extends Controller
     {
         $account->load([
             'employee:id,first_name,last_name',
+            'customer:id,name,first_name,last_name',
             'charges' => fn ($query) => $query
                 ->where('status', 'open')
                 ->where('outstanding_amount', '>', 0)
@@ -175,6 +191,8 @@ class EmployeeCreditAccountController extends Controller
             return $payment;
         }, 3);
 
+        broadcast(new CreditAccountChanged('payment_created', $account->id))->toOthers();
+
         return back()->with('success', "Abono {$payment->folio} registrado correctamente.");
     }
 
@@ -190,6 +208,11 @@ class EmployeeCreditAccountController extends Controller
                 : null,
         ]);
 
+        broadcast(new CreditAccountChanged('limit_updated', $account->id))->toOthers();
+        if ($account->customer_id) {
+            broadcast(new CustomerChanged('updated', $account->customer_id))->toOthers();
+        }
+
         return back()->with('success', 'Límite de crédito actualizado correctamente.');
     }
 
@@ -203,7 +226,14 @@ class EmployeeCreditAccountController extends Controller
     private function mapAccount(EmployeeCreditAccount $account): array
     {
         $chargesBalance = (float) ($account->balance ?? $account->charges?->where('status', 'open')->sum('outstanding_amount') ?? 0);
-        return ['id' => $account->id, 'employee' => trim(($account->employee?->first_name ?? '').' '.($account->employee?->last_name ?? '')),
+        $employeeName = trim(($account->employee?->first_name ?? '').' '.($account->employee?->last_name ?? ''));
+        $holderName = $account->customer?->name ?: $employeeName;
+
+        return ['id' => $account->id,
+            'holder' => $holderName,
+            'holder_type' => $account->customer_id ? 'Cliente' : 'Empleado',
+            'holder_contact' => null,
+            'employee' => $holderName,
             'balance' => max(0, $chargesBalance - (float) $account->credit_balance),
             'credit_balance' => (float) $account->credit_balance,
             'credit_limit' => $account->credit_limit === null ? null : (float) $account->credit_limit,

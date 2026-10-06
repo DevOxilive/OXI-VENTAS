@@ -11,12 +11,17 @@ class Customer extends Model
 
     protected $fillable = [
         'name',
-        'phone',
-        'email',
-        'active',
+        'first_name',
+        'last_name',
     ];
 
-    protected $casts = [
-        'active' => 'boolean',
-    ];
+    public function sales()
+    {
+        return $this->hasMany(Sale::class);
+    }
+
+    public function creditAccount()
+    {
+        return $this->hasOne(EmployeeCreditAccount::class);
+    }
 }
