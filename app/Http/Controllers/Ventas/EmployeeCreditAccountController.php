@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\EmployeeCreditAccount;
+use App\Models\EmployeeCreditCharge;
 use App\Models\EmployeeCreditPayment;
 use App\Models\PaymentMethod;
 use App\Models\TicketTemplate;
@@ -19,6 +20,8 @@ use Inertia\Inertia;
 class EmployeeCreditAccountController extends Controller
 {
     use AuthorizesBranchAccess;
+
+    private const DISPLAY_TIMEZONE = 'America/Mexico_City';
 
     public function index(Request $request)
     {
@@ -111,9 +114,9 @@ class EmployeeCreditAccountController extends Controller
             'charges' => $account->charges->map(fn ($charge) => [
                 'id' => $charge->id,
                 'folio' => $charge->sale?->folio,
-                'date' => optional($charge->sale?->date)->format('d/m/Y H:i'),
-                'date_key' => optional($charge->sale?->date)->format('Y-m-d'),
-                'date_label' => optional($charge->sale?->date)->format('d/m/Y'),
+                'date' => optional($charge->sale?->date)->setTimezone(self::DISPLAY_TIMEZONE)->format('d/m/Y H:i'),
+                'date_key' => optional($charge->sale?->date)->setTimezone(self::DISPLAY_TIMEZONE)->format('Y-m-d'),
+                'date_label' => optional($charge->sale?->date)->setTimezone(self::DISPLAY_TIMEZONE)->format('d/m/Y'),
                 'branch' => $charge->sale?->branch?->name,
                 'amount' => (float) $charge->amount,
                 'outstanding_amount' => (float) $charge->outstanding_amount,
@@ -129,7 +132,7 @@ class EmployeeCreditAccountController extends Controller
             ])->values(),
             'payments' => $account->payments->map(fn ($payment) => [
                 'folio' => $payment->folio,
-                'date' => optional($payment->paid_at)->format('d/m/Y H:i'),
+                'date' => optional($payment->paid_at)->setTimezone(self::DISPLAY_TIMEZONE)->format('d/m/Y H:i'),
                 'method' => $payment->paymentMethod?->name,
                 'amount' => (float) $payment->amount,
             ])->values(),
@@ -155,8 +158,9 @@ class EmployeeCreditAccountController extends Controller
             throw ValidationException::withMessages(['confirmed_card_payment' => 'Confirma que la terminal aprobó el pago con tarjeta.']);
         }
 
-        $payment = DB::transaction(function () use ($account, $data, $method, $branch, $request) {
+        $paymentResult = DB::transaction(function () use ($account, $data, $method, $branch, $request) {
             $account = EmployeeCreditAccount::query()->whereKey($account->id)->lockForUpdate()->firstOrFail();
+            $account->load(['employee:id,first_name,last_name', 'customer:id,name,first_name,last_name']);
             $selectedChargeIds = collect($data['selected_charge_ids'])->map(fn ($id) => (int) $id)->unique()->values();
             $charges = $account->charges()
                 ->whereIn('id', $selectedChargeIds)
@@ -164,11 +168,15 @@ class EmployeeCreditAccountController extends Controller
                 ->where('outstanding_amount', '>', 0)
                 ->orderBy('created_at')
                 ->lockForUpdate()
+                ->with('sale:id,folio')
                 ->get();
             if ($charges->count() !== $selectedChargeIds->count()) {
                 throw ValidationException::withMessages(['selected_charge_ids' => 'Selecciona únicamente tickets pendientes de esta cuenta.']);
             }
             $balance = (float) $charges->sum('outstanding_amount');
+            $accountBalanceBefore = max(0, (float) $account->charges()
+                ->where('status', 'open')
+                ->sum('outstanding_amount') - (float) $account->credit_balance);
             $amount = round((float) $data['amount'], 2);
             if (abs($amount - $balance) > 0.009) throw ValidationException::withMessages(['amount' => 'El importe debe coincidir con los tickets seleccionados.']);
             $isCash = str_contains(mb_strtolower($method->name), 'efectivo');
@@ -188,12 +196,53 @@ class EmployeeCreditAccountController extends Controller
                 $payment->allocations()->create(['employee_credit_charge_id' => $charge->id, 'amount' => $applied]);
                 $charge->update(['outstanding_amount' => 0, 'status' => 'paid']);
             }
-            return $payment;
+
+            $holder = $account->customer?->name
+                ?: trim(($account->employee?->first_name ?? '').' '.($account->employee?->last_name ?? ''));
+
+            return [
+                'payment' => $payment,
+                'print_job' => [
+                    'type' => 'employee_credit_payment',
+                    'folio' => $payment->folio,
+                    'date' => $payment->paid_at->setTimezone(self::DISPLAY_TIMEZONE)->format('d/m/Y H:i'),
+                    'branch_name' => $holder,
+                    'cash_box_number' => $payment->cash_box_number,
+                    'user_name' => $request->user()->name ?? '',
+                    'payment_method' => $method->name,
+                    'document_title' => 'COMPROBANTE DE ABONO',
+                    'cash_received' => (float) $payment->cash_received,
+                    'change_due' => (float) $payment->change_due,
+                    'total' => (float) $payment->amount,
+                    'payment_amount' => (float) $payment->amount,
+                    'balance_before' => $accountBalanceBefore,
+                    'balance_after' => max(0, round($accountBalanceBefore - $amount, 2)),
+                    'paid_charges' => $charges->map(fn (EmployeeCreditCharge $charge) => [
+                        'folio' => $charge->sale?->folio ?: 'Sin folio',
+                        'amount' => (float) $charge->amount,
+                    ])->values()->all(),
+                    // Un abono en efectivo debe abrir el cajón, aunque el ticket de
+                    // consulta de estado de cuenta no lo haga al reimprimirse.
+                    'open_cash_drawer' => $isCash,
+                ],
+            ];
         }, 3);
+
+        $payment = $paymentResult['payment'];
 
         broadcast(new CreditAccountChanged('payment_created', $account->id))->toOthers();
 
-        return back()->with('success', "Abono {$payment->folio} registrado correctamente.");
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => "Abono {$payment->folio} registrado correctamente.",
+                'print_job' => $paymentResult['print_job'],
+            ]);
+        }
+
+        return back()->with([
+            'success' => "Abono {$payment->folio} registrado correctamente.",
+            'credit_payment_print_job' => $paymentResult['print_job'],
+        ]);
     }
 
     public function updateLimit(Request $request, EmployeeCreditAccount $account)

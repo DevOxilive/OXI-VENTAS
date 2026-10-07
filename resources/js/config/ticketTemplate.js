@@ -289,7 +289,7 @@ function wrapText(value, maxWidth) {
 }
 
 function formatDocumentTitle(template, printJob) {
-  const title = normalizeText(template.subheader_text || "TICKET DE VENTA");
+  const title = normalizeText(printJob.document_title || template.subheader_text || "TICKET DE VENTA");
   const branch = normalizeText(printJob.branch_name);
 
   return branch ? `${title}: ${branch}` : title;
@@ -603,6 +603,11 @@ function buildRowsForBlock(template, printJob, block) {
       rows.push({ type: "pair", label: "Pago", value: printJob.payment_method, block_key: block.key, position_percent: block.position_percent, size_percent: block.size_percent });
       break;
     case "items":
+      if (printJob.type === "employee_credit_payment") {
+        rows.push(...buildCreditPaymentItemRows(template, printJob, block));
+        break;
+      }
+
       if (template.items_format === "credit_statement" || printJob.type === "employee_credit_statement") {
         rows.push(...buildCreditStatementItemRows(template, printJob, block));
         break;
@@ -730,6 +735,27 @@ function buildRowsForBlock(template, printJob, block) {
     default:
       break;
   }
+
+  return rows;
+}
+
+function buildCreditPaymentItemRows(template, printJob, block) {
+  const rows = [
+    { type: "columns", left: "Adeudo anterior:", right: `$${Number(printJob.balance_before || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(76, block.size_percent - 8), bold: true },
+    { type: "columns", left: "Abono aplicado:", right: `$${Number(printJob.payment_amount || printJob.total || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(76, block.size_percent - 8), bold: true },
+    { type: "columns", left: "Adeudo pendiente:", right: `$${Number(printJob.balance_after || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(76, block.size_percent - 8), bold: true },
+  ];
+
+  (printJob.paid_charges || []).forEach((charge) => {
+    rows.push({
+      type: "columns",
+      left: `Ticket liquidado: ${charge.folio || "Sin folio"}`,
+      right: `$${Number(charge.amount || 0).toFixed(2)}`,
+      block_key: block.key,
+      position_percent: block.position_percent,
+      size_percent: Math.max(74, block.size_percent - 10),
+    });
+  });
 
   return rows;
 }
@@ -1186,7 +1212,10 @@ export function buildEscPosTicketData(template, printJob) {
     }
   });
 
-  if (resolved.open_cash_drawer) {
+  const shouldOpenCashDrawer = printJob.open_cash_drawer === true
+    || (resolved.open_cash_drawer && printJob.open_cash_drawer !== false);
+
+  if (shouldOpenCashDrawer) {
     lines.push(...CASH_DRAWER_OPEN_COMMANDS);
   }
 
