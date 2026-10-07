@@ -1664,7 +1664,7 @@ function closeChangeModal() {
           </div>
       </GlobalModal>
 
-      <div class="grid min-h-0 gap-4 lg:h-[calc(100dvh-17rem)] lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_390px]">
+      <div class="grid min-h-0 gap-4 lg:h-[calc(100dvh-24rem)] lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_390px]">
         <section class="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-secondary bg-background p-3 shadow-sm md:p-4">
           <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end">
             <div class="min-w-0 flex-1">
@@ -1731,8 +1731,8 @@ function closeChangeModal() {
             </button>
           </div>
 
-          <div class="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-secondary">
-            <div class="hidden grid-cols-[minmax(0,1.4fr)_120px_120px_140px_48px] gap-3 border-b border-secondary bg-secondary px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-text opacity-70 md:grid">
+          <div class="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div class="hidden grid-cols-[minmax(0,1.4fr)_120px_120px_140px_88px] gap-3 border-b border-secondary px-1 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-text opacity-70 md:grid">
               <span>Producto</span>
               <span>Precio</span>
               <span>Cantidad</span>
@@ -1740,7 +1740,7 @@ function closeChangeModal() {
               <span></span>
             </div>
 
-            <div class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-background p-3">
+            <div class="min-h-0 flex-1 divide-y divide-secondary overflow-y-auto">
               <SaleCartItemCard
                 v-for="(item, index) in cart"
                 :key="`${item.branch_product_id}-${index}`"
@@ -1785,7 +1785,7 @@ function closeChangeModal() {
             </div>
           </div>
 
-          <div class="mt-3 flex min-h-0 flex-1 flex-col lg:overflow-y-auto lg:pr-1">
+          <div class="mt-3 flex min-h-0 flex-1 flex-col">
             <div class="grid grid-cols-2 divide-x divide-secondary rounded-lg bg-secondary px-3 py-2 text-sm">
               <div class="pr-3">
                 <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-text opacity-50">
@@ -1806,7 +1806,7 @@ function closeChangeModal() {
               </div>
             </div>
 
-            <div class="mt-3 flex flex-1 flex-col">
+            <div class="mt-3 min-h-0 flex-1 overflow-y-auto lg:pr-1">
               <div class="space-y-2.5">
                 <template v-if="isCashPayment">
                   <InputField
@@ -1910,7 +1910,9 @@ function closeChangeModal() {
                 </div>
               </div>
 
-              <div class="mt-auto space-y-2 pt-3">
+            </div>
+
+            <div class="shrink-0 space-y-2 border-t border-secondary pt-3">
                 <button
                   v-if="can('sales.employee-credit.create')"
                   type="button"
@@ -1938,7 +1940,6 @@ function closeChangeModal() {
                   {{ !canCreateSale ? "Sin permiso para cobrar" : saleSubmitting ? "Guardando..." : "Cobrar venta" }}
                 </button>
               </div>
-            </div>
           </div>
         </aside>
       </div>
