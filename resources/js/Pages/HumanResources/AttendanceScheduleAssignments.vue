@@ -14,6 +14,7 @@ import { usePermissions } from '@/Composables/usePermissions'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
 import { getAttendanceScheduleAssignmentsToolbarConfig } from '@/config/ToolbarConfigs/attendanceScheduleAssignmentsToolbarConfig'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
+import { localDateInput } from '@/utils/localDate'
 
 defineOptions({ layout: AdminLayout })
 
@@ -27,7 +28,7 @@ const showModal = ref(false)
 const mode = ref('create')
 const selected = ref(null)
 const perPage = ref(Number(props.filters?.per_page ?? 25))
-const form = useForm({ employee_id: '', attendance_schedule_ids: [], effective_from: new Date().toISOString().slice(0, 10), effective_to: '', active: true, observations: '', working_days: [...defaultDays] })
+const form = useForm({ employee_id: '', attendance_schedule_ids: [], effective_from: localDateInput(), effective_to: '', active: true, observations: '', working_days: [...defaultDays] })
 let unsubscribeAssignments = null
 
 const toolbarConfig = computed(() => getAttendanceScheduleAssignmentsToolbarConfig({ canCreate: can('attendance.schedule-assignments.create'), perPage: perPage.value, total: props.assignments?.total ?? 0 }))
@@ -35,7 +36,7 @@ const columns = [{ key: 'employee', label: 'Empleado' }, { key: 'department', la
 const actions = [{ id: 'view', label: 'Ver', icon: 'visibility', variant: 'blue', mobile: 'button', permission: 'attendance.schedule-assignments.view' }, { id: 'edit', label: 'Editar', icon: 'edit', variant: 'amber', mobile: 'button', permission: 'attendance.schedule-assignments.update' }, { id: 'delete', label: 'Eliminar', icon: 'delete', variant: 'red', mobile: 'button', permission: 'attendance.schedule-assignments.delete' }]
 const title = computed(() => ({ create: 'Nueva asignacion', edit: 'Editar asignacion', view: 'Detalle de asignacion' }[mode.value]))
 
-function reset() { form.reset(); form.clearErrors(); form.effective_from = new Date().toISOString().slice(0, 10); form.active = true; form.working_days = [...defaultDays] }
+function reset() { form.reset(); form.clearErrors(); form.effective_from = localDateInput(); form.active = true; form.working_days = [...defaultDays] }
 function openCreate() { mode.value = 'create'; selected.value = null; reset(); showModal.value = true }
 function load(row, nextMode) { selected.value = row; mode.value = nextMode; form.clearErrors(); Object.assign(form, { employee_id: String(row.employee_id), attendance_schedule_ids: [Number(row.attendance_schedule_id)], effective_from: row.effective_from || '', effective_to: row.effective_to || '', active: Boolean(row.active), observations: row.observations || '', working_days: [...(row.working_days || defaultDays)] }); showModal.value = true }
 function close() { showModal.value = false; form.clearErrors() }

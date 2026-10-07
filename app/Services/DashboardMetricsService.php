@@ -211,16 +211,16 @@ class DashboardMetricsService
     private function series(Collection $branchIds, Carbon $start, Carbon $end): array
     {
         $sales = $this->confirmedSales($branchIds, $start, $end)
-            ->selectRaw('DATE(sales.date) as date_key, COALESCE(SUM(sales.total), 0) as amount')
+            ->selectRaw('DATE(DATE_SUB(sales.date, INTERVAL 6 HOUR)) as date_key, COALESCE(SUM(sales.total), 0) as amount')
             ->groupBy('date_key')->pluck('amount', 'date_key');
         $costs = $this->saleCostQuery($branchIds, $start, $end)
-            ->selectRaw('DATE(sales.date) as date_key, COALESCE(SUM(sale_details.quantity * COALESCE(sale_details.unit_cost, products.cost_per_piece, products.cost)), 0) as amount')
+            ->selectRaw('DATE(DATE_SUB(sales.date, INTERVAL 6 HOUR)) as date_key, COALESCE(SUM(sale_details.quantity * COALESCE(sale_details.unit_cost, products.cost_per_piece, products.cost)), 0) as amount')
             ->groupBy('date_key')->pluck('amount', 'date_key');
         $investment = $this->investmentQuery($branchIds, $start, $end)
-            ->selectRaw('DATE(purchase_orders.completed_at) as date_key, COALESCE(SUM(purchase_orders.actual_total), 0) as amount')
+            ->selectRaw('DATE(DATE_SUB(purchase_orders.completed_at, INTERVAL 6 HOUR)) as date_key, COALESCE(SUM(purchase_orders.actual_total), 0) as amount')
             ->groupBy('date_key')->pluck('amount', 'date_key');
         $shrinkage = $this->shrinkageQuery($branchIds, $start, $end)
-            ->selectRaw('DATE(stock_movements.created_at) as date_key, COALESCE(SUM(ABS(stock_movements.quantity) * COALESCE(stock_movements.unit_cost, products.cost_per_piece, products.cost)), 0) as amount')
+            ->selectRaw('DATE(DATE_SUB(stock_movements.created_at, INTERVAL 6 HOUR)) as date_key, COALESCE(SUM(ABS(stock_movements.quantity) * COALESCE(stock_movements.unit_cost, products.cost_per_piece, products.cost)), 0) as amount')
             ->groupBy('date_key')->pluck('amount', 'date_key');
 
         return $this->dates($start, $end)->map(function (Carbon $date) use ($sales, $costs, $investment, $shrinkage) {
@@ -242,16 +242,16 @@ class DashboardMetricsService
     {
         $branchIds = $branches->pluck('id');
         $sales = $this->confirmedSales($branchIds, $start, $end)
-            ->selectRaw('sales.branch_id, DATE(sales.date) as date_key, COALESCE(SUM(sales.total), 0) as amount')
+            ->selectRaw('sales.branch_id, DATE(DATE_SUB(sales.date, INTERVAL 6 HOUR)) as date_key, COALESCE(SUM(sales.total), 0) as amount')
             ->groupBy('sales.branch_id', 'date_key')->get()->keyBy(fn ($row) => "{$row->branch_id}|{$row->date_key}");
         $costs = $this->saleCostQuery($branchIds, $start, $end)
-            ->selectRaw('sales.branch_id, DATE(sales.date) as date_key, COALESCE(SUM(sale_details.quantity * COALESCE(sale_details.unit_cost, products.cost_per_piece, products.cost)), 0) as amount')
+            ->selectRaw('sales.branch_id, DATE(DATE_SUB(sales.date, INTERVAL 6 HOUR)) as date_key, COALESCE(SUM(sale_details.quantity * COALESCE(sale_details.unit_cost, products.cost_per_piece, products.cost)), 0) as amount')
             ->groupBy('sales.branch_id', 'date_key')->get()->keyBy(fn ($row) => "{$row->branch_id}|{$row->date_key}");
         $investment = $this->investmentQuery($branchIds, $start, $end)
-            ->selectRaw('purchase_orders.branch_id, DATE(purchase_orders.completed_at) as date_key, COALESCE(SUM(purchase_orders.actual_total), 0) as amount')
+            ->selectRaw('purchase_orders.branch_id, DATE(DATE_SUB(purchase_orders.completed_at, INTERVAL 6 HOUR)) as date_key, COALESCE(SUM(purchase_orders.actual_total), 0) as amount')
             ->groupBy('purchase_orders.branch_id', 'date_key')->get()->keyBy(fn ($row) => "{$row->branch_id}|{$row->date_key}");
         $shrinkage = $this->shrinkageQuery($branchIds, $start, $end)
-            ->selectRaw('branch_products.branch_id, DATE(stock_movements.created_at) as date_key, COALESCE(SUM(ABS(stock_movements.quantity) * COALESCE(stock_movements.unit_cost, products.cost_per_piece, products.cost)), 0) as amount')
+            ->selectRaw('branch_products.branch_id, DATE(DATE_SUB(stock_movements.created_at, INTERVAL 6 HOUR)) as date_key, COALESCE(SUM(ABS(stock_movements.quantity) * COALESCE(stock_movements.unit_cost, products.cost_per_piece, products.cost)), 0) as amount')
             ->groupBy('branch_products.branch_id', 'date_key')->get()->keyBy(fn ($row) => "{$row->branch_id}|{$row->date_key}");
 
         return $branches->map(function (Branch $branch) use ($start, $end, $grouping, $sales, $costs, $investment, $shrinkage) {

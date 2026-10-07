@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\SystemAudit;
 use App\Support\SystemPermission;
 use App\Support\TablePagination;
+use App\Support\LocalDateTime;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -44,8 +45,8 @@ class SystemAuditController extends SystemAdministrationController
             ->when($filters['module'] ?? null, fn ($query, $module) => $query->where('module', $module))
             ->when($filters['user_id'] ?? null, fn ($query, $userId) => $query->where('user_id', $userId))
             ->when($filters['result'] ?? null, fn ($query, $result) => $query->where('result', $result))
-            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('occurred_at', '>=', $from))
-            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('occurred_at', '<=', $to))
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->where('occurred_at', '>=', LocalDateTime::startOfDay($from)))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->where('occurred_at', '<=', LocalDateTime::endOfDay($to)))
             ->latest('occurred_at')
             ->paginate(TablePagination::resolvePerPage($request))
             ->withQueryString();
@@ -68,13 +69,13 @@ class SystemAuditController extends SystemAdministrationController
 
             SystemAudit::query()->latest('occurred_at')->cursor()->each(function (SystemAudit $audit) use ($output) {
                 fputcsv($output, [
-                    $audit->occurred_at?->toDateTimeString(), $audit->user_name, $audit->role_name,
+                    LocalDateTime::format($audit->occurred_at, 'Y-m-d H:i:s'), $audit->user_name, $audit->role_name,
                     $audit->module, $audit->action, $audit->record_label, $audit->result, $audit->ip_address,
                 ]);
             });
 
             fclose($output);
-        }, 'auditoria-del-sistema-' . now()->format('Ymd-His') . '.csv', [
+        }, 'auditoria-del-sistema-' . LocalDateTime::now('Ymd-His') . '.csv', [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }

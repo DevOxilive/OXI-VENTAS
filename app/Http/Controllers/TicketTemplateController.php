@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Models\Branch;
 use App\Models\Product;
 use App\Models\TicketTemplate;
+use App\Support\LocalDateTime;
 use App\Search\ProductSearchOptions;
 use App\Search\ProductSearchService;
 use Illuminate\Http\Request;
@@ -277,7 +278,7 @@ class TicketTemplateController extends Controller
         return [
             'sale_id' => 9999,
             'folio' => 'V-009999',
-            'date' => now()->format('d/m/Y H:i'),
+            'date' => LocalDateTime::format(now(), 'd/m/Y H:i'),
             'branch_name' => 'Ajusco',
             'payment_method' => 'Cash',
             'employee_name' => 'Carlos Ramirez',
@@ -313,7 +314,7 @@ class TicketTemplateController extends Controller
         return [
             'type' => 'cash_closure',
             'folio' => 'CC-20260716-000123',
-            'date' => now()->format('d/m/Y H:i'),
+            'date' => LocalDateTime::format(now(), 'd/m/Y H:i'),
             'branch_name' => 'Ajusco',
             'user_name' => 'Usuario de sesion',
             'cash_box_number' => '1',
@@ -346,7 +347,7 @@ class TicketTemplateController extends Controller
         return [
             'type' => 'employee_credit_statement',
             'folio' => 'EDO-000001',
-            'date' => now()->format('d/m/Y H:i'),
+            'date' => LocalDateTime::format(now(), 'd/m/Y H:i'),
             'branch_name' => 'Sistemas OXI',
             'payment_method' => 'Estado de cuenta',
             'user_name' => 'Usuario de sesion',
