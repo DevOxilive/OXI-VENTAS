@@ -9,7 +9,7 @@ import { GlobalModal } from '@/Components/Modales'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import MultiSelectDropdown from '@/Components/Forms/MultiSelectDropdown.vue'
-import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
+import { BlockingWarningAlert, ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { usePermissions } from '@/Composables/usePermissions'
 import {
@@ -493,7 +493,33 @@ async function printAccountTicket() {
   }
 }
 
-function submitPayment() {
+async function printCreditPaymentTicket(receipt) {
+  if (!receipt || !canPrintEmployeeCredit.value) return
+  if (!selectedPrinterName.value || !printerBridgeReady.value) {
+    printerBridgeMessage.value = 'El abono quedó registrado. Reconecta la impresora para imprimir su comprobante.'
+    ToastAlert({ icon: 'warning', title: 'Abono registrado sin comprobante: impresora no verificada' })
+    return
+  }
+
+  try {
+    const printJob = {
+      ...receipt,
+      ticket_logo_data_url: await getTicketLogoDataUrl(),
+      ticket_header_data_url: await getTicketHeaderDataUrl(`CAJA #${receipt.cash_box_number || '1'}`),
+    }
+    const printData = buildEscPosTicketData(resolvedTicketTemplate.value, printJob)
+    await printEscPosTicket(selectedPrinterName.value, printData, { timeoutMs: 10000 })
+    printerBridgeReady.value = true
+    printerBridgeMessage.value = `Impresora lista: ${selectedPrinterName.value}`
+    ToastAlert({ title: `Comprobante ${receipt.folio || 'de abono'} enviado a la impresora` })
+  } catch (error) {
+    printerBridgeReady.value = false
+    printerBridgeMessage.value = error?.message || 'QZ Tray no pudo imprimir el comprobante del abono.'
+    ErrorAlert({ title: 'Abono registrado, pero no se pudo imprimir', message: printerBridgeMessage.value })
+  }
+}
+
+async function submitPayment() {
   if (!selected.value || payment.processing) return
   if (!payment.selected_charge_ids.length) {
     ErrorAlert({ title: 'Selecciona al menos un ticket', message: 'Elige los tickets completos que vas a cobrar.' })
@@ -504,15 +530,51 @@ function submitPayment() {
     return
   }
 
-  payment.post(route('ventas.employee-credit.pay', { account: selected.value.id }), {
-    preserveScroll: true,
-    onSuccess: async () => {
-      if (canPrintEmployeeCredit.value) {
-        await printAccountTicket()
-      }
-      selected.value = null
-    },
-  })
+  payment.processing = true
+  payment.clearErrors()
+
+  try {
+    const { data } = await window.axios.post(route('ventas.employee-credit.pay', { account: selected.value.id }), {
+      payment_method_id: payment.payment_method_id,
+      selected_charge_ids: payment.selected_charge_ids,
+      amount: payment.amount,
+      cash_received: payment.cash_received,
+      confirmed_card_payment: payment.confirmed_card_payment,
+    })
+    const receipt = data?.print_job
+    const change = Number(receipt?.change_due || 0)
+
+    if (!receipt) {
+      throw new Error('El abono se registró, pero el sistema no recibió su comprobante para imprimir.')
+    }
+
+    if (change > 0) {
+      await BlockingWarningAlert({
+        title: 'Entrega el cambio',
+        message: `<strong style="font-size:28px">${money(change)}</strong><br><span style="display:block;margin-top:8px">El cliente entregó ${money(receipt.cash_received)} y se aplicaron ${money(receipt.payment_amount)} al abono.</span>`,
+        confirmText: 'Cambio entregado',
+        confirmButtonColor: 'var(--primary)',
+      })
+    }
+
+    await printCreditPaymentTicket(receipt)
+    selected.value = null
+    reloadAccounts()
+  } catch (error) {
+    const errors = error?.response?.data?.errors || {}
+    Object.entries(errors).forEach(([field, messages]) => {
+      payment.setError(field, Array.isArray(messages) ? messages[0] : messages)
+    })
+
+    if (!Object.keys(errors).length) {
+      ErrorAlert({
+        title: 'No se pudo registrar el abono',
+        message: error?.message || 'Intenta nuevamente. Si el cobro quedó registrado, revisa el historial antes de repetirlo.',
+      })
+    }
+  } finally {
+    payment.processing = false
+  }
 }
 
 function submitLimit() {

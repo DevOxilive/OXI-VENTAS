@@ -65,6 +65,7 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn () => $request->session()->get('error'),
                 'sale_folio' => fn () => $request->session()->get('sale_folio'),
                 'print_job' => fn () => $request->session()->get('print_job'),
+                'credit_payment_print_job' => fn () => $request->session()->get('credit_payment_print_job'),
                 'cash_closure_print_jobs' => fn () => $request->session()->get('cash_closure_print_jobs', []),
                 'expiration_alerts' => fn () => $request->session()->get('expiration_alerts', []),
             ],
