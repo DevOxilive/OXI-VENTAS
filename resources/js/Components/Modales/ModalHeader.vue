@@ -53,8 +53,9 @@ defineEmits(['close', 'select-section'])
 
             <button
                 type="button"
-                class="text-2xl text-text opacity-70 transition hover:opacity-100"
+                class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-4xl leading-none text-text opacity-70 transition hover:bg-secondary hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 aria-label="Cerrar modal"
+                title="Cerrar modal"
                 @click="$emit('close')"
             >
                 ×

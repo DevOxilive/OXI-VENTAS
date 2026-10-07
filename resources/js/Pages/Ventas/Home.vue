@@ -4,7 +4,7 @@ import { router, useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
 import { GlobalToolbar } from "@/Components/Toolbars";
-import GlobalModal from "@/Components/Modales/GlobalModal.vue";
+import { ChangeDueModal, GlobalModal } from "@/Components/Modales";
 import InputField from "@/Components/Forms/InputField.vue";
 import SelectField from "@/Components/Forms/SelectField.vue";
 import SearchableSelectField from "@/Components/Forms/SearchableSelectField.vue";
@@ -1951,32 +1951,12 @@ function closeChangeModal() {
       </div>
     </GlobalModal>
 
-    <GlobalModal
+    <ChangeDueModal
       v-if="showChangeModal"
-      title="Cambio a devolver"
       :subtitle="completedSaleFolio ? `Venta ${completedSaleFolio} registrada correctamente` : 'Venta registrada correctamente'"
-      size="lg"
-      height="compact"
-      :columns="1"
-      :show-save="false"
-      close-button-text="Entendido"
-      :close-on-backdrop="false"
-      :close-on-esc="false"
+      :amount="completedSaleChange"
       @close="closeChangeModal"
-    >
-      <div class="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-primary bg-secondary px-6 py-10 text-center">
-        <span class="material-symbols-outlined mb-3 text-6xl text-primary">payments</span>
-        <p class="text-sm font-black uppercase tracking-[0.2em] text-text opacity-65">
-          Entrega al cliente
-        </p>
-        <p class="mt-3 text-6xl font-black leading-none text-primary sm:text-7xl">
-          {{ formatMoney(completedSaleChange) }}
-        </p>
-        <p class="mt-5 max-w-md text-base font-semibold text-text opacity-75">
-          Confirma este importe antes de atender la siguiente venta.
-        </p>
-      </div>
-    </GlobalModal>
+    />
 
     </template>
   </PageLayout>

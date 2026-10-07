@@ -5,11 +5,11 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import { GlobalTable } from '@/Components/Tables'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
-import { GlobalModal } from '@/Components/Modales'
+import { ChangeDueModal, GlobalModal } from '@/Components/Modales'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import MultiSelectDropdown from '@/Components/Forms/MultiSelectDropdown.vue'
-import { BlockingWarningAlert, ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
+import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { usePermissions } from '@/Composables/usePermissions'
 import {
@@ -40,6 +40,7 @@ const page = usePage()
 const { can } = usePermissions()
 const selected = ref(null)
 const selectedLimit = ref(null)
+const pendingChangeReceipt = ref(null)
 const loading = ref(false)
 const search = ref(props.filters.search || '')
 const recordsPerPage = ref(Number(props.filters.per_page || props.accounts?.per_page || 25))
@@ -519,6 +520,15 @@ async function printCreditPaymentTicket(receipt) {
   }
 }
 
+async function completeCreditPayment(receipt = pendingChangeReceipt.value) {
+  if (!receipt) return
+
+  pendingChangeReceipt.value = null
+  await printCreditPaymentTicket(receipt)
+  selected.value = null
+  reloadAccounts()
+}
+
 async function submitPayment() {
   if (!selected.value || payment.processing) return
   if (!payment.selected_charge_ids.length) {
@@ -549,17 +559,11 @@ async function submitPayment() {
     }
 
     if (change > 0) {
-      await BlockingWarningAlert({
-        title: 'Entrega el cambio',
-        message: `<strong style="font-size:28px">${money(change)}</strong><br><span style="display:block;margin-top:8px">El cliente entregó ${money(receipt.cash_received)} y se aplicaron ${money(receipt.payment_amount)} al abono.</span>`,
-        confirmText: 'Cambio entregado',
-        confirmButtonColor: 'var(--primary)',
-      })
+      pendingChangeReceipt.value = receipt
+      return
     }
 
-    await printCreditPaymentTicket(receipt)
-    selected.value = null
-    reloadAccounts()
+    await completeCreditPayment(receipt)
   } catch (error) {
     const errors = error?.response?.data?.errors || {}
     Object.entries(errors).forEach(([field, messages]) => {
@@ -815,6 +819,13 @@ onBeforeUnmount(() => {
         </section>
       </div>
     </GlobalModal>
+
+    <ChangeDueModal
+      v-if="pendingChangeReceipt"
+      :amount="Number(pendingChangeReceipt.change_due || 0)"
+      :subtitle="pendingChangeReceipt.folio ? `Abono ${pendingChangeReceipt.folio} registrado correctamente` : 'Abono registrado correctamente'"
+      @close="completeCreditPayment()"
+    />
 
     <GlobalModal
       v-if="selectedLimit"

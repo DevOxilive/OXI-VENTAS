@@ -1,4 +1,5 @@
 export { default as GlobalModal } from './GlobalModal.vue'
+export { default as ChangeDueModal } from './ChangeDueModal.vue'
 export { default as ModalContent } from './ModalContent.vue'
 export { default as ModalDesktop } from './ModalDesktop.vue'
 export { default as ModalFooter } from './ModalFooter.vue'
