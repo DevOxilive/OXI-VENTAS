@@ -9,6 +9,7 @@ use App\Models\StockMovement;
 use App\Search\ProductSearchOptions;
 use App\Search\ProductSearchService;
 use App\Support\FlexibleSearch;
+use App\Support\LocalDateTime;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -571,11 +572,11 @@ class InventoryReportService
     private function applyPeriod($query, array $filters, string $column = 'created_at'): void
     {
         if (! empty($filters['date_from'])) {
-            $query->whereDate($column, '>=', $filters['date_from']);
+            $query->where($column, '>=', LocalDateTime::startOfDay($filters['date_from']));
         }
 
         if (! empty($filters['date_to'])) {
-            $query->whereDate($column, '<=', $filters['date_to']);
+            $query->where($column, '<=', LocalDateTime::endOfDay($filters['date_to']));
         }
 
         if (! empty($filters['date_from']) || ! empty($filters['date_to'])) {
@@ -583,7 +584,7 @@ class InventoryReportService
         }
 
         match ($filters['period'] ?? null) {
-            'today' => $query->whereDate($column, today()),
+            'today' => $query->whereBetween($column, [LocalDateTime::startOfDay(), LocalDateTime::endOfDay()]),
             '7_days' => $query->where($column, '>=', now()->subDays(7)),
             '30_days' => $query->where($column, '>=', now()->subDays(30)),
             '90_days' => $query->where($column, '>=', now()->subDays(90)),

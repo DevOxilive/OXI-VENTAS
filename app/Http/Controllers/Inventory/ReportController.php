@@ -11,6 +11,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\InventoryReportService;
+use App\Support\LocalDateTime;
 use App\Support\TablePagination;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -183,7 +184,7 @@ class ReportController extends Controller
         unset($filters['product_id']);
         $rows = $reportService->rows($branch, $filters);
         $title = $this->reportTitle($filters['report'] ?? 'dashboard');
-        $fileName = 'reporte-inventario-' . now()->format('Y-m-d-H-i') . '.xlsx';
+        $fileName = 'reporte-inventario-' . LocalDateTime::now('Y-m-d-H-i') . '.xlsx';
 
         return Excel::download(
             new InventoryReportExport($rows, $title, 'inventory'),
@@ -208,7 +209,7 @@ class ReportController extends Controller
             'reportType' => 'inventory',
         ])->setPaper('letter', 'landscape');
 
-        return $pdf->download('reporte-inventario-' . now()->format('Y-m-d-H-i') . '.pdf');
+        return $pdf->download('reporte-inventario-' . LocalDateTime::now('Y-m-d-H-i') . '.pdf');
     }
 
     public function exportMovementsExcel(Request $request, Branch $branch, InventoryReportService $reportService)
@@ -220,7 +221,7 @@ class ReportController extends Controller
         ]);
         unset($filters['product_id']);
         $rows = $reportService->rows($branch, $filters);
-        $fileName = 'reporte-movimientos-inventario-' . now()->format('Y-m-d-H-i') . '.xlsx';
+        $fileName = 'reporte-movimientos-inventario-' . LocalDateTime::now('Y-m-d-H-i') . '.xlsx';
 
         return Excel::download(
             new InventoryReportExport($rows, 'Movimientos', 'movements'),
@@ -247,7 +248,7 @@ class ReportController extends Controller
             'reportType' => 'movements',
         ])->setPaper('letter', 'landscape');
 
-        return $pdf->download('reporte-movimientos-inventario-' . now()->format('Y-m-d-H-i') . '.pdf');
+        return $pdf->download('reporte-movimientos-inventario-' . LocalDateTime::now('Y-m-d-H-i') . '.pdf');
     }
 
     private function resolveFilters(Request $request): array

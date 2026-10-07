@@ -18,6 +18,7 @@ use App\Search\ProductSearchOptions;
 use App\Search\ProductSearchService;
 use App\Services\Reports\SalesReplenishmentReportService;
 use App\Support\TablePagination;
+use App\Support\LocalDateTime;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -179,7 +180,7 @@ class SalesReportController extends Controller
 
             return Excel::download(
                 new SalesReplenishmentReportExport($report, $filters['tab']),
-                'reporte-ventas-'.$filters['tab'].'-'.$fileScope.'-'.now()->format('Y-m-d-H-i').'.xlsx'
+                'reporte-ventas-'.$filters['tab'].'-'.$fileScope.'-'.LocalDateTime::now('Y-m-d-H-i').'.xlsx'
             );
         }
 
@@ -189,7 +190,7 @@ class SalesReportController extends Controller
 
         return Excel::download(
             new SalesReportExport($rows, 'Productos vendidos', 'products'),
-            'reporte-productos-vendidos-'.$fileScope.'-'.now()->format('Y-m-d-H-i').'.xlsx'
+            'reporte-productos-vendidos-'.$fileScope.'-'.LocalDateTime::now('Y-m-d-H-i').'.xlsx'
         );
     }
 
@@ -207,7 +208,7 @@ class SalesReportController extends Controller
 
         return Excel::download(
             new SalesReportExport($rows, 'Ventas registradas', 'sales'),
-            'reporte-ventas-registradas-'.$fileScope.'-'.now()->format('Y-m-d-H-i').'.xlsx'
+            'reporte-ventas-registradas-'.$fileScope.'-'.LocalDateTime::now('Y-m-d-H-i').'.xlsx'
         );
     }
 
@@ -232,7 +233,7 @@ class SalesReportController extends Controller
             'title' => 'Ventas registradas',
         ])->setPaper('letter', 'landscape');
 
-        return $pdf->download('reporte-ventas-registradas-'.$fileScope.'-'.now()->format('Y-m-d-H-i').'.pdf');
+        return $pdf->download('reporte-ventas-registradas-'.$fileScope.'-'.LocalDateTime::now('Y-m-d-H-i').'.pdf');
     }
 
     public function exportSaleExcel(Request $request, Sale $sale)
@@ -578,8 +579,8 @@ class SalesReportController extends Controller
             'folio' => trim((string) ($validated['folio'] ?? '')),
             'status' => $validated['status'] ?? '',
             'payment_method' => $validated['payment_method'] ?? '',
-            'date_from' => $validated['date_from'] ?? now()->startOfMonth()->toDateString(),
-            'date_to' => $validated['date_to'] ?? now()->toDateString(),
+            'date_from' => $validated['date_from'] ?? Carbon::now(LocalDateTime::TIMEZONE)->startOfMonth()->toDateString(),
+            'date_to' => $validated['date_to'] ?? LocalDateTime::today(),
             'coverage_months' => (int) ($validated['coverage_months'] ?? 2),
             'department_ids' => $this->integerFilterValues($validated['department_ids'] ?? []),
             'category_ids' => $this->integerFilterValues($validated['category_ids'] ?? []),
@@ -642,7 +643,7 @@ class SalesReportController extends Controller
             'monthly_average' => $monthlyAverageValue,
             'monthly_average_display' => $this->quantityLabel($monthlyAverage, $unit),
             'last_sale' => $row->last_sale_at,
-            'last_sale_display' => $row->last_sale_at ? Carbon::parse($row->last_sale_at)->format('d/m/Y H:i') : '-',
+            'last_sale_display' => $row->last_sale_at ? LocalDateTime::format(Carbon::parse($row->last_sale_at, 'UTC'), 'd/m/Y H:i') : '-',
         ];
     }
 
@@ -656,11 +657,11 @@ class SalesReportController extends Controller
             'operation_type' => 'sale',
             'operation_sort' => 'sale-'.str_pad((string) $sale->id, 12, '0', STR_PAD_LEFT),
             'folio' => $sale->folio ?: 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
-            'date' => optional($sale->date)->toISOString(),
-            'date_sort' => optional($sale->date)->format('Y-m-d H:i:s') ?? '',
-            'date_display' => optional($sale->date)->format('d/m/Y H:i') ?? '-',
-            'date_only' => optional($sale->date)->format('d/m/Y') ?? '-',
-            'time_only' => optional($sale->date)->format('H:i') ?? '-',
+            'date' => LocalDateTime::iso($sale->date),
+            'date_sort' => LocalDateTime::format($sale->date, 'Y-m-d H:i:s') ?? '',
+            'date_display' => LocalDateTime::format($sale->date, 'd/m/Y H:i') ?? '-',
+            'date_only' => LocalDateTime::format($sale->date, 'd/m/Y') ?? '-',
+            'time_only' => LocalDateTime::format($sale->date, 'H:i') ?? '-',
             'branch' => $sale->branch?->name ?? '-',
             'customer' => $sale->customer?->name ?? 'Público en General',
             'cash_box' => $sale->cash_box_number ? 'Caja '.$sale->cash_box_number : '-',
@@ -671,15 +672,15 @@ class SalesReportController extends Controller
             'status' => $sale->status,
             'status_label' => $sale->status === 'cancelled' ? 'Cancelada' : 'Completada',
             'status_tone' => $sale->status === 'cancelled' ? 'danger' : 'success',
-            'cancelled_at' => optional($sale->cancelled_at)->toISOString(),
-            'cancelled_at_display' => optional($sale->cancelled_at)->format('d/m/Y H:i') ?? null,
+            'cancelled_at' => LocalDateTime::iso($sale->cancelled_at),
+            'cancelled_at_display' => LocalDateTime::format($sale->cancelled_at, 'd/m/Y H:i') ?? null,
             'cancellation' => $sale->cancellation ? [
                 'id' => (int) $sale->cancellation->id,
                 'reason' => $sale->cancellation->reason,
                 'amount' => (float) $sale->cancellation->amount,
                 'payment_method' => $sale->cancellation->paymentMethod?->name ?? 'Sin método',
-                'cancelled_at' => optional($sale->cancellation->cancelled_at)->toISOString(),
-                'cancelled_at_display' => optional($sale->cancellation->cancelled_at)->format('d/m/Y H:i') ?? '-',
+                'cancelled_at' => LocalDateTime::iso($sale->cancellation->cancelled_at),
+                'cancelled_at_display' => LocalDateTime::format($sale->cancellation->cancelled_at, 'd/m/Y H:i') ?? '-',
                 'cancelled_by' => $sale->cancellation->cancelledBy?->name ?? 'Sin usuario',
                 'details' => $sale->cancellation->details
                     ->map(fn ($detail) => [
@@ -737,10 +738,10 @@ class SalesReportController extends Controller
             'operation_sort' => 'payment-'.str_pad((string) $payment->id, 12, '0', STR_PAD_LEFT),
             'folio' => $sale->folio ?: 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
             'payment_folio' => $payment->folio,
-            'date_sort' => optional($payment->paid_at)->format('Y-m-d H:i:s') ?? '',
-            'date_display' => optional($payment->paid_at)->format('d/m/Y H:i') ?? '-',
-            'date_only' => optional($payment->paid_at)->format('d/m/Y') ?? '-',
-            'time_only' => optional($payment->paid_at)->format('H:i') ?? '-',
+            'date_sort' => LocalDateTime::format($payment->paid_at, 'Y-m-d H:i:s') ?? '',
+            'date_display' => LocalDateTime::format($payment->paid_at, 'd/m/Y H:i') ?? '-',
+            'date_only' => LocalDateTime::format($payment->paid_at, 'd/m/Y') ?? '-',
+            'time_only' => LocalDateTime::format($payment->paid_at, 'H:i') ?? '-',
             'branch' => $sale->branch?->name ?? '-',
             'customer' => $payment->account?->employee
                 ? trim($payment->account->employee->first_name.' '.$payment->account->employee->last_name)
@@ -790,11 +791,11 @@ class SalesReportController extends Controller
     private function applyDateFilters($query, array $filters, string $column): void
     {
         if (filled($filters['date_from'] ?? null)) {
-            $query->whereDate($column, '>=', $filters['date_from']);
+            $query->where($column, '>=', LocalDateTime::startOfDay($filters['date_from']));
         }
 
         if (filled($filters['date_to'] ?? null)) {
-            $query->whereDate($column, '<=', $filters['date_to']);
+            $query->where($column, '<=', LocalDateTime::endOfDay($filters['date_to']));
         }
     }
 
@@ -861,8 +862,8 @@ class SalesReportController extends Controller
 
     private function monthsInPeriod(array $filters): int
     {
-        $from = Carbon::parse($filters['date_from'] ?? now()->startOfMonth())->startOfMonth();
-        $to = Carbon::parse($filters['date_to'] ?? now())->startOfMonth();
+        $from = Carbon::parse($filters['date_from'] ?? Carbon::now(LocalDateTime::TIMEZONE)->startOfMonth(), LocalDateTime::TIMEZONE)->startOfMonth();
+        $to = Carbon::parse($filters['date_to'] ?? LocalDateTime::today(), LocalDateTime::TIMEZONE)->startOfMonth();
 
         return max(1, (($to->year - $from->year) * 12) + ($to->month - $from->month) + 1);
     }

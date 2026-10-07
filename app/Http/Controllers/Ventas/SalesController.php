@@ -23,6 +23,8 @@ use App\Search\ProductSearchService;
 use App\Services\SaleCancellationService;
 use App\Services\StockMovementService;
 use App\Support\SystemPermission;
+use App\Support\LocalDateTime;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -151,8 +153,8 @@ class SalesController extends Controller
             ])
             ->whereIn('branch_id', $branchIds)
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
-            ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->whereDate('date', '>=', $date))
-            ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereDate('date', '<=', $date))
+            ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->where('date', '>=', LocalDateTime::startOfDay($date)))
+            ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->where('date', '<=', LocalDateTime::endOfDay($date)))
             ->when($search !== '', function ($query) use ($search) {
                 $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
                 $productIds = app(ProductSearchService::class)->ids(
@@ -545,7 +547,7 @@ class SalesController extends Controller
                 'sale_id' => $sale->id,
                 'folio' => $sale->folio,
                 'amount' => (float) $cancellation->amount,
-                'cancelled_at' => $cancellation->cancelled_at?->format('d/m/Y H:i'),
+                'cancelled_at' => LocalDateTime::format($cancellation->cancelled_at, 'd/m/Y H:i'),
             ],
         ]);
     }
@@ -581,6 +583,8 @@ class SalesController extends Controller
 
     private function applyNearExpirationBatchConstraints($query)
     {
+        $localToday = LocalDateTime::today();
+
         return $query
             ->whereIn('status', [
                 ProductBatch::STATUS_ACTIVE,
@@ -588,8 +592,8 @@ class SalesController extends Controller
             ])
             ->where('quantity', '>', 0)
             ->whereNotNull('expiration_date')
-            ->whereDate('expiration_date', '>=', today())
-            ->whereDate('expiration_date', '<=', now()->addDays(20))
+            ->whereDate('expiration_date', '>=', $localToday)
+            ->whereDate('expiration_date', '<=', Carbon::parse($localToday)->addDays(20)->toDateString())
             ->orderBy('expiration_date')
             ->orderBy('received_at')
             ->orderBy('id');
@@ -648,8 +652,8 @@ class SalesController extends Controller
         return [
             'id' => (int) $sale->id,
             'folio' => $sale->folio ?: 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
-            'date' => optional($sale->date)->toISOString(),
-            'date_display' => optional($sale->date)->format('d/m/Y H:i') ?? '-',
+            'date' => LocalDateTime::iso($sale->date),
+            'date_display' => LocalDateTime::format($sale->date, 'd/m/Y H:i') ?? '-',
             'branch' => $sale->branch?->name ?? '-',
             'seller' => trim(($sale->employee?->first_name ?? '').' '.($sale->employee?->last_name ?? '')) ?: 'Sin vendedor',
             'payment_method' => $sale->paymentMethod
@@ -670,7 +674,7 @@ class SalesController extends Controller
                 ->map(fn ($cancellation) => [
                     'reason' => $cancellation->reason,
                     'amount' => (float) $cancellation->amount,
-                    'cancelled_at_display' => optional($cancellation->cancelled_at)->format('d/m/Y H:i') ?? '-',
+                    'cancelled_at_display' => LocalDateTime::format($cancellation->cancelled_at, 'd/m/Y H:i') ?? '-',
                     'cancelled_by' => $cancellation->cancelledBy?->name ?? 'Sin usuario',
                 ])
                 ->values()
@@ -854,6 +858,8 @@ class SalesController extends Controller
 
     private function buildRemainingNearExpirationAlertsAfterSale(Sale $sale): array
     {
+        $localToday = LocalDateTime::today();
+
         $branchProducts = BranchProduct::query()
             ->with([
                 'product:id,name',
@@ -864,8 +870,8 @@ class SalesController extends Controller
                     ])
                     ->where('quantity', '>', 0)
                     ->whereNotNull('expiration_date')
-                    ->whereDate('expiration_date', '>=', today())
-                    ->whereDate('expiration_date', '<=', now()->addDays(20))
+                    ->whereDate('expiration_date', '>=', $localToday)
+                    ->whereDate('expiration_date', '<=', Carbon::parse($localToday)->addDays(20)->toDateString())
                     ->orderBy('expiration_date')
                     ->orderBy('received_at')
                     ->orderBy('id'),
@@ -893,7 +899,7 @@ class SalesController extends Controller
         return [
             'sale_id' => $sale->id,
             'folio' => $sale->folio,
-            'date' => optional($sale->date)->format('d/m/Y H:i'),
+            'date' => LocalDateTime::format($sale->date, 'd/m/Y H:i'),
             'branch_name' => $sale->branch?->name ?? 'Sucursal',
             'payment_method' => $sale->paymentMethod
                 ? $this->displayPaymentMethodName($sale->paymentMethod->name)

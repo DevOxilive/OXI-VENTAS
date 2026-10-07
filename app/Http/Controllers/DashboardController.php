@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Category;
 use App\Services\DashboardMetricsService;
+use App\Support\LocalDateTime;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -91,7 +92,7 @@ class DashboardController extends Controller
 
     private function widgetFilters(Request $request, string $prefix, Collection $branches, bool $needsBranch = false): array
     {
-        $timezone = config('app.timezone');
+        $timezone = LocalDateTime::TIMEZONE;
         $now = now($timezone);
         $dateFrom = $request->input($prefix.'date_from');
         $dateTo = $request->input($prefix.'date_to');
@@ -109,15 +110,19 @@ class DashboardController extends Controller
             ? ($branches->pluck('id')->contains($requestedBranch) ? $requestedBranch : $branches->first()?->id)
             : null;
 
-        return compact('start', 'end', 'grouping', 'branchId') + ['branch_id' => $branchId];
+        return compact('grouping', 'branchId') + [
+            'start' => $start->utc(),
+            'end' => $end->utc(),
+            'branch_id' => $branchId,
+        ];
     }
 
     private function publicFilters(array $filters): array
     {
         return [
             'branch_id' => $filters['branch_id'],
-            'date_from' => $filters['start']->toDateString(),
-            'date_to' => $filters['end']->toDateString(),
+            'date_from' => LocalDateTime::format($filters['start'], 'Y-m-d'),
+            'date_to' => LocalDateTime::format($filters['end'], 'Y-m-d'),
             'grouping' => $filters['grouping'],
         ];
     }

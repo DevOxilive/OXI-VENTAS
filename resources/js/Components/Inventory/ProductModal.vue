@@ -12,6 +12,7 @@ import {
   ToastAlert,
   ErrorAlert,
 } from "@/Components/Modales/UniversalActionModal";
+import { localDateInput } from "@/utils/localDate";
 
 const props = defineProps({
   mode: String,
@@ -58,7 +59,7 @@ const form = useForm({
   piece_margin_percentage: "",
   box_margin_percentage: "",
   allow_low_margin: false,
-  entry_date: new Date().toISOString().slice(0, 10),
+  entry_date: localDateInput(),
   active: true,
   image: null,
   quantity: null,
@@ -301,7 +302,7 @@ watch(
     form.cost_per_box = product.cost_per_box ?? "";
     form.sale_price_per_box = product.sale_price_per_box ?? "";
     form.entry_date =
-      product.entry_date ?? new Date().toISOString().slice(0, 10);
+      product.entry_date ?? localDateInput();
     form.active = true;
     form.image = product.image ?? null;
     form.record_version = product.record_version ?? "";
@@ -464,7 +465,7 @@ function setCreateDefaults() {
   form.cost_per_box = "";
   form.sale_price_per_box = "";
   form.allow_low_margin = false;
-  form.entry_date = new Date().toISOString().slice(0, 10);
+  form.entry_date = localDateInput();
   form.active = true;
   form.image = null;
   form.quantity = null;

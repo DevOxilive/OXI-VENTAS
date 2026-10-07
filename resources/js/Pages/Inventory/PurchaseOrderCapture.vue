@@ -14,6 +14,7 @@ import TextareaField from '@/Components/Forms/TextareaField.vue'
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
+import { localDateInput } from '@/utils/localDate'
 
 defineOptions({ layout: AdminLayout })
 
@@ -33,7 +34,7 @@ function presentationOptions(item) {
     ]
 }
 const form = reactive({
-    purchased_at: props.orderDB.purchased_at || new Date().toISOString().slice(0, 10),
+    purchased_at: props.orderDB.purchased_at || localDateInput(),
     items: (props.orderDB.items || []).map((item) => ({
         ...item,
         purchase_presentation: item.base_unit === 'kg'

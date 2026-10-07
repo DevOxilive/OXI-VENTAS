@@ -12,6 +12,7 @@ use App\Models\EmployeeCreditCharge;
 use App\Models\EmployeeCreditPayment;
 use App\Models\PaymentMethod;
 use App\Models\TicketTemplate;
+use App\Support\LocalDateTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -20,8 +21,6 @@ use Inertia\Inertia;
 class EmployeeCreditAccountController extends Controller
 {
     use AuthorizesBranchAccess;
-
-    private const DISPLAY_TIMEZONE = 'America/Mexico_City';
 
     public function index(Request $request)
     {
@@ -114,9 +113,9 @@ class EmployeeCreditAccountController extends Controller
             'charges' => $account->charges->map(fn ($charge) => [
                 'id' => $charge->id,
                 'folio' => $charge->sale?->folio,
-                'date' => optional($charge->sale?->date)->setTimezone(self::DISPLAY_TIMEZONE)->format('d/m/Y H:i'),
-                'date_key' => optional($charge->sale?->date)->setTimezone(self::DISPLAY_TIMEZONE)->format('Y-m-d'),
-                'date_label' => optional($charge->sale?->date)->setTimezone(self::DISPLAY_TIMEZONE)->format('d/m/Y'),
+                'date' => LocalDateTime::format($charge->sale?->date, 'd/m/Y H:i'),
+                'date_key' => LocalDateTime::format($charge->sale?->date, 'Y-m-d'),
+                'date_label' => LocalDateTime::format($charge->sale?->date, 'd/m/Y'),
                 'branch' => $charge->sale?->branch?->name,
                 'amount' => (float) $charge->amount,
                 'outstanding_amount' => (float) $charge->outstanding_amount,
@@ -132,7 +131,7 @@ class EmployeeCreditAccountController extends Controller
             ])->values(),
             'payments' => $account->payments->map(fn ($payment) => [
                 'folio' => $payment->folio,
-                'date' => optional($payment->paid_at)->setTimezone(self::DISPLAY_TIMEZONE)->format('d/m/Y H:i'),
+                'date' => LocalDateTime::format($payment->paid_at, 'd/m/Y H:i'),
                 'method' => $payment->paymentMethod?->name,
                 'amount' => (float) $payment->amount,
             ])->values(),
@@ -205,7 +204,7 @@ class EmployeeCreditAccountController extends Controller
                 'print_job' => [
                     'type' => 'employee_credit_payment',
                     'folio' => $payment->folio,
-                    'date' => $payment->paid_at->setTimezone(self::DISPLAY_TIMEZONE)->format('d/m/Y H:i'),
+                    'date' => LocalDateTime::format($payment->paid_at, 'd/m/Y H:i'),
                     'branch_name' => $holder,
                     'cash_box_number' => $payment->cash_box_number,
                     'user_name' => $request->user()->name ?? '',

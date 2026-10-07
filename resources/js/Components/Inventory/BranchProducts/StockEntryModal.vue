@@ -4,6 +4,7 @@ import { useAdjustStockForm } from '@/Composables/Inventory/useAdjustStockForm'
 import FormPanel from '@/Components/Cards/FormPanel.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { getStockEntryModalConfig } from '@/config/ModalConfigs/stockEntryModalConfig'
+import { localDateInput } from '@/utils/localDate'
 
 import InputField from '@/Components/Forms/InputField.vue'
 import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
@@ -69,7 +70,7 @@ const quantityStep = computed(() => isKilogramUnit.value ? 0.001 : 1)
 
 const entry = computed(() => form.batches?.[0] ?? null)
 
-const today = computed(() => new Date().toISOString().slice(0, 10))
+const today = computed(() => localDateInput())
 const activeSection = ref(1)
 const modalSections = [
     { id: 1, label: 'Datos del lote' },
@@ -81,7 +82,7 @@ const minExpirationDate = computed(() => {
     const date = new Date(today.value)
     date.setDate(date.getDate() + 1)
 
-    return date.toISOString().slice(0, 10)
+    return localDateInput(date)
 })
 
 const totalErrors = computed(() => errorSummary.value.length)

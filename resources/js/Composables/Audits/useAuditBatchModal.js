@@ -3,6 +3,7 @@ import { useForm } from '@inertiajs/vue3'
 
 import { getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { getAuditBatchModalConfig } from '@/config/ModalConfigs/auditBatchModalConfig'
+import { localDateInput } from '@/utils/localDate'
 
 export function useAuditBatchModal(props, emit) {
     const form = useForm({
@@ -15,12 +16,12 @@ export function useAuditBatchModal(props, emit) {
     })
 
     const productName = computed(() => props.product?.name ?? 'Producto')
-    const today = computed(() => new Date().toISOString().slice(0, 10))
+    const today = computed(() => localDateInput())
     const minExpirationDate = computed(() => {
         const date = new Date()
         date.setDate(date.getDate() + 1)
 
-        return date.toISOString().slice(0, 10)
+        return localDateInput(date)
     })
 
     const totalErrors = computed(() => Object.keys(form.errors || {}).length)
