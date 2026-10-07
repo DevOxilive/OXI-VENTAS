@@ -1,7 +1,7 @@
 <script setup>
 import InputField from "@/Components/Forms/InputField.vue"
 import QuantityStepper from "@/Components/Forms/QuantityStepper.vue"
-import MetricCard from "@/Components/Cards/MetricCard.vue"
+import ActionIconButton from "@/Components/Forms/ActionIconButton.vue"
 
 defineProps({
   item: {
@@ -30,8 +30,8 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
 </script>
 
 <template>
-  <article class="rounded-xl border border-secondary bg-secondary p-3">
-    <div class="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_120px_120px_140px_48px] md:items-start">
+  <article class="px-1 py-3">
+    <div class="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_120px_120px_140px_88px] md:items-start">
       <div class="min-w-0">
         <div class="flex gap-3">
           <div class="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-secondary bg-background">
@@ -84,14 +84,11 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
         <p class="text-[11px] uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
           Precio
         </p>
-        <p class="mt-1 text-sm font-semibold text-text md:mt-0">
-          {{ formatMoney(cartItemUnitPrice(item)) }}
-        </p>
-        <p
-          v-if="item.discount_enabled && Number(item.discount_percentage || 0) > 0"
-          class="mt-1 text-xs text-primary"
-        >
-          Rebaja {{ Number(item.discount_percentage || 0).toFixed(0) }}%
+        <p class="mt-1 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-text md:mt-0">
+          <del v-if="item.discount_enabled && Number(item.discount_percentage || 0) > 0" class="text-xs font-normal opacity-50" title="Precio antes del descuento">
+            {{ formatMoney(item.original_price || item.price || 0) }}
+          </del>
+          <span title="Precio final">{{ formatMoney(cartItemUnitPrice(item)) }}</span>
         </p>
       </div>
 
@@ -115,70 +112,67 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
         <p class="text-[11px] uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
           Importe
         </p>
-        <p class="mt-1 text-base font-bold text-text md:mt-0">
-          {{ formatMoney(cartItemSubtotal(item)) }}
-        </p>
-        <p
-          v-if="item.discount_enabled && cartItemDiscountAmount(item) > 0"
-          class="mt-1 text-xs text-primary"
-        >
-          -{{ formatMoney(cartItemDiscountAmount(item)) }}
+        <p class="mt-1 flex flex-wrap items-baseline gap-x-2 text-base font-bold text-text md:mt-0">
+          <del v-if="item.discount_enabled && cartItemDiscountAmount(item) > 0" class="text-xs font-normal opacity-50" title="Importe antes del descuento">
+            {{ formatMoney(Number(item.original_price || item.price || 0) * Number(item.quantity || 0)) }}
+          </del>
+          <span title="Importe final">{{ formatMoney(cartItemSubtotal(item)) }}</span>
         </p>
       </div>
 
       <div class="flex items-start justify-end gap-2">
-        <button
-          type="button"
-          class="flex h-9 w-9 items-center justify-center rounded-lg border border-secondary bg-background text-text transition hover:border-primary"
-          :class="item.discount_enabled ? 'border-primary text-primary' : ''"
+        <ActionIconButton
+          icon="percent"
+          variant="amber"
+          class="shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          :class="item.discount_enabled ? 'ring-1 ring-primary' : ''"
           title="Aplicar descuento"
+          :aria-label="`Descuento para ${item.name}`"
+          :aria-pressed="Boolean(item.discount_enabled)"
           @click="$emit('toggle-discount')"
-        >
-          <span class="material-symbols-outlined text-[18px]">
-            sell
-          </span>
-        </button>
-        <button
-          type="button"
-          class="flex h-9 w-9 items-center justify-center rounded-lg bg-background text-text transition hover:bg-secondary"
+        />
+        <ActionIconButton
+          icon="delete"
+          variant="red"
+          class="shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
           title="Quitar producto"
+          :aria-label="`Quitar ${item.name}`"
           @click="$emit('remove')"
-        >
-          <span class="material-symbols-outlined text-[18px]">
-            close
-          </span>
-        </button>
+        />
       </div>
     </div>
 
     <div
       v-if="item.discount_enabled"
-      class="mt-3 grid gap-3 rounded-xl border border-secondary bg-background p-3 lg:grid-cols-[180px_minmax(0,1fr)]"
+      class="mt-2 flex items-center justify-end gap-2"
     >
+        <label :for="`item_discount_percentage_${item.branch_product_id}`" class="text-xs text-text opacity-60">Descuento</label>
         <InputField
           v-model="item.discount_percentage"
           label="Porcentaje"
-          field="item_discount_percentage"
+          :field="`item_discount_percentage_${item.branch_product_id}`"
+          hide-label
+          :show-counter="false"
+          :aria-label="`Porcentaje de descuento para ${item.name}`"
+          class="discount-input w-24"
           type="number"
+          min="0"
+          max="100"
+          step="0.01"
           placeholder="0"
           suffix="%"
           @validate="$emit('normalize-discount')"
         />
 
-        <div class="grid grid-cols-2 gap-3 text-sm">
-          <MetricCard
-            label="Precio original"
-            :value="formatMoney(item.original_price)"
-            size="sm"
-          />
-
-          <MetricCard
-            label="Descuento"
-            :value="`-${formatMoney(cartItemDiscountAmount(item))}`"
-            tone="danger"
-            size="sm"
-          />
-        </div>
     </div>
   </article>
 </template>
+
+<style scoped>
+.discount-input :deep(input) {
+  height: 2rem;
+  border-radius: 0.5rem;
+  padding: 0.25rem 1.75rem 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+</style>
