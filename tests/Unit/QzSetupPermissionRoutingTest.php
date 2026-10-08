@@ -41,6 +41,10 @@ class QzSetupPermissionRoutingTest extends TestCase
             $this->assertNotFalse($zip->locateName('install-qz-tray-trust.ps1'));
             $this->assertNotFalse($zip->locateName('INSTALAR-QZ.bat'));
             $this->assertFalse($zip->locateName('qz-private.pem'));
+            $this->assertStringContainsString(
+                '%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+                (string) $zip->getFromName('INSTALAR-QZ.bat')
+            );
         } finally {
             $zip->close();
             @unlink($zipPath);
