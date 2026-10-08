@@ -57,10 +57,16 @@ title Super-Kay - Configurar QZ Tray
 
 echo.
 echo Este instalador autorizara QZ Tray para Super-Kay en este usuario de Windows.
-echo No instala ni copia ninguna llave privada.
 echo.
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-qz-tray-trust.ps1" -CertificatePath "%~dp0qz-public.pem" -RestartQzTray
+set "POWERSHELL_EXE=%SystemRoot%\System32\WindowsPowerShell\\v1.0\powershell.exe"
+if not exist "%POWERSHELL_EXE%" (
+    echo No se encontro Windows PowerShell en esta computadora.
+    pause
+    exit /b 1
+)
+
+"%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-qz-tray-trust.ps1" -CertificatePath "%~dp0qz-public.pem" -RestartQzTray
 if errorlevel 1 (
     echo.
     echo No se pudo configurar QZ Tray. Lee el mensaje anterior y vuelve a intentarlo.
