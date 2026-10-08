@@ -41,6 +41,7 @@ const permissionModuleOrder = [
     "systems.tickets",
     "systems.cash-closure-tickets",
     "systems.labels",
+    "systems.qz",
     "system.center",
     "system.audit",
     "system.trash",
@@ -176,6 +177,10 @@ const permissionModules = {
     },
     "systems.labels": {
         label: "Etiquetas",
+        section: "printers",
+    },
+    "systems.qz": {
+        label: "Configuración de QZ Tray",
         section: "printers",
     },
     "system.center": {
@@ -337,6 +342,7 @@ const permissionLabels = {
     "systems.labels.update": "Editar configuracion de etiquetas",
     "systems.labels.print": "Imprimir etiquetas de productos",
     "systems.qz.sign": "Firmar trabajos de impresion local",
+    "systems.qz.setup": "Descargar y configurar QZ Tray en una caja",
 
     "system.center.access": "Acceder al Centro de Administración",
     "system.audit.view": "Consultar Auditoría del Sistema",
@@ -373,8 +379,12 @@ export function getPermissionModule(permissionName = "") {
         return "systems.cash-closure-tickets";
     }
 
-    if (permissionName.startsWith("systems.labels.") || permissionName === "systems.qz.sign") {
+    if (permissionName.startsWith("systems.labels.")) {
         return "systems.labels";
+    }
+
+    if (permissionName.startsWith("systems.qz.")) {
+        return "systems.qz";
     }
 
     if (permissionName === "system.center.access") {
