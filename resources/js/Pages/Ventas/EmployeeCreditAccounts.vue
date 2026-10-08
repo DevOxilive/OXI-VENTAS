@@ -6,7 +6,6 @@ import PageLayout from '@/Layouts/PageLayout.vue'
 import { GlobalTable } from '@/Components/Tables'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import { ChangeDueModal, GlobalModal } from '@/Components/Modales'
-import SelectField from '@/Components/Forms/SelectField.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import MultiSelectDropdown from '@/Components/Forms/MultiSelectDropdown.vue'
 import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
@@ -14,11 +13,9 @@ import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination
 import { usePermissions } from '@/Composables/usePermissions'
 import {
   connectQzTray,
-  getDefaultQzPrinter,
+  findTicketPrinter,
   getQzPrinters,
-  getStoredPrinterName,
   printEscPosTicket,
-  saveStoredPrinterName,
 } from '@/Composables/useQzTray'
 import {
   buildEscPosTicketData,
@@ -45,8 +42,7 @@ const loading = ref(false)
 const search = ref(props.filters.search || '')
 const recordsPerPage = ref(Number(props.filters.per_page || props.accounts?.per_page || 25))
 const { handlePageChange } = useGlobalTablePagination()
-const availablePrinters = ref([])
-const selectedPrinterName = ref(getStoredPrinterName())
+const selectedPrinterName = ref('')
 const printerBridgeReady = ref(false)
 const printerBridgeMessage = ref('Conecta QZ Tray para imprimir tickets.')
 const TICKET_LOGO_URL = '/icons/super-kay-ticket-bw.png'
@@ -101,10 +97,6 @@ const toolbarConfig = computed(() => ({
 
 const selectedPaymentMethod = computed(() =>
   props.paymentMethods.find((method) => String(method.id) === String(payment.payment_method_id))
-)
-
-const printerOptions = computed(() =>
-  availablePrinters.value.map((printerName) => ({ label: printerName, value: printerName }))
 )
 
 const ticketOptions = computed(() =>
@@ -281,55 +273,22 @@ function handleTableAction({ action, row }) {
   if (action === 'limit') openLimit(row)
 }
 
-function detectPreferredPrinter(printers = []) {
-  return printers.find((printerName) => {
-    const text = String(printerName || '').toLowerCase()
-    return text.includes('3nstar') || text.includes('rpt006') || text.includes('pos-58') || text.includes('pos58')
-  }) || printers[0] || ''
-}
-
 async function initializePrinterBridge({ silent = true } = {}) {
   try {
     await connectQzTray()
     const printers = await getQzPrinters()
-    availablePrinters.value = printers
     printerBridgeReady.value = true
-
-    let printerName = selectedPrinterName.value || getStoredPrinterName()
-    if (!printerName || !printers.includes(printerName)) {
-      try {
-        const defaultPrinter = await getDefaultQzPrinter()
-        printerName = printers.includes(defaultPrinter) ? defaultPrinter : ''
-      } catch {
-        printerName = ''
-      }
-    }
-    if (!printerName || !printers.includes(printerName)) {
-      printerName = detectPreferredPrinter(printers)
-    }
-
-    selectedPrinterName.value = printerName || ''
-    saveStoredPrinterName(selectedPrinterName.value)
+    selectedPrinterName.value = findTicketPrinter(printers)
     printerBridgeMessage.value = selectedPrinterName.value
       ? `Impresora lista: ${selectedPrinterName.value}`
-      : 'QZ Tray conectado. Selecciona la impresora del ticket.'
+      : 'QZ Tray conectado, pero no encontro una impresora de tickets identificada.'
   } catch (error) {
     printerBridgeReady.value = false
-    availablePrinters.value = []
     printerBridgeMessage.value = error?.message || 'QZ Tray no esta conectado en esta computadora.'
     if (!silent) {
       ErrorAlert({ title: 'No se pudo conectar la impresora', message: printerBridgeMessage.value })
     }
   }
-}
-
-function handlePrinterChange(value) {
-  selectedPrinterName.value = value || ''
-  saveStoredPrinterName(selectedPrinterName.value)
-  printerBridgeReady.value = false
-  printerBridgeMessage.value = selectedPrinterName.value
-    ? `Impresora seleccionada: ${selectedPrinterName.value}. Falta verificar la conexión.`
-    : 'Selecciona una impresora para continuar.'
 }
 
 function blobToDataUrl(blob) {
@@ -677,15 +636,6 @@ onBeforeUnmount(() => {
 
         <section v-if="canPrintEmployeeCredit" class="grid gap-3 rounded-xl border border-secondary bg-secondary/30 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div>
-            <SelectField
-              label="Impresora"
-              field="ticket_printer"
-              :model-value="selectedPrinterName"
-              :options="printerOptions"
-              :disabled="!printerOptions.length"
-              :placeholder="printerBridgeReady ? 'Selecciona impresora' : 'QZ Tray no conectado'"
-              @update:model-value="handlePrinterChange"
-            />
             <p class="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-text opacity-75">
               <span>Estado: {{ printerBridgeReady ? 'Lista' : 'Sin conexión' }}</span>
               <span v-if="selectedPrinterName">{{ selectedPrinterName }}</span>

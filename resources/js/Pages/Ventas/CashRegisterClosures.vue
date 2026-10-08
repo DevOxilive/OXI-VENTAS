@@ -16,12 +16,10 @@ import {
 } from "@/Components/Modales/UniversalActionModal";
 import {
   connectQzTray,
-  getDefaultQzPrinter,
+  findTicketPrinter,
   getQzPrinters,
-  getStoredPrinterName,
   isQzTrayActive,
   printEscPosTicket,
-  saveStoredPrinterName,
 } from "@/Composables/useQzTray";
 import {
   buildEscPosTicketData,
@@ -45,8 +43,7 @@ const props = defineProps({
 const { can } = usePermissions();
 
 const showClosureModal = ref(false);
-const availablePrinters = ref([]);
-const selectedPrinterName = ref(getStoredPrinterName());
+const selectedPrinterName = ref("");
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para imprimir tickets.");
 const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
@@ -78,12 +75,6 @@ const form = useForm({
   notes: "",
 });
 
-const printerOptions = computed(() =>
-  availablePrinters.value.map((printerName) => ({
-    label: printerName,
-    value: printerName,
-  }))
-);
 const resolvedTicketTemplate = computed(() =>
   normalizeTicketTemplate(props.ticketTemplate?.settings || {
     ...createDefaultTicketTemplate(),
@@ -281,32 +272,13 @@ async function initializePrinterBridge({ silent = true } = {}) {
   try {
     await connectQzTray();
     const printers = await getQzPrinters();
-    availablePrinters.value = printers;
     printerBridgeReady.value = true;
-
-    let printerName = selectedPrinterName.value || getStoredPrinterName();
-
-    if (!printerName || !printers.includes(printerName)) {
-      try {
-        const defaultPrinter = await getDefaultQzPrinter();
-        printerName = printers.includes(defaultPrinter) ? defaultPrinter : "";
-      } catch (error) {
-        printerName = "";
-      }
-    }
-
-    if (!printerName || !printers.includes(printerName)) {
-      printerName = printers[0] || "";
-    }
-
-    selectedPrinterName.value = printerName;
-    saveStoredPrinterName(printerName);
-    printerBridgeMessage.value = printerName
-      ? `Impresora lista: ${printerName}`
-      : "QZ Tray conectado. Selecciona una impresora.";
+    selectedPrinterName.value = findTicketPrinter(printers);
+    printerBridgeMessage.value = selectedPrinterName.value
+      ? `Impresora lista: ${selectedPrinterName.value}`
+      : "QZ Tray conectado, pero no encontro una impresora de tickets identificada.";
   } catch (error) {
     printerBridgeReady.value = false;
-    availablePrinters.value = [];
     printerBridgeMessage.value = error?.message || "QZ Tray no esta conectado.";
 
     if (!silent) {
@@ -316,14 +288,6 @@ async function initializePrinterBridge({ silent = true } = {}) {
       });
     }
   }
-}
-
-function handlePrinterChange(event) {
-  selectedPrinterName.value = event.target.value || "";
-  saveStoredPrinterName(selectedPrinterName.value);
-  printerBridgeMessage.value = selectedPrinterName.value
-    ? `Impresora lista: ${selectedPrinterName.value}`
-    : "Selecciona una impresora para imprimir.";
 }
 
 function escLine(text = "") {
@@ -492,21 +456,6 @@ onMounted(() => {
                   {{ selectedPrinterName || 'Sin seleccionar' }}
                 </p>
               </div>
-              <select
-                class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm font-semibold text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary sm:w-56"
-                :value="selectedPrinterName"
-                :disabled="!printerOptions.length"
-                @change="handlePrinterChange"
-              >
-                <option value="">Selecciona impresora</option>
-                <option
-                  v-for="printer in printerOptions"
-                  :key="printer.value"
-                  :value="printer.value"
-                >
-                  {{ printer.label }}
-                </option>
-              </select>
               <button
                 type="button"
                 class="h-11 rounded-xl border border-secondary bg-background px-5 text-sm font-black text-text transition hover:bg-secondary"

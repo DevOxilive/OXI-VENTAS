@@ -15,7 +15,7 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['update:modelValue', 'validate', 'change'])
+const emit = defineEmits(['update:modelValue', 'validate', 'change', 'keydown'])
 const root = ref(null)
 const input = ref(null)
 const open = ref(false)
@@ -114,12 +114,15 @@ function handleKeydown(event) {
   if (event.key === 'Enter' && open.value && filteredOptions.value[highlightedIndex.value]) {
     event.preventDefault()
     selectOption(filteredOptions.value[highlightedIndex.value])
+    return
   }
 
   if (event.key === 'Escape') {
     event.stopPropagation()
     closeOptions()
   }
+
+  emit('keydown', event)
 }
 
 function handleOutsideClick(event) {
@@ -132,6 +135,10 @@ watch(() => props.options, syncSelectedLabel)
 
 onMounted(() => document.addEventListener('pointerdown', handleOutsideClick))
 onBeforeUnmount(() => document.removeEventListener('pointerdown', handleOutsideClick))
+
+defineExpose({
+  focus: () => input.value?.focus(),
+})
 </script>
 
 <template>

@@ -1,6 +1,13 @@
 import qz from "qz-tray";
 
 const PRINTER_STORAGE_KEY = "ventas_printer_name";
+const TICKET_PRINTER_STORAGE_KEY = "ventas_ticket_printer_name";
+const TICKET_PRINTER_IDENTIFIERS = ["3nstar", "rpt006", "pos-58", "pos58", "pos 58"];
+// QZ Tray puede tardar varios segundos en iniciar cuando Windows acaba de abrirlo.
+// Mantener el reintento aqui hace que todas las pantallas que imprimen esperen al
+// mismo proceso, en vez de pedir al usuario que recargue la pagina.
+const QZ_CONNECTION_RETRIES = 8;
+const QZ_CONNECTION_DELAY_SECONDS = 1;
 
 let securityConfigured = false;
 let connectionPromise = null;
@@ -82,6 +89,48 @@ export function saveStoredPrinterName(printerName) {
   window.localStorage.setItem(PRINTER_STORAGE_KEY, printerName);
 }
 
+export function getStoredTicketPrinterName() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return window.localStorage.getItem(TICKET_PRINTER_STORAGE_KEY) || "";
+}
+
+function saveStoredTicketPrinterName(printerName) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (!printerName) {
+    window.localStorage.removeItem(TICKET_PRINTER_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(TICKET_PRINTER_STORAGE_KEY, printerName);
+}
+
+// Los tickets no deben caer en la impresora predeterminada ni en la primera
+// cola de Windows: una caja puede tener tambien una impresora de etiquetas.
+export function findTicketPrinter(printers = []) {
+  const availablePrinters = Array.isArray(printers) ? printers : [];
+  const storedPrinter = getStoredTicketPrinterName();
+
+  if (storedPrinter && availablePrinters.includes(storedPrinter)) {
+    return storedPrinter;
+  }
+
+  const detectedPrinter = availablePrinters.find((printerName) => {
+    const normalizedName = String(printerName || "").toLowerCase();
+
+    return TICKET_PRINTER_IDENTIFIERS.some((identifier) => normalizedName.includes(identifier));
+  }) || "";
+
+  saveStoredTicketPrinterName(detectedPrinter);
+
+  return detectedPrinter;
+}
+
 export async function connectQzTray() {
   configureSecurity();
 
@@ -91,8 +140,8 @@ export async function connectQzTray() {
 
   if (!connectionPromise) {
     connectionPromise = qz.websocket.connect({
-      retries: 2,
-      delay: 1,
+      retries: QZ_CONNECTION_RETRIES,
+      delay: QZ_CONNECTION_DELAY_SECONDS,
       keepAlive: 60,
     }).then(() => qz)
       .finally(() => {

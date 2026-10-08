@@ -1,16 +1,6 @@
 export function getSalesToolbarConfig({
   selectorMode = false,
-  branchName = "",
   selectorDescription = "",
-  branches = [],
-  selectedBranchId = "",
-  paymentMethods = [],
-  selectedPaymentMethodId = "",
-  cashBoxOptions = [],
-  selectedCashBoxNumber = "",
-  printerOptions = [],
-  selectedPrinterName = "",
-  printerBridgeReady = false,
   expirationAlertCount = 0,
   backButton = false,
 } = {}) {
@@ -33,52 +23,20 @@ export function getSalesToolbarConfig({
   return {
     icon: "point_of_sale",
     title: "Ventas",
-    subtitle: `${branchName || "Sin sucursal"} · Escanea, agrega productos y cobra una venta real.`,
+    subtitle: "",
     showSearch: false,
     showRecordsPerPage: false,
     showCounter: false,
     backButton,
     backLabel: "Sucursales",
-    compactFilters: true,
-    filters: [
-      {
-        key: "branch_id",
-        label: "Sucursal",
-        placeholder: "Selecciona una sucursal",
-        value: selectedBranchId,
-        options: branches,
-        optionLabel: "name",
-        optionValue: "id",
-        visible: () => branches.length > 1,
-      },
-      {
-        key: "payment_method_id",
-        label: "Forma de pago",
-        placeholder: "Selecciona pago",
-        value: selectedPaymentMethodId,
-        options: paymentMethods,
-        optionLabel: "name",
-        optionValue: "id",
-      },
-      {
-        key: "cash_box",
-        label: "Caja",
-        placeholder: "Selecciona caja",
-        value: selectedCashBoxNumber,
-        options: cashBoxOptions,
-      },
-      {
-        key: "ticket_printer",
-        label: "Impresora",
-        placeholder: printerBridgeReady
-          ? "Selecciona impresora"
-          : "QZ Tray no conectado",
-        value: selectedPrinterName,
-        options: printerOptions,
-        disabled: !printerOptions.length,
-      },
-    ],
+    filters: [],
     actions: [
+      {
+        id: "open-cash-drawer",
+        label: "Abrir caja",
+        icon: "point_of_sale",
+        variant: "danger",
+      },
       {
         id: "toggle-expiration-alerts",
         label: "Alertas",
