@@ -13,6 +13,8 @@ class TicketPrinterDetectionTest extends TestCase
         $this->assertStringContainsString('const TICKET_PRINTER_STORAGE_KEY = "ventas_ticket_printer_name";', $composable);
         $this->assertStringContainsString('const TICKET_PRINTER_IDENTIFIERS = ["3nstar", "rpt006", "pos-58", "pos58", "pos 58"];', $composable);
         $this->assertStringContainsString('export function findTicketPrinter(printers = [])', $composable);
+        $this->assertStringContainsString('const legacyStoredPrinter = getStoredPrinterName();', $composable);
+        $this->assertStringContainsString('saveStoredTicketPrinterName(storedPrinter);', $composable);
         $this->assertStringNotContainsString('return detectedPrinter || availablePrinters[0]', $composable);
     }
 
