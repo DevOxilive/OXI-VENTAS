@@ -14,11 +14,9 @@ import {
 } from "@/Components/Modales/UniversalActionModal";
 import {
   connectQzTray,
-  getDefaultQzPrinter,
+  findTicketPrinter,
   getQzPrinters,
-  getStoredPrinterName,
   printEscPosTicket,
-  saveStoredPrinterName,
 } from "@/Composables/useQzTray";
 import {
   buildEscPosTicketData,
@@ -40,8 +38,7 @@ const props = defineProps({
 const page = usePage();
 const selectedSale = ref(null);
 const cancellationSale = ref(null);
-const availablePrinters = ref([]);
-const selectedPrinterName = ref(getStoredPrinterName());
+const selectedPrinterName = ref("");
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para reimprimir tickets.");
 const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
@@ -372,31 +369,13 @@ async function initializePrinterBridge() {
   try {
     await connectQzTray();
     const printers = await getQzPrinters();
-    availablePrinters.value = printers;
-
-    let printerName = selectedPrinterName.value || getStoredPrinterName();
-    if (!printerName || !printers.includes(printerName)) {
-      try {
-        const defaultPrinter = await getDefaultQzPrinter();
-        printerName = printers.includes(defaultPrinter) ? defaultPrinter : "";
-      } catch (error) {
-        printerName = "";
-      }
-    }
-
-    if (!printerName || !printers.includes(printerName)) {
-      printerName = printers[0] || "";
-    }
-
-    selectedPrinterName.value = printerName;
-    saveStoredPrinterName(printerName);
+    selectedPrinterName.value = findTicketPrinter(printers);
     printerBridgeReady.value = true;
-    printerBridgeMessage.value = printerName
-      ? `Impresora lista: ${printerName}`
-      : "QZ Tray conectado. Selecciona una impresora.";
+    printerBridgeMessage.value = selectedPrinterName.value
+      ? `Impresora lista: ${selectedPrinterName.value}`
+      : "QZ Tray conectado, pero no encontro una impresora de tickets identificada.";
   } catch (error) {
     printerBridgeReady.value = false;
-    availablePrinters.value = [];
     printerBridgeMessage.value = error?.message || "QZ Tray no esta conectado.";
     throw error;
   }

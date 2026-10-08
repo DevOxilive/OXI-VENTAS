@@ -49,7 +49,6 @@ const formattedAmount = computed(() => new Intl.NumberFormat('es-MX', {
                         class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-4xl leading-none text-text opacity-70 transition hover:bg-secondary hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                         aria-label="Cerrar aviso de cambio"
                         title="Cerrar modal"
-                        data-modal-autofocus
                         @click="close"
                     >
                         ×
@@ -70,6 +69,7 @@ const formattedAmount = computed(() => new Intl.NumberFormat('es-MX', {
                 <button
                     type="button"
                     class="rounded-full border border-primary/40 bg-secondary px-8 py-3 text-sm font-semibold text-text transition hover:border-primary hover:bg-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    data-modal-autofocus
                     @click="close"
                 >
                     {{ closeButtonText }}

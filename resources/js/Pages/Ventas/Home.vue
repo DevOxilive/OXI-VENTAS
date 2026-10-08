@@ -15,11 +15,9 @@ import SaleBranchSelectorCard from "@/Components/Ventas/SaleBranchSelectorCard.v
 import { getSalesToolbarConfig } from "@/config/ToolbarConfigs/salesToolbarConfig";
 import {
   connectQzTray,
-  getDefaultQzPrinter,
+  findTicketPrinter,
   getQzPrinters,
-  getStoredPrinterName,
   printEscPosTicket,
-  saveStoredPrinterName,
 } from "@/Composables/useQzTray";
 import {
   ToastAlert,
@@ -101,8 +99,7 @@ const expirationAlerts = ref([]);
 const expirationAlertPanelOpen = ref(false);
 const expirationAlertPulse = ref(false);
 const highlightedSuggestionIndex = ref(0);
-const availablePrinters = ref([]);
-const selectedPrinterName = ref(getStoredPrinterName());
+const selectedPrinterName = ref("");
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para imprimir tickets.");
 let searchDebounceTimer = null;
@@ -129,11 +126,14 @@ const saleForm = useForm({
 });
 const saleSubmitting = ref(false);
 const showCreditModal = ref(false);
+const showPaymentModal = ref(false);
 const creditHolder = ref("");
 const creditDueDate = ref("");
 const showChangeModal = ref(false);
 const completedSaleChange = ref(0);
 const completedSaleFolio = ref("");
+const cashReceivedInput = ref(null);
+const creditHolderInput = ref(null);
 
 function formatMoney(value) {
   return new Intl.NumberFormat("es-MX", {
@@ -444,17 +444,7 @@ watch(cartTotal, (total) => {
 const toolbarConfig = computed(() =>
   getSalesToolbarConfig({
     selectorMode: props.selectorMode,
-    branchName: currentBranchLabel.value,
     selectorDescription: selectorDescription.value,
-    branches: props.branchesDB,
-    selectedBranchId: selectedBranchId.value,
-    paymentMethods: props.paymentMethodsDB,
-    selectedPaymentMethodId: saleForm.payment_method_id,
-    cashBoxOptions,
-    selectedCashBoxNumber: selectedCashBoxNumber.value,
-    printerOptions: printerOptions.value,
-    selectedPrinterName: selectedPrinterName.value,
-    printerBridgeReady: printerBridgeReady.value,
     expirationAlertCount: expirationAlertCount.value,
     backButton: canReturnToBranchSelector.value,
   })
@@ -467,13 +457,6 @@ const selectorDescription = computed(() => {
 
   return "Selecciona la sucursal donde quieres abrir el punto de venta.";
 });
-
-const printerOptions = computed(() =>
-  availablePrinters.value.map((printerName) => ({
-    label: printerName,
-    value: printerName,
-  }))
-);
 
 const cashBoxOptions = [
   { label: "Caja #1", value: "1" },
@@ -634,60 +617,19 @@ function readablePrinterBridgeError(error) {
   return message || "QZ Tray no esta conectado en esta computadora.";
 }
 
-function detectPreferredPrinter(printers = []) {
-  const normalizedPreferred = printers.find((printerName) => {
-    const text = String(printerName || "").toLowerCase();
-
-    return (
-      text.includes("3nstar") ||
-      text.includes("rpt006") ||
-      text.includes("pos-58") ||
-      text.includes("pos58")
-    );
-  });
-
-  return normalizedPreferred || printers[0] || "";
-}
-
 async function initializePrinterBridge({ silent = true } = {}) {
   try {
     await connectQzTray();
 
     const printers = await getQzPrinters();
-    availablePrinters.value = printers;
     printerBridgeReady.value = true;
-
-    let printerName = selectedPrinterName.value;
-
-    if (!printerName || !printers.includes(printerName)) {
-      printerName = getStoredPrinterName();
-    }
-
-    if (!printerName || !printers.includes(printerName)) {
-      try {
-        const defaultPrinter = await getDefaultQzPrinter();
-
-        if (defaultPrinter && printers.includes(defaultPrinter)) {
-          printerName = defaultPrinter;
-        }
-      } catch (error) {
-        printerName = "";
-      }
-    }
-
-    if (!printerName || !printers.includes(printerName)) {
-      printerName = detectPreferredPrinter(printers);
-    }
-
-    selectedPrinterName.value = printerName || "";
-    saveStoredPrinterName(selectedPrinterName.value);
+    selectedPrinterName.value = findTicketPrinter(printers);
 
     printerBridgeMessage.value = selectedPrinterName.value
       ? `Impresora lista: ${selectedPrinterName.value}`
-      : "QZ Tray conectado. Selecciona la impresora del ticket.";
+      : "QZ Tray conectado, pero no encontro una impresora de tickets identificada.";
   } catch (error) {
     printerBridgeReady.value = false;
-    availablePrinters.value = [];
     printerBridgeMessage.value = readablePrinterBridgeError(error);
 
     if (!silent) {
@@ -722,16 +664,6 @@ async function ensurePrinterReadyForPrint({ silent = true } = {}) {
     }
     throw error;
   }
-}
-
-function handlePrinterChange(value) {
-  selectedPrinterName.value = value || "";
-  saveStoredPrinterName(selectedPrinterName.value);
-  printerBridgeReady.value = false;
-
-  printerBridgeMessage.value = selectedPrinterName.value
-    ? `Impresora seleccionada: ${selectedPrinterName.value}. Falta verificar la conexión.`
-    : "Selecciona una impresora para continuar.";
 }
 
 function resolvePrintJob(printJob) {
@@ -1073,7 +1005,10 @@ async function handleSearchKeydown(event) {
   }
 
   const query = search.value.trim();
-  if (!query) return;
+  if (!query) {
+    openPaymentModal();
+    return;
+  }
 
   if (!searchSuggestions.value.length) {
     clearPendingProductSearch();
@@ -1149,6 +1084,7 @@ function clearCart() {
   creditHolder.value = "";
   creditDueDate.value = "";
   showCreditModal.value = false;
+  showPaymentModal.value = false;
   cardPaymentConfirmed.value = false;
   highlightedSuggestionIndex.value = 0;
   focusSearch();
@@ -1200,6 +1136,47 @@ function handlePaymentMethodChange(value) {
   saleForm.cash_received = "";
 }
 
+function openPaymentModal() {
+  if (!cart.value.length) {
+    return;
+  }
+
+  showPaymentModal.value = true;
+  nextTick(() => {
+    if (isCashPayment.value) {
+      cashReceivedInput.value?.focus?.();
+    }
+  });
+}
+
+function closePaymentModal() {
+  showPaymentModal.value = false;
+  focusSearch();
+}
+
+function handlePaymentMethodSelection(value) {
+  handlePaymentMethodChange(value);
+
+  nextTick(() => {
+    if (isCashPayment.value) {
+      cashReceivedInput.value?.focus?.();
+    }
+  });
+}
+
+function submitPaymentFromModal() {
+  if (saleSubmitting.value) return;
+
+  void submitSale();
+}
+
+function handlePaymentKeydown(event) {
+  if (event.key !== "Enter") return;
+
+  event.preventDefault();
+  submitPaymentFromModal();
+}
+
 function handleToolbarFilterUpdate({ key, value }) {
   if (key === "branch_id") {
     handleBranchChange(value);
@@ -1215,15 +1192,40 @@ function handleToolbarFilterUpdate({ key, value }) {
     handleCashBoxChange(value);
     return;
   }
-
-  if (key === "ticket_printer") {
-    handlePrinterChange(value);
-  }
 }
 
 function handleToolbarAction(actionId) {
   if (actionId === "toggle-expiration-alerts") {
     toggleExpirationAlerts();
+    return;
+  }
+
+  if (actionId === "open-cash-drawer") {
+    void openCashDrawer();
+  }
+}
+
+async function openCashDrawer() {
+  if (!printerBridgeReady.value || !selectedPrinterName.value) {
+    await initializePrinterBridge({ silent: false });
+  }
+
+  if (!printerBridgeReady.value || !selectedPrinterName.value) {
+    return;
+  }
+
+  try {
+    await printEscPosTicket(selectedPrinterName.value, [
+      "\x1B\x70\x00\x19\xFA",
+      "\x1B\x70\x01\x19\xFA",
+      "\x10\x14\x01\x00\x05",
+    ]);
+    ToastAlert({ title: "Caja abierta" });
+  } catch (error) {
+    ErrorAlert({
+      title: "No se pudo abrir la caja",
+      message: readablePrinterBridgeError(error),
+    });
   }
 }
 
@@ -1390,6 +1392,8 @@ function handleSaleRegistered(payload = {}, completion = {}) {
     showChangeModal.value = true;
   }
 
+  showPaymentModal.value = false;
+
   replaceExpirationAlerts(payload.expiration_alerts || []);
 
   if ((payload.expiration_alerts || []).length) {
@@ -1427,9 +1431,11 @@ function handleSaleRegistered(payload = {}, completion = {}) {
 
 function openCreditModal() {
   if (!cart.value.length) return ErrorAlert({ title: "Venta vacía", message: "Agrega productos antes de registrar un fiado." });
+  showPaymentModal.value = false;
   creditHolder.value = "";
   creditDueDate.value = "";
   showCreditModal.value = true;
+  nextTick(() => creditHolderInput.value?.focus?.());
 }
 
 async function submitSale(creditSelection = null, estimatedPaymentDate = null) {
@@ -1540,6 +1546,13 @@ function submitCreditSale() {
   void submitSale(creditHolder.value, creditDueDate.value || null);
 }
 
+function handleCreditHolderKeydown(event) {
+  if (event.key !== "Enter" || !creditHolder.value) return;
+
+  event.preventDefault();
+  submitCreditSale();
+}
+
 function closeChangeModal() {
   showChangeModal.value = false;
   completedSaleChange.value = 0;
@@ -1549,7 +1562,7 @@ function closeChangeModal() {
 </script>
 
 <template>
-  <PageLayout>
+  <PageLayout fill-height>
     <template #toolbar>
       <GlobalToolbar
         v-bind="toolbarConfig"
@@ -1664,8 +1677,8 @@ function closeChangeModal() {
           </div>
       </GlobalModal>
 
-      <div class="grid min-h-0 gap-4 lg:h-[calc(100dvh-24rem)] lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_390px]">
-        <section class="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-secondary bg-background p-3 shadow-sm md:p-4">
+      <div class="min-h-0 flex-1">
+        <section class="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-secondary bg-background p-3 shadow-sm lg:h-full md:p-4">
           <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end">
             <div class="min-w-0 flex-1">
               <div class="relative">
@@ -1677,6 +1690,7 @@ function closeChangeModal() {
                   v-model="search"
                   icon="barcode_scanner"
                   placeholder="Codigo de barras o nombre del producto"
+                  autocomplete="off"
                   @keydown="handleSearchKeydown"
                 />
 
@@ -1724,7 +1738,7 @@ function closeChangeModal() {
 
             <button
               type="button"
-              class="h-[46px] shrink-0 rounded-lg border border-secondary bg-background px-4 text-sm font-semibold text-text transition hover:border-primary hover:bg-secondary"
+              class="h-[46px] shrink-0 rounded-lg border border-secondary bg-background px-4 text-sm font-semibold text-text transition hover:border-primary hover:bg-secondary sm:mb-5"
               @click="clearCart"
             >
               Limpiar
@@ -1758,18 +1772,37 @@ function closeChangeModal() {
                 @normalize-discount="normalizeDiscount(item)"
               />
 
-              <EmptyStateCard
+              <div
                 v-if="cart.length === 0"
-                title="Todavia no hay productos capturados"
-                description="Escanea o busca uno para empezar."
-                icon="shopping_cart"
-                min-height-class="min-h-[260px]"
-              />
+                class="flex min-h-[260px] items-center justify-center bg-background px-6 text-center"
+              >
+                <div>
+                  <span class="material-symbols-outlined text-4xl text-text opacity-35">shopping_cart</span>
+                  <p class="mt-2 text-sm font-semibold text-text">Todavia no hay productos capturados</p>
+                  <p class="mt-1 text-sm text-text opacity-70">Escanea o busca uno para empezar.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 flex shrink-0 items-center justify-between gap-3 rounded-xl border border-primary/30 bg-secondary px-4 py-3">
+              <div class="min-w-0">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-text opacity-60">Total de la venta</p>
+                <p class="mt-1 text-2xl font-black leading-none text-text">{{ formatMoney(cartTotal) }}</p>
+              </div>
+              <button
+                type="button"
+                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-primary bg-primary px-5 py-3 text-sm font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="saleSubmitting || !cart.length"
+                @click="openPaymentModal"
+              >
+                <span class="material-symbols-outlined text-[20px]">payments</span>
+                Cobrar
+              </button>
             </div>
           </div>
         </section>
 
-        <aside class="flex min-h-0 flex-col rounded-xl border border-secondary bg-background p-3 shadow-sm lg:overflow-hidden 2xl:p-4">
+        <aside class="hidden">
           <div class="flex shrink-0 items-start justify-between gap-3">
             <div>
               <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-text opacity-50">
@@ -1944,9 +1977,115 @@ function closeChangeModal() {
         </aside>
       </div>
 
-    <GlobalModal v-if="showCreditModal" title="Venta a crédito" subtitle="Selecciona un empleado o un cliente independiente para registrar la venta." size="2xl" :columns="1" save-button-text="Registrar fiado" close-button-text="Cancelar" @close="showCreditModal = false" @save="submitCreditSale">
+    <GlobalModal
+      v-if="showPaymentModal"
+      title="Cobrar venta"
+      subtitle="Confirma el pago para registrar la venta."
+      size="lg"
+      height="auto"
+      :columns="1"
+      :processing="saleSubmitting"
+      save-button-text="Cobrar venta"
+      close-button-text="Cancelar"
+      @close="closePaymentModal"
+      @save="submitPaymentFromModal"
+    >
       <div class="space-y-4">
-        <SearchableSelectField v-model="creditHolder" label="Cliente o empleado" field="credit_holder_id" :options="creditAccounts" option-label="name" option-value="value" placeholder="Escribe el nombre del cliente o empleado" empty-message="No se encontró ningún cliente o empleado." :error="saleForm.errors.credit_holder_id" />
+        <div class="grid grid-cols-2 divide-x divide-secondary rounded-xl bg-secondary px-4 py-3">
+          <div class="pr-4">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-text opacity-60">Artículos</p>
+            <p class="mt-1 text-xl font-black text-text">{{ totalLines }}</p>
+          </div>
+          <div class="pl-4">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-text opacity-60">Total a cobrar</p>
+            <p class="mt-1 text-xl font-black text-primary">{{ formatMoney(cartTotal) }}</p>
+          </div>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <SelectField
+            v-model="saleForm.payment_method_id"
+            label="Método de pago"
+            field="payment_method_id"
+            :options="paymentMethodsDB"
+            placeholder="Selecciona pago"
+            @change="handlePaymentMethodSelection"
+          />
+          <SelectField
+            v-model="selectedCashBoxNumber"
+            label="Caja"
+            field="cash_box"
+            :options="cashBoxOptions"
+            @change="handleCashBoxChange"
+          />
+        </div>
+
+        <template v-if="isCashPayment">
+          <InputField
+            ref="cashReceivedInput"
+            v-model="saleForm.cash_received"
+            label="Efectivo recibido"
+            field="cash_received"
+            type="number"
+            placeholder="0.00"
+            :error="saleForm.errors.cash_received"
+            prefix="$"
+            data-modal-autofocus
+            @keydown="handlePaymentKeydown"
+          />
+
+          <div class="grid grid-cols-2 gap-3 rounded-xl bg-secondary px-4 py-3 text-sm">
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">Cambio</p>
+              <p class="mt-1 text-lg font-black text-accent">{{ formatMoney(changeDue) }}</p>
+            </div>
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">Falta</p>
+              <p class="mt-1 text-lg font-black text-primary">{{ formatMoney(missingAmount) }}</p>
+            </div>
+          </div>
+        </template>
+
+        <button
+          v-else
+          type="button"
+          class="flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition"
+          :class="cardPaymentConfirmed ? 'border-accent bg-secondary text-accent' : 'border-primary bg-secondary text-primary hover:bg-background'"
+          @click="cardPaymentConfirmed = !cardPaymentConfirmed"
+        >
+          <span>
+            <span class="block text-sm font-bold">Terminal aprobada</span>
+            <span class="mt-1 block text-xs font-semibold opacity-75">Confirma que el pago con tarjeta ya fue aceptado.</span>
+          </span>
+          <span class="material-symbols-outlined text-2xl">{{ cardPaymentConfirmed ? 'task_alt' : 'credit_score' }}</span>
+        </button>
+
+        <button
+          v-if="can('sales.employee-credit.create')"
+          type="button"
+          class="inline-flex w-full items-center justify-center rounded-xl border border-primary bg-background px-4 py-3 text-sm font-bold text-primary transition hover:bg-secondary"
+          :disabled="saleSubmitting"
+          @click="openCreditModal"
+        >
+          Venta a crédito
+        </button>
+      </div>
+    </GlobalModal>
+
+    <GlobalModal
+      v-if="showCreditModal"
+      title="Venta a crédito"
+      subtitle="Selecciona un empleado o un cliente independiente para registrar la venta."
+      size="lg"
+      height="auto"
+      :columns="1"
+      save-button-text="Registrar fiado"
+      close-button-text="Cancelar"
+      @close="showCreditModal = false"
+      @save="submitCreditSale"
+    >
+      <div class="space-y-4">
+        <SearchableSelectField ref="creditHolderInput" v-model="creditHolder" label="Cliente o empleado" field="credit_holder_id" :options="creditAccounts" option-label="name" option-value="value" placeholder="Escribe el nombre del cliente o empleado" empty-message="No se encontró ningún cliente o empleado." :error="saleForm.errors.credit_holder_id" @keydown="handleCreditHolderKeydown" />
         <InputField v-model="creditDueDate" label="Fecha estimada de pago (opcional)" field="estimated_payment_date" type="date" />
         <MetricCard label="Cargo a cuenta" :value="formatMoney(cartTotal)" tone="dark" size="lg" />
       </div>
