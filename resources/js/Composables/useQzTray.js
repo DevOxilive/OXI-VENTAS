@@ -97,7 +97,7 @@ export function getStoredTicketPrinterName() {
   return window.localStorage.getItem(TICKET_PRINTER_STORAGE_KEY) || "";
 }
 
-function saveStoredTicketPrinterName(printerName) {
+export function saveStoredTicketPrinterName(printerName) {
   if (typeof window === "undefined") {
     return;
   }
@@ -114,9 +114,18 @@ function saveStoredTicketPrinterName(printerName) {
 // cola de Windows: una caja puede tener tambien una impresora de etiquetas.
 export function findTicketPrinter(printers = []) {
   const availablePrinters = Array.isArray(printers) ? printers : [];
-  const storedPrinter = getStoredTicketPrinterName();
+  const storedTicketPrinter = getStoredTicketPrinterName();
+  // Antes de separar impresora de tickets y etiquetas, Ventas ya guardaba la
+  // elección del cajero con esta llave. La interfaz nueva ocultó el selector,
+  // pero no puede ignorar esa elección existente o el POS se queda sin destino.
+  const legacyStoredPrinter = getStoredPrinterName();
+  const storedPrinter = [storedTicketPrinter, legacyStoredPrinter]
+    .find((printerName) => printerName && availablePrinters.includes(printerName)) || "";
 
-  if (storedPrinter && availablePrinters.includes(storedPrinter)) {
+  if (storedPrinter) {
+    // Migramos la elección válida al nombre específico de tickets para que las
+    // siguientes aperturas no dependan de la llave anterior.
+    saveStoredTicketPrinterName(storedPrinter);
     return storedPrinter;
   }
 

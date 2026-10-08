@@ -16,8 +16,10 @@ import { getSalesToolbarConfig } from "@/config/ToolbarConfigs/salesToolbarConfi
 import {
   connectQzTray,
   findTicketPrinter,
+  getStoredTicketPrinterName,
   getQzPrinters,
   printEscPosTicket,
+  saveStoredTicketPrinterName,
 } from "@/Composables/useQzTray";
 import {
   ToastAlert,
@@ -99,7 +101,8 @@ const expirationAlerts = ref([]);
 const expirationAlertPanelOpen = ref(false);
 const expirationAlertPulse = ref(false);
 const highlightedSuggestionIndex = ref(0);
-const selectedPrinterName = ref("");
+const availablePrinters = ref([]);
+const selectedPrinterName = ref(getStoredTicketPrinterName());
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para imprimir tickets.");
 let searchDebounceTimer = null;
@@ -463,6 +466,13 @@ const cashBoxOptions = [
   { label: "Caja #2", value: "2" },
 ];
 
+const printerOptions = computed(() =>
+  availablePrinters.value.map((printerName) => ({
+    label: printerName,
+    value: printerName,
+  }))
+);
+
 function readStoredCashBoxes() {
   if (typeof window === "undefined") {
     return {};
@@ -622,14 +632,18 @@ async function initializePrinterBridge({ silent = true } = {}) {
     await connectQzTray();
 
     const printers = await getQzPrinters();
+    availablePrinters.value = printers;
     printerBridgeReady.value = true;
-    selectedPrinterName.value = findTicketPrinter(printers);
+    selectedPrinterName.value = printers.includes(selectedPrinterName.value)
+      ? selectedPrinterName.value
+      : findTicketPrinter(printers);
 
     printerBridgeMessage.value = selectedPrinterName.value
       ? `Impresora lista: ${selectedPrinterName.value}`
       : "QZ Tray conectado, pero no encontro una impresora de tickets identificada.";
   } catch (error) {
     printerBridgeReady.value = false;
+    availablePrinters.value = [];
     printerBridgeMessage.value = readablePrinterBridgeError(error);
 
     if (!silent) {
@@ -638,6 +652,19 @@ async function initializePrinterBridge({ silent = true } = {}) {
         message: readablePrinterBridgeError(error),
       });
     }
+  }
+}
+
+function handlePrinterChange(value) {
+  selectedPrinterName.value = value || "";
+  saveStoredTicketPrinterName(selectedPrinterName.value);
+  printerBridgeReady.value = false;
+  printerBridgeMessage.value = selectedPrinterName.value
+    ? `Impresora seleccionada: ${selectedPrinterName.value}. Verificando conexión.`
+    : "Selecciona una impresora para continuar.";
+
+  if (selectedPrinterName.value) {
+    void initializePrinterBridge({ silent: true });
   }
 }
 
@@ -2018,7 +2045,20 @@ function closeChangeModal() {
             :options="cashBoxOptions"
             @change="handleCashBoxChange"
           />
+          <SelectField
+            v-model="selectedPrinterName"
+            label="Impresora de tickets"
+            field="ticket_printer"
+            :options="printerOptions"
+            :disabled="!printerOptions.length"
+            :placeholder="printerBridgeReady ? 'Selecciona impresora' : 'Conectando QZ Tray...'"
+            @change="handlePrinterChange"
+          />
         </div>
+
+        <p class="-mt-2 text-xs text-text opacity-65">
+          {{ printerBridgeMessage }}
+        </p>
 
         <template v-if="isCashPayment">
           <InputField
