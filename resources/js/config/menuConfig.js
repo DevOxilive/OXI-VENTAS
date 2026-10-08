@@ -81,6 +81,7 @@ export function generateMenu(role, permissions = [], branches = []) {
             "systems.cash-closure-tickets.update",
         ],
         labels: ["systems.labels.view", "systems.labels.update", "systems.labels.print"],
+        qzSetup: ["systems.qz.setup"],
         attendance: [
             "attendance.view",
             "attendance.register",
@@ -446,7 +447,8 @@ export function generateMenu(role, permissions = [], branches = []) {
     if (
         canUse("tickets") ||
         canUse("cashClosureTickets") ||
-        canUse("labels")
+        canUse("labels") ||
+        canUse("qzSetup")
     ) {
         menu.push({
             text: "Impresoras",
@@ -487,6 +489,16 @@ export function generateMenu(role, permissions = [], branches = []) {
                               key: "printers.labels",
                               icon: "barcode",
                               url: route("printers.labels.index"),
+                          },
+                      ]
+                    : []),
+                ...(canUse("qzSetup")
+                    ? [
+                          {
+                              text: "Configurar QZ Tray",
+                              key: "printers.qz-setup",
+                              icon: "settings_input_component",
+                              url: route("printers.qz-setup.index"),
                           },
                       ]
                     : []),

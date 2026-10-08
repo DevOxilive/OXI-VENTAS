@@ -20,6 +20,7 @@ use App\Http\Controllers\Inventory\ReportController;
 use App\Http\Controllers\Inventory\StockMovementController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\QzTrayController;
+use App\Http\Controllers\QzTrayInstallerController;
 use App\Http\Controllers\SystemAdministrationController;
 use App\Http\Controllers\SystemAuditController;
 use App\Http\Controllers\SystemRoleController;
@@ -128,6 +129,7 @@ Route::middleware([
     $ticketsAccess = 'permission:systems.tickets.view,systems.tickets.update';
     $cashClosureTicketsAccess = 'permission:systems.cash-closure-tickets.view,systems.cash-closure-tickets.update';
     $labelsAccess = 'permission:systems.labels.view,systems.labels.update,systems.labels.print';
+    $qzSetupAccess = 'permission:systems.qz.setup';
     $productsAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete';
     $productImagesAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete,sales.view,sales.create,sales.purchase-lists.view,sales.purchase-lists.create,sales.purchase-orders.view,sales.purchase-orders.receive,inventory.purchase-orders.general.view,inventory.purchase-orders.general.create,inventory.purchase-orders.general.update,inventory.purchase-orders.general.complete';
     $branchInventoryAccess = 'permission:inventory.branches.view,inventory.branches.stock-in,inventory.branches.stock-out,inventory.branches.stock-adjust,inventory.branches.batches.update,inventory.branches.config.update';
@@ -506,7 +508,8 @@ Route::middleware([
     Route::prefix('printers')->name('printers.')->group(function () use (
         $ticketsAccess,
         $cashClosureTicketsAccess,
-        $labelsAccess
+        $labelsAccess,
+        $qzSetupAccess
     ) {
         Route::get('/tickets', [TicketTemplateController::class, 'index'])
             ->middleware($ticketsAccess)
@@ -543,6 +546,14 @@ Route::middleware([
         Route::put('/labels/{ticketTemplate}', [TicketTemplateController::class, 'updateLabel'])
             ->middleware('permission:systems.labels.update')
             ->name('labels.update');
+
+        Route::get('/qz-tray', [QzTrayInstallerController::class, 'index'])
+            ->middleware($qzSetupAccess)
+            ->name('qz-setup.index');
+
+        Route::get('/qz-tray/installer', [QzTrayInstallerController::class, 'download'])
+            ->middleware($qzSetupAccess)
+            ->name('qz-setup.download');
     });
 
     /*

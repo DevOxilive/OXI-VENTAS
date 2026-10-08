@@ -135,7 +135,10 @@ class SetupQzTray extends Command
             return;
         }
 
-        $option = '-Dauthcert.override='.$certificatePath;
+        // QZ Tray reads this option when it starts.  Keeping the public
+        // certificate outside Program Files lets the same deployment work
+        // without granting the POS user administrator permissions.
+        $option = '-DtrustedRootCert='.$certificatePath;
         $encodedOption = base64_encode($option);
         $process = new Process([
             'powershell',

@@ -187,6 +187,7 @@ class PermissionSeeder extends Seeder
             'systems.labels.update',
             'systems.labels.print',
             'systems.qz.sign',
+            'systems.qz.setup',
         ]));
     }
 }
