@@ -12,6 +12,10 @@ class QzTrayConnectionRetryTest extends TestCase
 
         $this->assertStringContainsString('const QZ_CONNECTION_RETRIES = 8;', $composable);
         $this->assertStringContainsString('const QZ_CONNECTION_DELAY_SECONDS = 1;', $composable);
+        $this->assertStringContainsString('const QZ_STARTUP_TIMEOUT_MS = 60000;', $composable);
+        $this->assertStringContainsString('const QZ_STARTUP_RETRY_DELAY_MS = 1500;', $composable);
+        $this->assertStringContainsString('connectionPromise = connectQzTrayDuringStartup()', $composable);
+        $this->assertStringContainsString('while (Date.now() < deadline)', $composable);
         $this->assertStringContainsString('retries: QZ_CONNECTION_RETRIES,', $composable);
         $this->assertStringContainsString('delay: QZ_CONNECTION_DELAY_SECONDS,', $composable);
     }

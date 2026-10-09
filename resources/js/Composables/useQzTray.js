@@ -8,6 +8,8 @@ const TICKET_PRINTER_IDENTIFIERS = ["3nstar", "rpt006", "pos-58", "pos58", "pos 
 // mismo proceso, en vez de pedir al usuario que recargue la pagina.
 const QZ_CONNECTION_RETRIES = 8;
 const QZ_CONNECTION_DELAY_SECONDS = 1;
+const QZ_STARTUP_TIMEOUT_MS = 60000;
+const QZ_STARTUP_RETRY_DELAY_MS = 1500;
 
 let securityConfigured = false;
 let connectionPromise = null;
@@ -148,11 +150,7 @@ export async function connectQzTray() {
   }
 
   if (!connectionPromise) {
-    connectionPromise = qz.websocket.connect({
-      retries: QZ_CONNECTION_RETRIES,
-      delay: QZ_CONNECTION_DELAY_SECONDS,
-      keepAlive: 60,
-    }).then(() => qz)
+    connectionPromise = connectQzTrayDuringStartup()
       .finally(() => {
         connectionPromise = null;
       });
@@ -179,6 +177,38 @@ function wait(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+async function connectQzTrayDuringStartup() {
+  const deadline = Date.now() + QZ_STARTUP_TIMEOUT_MS;
+  let lastError = null;
+
+  while (Date.now() < deadline) {
+    if (qz.websocket.isActive()) {
+      return qz;
+    }
+
+    try {
+      await qz.websocket.connect({
+        retries: QZ_CONNECTION_RETRIES,
+        delay: QZ_CONNECTION_DELAY_SECONDS,
+        keepAlive: 60,
+      });
+
+      return qz;
+    } catch (error) {
+      lastError = error;
+
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        break;
+      }
+
+      await wait(Math.min(QZ_STARTUP_RETRY_DELAY_MS, remainingMs));
+    }
+  }
+
+  throw lastError || new Error("QZ Tray no estuvo disponible durante el arranque.");
 }
 
 function withTimeout(promise, ms, message) {
