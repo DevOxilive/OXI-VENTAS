@@ -16,6 +16,7 @@ use App\Support\SystemPermission;
 use App\Support\TablePagination;
 use App\Support\LocalDateTime;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -46,6 +47,12 @@ class CashRegisterClosureController extends Controller
 
         $branch = $this->resolveBranchForCut($request, $branches);
         $current = $this->buildCurrentCut($branch, null, $request->query('cash_box'));
+
+        if (! $user->hasPermission('reports.cash-closures.view')) {
+            $current = Arr::only($current, [
+                'cash_box_number', 'period_start', 'period_end', 'sales_count', 'refunds_count',
+            ]);
+        }
 
         return Inertia::render('Ventas/CashRegisterClosures', [
             'selectorMode' => false,
@@ -136,6 +143,7 @@ class CashRegisterClosureController extends Controller
             'closures' => $closures,
             'summary' => $this->mapClosureSummary($summary),
             'filters' => $this->mapClosureReportFilters($filters),
+            'ticketTemplate' => $this->cashClosureTicketTemplate(),
             'users' => User::query()
                 ->whereIn('id', CashRegisterClosure::query()
                     ->whereIn('branch_id', $branchIds)
@@ -144,6 +152,16 @@ class CashRegisterClosureController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->values(),
+        ]);
+    }
+
+    public function ticket(Request $request, CashRegisterClosure $closure)
+    {
+        $closure->loadMissing(['branch:id,name,slug', 'user:id,name']);
+        $this->abortIfUserCannotAccessBranch($request, $closure->branch);
+
+        return response()->json([
+            'print_jobs' => $this->buildClosurePrintJobs($closure),
         ]);
     }
 
@@ -222,20 +240,23 @@ class CashRegisterClosureController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $closure->branch);
 
         $data = $request->validate([
-            'counted_cash' => ['required', 'numeric', 'min:0'],
+            'denomination_breakdown' => ['required', 'array'],
+            'denomination_breakdown.*' => ['nullable', 'integer', 'min:0'],
             'cash_left' => ['required', 'numeric', 'min:0'],
             'counted_card' => ['required', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $countedCash = round((float) $data['counted_cash'], 2);
+        $denominations = $this->normalizeDenominations($data['denomination_breakdown']);
+        $countedCash = $this->sumDenominations($denominations);
         $cashLeft = round((float) $data['cash_left'], 2);
         $countedCard = round((float) $data['counted_card'], 2);
 
-        $closure = DB::transaction(function () use ($request, $closure, $countedCash, $cashLeft, $countedCard, $data) {
+        $closure = DB::transaction(function () use ($request, $closure, $denominations, $countedCash, $cashLeft, $countedCard, $data) {
             $closure = $this->lockCurrentVersion($request, $closure);
             $closure->update([
                 'counted_cash' => $countedCash,
+                'denomination_breakdown' => $denominations,
                 'cash_left' => $cashLeft,
                 'counted_card' => $countedCard,
                 'cash_difference' => round($countedCash - (float) $closure->expected_drawer_cash, 2),
@@ -519,6 +540,7 @@ class CashRegisterClosureController extends Controller
             'recharge_total' => (float) $closure->recharge_total,
             'expected_drawer_cash' => (float) $closure->expected_drawer_cash,
             'counted_cash' => (float) $closure->counted_cash,
+            'denomination_breakdown' => $closure->denomination_breakdown ?? [],
             'cash_left' => (float) $closure->cash_left,
             'counted_card' => (float) $closure->counted_card,
             'cash_difference' => (float) $closure->cash_difference,

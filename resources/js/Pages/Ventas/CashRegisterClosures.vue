@@ -27,6 +27,7 @@ import {
   normalizeTicketTemplate,
 } from "@/config/ticketTemplate";
 import { usePermissions } from "@/Composables/usePermissions";
+import { cashDenominations, totalCashDenominations } from "@/config/cashDenominations";
 
 defineOptions({
   layout: AdminLayout,
@@ -50,20 +51,7 @@ const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
 let ticketLogoDataUrlPromise = null;
 const ticketHeaderDataUrlPromises = new Map();
 
-const denominations = [
-  { key: "1000", label: "$1000", value: 1000, group: "Billetes" },
-  { key: "500", label: "$500", value: 500, group: "Billetes" },
-  { key: "200", label: "$200", value: 200, group: "Billetes" },
-  { key: "100", label: "$100", value: 100, group: "Billetes" },
-  { key: "50", label: "$50", value: 50, group: "Billetes" },
-  { key: "20b", label: "$20", value: 20, group: "Billetes" },
-  { key: "20m", label: "$20", value: 20, group: "Monedas" },
-  { key: "10", label: "$10", value: 10, group: "Monedas" },
-  { key: "5", label: "$5", value: 5, group: "Monedas" },
-  { key: "2", label: "$2", value: 2, group: "Monedas" },
-  { key: "1", label: "$1", value: 1, group: "Monedas" },
-  { key: "0.5", label: "$0.50", value: 0.5, group: "Monedas" },
-];
+const denominations = cashDenominations;
 
 const form = useForm({
   branch_id: props.branch?.id ?? "",
@@ -85,13 +73,19 @@ const resolvedTicketTemplate = computed(() =>
 
 const billDenominations = computed(() => denominations.filter((item) => item.group === "Billetes"));
 const coinDenominations = computed(() => denominations.filter((item) => item.group === "Monedas"));
-const countedCashTotal = computed(() =>
-  denominations.reduce((sum, item) => {
-    return sum + Number(form.denomination_breakdown[item.key] || 0) * item.value;
-  }, 0)
-);
+const denominationGroups = computed(() => [
+  { label: "Billetes", items: billDenominations.value },
+  { label: "Monedas", items: coinDenominations.value },
+]);
+const countedCashTotal = computed(() => totalCashDenominations(form.denomination_breakdown));
 const cashToWithdraw = computed(() => Math.max(0, countedCashTotal.value - Number(form.cash_left || 0)));
+const cashDifference = computed(() => countedCashTotal.value - Number(props.current?.expected_cash || 0));
+const cardDifference = computed(() => Number(form.counted_card || 0) - Number(props.current?.card_total || 0));
+const cashDifferenceLabel = computed(() => cashDifference.value > 0.009 ? "Sobrante" : cashDifference.value < -0.009 ? "Faltante" : "Cuadrado");
+const denominationError = computed(() => Object.entries(form.errors)
+  .find(([field]) => field === "denomination_breakdown" || field.startsWith("denomination_breakdown."))?.[1] || "");
 const canCreateClosure = computed(() => can("sales.cash-closures.create"));
+const canViewClosureOutcome = computed(() => can("reports.cash-closures.view"));
 const summaryCards = computed(() => [
   { label: "Caja", value: `#${props.current?.cash_box_number || "1"}`, tone: "neutral" },
   { label: "Ventas pendientes", value: props.current?.sales_count ?? 0, tone: "neutral" },
@@ -482,147 +476,113 @@ onMounted(() => {
     <GlobalModal
       v-if="showClosureModal"
       title="Registrar corte de caja"
-      :subtitle="`Caja #${form.cash_box_number}. Captura el dinero físico y los pagos con tarjeta registrados en terminal.`"
+      :subtitle="`Caja #${form.cash_box_number} · ${branch?.name || ''}`"
       :processing="form.processing"
       :total-errors="Object.keys(form.errors).length"
       save-button-text="Guardar e imprimir"
       size="2xl"
       :columns="1"
+      height="auto"
       @close="closeClosureModal"
       @save="saveClosure"
     >
-      <div class="grid w-full gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div class="min-w-0 space-y-4">
-          <section class="overflow-hidden rounded-2xl border border-secondary bg-background">
-            <div class="flex flex-col gap-1 border-b border-secondary px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h3 class="text-lg font-black text-text">Conteo de efectivo</h3>
-                <p class="text-sm text-text opacity-60">Captura las piezas por denominacion.</p>
-              </div>
-              <div class="rounded-xl bg-primary px-4 py-2 text-right text-white">
-                <p class="text-[11px] font-black uppercase tracking-[0.14em] text-white opacity-80">Total contado</p>
-                <p class="text-2xl font-black">{{ money(countedCashTotal) }}</p>
-              </div>
+      <div class="grid w-full gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+        <section class="min-w-0 rounded-xl border border-secondary bg-background p-4">
+          <div class="flex items-baseline justify-between gap-3">
+            <h3 class="text-base font-black text-text">Denominaciones</h3>
+            <p class="whitespace-nowrap text-lg font-black text-primary">{{ money(countedCashTotal) }}</p>
+          </div>
+
+          <div class="mt-4 grid gap-5 sm:grid-cols-2">
+            <div v-for="group in denominationGroups" :key="group.label">
+              <p class="mb-2 text-xs font-black uppercase tracking-wide text-text opacity-60">{{ group.label }}</p>
+              <label
+                v-for="item in group.items"
+                :key="item.key"
+                class="grid grid-cols-[48px_minmax(0,1fr)_72px] items-center gap-2 border-b border-secondary py-1.5 last:border-0"
+              >
+                <span class="text-xs font-bold text-text">{{ item.label }}</span>
+                <input
+                  v-model="form.denomination_breakdown[item.key]"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="numeric"
+                  class="h-9 min-w-0 rounded-lg border border-secondary bg-background px-2 text-center text-sm font-bold text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                  placeholder="0"
+                />
+                <span class="text-right text-xs font-bold text-text">{{ money(denominationTotal(item)) }}</span>
+              </label>
             </div>
+          </div>
+          <p v-if="denominationError" class="mt-3 text-xs font-bold text-primary">{{ denominationError }}</p>
+        </section>
 
-            <div class="grid gap-4 p-4 lg:grid-cols-2">
-              <div class="rounded-2xl border border-secondary bg-secondary p-4">
-                <p class="mb-3 text-sm font-black text-text">Billetes</p>
-                <div class="space-y-2">
-                  <label
-                    v-for="item in billDenominations"
-                    :key="item.key"
-                    class="grid grid-cols-[76px_minmax(0,1fr)_92px] items-center gap-2 rounded-xl border border-secondary bg-background px-3 py-2"
-                  >
-                    <span class="text-sm font-black text-text">{{ item.label }}</span>
-                    <input
-                      v-model="form.denomination_breakdown[item.key]"
-                      type="number"
-                      min="0"
-                      inputmode="numeric"
-                      class="h-10 min-w-0 rounded-lg border border-secondary bg-background px-3 text-center text-base font-black text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
-                      placeholder="0"
-                    />
-                    <span class="text-right text-sm font-black text-text opacity-75">
-                      {{ money(denominationTotal(item)) }}
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              <div class="rounded-2xl border border-secondary bg-secondary p-4">
-                <p class="mb-3 text-sm font-black text-text">Monedas</p>
-                <div class="space-y-2">
-                  <label
-                    v-for="item in coinDenominations"
-                    :key="item.key"
-                    class="grid grid-cols-[76px_minmax(0,1fr)_92px] items-center gap-2 rounded-xl border border-secondary bg-background px-3 py-2"
-                  >
-                    <span class="text-sm font-black text-text">{{ item.label }}</span>
-                    <input
-                      v-model="form.denomination_breakdown[item.key]"
-                      type="number"
-                      min="0"
-                      inputmode="decimal"
-                      class="h-10 min-w-0 rounded-lg border border-secondary bg-background px-3 text-center text-base font-black text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
-                      placeholder="0"
-                    />
-                    <span class="text-right text-sm font-black text-text opacity-75">
-                      {{ money(denominationTotal(item)) }}
-                    </span>
-                  </label>
-                </div>
-              </div>
+        <section class="min-w-0 rounded-xl border border-secondary bg-background p-4">
+          <h3 class="text-base font-black text-text">{{ canViewClosureOutcome ? 'Resumen del corte' : 'Captura del corte' }}</h3>
+          <dl v-if="canViewClosureOutcome" class="mt-3 divide-y divide-secondary text-sm text-text">
+            <div class="flex justify-between gap-3 py-2">
+              <dt class="opacity-70">Efectivo esperado</dt>
+              <dd class="font-black">{{ money(current?.expected_cash) }}</dd>
             </div>
-          </section>
+            <div class="flex justify-between gap-3 py-2">
+              <dt class="opacity-70">Tarjeta esperada</dt>
+              <dd class="font-black">{{ money(current?.card_total) }}</dd>
+            </div>
+          </dl>
 
-          <section class="grid gap-4 md:grid-cols-2">
+          <div class="mt-4 grid gap-3 sm:grid-cols-2">
             <InputField
               v-model="form.counted_card"
               label="Total en tarjeta"
               field="counted_card"
               type="number"
+              min="0"
+              step="0.01"
               prefix="$"
               :error="form.errors.counted_card"
             />
-
             <InputField
               v-model="form.cash_left"
               label="Se deja en caja"
               field="cash_left"
               type="number"
+              min="0"
+              step="0.01"
               prefix="$"
               :error="form.errors.cash_left"
             />
-          </section>
-
-          <TextareaField
-            v-model="form.notes"
-            label="Observaciones"
-            field="notes"
-            :rows="4"
-            placeholder="Observaciones del corte."
-            :error="form.errors.notes"
-          />
-        </div>
-
-        <aside class="space-y-4">
-          <div
-            class="rounded-2xl border border-secondary bg-secondary p-4"
-          >
-            <p
-              class="text-sm font-black text-text"
-            >
-              Resumen
-            </p>
-            <p class="mt-1 text-xs font-semibold text-text opacity-70">
-              Revisa los importes capturados antes de guardar.
-            </p>
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
-            <MetricCard label="Caja" :value="`#${form.cash_box_number}`" size="sm" />
-            <MetricCard label="Efectivo contado" :value="money(countedCashTotal)" tone="dark" size="sm" />
-            <MetricCard label="Tarjeta capturada" :value="money(form.counted_card)" size="sm" />
-            <MetricCard label="Se deja en caja" :value="money(form.cash_left)" size="sm" />
+          <div class="mt-4 flex justify-between gap-3 border-t border-secondary pt-3 text-sm text-text">
+            <span class="opacity-70">Retiro de efectivo</span>
+            <strong>{{ money(cashToWithdraw) }}</strong>
           </div>
 
-          <div class="rounded-2xl border border-secondary bg-background p-4">
-            <p class="text-[11px] font-black uppercase tracking-[0.14em] text-text opacity-50">
-              Movimiento de efectivo
-            </p>
-            <div class="mt-3 space-y-2 text-sm font-semibold text-text">
-              <div class="flex justify-between gap-3">
-                <span class="opacity-60">Se deja para cambio</span>
-                <span>{{ money(form.cash_left) }}</span>
-              </div>
-              <div class="flex justify-between gap-3">
-                <span class="opacity-60">Retiro</span>
-                <span>{{ money(cashToWithdraw) }}</span>
-              </div>
+          <div v-if="canViewClosureOutcome" class="mt-4 border-t border-secondary pt-3">
+            <h4 class="text-sm font-black text-text">Resultado</h4>
+            <div class="mt-2 flex justify-between gap-3 text-sm font-bold" :class="Math.abs(cashDifference) < 0.01 ? 'text-accent' : 'text-primary'">
+              <span>Efectivo · {{ cashDifferenceLabel }}</span>
+              <span>{{ money(Math.abs(cashDifference)) }}</span>
+            </div>
+            <div class="mt-2 flex justify-between gap-3 text-sm font-bold" :class="Math.abs(cardDifference) < 0.01 ? 'text-accent' : 'text-primary'">
+              <span>Diferencia en tarjeta</span>
+              <span>{{ money(cardDifference) }}</span>
             </div>
           </div>
-        </aside>
+
+          <div class="mt-4 border-t border-secondary pt-3">
+            <TextareaField
+              v-model="form.notes"
+              label="Observaciones"
+              field="notes"
+              :rows="2"
+              :max-height="72"
+              placeholder="Opcional"
+              :error="form.errors.notes"
+            />
+          </div>
+        </section>
       </div>
     </GlobalModal>
   </PageLayout>
