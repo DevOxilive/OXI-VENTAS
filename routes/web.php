@@ -482,6 +482,10 @@ Route::middleware([
                 ->middleware($cashClosureReportsAccess)
                 ->name('cash-closures.reports');
 
+            Route::get('/cortes/{closure}/ticket', [CashRegisterClosureController::class, 'ticket'])
+                ->middleware($cashClosureReportsAccess)
+                ->name('cash-closures.ticket');
+
             Route::get('/listas-de-compra', [PurchaseReportController::class, 'salesPurchaseLists'])
                 ->middleware($purchaseReportsAccess)
                 ->name('purchase-reports.index');
