@@ -28,7 +28,7 @@ class IndependentProductPricingTest extends TestCase
         Event::fake();
         config(['broadcasting.default' => 'null']);
         $role = Role::firstOrCreate(['name' => 'Administrador']);
-        foreach (['inventory.products.create', 'inventory.products.update', 'inventory.products.view'] as $name) {
+        foreach (['inventory.products.create', 'inventory.products.update', 'inventory.products.view', 'inventory.products.manage-pricing'] as $name) {
             $role->permissions()->syncWithoutDetaching([Permission::firstOrCreate(['name' => $name])->id]);
         }
         $this->branch = Branch::create(['name' => 'Pricing', 'slug' => 'pricing', 'active' => true]);
@@ -133,6 +133,29 @@ class IndependentProductPricingTest extends TestCase
         $this->assertEquals(30, $product->box_margin_percentage);
         $this->assertEquals(18, $product->sale_price_per_piece);
         $this->assertEquals(260, $product->sale_price_per_box);
+    }
+
+    public function test_inventory_user_with_pricing_permission_can_set_manual_prices(): void
+    {
+        $product = $this->createProduct();
+        $role = Role::firstOrCreate(['name' => 'Inventario']);
+        foreach (['inventory.products.update', 'inventory.products.manage-pricing'] as $name) {
+            $role->permissions()->syncWithoutDetaching([Permission::firstOrCreate(['name' => $name])->id]);
+        }
+        $user = User::factory()->create(['role_id' => $role->id, 'is_active' => true]);
+        $user->branches()->attach($this->branch);
+
+        $this->actingAs($user)->put(route('inventory.branches.products.update', [$this->branch->slug, $product->id]),
+            $this->payload([
+                'sale_price_per_piece' => 25,
+                'box_pricing_mode' => 'manual',
+                'sale_price_per_box' => 280,
+                'record_version' => $product->updated_at->toJSON(),
+            ]))->assertSessionHasNoErrors();
+
+        $product->refresh();
+        $this->assertEquals(25, $product->sale_price_per_piece);
+        $this->assertEquals(280, $product->sale_price_per_box);
     }
 
     private function purchase(Product $product, string $presentation, float $cost): void

@@ -53,10 +53,7 @@ class ProductController extends Controller
 
     private function canManagePricing(Request $request): bool
     {
-        return in_array($request->user()?->role?->name, [
-            'Administrador',
-            'Super Administrador',
-        ], true);
+        return $request->user()?->hasPermission('inventory.products.manage-pricing') ?? false;
     }
 
     private function resolvePresentationPricing(array &$data, bool $canManagePricing, ?Product $currentProduct = null): void

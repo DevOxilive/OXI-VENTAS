@@ -282,6 +282,7 @@ const permissionLabels = {
     "sales.cash-closures.create": "Crear cortes de caja",
     "sales.cash-closures.update": "Editar cortes de caja",
     "sales.cash-closures.delete": "Eliminar cortes de caja",
+    "sales.cash-closures.view-expected": "Ver el monto esperado durante el corte de caja",
     "reports.audits.view": "Ver reportes de auditoría",
     "reports.audits.export.excel": "Exportar reportes de auditoria en Excel",
     "reports.audits.export.pdf": "Exportar reportes de auditoria en PDF",
@@ -300,6 +301,7 @@ const permissionLabels = {
     "inventory.products.create": "Crear productos",
     "inventory.products.update": "Editar productos",
     "inventory.products.delete": "Eliminar productos",
+    "inventory.products.manage-pricing": "Administrar precios de venta y márgenes",
 
     "inventory.branches.view": "Ver historial de movimientos",
     "inventory.branches.stock-in": "Ingresar lotes",
