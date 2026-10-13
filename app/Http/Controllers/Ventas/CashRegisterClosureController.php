@@ -48,7 +48,7 @@ class CashRegisterClosureController extends Controller
         $branch = $this->resolveBranchForCut($request, $branches);
         $current = $this->buildCurrentCut($branch, null, $request->query('cash_box'));
 
-        if (! $user->hasPermission('reports.cash-closures.view')) {
+        if (! $user->hasPermission('sales.cash-closures.view-expected')) {
             $current = Arr::only($current, [
                 'cash_box_number', 'period_start', 'period_end', 'sales_count', 'refunds_count',
             ]);

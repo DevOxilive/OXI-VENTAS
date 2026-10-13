@@ -64,7 +64,7 @@ class RoleSeeder extends Seeder
         $this->collectRolePermissions(
             $rolePermissions,
             $roles['Sistemas']->id,
-            $this->permissionsStartingWith($permissionIdsByName, ['users.', 'systems.']),
+            [...$this->permissionsStartingWith($permissionIdsByName, ['users.', 'systems.']), 'inventory.products.manage-pricing'],
             $permissionIdsByName
         );
 
@@ -131,6 +131,7 @@ class RoleSeeder extends Seeder
                 'inventory.products.create',
                 'inventory.products.update',
                 'inventory.products.delete',
+                'inventory.products.manage-pricing',
                 'inventory.branches.view',
                 'inventory.branches.stock-in',
                 'inventory.branches.stock-out',

@@ -85,7 +85,7 @@ const cashDifferenceLabel = computed(() => cashDifference.value > 0.009 ? "Sobra
 const denominationError = computed(() => Object.entries(form.errors)
   .find(([field]) => field === "denomination_breakdown" || field.startsWith("denomination_breakdown."))?.[1] || "");
 const canCreateClosure = computed(() => can("sales.cash-closures.create"));
-const canViewClosureOutcome = computed(() => can("reports.cash-closures.view"));
+const canViewClosureOutcome = computed(() => can("sales.cash-closures.view-expected"));
 const summaryCards = computed(() => [
   { label: "Caja", value: `#${props.current?.cash_box_number || "1"}`, tone: "neutral" },
   { label: "Ventas pendientes", value: props.current?.sales_count ?? 0, tone: "neutral" },
