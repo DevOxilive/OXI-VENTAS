@@ -600,7 +600,7 @@ function buildRowsForBlock(template, printJob, block) {
       }
       break;
     case "payment_method":
-      rows.push({ type: "pair", label: "Pago", value: printJob.payment_method, block_key: block.key, position_percent: block.position_percent, size_percent: block.size_percent });
+      rows.push({ type: "pair", label: printJob.type === "sale_return" ? "Aplicacion" : "Pago", value: printJob.payment_method, block_key: block.key, position_percent: block.position_percent, size_percent: block.size_percent });
       break;
     case "items":
       if (printJob.type === "employee_credit_payment") {
@@ -680,6 +680,17 @@ function buildRowsForBlock(template, printJob, block) {
         break;
       }
 
+      if (printJob.type === "sale_return") {
+        rows.push({
+          type: "text",
+          text: `Ticket original: ${normalizeText(printJob.original_sale_folio || "Sin folio")}`,
+          block_key: block.key,
+          position_percent: block.position_percent,
+          size_percent: Math.max(76, block.size_percent - 8),
+          bold: true,
+        });
+      }
+
       (printJob.items || []).forEach((item) => {
         rows.push({
           type: "text",
@@ -720,6 +731,18 @@ function buildRowsForBlock(template, printJob, block) {
         if (normalizeText(printJob.notes)) {
           rows.push({ type: "text", text: `Observaciones: ${printJob.notes}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(76, block.size_percent - 12) });
         }
+        break;
+      }
+
+      if (printJob.type === "sale_return") {
+        rows.push({ type: "columns", left: "IMPORTE DEVUELTO:", right: `$${Number(printJob.total || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: block.size_percent, bold: true });
+        if (printJob.account_balance_before !== null && printJob.account_balance_before !== undefined) {
+          rows.push({ type: "columns", left: "Adeudo anterior:", right: `$${Number(printJob.account_balance_before || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(78, block.size_percent - 12), bold: true });
+          rows.push({ type: "columns", left: "Adeudo nuevo:", right: `$${Number(printJob.account_balance_after || 0).toFixed(2)}`, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(78, block.size_percent - 12), bold: true });
+        }
+        wrapText(`Motivo: ${normalizeText(printJob.reason || "Sin motivo")}`, Math.max(24, width - 6)).forEach((line) => {
+          rows.push({ type: "text", text: line, block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(72, block.size_percent - 14) });
+        });
         break;
       }
 
@@ -764,6 +787,7 @@ function buildCreditStatementItemRows(template, printJob, block) {
   const rows = [];
   const width = lineWidthForPaper(template.paper_width);
   const groups = Array.isArray(printJob.credit_groups) ? printJob.credit_groups : [];
+  const returns = Array.isArray(printJob.credit_returns) ? printJob.credit_returns : [];
 
   groups.forEach((group) => {
     const groupLabel = normalizeText(group.label || group.date_label || group.date || "Sin fecha");
@@ -830,6 +854,34 @@ function buildCreditStatementItemRows(template, printJob, block) {
 
   if (rows.at(-1)?.type === "divider") {
     rows.pop();
+  }
+
+  if (returns.length) {
+    if (rows.length && template.show_dividers) {
+      rows.push({ type: "divider", text: "-".repeat(width), block_key: block.key, position_percent: block.position_percent, size_percent: Math.max(70, block.size_percent - 14) });
+    }
+    rows.push({ type: "text", text: "DEVOLUCIONES APLICADAS", block_key: block.key, position_percent: 50, size_percent: Math.max(80, block.size_percent - 4), bold: true });
+
+    returns.forEach((returnedSale) => {
+      rows.push({
+        type: "columns",
+        left: `${returnedSale.folio || "Devolucion"} / ${returnedSale.sale_folio || "Sin ticket"}`,
+        right: `-$${Number(returnedSale.amount || 0).toFixed(2)}`,
+        block_key: block.key,
+        position_percent: block.position_percent,
+        size_percent: Math.max(76, block.size_percent - 8),
+        bold: true,
+      });
+      (returnedSale.items || []).forEach((item) => {
+        rows.push({
+          type: "text",
+          text: `${normalizeText(item.quantity_label || item.quantity)} ${normalizeText(item.product || "Producto")}`,
+          block_key: block.key,
+          position_percent: block.position_percent,
+          size_percent: Math.max(70, block.size_percent - 12),
+        });
+      });
+    });
   }
 
   return rows;

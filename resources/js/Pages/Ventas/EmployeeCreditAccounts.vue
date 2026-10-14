@@ -378,6 +378,17 @@ function buildAccountPrintJob(account) {
       })),
     })),
   }))
+  const creditReturns = (account.returns || []).map((returnedSale) => ({
+    folio: returnedSale.folio,
+    sale_folio: returnedSale.sale_folio,
+    date: returnedSale.date,
+    amount: Number(returnedSale.amount || 0),
+    items: (returnedSale.items || []).map((item) => ({
+      product: item.product || 'Producto',
+      quantity: Number(item.quantity || 0),
+      quantity_label: quantityLabel(item),
+    })),
+  }))
 
   groupedCharges.value.forEach((group) => {
     items.push({
@@ -411,6 +422,7 @@ function buildAccountPrintJob(account) {
     user_name: page.props.auth?.user?.name || '',
     payment_method: 'Estado de cuenta',
     credit_groups: creditGroups,
+    credit_returns: creditReturns,
     items,
     cash_received: 0,
     change_due: 0,
@@ -715,12 +727,14 @@ onBeforeUnmount(() => {
           <h2 class="mb-2 text-sm font-black uppercase tracking-[0.18em] text-text opacity-60">Compras pendientes</h2>
 
           <div class="overflow-x-auto rounded-xl border border-secondary">
-            <table class="w-full min-w-[820px] text-sm">
+            <table class="w-full min-w-[980px] text-sm">
               <thead class="bg-secondary text-left text-text">
                 <tr>
                   <th class="px-3 py-2">Código</th>
                   <th class="px-3 py-2">Producto</th>
                   <th class="px-3 py-2">Piezas</th>
+                  <th class="px-3 py-2">Devuelto</th>
+                  <th class="px-3 py-2">Conserva</th>
                   <th class="px-3 py-2">Precio</th>
                   <th class="px-3 py-2">Importe</th>
                 </tr>
@@ -729,14 +743,14 @@ onBeforeUnmount(() => {
               <tbody class="divide-y divide-secondary bg-background">
                 <template v-for="group in groupedCharges" :key="group.key">
                   <tr class="bg-secondary/80">
-                    <td colspan="5" class="px-3 py-2 text-center font-black text-text">
+                    <td colspan="7" class="px-3 py-2 text-center font-black text-text">
                       Fecha de venta: {{ saleDateLabel(group) }}
                     </td>
                   </tr>
 
                   <template v-for="charge in group.charges" :key="charge.folio || charge.date">
                     <tr class="bg-background">
-                      <td colspan="3" class="px-3 py-2 font-black text-text">
+                      <td colspan="5" class="px-3 py-2 font-black text-text">
                         Número de ticket: {{ charge.folio || 'Sin folio' }}
                       </td>
                       <td colspan="2" class="px-3 py-2 text-right font-black text-text">
@@ -748,6 +762,8 @@ onBeforeUnmount(() => {
                       <td class="px-3 py-2 font-semibold text-text opacity-75">{{ item.code || '-' }}</td>
                       <td class="px-3 py-2 font-semibold text-text">{{ item.product }}</td>
                       <td class="px-3 py-2 text-text opacity-80">{{ quantityLabel(item) }}</td>
+                      <td class="px-3 py-2 font-semibold text-primary">{{ quantityLabel({ ...item, quantity: item.returned_quantity }) }}</td>
+                      <td class="px-3 py-2 text-text opacity-80">{{ quantityLabel({ ...item, quantity: item.remaining_quantity }) }}</td>
                       <td class="px-3 py-2 text-text opacity-80">{{ money(item.unit_price) }}</td>
                       <td class="px-3 py-2 text-text opacity-80">{{ money(item.subtotal) }}</td>
                     </tr>
@@ -755,6 +771,29 @@ onBeforeUnmount(() => {
                 </template>
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section v-if="selected.returns?.length">
+          <h2 class="mb-2 text-sm font-black uppercase tracking-[0.18em] text-primary">Devoluciones aplicadas</h2>
+          <div class="space-y-3">
+            <article v-for="returnedSale in selected.returns" :key="returnedSale.id" class="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm text-text">
+              <div class="flex flex-wrap justify-between gap-2 font-black">
+                <span>{{ returnedSale.folio }} · Ticket {{ returnedSale.sale_folio }}</span>
+                <span>-{{ money(returnedSale.amount) }}</span>
+              </div>
+              <p class="mt-1 text-xs opacity-65">{{ returnedSale.date }}</p>
+              <div class="mt-3 space-y-1">
+                <p v-for="(item, index) in returnedSale.items" :key="`${returnedSale.id}-${index}`" class="flex justify-between gap-3">
+                  <span>{{ quantityLabel(item) }} · {{ item.product }}</span>
+                  <strong>-{{ money(item.subtotal) }}</strong>
+                </p>
+              </div>
+              <div v-if="returnedSale.account_balance_before !== null" class="mt-3 flex flex-wrap justify-between gap-3 border-t border-primary/20 pt-2 text-xs">
+                <span>Adeudo anterior: <strong>{{ money(returnedSale.account_balance_before) }}</strong></span>
+                <span>Adeudo nuevo: <strong>{{ money(returnedSale.account_balance_after) }}</strong></span>
+              </div>
+            </article>
           </div>
         </section>
 

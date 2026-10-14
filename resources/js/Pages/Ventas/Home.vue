@@ -1708,7 +1708,7 @@ function closeChangeModal() {
         <section class="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-secondary bg-background p-3 shadow-sm lg:h-full md:p-4">
           <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end">
             <div class="min-w-0 flex-1">
-              <div class="relative">
+              <div class="pos-search relative">
                 <InputField
                   ref="searchInput"
                   label="Buscar o escanear"
@@ -1727,7 +1727,7 @@ function closeChangeModal() {
                 >
                   <div
                     v-if="searchLoading && !searchSuggestions.length"
-                    class="px-4 py-3 text-sm font-semibold text-text opacity-70"
+                    class="px-4 py-3 text-base font-semibold text-text opacity-70"
                   >
                     Buscando productos...
                   </div>
@@ -1741,11 +1741,11 @@ function closeChangeModal() {
                     @click="selectSuggestion(product)"
                   >
                     <div class="min-w-0">
-                      <p class="truncate text-sm font-semibold">
+                      <p class="truncate text-base font-semibold">
                         {{ product.name }}
                       </p>
                       <p
-                        class="truncate text-xs"
+                        class="truncate text-sm"
                         :class="index === highlightedSuggestionIndex ? 'text-white opacity-80' : 'text-text opacity-70'"
                       >
                         {{ product.barcode || "Sin codigo" }}
@@ -1753,7 +1753,7 @@ function closeChangeModal() {
                     </div>
 
                     <span
-                      class="shrink-0 text-sm font-bold"
+                      class="shrink-0 text-base font-bold"
                       :class="index === highlightedSuggestionIndex ? 'text-white' : 'text-text'"
                     >
                       {{ formatMoney(product.price) }}
@@ -1765,7 +1765,7 @@ function closeChangeModal() {
 
             <button
               type="button"
-              class="h-[46px] shrink-0 rounded-lg border border-secondary bg-background px-4 text-sm font-semibold text-text transition hover:border-primary hover:bg-secondary sm:mb-5"
+              class="h-14 shrink-0 rounded-lg border border-secondary bg-background px-5 text-base font-semibold text-text transition hover:border-primary hover:bg-secondary sm:mb-5"
               @click="clearCart"
             >
               Limpiar
@@ -1773,7 +1773,7 @@ function closeChangeModal() {
           </div>
 
           <div class="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div class="hidden grid-cols-[minmax(0,1.4fr)_120px_120px_140px_88px] gap-3 border-b border-secondary px-1 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-text opacity-70 md:grid">
+            <div class="hidden grid-cols-[minmax(0,1.4fr)_120px_120px_140px_88px] gap-3 border-b border-secondary px-1 py-3 text-xs font-bold uppercase tracking-[0.14em] text-text opacity-70 md:grid">
               <span>Producto</span>
               <span>Precio</span>
               <span>Cantidad</span>
@@ -1805,24 +1805,24 @@ function closeChangeModal() {
               >
                 <div>
                   <span class="material-symbols-outlined text-4xl text-text opacity-35">shopping_cart</span>
-                  <p class="mt-2 text-sm font-semibold text-text">Todavia no hay productos capturados</p>
-                  <p class="mt-1 text-sm text-text opacity-70">Escanea o busca uno para empezar.</p>
+                  <p class="mt-3 text-base font-semibold text-text">Todavia no hay productos capturados</p>
+                  <p class="mt-1 text-base text-text opacity-70">Escanea o busca uno para empezar.</p>
                 </div>
               </div>
             </div>
 
             <div class="mt-3 flex shrink-0 items-center justify-between gap-3 rounded-xl border border-primary/30 bg-secondary px-4 py-3">
               <div class="min-w-0">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-text opacity-60">Total de la venta</p>
-                <p class="mt-1 text-2xl font-black leading-none text-text">{{ formatMoney(cartTotal) }}</p>
+                <p class="text-xs font-bold uppercase tracking-[0.14em] text-text opacity-60">Total de la venta</p>
+                <p class="mt-1 text-3xl font-black leading-none text-text">{{ formatMoney(cartTotal) }}</p>
               </div>
               <button
                 type="button"
-                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-primary bg-primary px-5 py-3 text-sm font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-primary bg-primary px-6 py-3.5 text-base font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="saleSubmitting || !cart.length"
                 @click="openPaymentModal"
               >
-                <span class="material-symbols-outlined text-[20px]">payments</span>
+                <span class="material-symbols-outlined text-[22px]">payments</span>
                 Cobrar
               </button>
             </div>
@@ -2141,3 +2141,22 @@ function closeChangeModal() {
     </template>
   </PageLayout>
 </template>
+
+<style scoped>
+.pos-search :deep(label) {
+  font-size: 1rem;
+}
+
+.pos-search :deep(input) {
+  min-height: 3.5rem;
+  font-size: 1rem;
+}
+
+.pos-search :deep(.material-symbols-outlined) {
+  font-size: 1.5rem;
+}
+
+.pos-search :deep(.text-\[11px\]) {
+  font-size: 0.75rem;
+}
+</style>

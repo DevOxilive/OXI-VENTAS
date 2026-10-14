@@ -445,6 +445,10 @@ Route::middleware([
                 ->middleware(['permission:sales.update', 'idempotent'])
                 ->name('cancel');
 
+            Route::get('/{sale}/devoluciones/{cancellation}/ticket', [SalesController::class, 'returnTicket'])
+                ->middleware($salesAccess)
+                ->name('returns.ticket');
+
             Route::get('/estados-cuenta', [EmployeeCreditAccountController::class, 'index'])
                 ->middleware('permission:sales.employee-credit.view')
                 ->name('employee-credit.index');

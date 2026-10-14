@@ -67,7 +67,10 @@ class SaleCancellationService
                 $sale->update(['status' => 'cancelled', 'cancelled_at' => $cancellation->cancelled_at]);
             }
 
-            $this->adjustEmployeeCreditForReturn($sale, $amount);
+            $financialEffect = $this->adjustEmployeeCreditForReturn($sale, $amount);
+            $cancellation->update($financialEffect ?? [
+                'application_type' => $this->isCashPayment($sale) ? 'cash_refund' : 'payment_refund',
+            ]);
 
             return $cancellation->fresh(['sale', 'details.product', 'details.returnStockMovement.batches.productBatch', 'cancelledBy:id,name']);
         }, 3);
@@ -194,10 +197,17 @@ class SaleCancellationService
         }
     }
 
-    private function adjustEmployeeCreditForReturn(Sale $sale, float $amount): void
+    private function adjustEmployeeCreditForReturn(Sale $sale, float $amount): ?array
     {
         $charge = EmployeeCreditCharge::query()->where('sale_id', $sale->id)->lockForUpdate()->first();
-        if (! $charge) return;
+        if (! $charge) {
+            return null;
+        }
+
+        $account = $charge->account()->lockForUpdate()->firstOrFail();
+        $balanceBefore = max(0, (float) $account->charges()
+            ->where('status', 'open')
+            ->sum('outstanding_amount') - (float) $account->credit_balance);
 
         $outstanding = (float) $charge->outstanding_amount;
         $applied = min($outstanding, $amount);
@@ -205,7 +215,21 @@ class SaleCancellationService
         $charge->update(['outstanding_amount' => $remaining, 'status' => $remaining <= 0 ? 'paid' : 'open']);
         $creditBalance = round($amount - $applied, 2);
         if ($creditBalance > 0) {
-            $charge->account()->lockForUpdate()->first()->increment('credit_balance', $creditBalance);
+            $account->increment('credit_balance', $creditBalance);
         }
+
+        return [
+            'application_type' => 'account_adjustment',
+            'account_balance_before' => round($balanceBefore, 2),
+            'account_balance_after' => round(max(0, $balanceBefore - $amount), 2),
+        ];
+    }
+
+    private function isCashPayment(Sale $sale): bool
+    {
+        $sale->loadMissing('paymentMethod:id,name');
+        $name = mb_strtolower((string) $sale->paymentMethod?->name);
+
+        return str_contains($name, 'efectivo') || str_contains($name, 'cash');
     }
 }

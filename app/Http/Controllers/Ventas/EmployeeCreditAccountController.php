@@ -11,6 +11,7 @@ use App\Models\EmployeeCreditAccount;
 use App\Models\EmployeeCreditCharge;
 use App\Models\EmployeeCreditPayment;
 use App\Models\PaymentMethod;
+use App\Models\SaleCancellation;
 use App\Models\TicketTemplate;
 use App\Support\LocalDateTime;
 use Illuminate\Http\Request;
@@ -102,11 +103,24 @@ class EmployeeCreditAccountController extends Controller
                     'sale.details.barcode:id,product_id,code',
                     'sale.details.product:id,name',
                     'sale.details.product.barcodes:id,product_id,code',
+                    'sale.details.cancellationDetails:id,sale_detail_id,quantity',
                     'sale.branch:id,name',
                 ])
                 ->latest('id'),
             'payments' => fn ($query) => $query->with('paymentMethod:id,name')->latest('paid_at'),
         ]);
+
+        $returns = SaleCancellation::query()
+            ->whereHas('sale.creditCharge', fn ($query) => $query
+                ->where('employee_credit_account_id', $account->id))
+            ->with([
+                'sale:id,folio,branch_id',
+                'sale.branch:id,name',
+                'details.product:id,name,inventory_unit,unit',
+                'details.barcode:id,code',
+            ])
+            ->latest('cancelled_at')
+            ->get();
 
         return response()->json(['account' => [
             ...$this->mapAccount($account),
@@ -124,6 +138,8 @@ class EmployeeCreditAccountController extends Controller
                     'code' => $detail->barcode?->code ?? $detail->product?->barcodes?->first()?->code ?? '-',
                     'product' => $detail->product?->name,
                     'quantity' => (float) $detail->quantity,
+                    'returned_quantity' => (float) $detail->cancellationDetails->sum('quantity'),
+                    'remaining_quantity' => max(0, (float) $detail->quantity - (float) $detail->cancellationDetails->sum('quantity')),
                     'sale_unit' => $detail->sale_unit,
                     'unit_price' => (float) $detail->unit_price,
                     'subtotal' => (float) $detail->subtotal,
@@ -134,6 +150,24 @@ class EmployeeCreditAccountController extends Controller
                 'date' => LocalDateTime::format($payment->paid_at, 'd/m/Y H:i'),
                 'method' => $payment->paymentMethod?->name,
                 'amount' => (float) $payment->amount,
+            ])->values(),
+            'returns' => $returns->map(fn (SaleCancellation $return) => [
+                'id' => (int) $return->id,
+                'folio' => 'DEV-'.str_pad((string) $return->id, 6, '0', STR_PAD_LEFT),
+                'sale_folio' => $return->sale?->folio,
+                'date' => LocalDateTime::format($return->cancelled_at, 'd/m/Y H:i'),
+                'date_key' => LocalDateTime::format($return->cancelled_at, 'Y-m-d'),
+                'amount' => (float) $return->amount,
+                'account_balance_before' => $return->account_balance_before !== null ? (float) $return->account_balance_before : null,
+                'account_balance_after' => $return->account_balance_after !== null ? (float) $return->account_balance_after : null,
+                'items' => $return->details->map(fn ($detail) => [
+                    'code' => $detail->barcode?->code ?? '-',
+                    'product' => $detail->product?->name ?? 'Producto',
+                    'quantity' => (float) $detail->quantity,
+                    'sale_unit' => $detail->sale_unit,
+                    'unit_price' => (float) $detail->unit_price,
+                    'subtotal' => (float) $detail->subtotal,
+                ])->values(),
             ])->values(),
         ]]);
     }
