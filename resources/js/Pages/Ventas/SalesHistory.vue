@@ -68,7 +68,24 @@ const columns = [
   { key: "seller", label: "Vendedor", format: "text", mobileDisplay: true },
   { key: "payment_method", label: "Pago", format: "text", mobileDisplay: true },
   { key: "cash_box_number", label: "Caja", format: "text", mobileDisplay: true },
-  { key: "status_label", label: "Estado", format: "text", mobileDisplay: true },
+  {
+    key: "visual_status",
+    label: "Estado",
+    format: "badge",
+    mobileBadge: true,
+    formatOptions: {
+      labelMap: {
+        completed: "Completada",
+        partial_return: "Devolución parcial",
+        returned: "Devolución total",
+      },
+      statusMap: {
+        completed: "green",
+        partial_return: "amber",
+        returned: "red",
+      },
+    },
+  },
   { key: "total", label: "Total", format: "currency", mobileDisplay: true },
 ];
 
@@ -76,6 +93,8 @@ const detailColumns = [
   { key: "product", label: "Producto", format: "text", mobileSecondary: true },
   { key: "code", label: "Codigo", format: "text", mobileDisplay: true },
   { key: "quantity_display", label: "Cantidad", format: "text", mobileDisplay: true },
+  { key: "returned_quantity", label: "Devuelto", format: "number", formatOptions: { unitKey: "sale_unit" }, mobileDisplay: true },
+  { key: "remaining_quantity", label: "Conserva", format: "number", formatOptions: { unitKey: "sale_unit" }, mobileDisplay: true },
   { key: "unit_price", label: "Precio", format: "currency", mobileDisplay: true },
   { key: "discount_amount", label: "Descuento", format: "currency", mobileDisplay: true },
   { key: "subtotal", label: "Subtotal", format: "currency", mobileDisplay: true },
@@ -86,7 +105,7 @@ const actions = [
   { id: "reprint", label: "Reimprimir", icon: "print", variant: "green", permission: "sales.view" },
   {
     id: "cancel",
-    label: "Cancelar",
+    label: "Registrar devolución",
     icon: "undo",
     variant: "red",
     permission: "sales.update",
@@ -108,7 +127,7 @@ const resolvedTicketTemplate = computed(() =>
 const toolbarConfig = computed(() => ({
   icon: "receipt_long",
   title: "Historial de ventas",
-  subtitle: "Consulta tickets, revisa detalle, reimprime o cancela ventas autorizadas.",
+  subtitle: "Consulta tickets, revisa devoluciones y reimprime comprobantes.",
   search: filtersState.search,
   searchPlaceholder: "Buscar folio, producto o vendedor",
   showSearch: true,
@@ -237,7 +256,7 @@ function openCancellationModal(row) {
   if (!row?.can_cancel) {
     ErrorAlert({
       title: "Ticket ya cancelado",
-      message: "Esta venta ya tiene una cancelacion registrada y no puede cancelarse otra vez.",
+      message: "Este ticket ya no tiene productos pendientes por devolver.",
     });
     return;
   }
@@ -282,9 +301,13 @@ function saveCancellation() {
     errorTitle: "No se pudo registrar la devolución",
     errorMessage: "Revisa las cantidades, el motivo y que el ticket siga activo.",
     preserveScroll: true,
-    onSuccess: () => {
+    onSuccess: (pageResponse) => {
+      const printJob = pageResponse?.props?.flash?.sale_cancellation?.print_job;
       closeCancellationModal();
       selectedSale.value = null;
+      if (printJob) {
+        void printReturnTicket(printJob, "Devolución registrada, pero no se pudo imprimir");
+      }
       applyFilters();
     },
   }));
@@ -428,6 +451,38 @@ async function reprintSaleTicket(sale) {
     });
   }
 }
+
+async function printReturnTicket(printJob, errorTitle = "No se pudo imprimir la devolución") {
+  try {
+    await printTicket(printJob);
+    ToastAlert({ title: `Comprobante ${printJob.folio || "de devolución"} enviado a la impresora` });
+  } catch (error) {
+    ErrorAlert({
+      title: errorTitle,
+      message: `${error?.message || "QZ Tray no pudo enviar el comprobante."} La devolución quedó guardada y puede reimprimirse desde el historial.`,
+    });
+  }
+}
+
+async function reprintReturnTicket(sale, returnedSale) {
+  if (!sale?.id || !returnedSale?.id) return;
+
+  try {
+    const { data } = await window.axios.get(route("ventas.returns.ticket", {
+      sale: sale.id,
+      cancellation: returnedSale.id,
+    }));
+    const printJob = data?.print_job;
+
+    if (!printJob) throw new Error("El servidor no devolvió la información del comprobante.");
+    await printReturnTicket(printJob);
+  } catch (error) {
+    ErrorAlert({
+      title: "No se pudo reimprimir la devolución",
+      message: error?.response?.data?.message || error?.message || "No fue posible recuperar el comprobante.",
+    });
+  }
+}
 </script>
 
 <template>
@@ -476,8 +531,13 @@ async function reprintSaleTicket(sale) {
         <section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="Fecha" :value="selectedSale.date_display" size="sm" />
           <MetricCard label="Sucursal" :value="selectedSale.branch" size="sm" />
-          <MetricCard label="Estado" :value="selectedSale.status_label" :tone="selectedSale.status === 'cancelled' ? 'danger' : 'success'" size="sm" />
+          <MetricCard label="Estado" :value="selectedSale.status_label" :tone="selectedSale.visual_status === 'completed' ? 'success' : 'danger'" size="sm" />
           <MetricCard label="Total" :value="money(selectedSale.total)" tone="dark" size="sm" />
+        </section>
+
+        <section v-if="selectedSale.returned_amount > 0" class="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <MetricCard label="Total devuelto" :value="money(selectedSale.returned_amount)" tone="danger" size="sm" />
+          <MetricCard label="Total efectivo del ticket" :value="money(selectedSale.effective_total)" size="sm" />
         </section>
 
         <GlobalTable
@@ -495,11 +555,38 @@ async function reprintSaleTicket(sale) {
           class="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-text"
         >
           <p class="font-black">Devoluciones registradas</p>
-          <article v-for="(returnedSale, index) in selectedSale.returns" :key="index" class="mt-3 border-t border-primary/20 pt-3 first:border-0 first:pt-0">
-            <div class="grid gap-2 md:grid-cols-3">
+          <article v-for="returnedSale in selectedSale.returns" :key="returnedSale.id" class="mt-3 border-t border-primary/20 pt-3 first:border-0 first:pt-0">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p class="font-black">{{ returnedSale.folio }}</p>
+                <p class="text-xs opacity-70">Vinculada con {{ selectedSale.folio }}</p>
+              </div>
+              <button type="button" class="inline-flex items-center gap-2 rounded-xl border border-primary px-3 py-2 font-bold text-primary transition hover:bg-primary hover:text-white" @click="reprintReturnTicket(selectedSale, returnedSale)">
+                <span class="material-symbols-outlined text-[18px]">print</span>
+                Reimprimir devolución
+              </button>
+            </div>
+            <div class="mt-3 grid gap-2 md:grid-cols-3">
               <p><span class="font-semibold opacity-60">Fecha:</span> {{ returnedSale.cancelled_at_display }}</p>
               <p><span class="font-semibold opacity-60">Usuario:</span> {{ returnedSale.cancelled_by }}</p>
               <p><span class="font-semibold opacity-60">Monto:</span> {{ money(returnedSale.amount) }}</p>
+            </div>
+            <p class="mt-2"><span class="font-semibold opacity-60">Aplicación:</span> {{ returnedSale.application_label }}</p>
+            <div v-if="returnedSale.account_balance_before !== null" class="mt-2 grid gap-2 md:grid-cols-2">
+              <p><span class="font-semibold opacity-60">Adeudo anterior:</span> {{ money(returnedSale.account_balance_before) }}</p>
+              <p><span class="font-semibold opacity-60">Adeudo nuevo:</span> {{ money(returnedSale.account_balance_after) }}</p>
+            </div>
+            <div class="mt-3 overflow-x-auto rounded-xl border border-primary/20 bg-background">
+              <table class="min-w-full text-xs">
+                <thead class="bg-primary/10 text-left"><tr><th class="px-3 py-2">Producto</th><th class="px-3 py-2">Cantidad</th><th class="px-3 py-2 text-right">Importe</th></tr></thead>
+                <tbody class="divide-y divide-primary/10">
+                  <tr v-for="(item, itemIndex) in returnedSale.items" :key="`${returnedSale.id}-${itemIndex}`">
+                    <td class="px-3 py-2"><strong>{{ item.product }}</strong><span class="block opacity-60">{{ item.code }}</span></td>
+                    <td class="px-3 py-2">{{ item.quantity_display }}</td>
+                    <td class="px-3 py-2 text-right">{{ money(item.subtotal) }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
             <p class="mt-2 whitespace-pre-line">{{ returnedSale.reason }}</p>
           </article>

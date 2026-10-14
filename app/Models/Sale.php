@@ -64,6 +64,11 @@ class Sale extends Model
         return $this->hasMany(SaleCancellation::class);
     }
 
+    public function creditCharge()
+    {
+        return $this->hasOne(EmployeeCreditCharge::class);
+    }
+
     public function stockMovements()
     {
         return $this->hasMany(StockMovement::class);

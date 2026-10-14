@@ -13,12 +13,17 @@ class SaleCancellation extends Model
         'cancelled_by_user_id',
         'cash_box_number',
         'amount',
+        'application_type',
+        'account_balance_before',
+        'account_balance_after',
         'reason',
         'cancelled_at',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'account_balance_before' => 'decimal:2',
+        'account_balance_after' => 'decimal:2',
         'cancelled_at' => 'datetime',
     ];
 

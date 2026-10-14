@@ -34,7 +34,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
     <div class="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_120px_120px_140px_88px] md:items-start">
       <div class="min-w-0">
         <div class="flex gap-3">
-          <div class="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-secondary bg-background">
+          <div class="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-secondary bg-background">
             <img
               v-if="item.image"
               :src="item.image"
@@ -49,10 +49,10 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
           </div>
 
           <div class="min-w-0">
-            <p class="truncate text-sm font-semibold text-text">
+            <p class="truncate text-base font-semibold text-text">
               {{ item.name }}
             </p>
-            <p class="mt-0.5 truncate text-xs text-text opacity-70">
+            <p class="mt-0.5 truncate text-sm text-text opacity-70">
               {{ item.barcode || "Sin codigo" }} · Stock: {{ Number(item.available_quantity ?? item.stock).toFixed(3) }} {{ item.presentation === 'box' ? 'cajas' : item.inventory_unit }}
             </p>
             <div
@@ -61,7 +61,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
             >
               <button
                 type="button"
-                class="rounded-md px-2 py-1 text-xs font-semibold"
+                class="rounded-md px-3 py-1.5 text-sm font-semibold"
                 :class="item.presentation === 'piece' ? 'bg-primary text-white' : 'text-text'"
                 @click="$emit('set-presentation', 'piece')"
               >
@@ -69,7 +69,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
               </button>
               <button
                 type="button"
-                class="rounded-md px-2 py-1 text-xs font-semibold"
+                class="rounded-md px-3 py-1.5 text-sm font-semibold"
                 :class="item.presentation === 'box' ? 'bg-primary text-white' : 'text-text'"
                 @click="$emit('set-presentation', 'box')"
               >
@@ -81,10 +81,10 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
       </div>
 
       <div class="rounded-lg bg-background px-3 py-2 md:bg-transparent md:px-0 md:py-0">
-        <p class="text-[11px] uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
           Precio
         </p>
-        <p class="mt-1 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-text md:mt-0">
+        <p class="mt-1 flex flex-wrap items-baseline gap-x-2 text-base font-semibold text-text md:mt-0">
           <del v-if="item.discount_enabled && Number(item.discount_percentage || 0) > 0" class="text-xs font-normal opacity-50" title="Precio antes del descuento">
             {{ formatMoney(item.original_price || item.price || 0) }}
           </del>
@@ -93,7 +93,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
       </div>
 
       <div class="rounded-lg bg-background px-3 py-2 md:bg-transparent md:px-0 md:py-0">
-        <p class="text-[11px] uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
           Cantidad
         </p>
         <QuantityStepper
@@ -102,6 +102,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
           :max-integer-digits="3"
           :max-decimal-digits="3"
           :decrease-disabled="Number(item.quantity) <= 0"
+          class="pos-quantity-stepper"
           @decrease="$emit('decrease')"
           @increase="$emit('increase')"
           @update="$emit('update-quantity', $event)"
@@ -109,10 +110,10 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
       </div>
 
       <div class="rounded-lg bg-background px-3 py-2 md:bg-transparent md:px-0 md:py-0">
-        <p class="text-[11px] uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
           Importe
         </p>
-        <p class="mt-1 flex flex-wrap items-baseline gap-x-2 text-base font-bold text-text md:mt-0">
+        <p class="mt-1 flex flex-wrap items-baseline gap-x-2 text-lg font-bold text-text md:mt-0">
           <del v-if="item.discount_enabled && cartItemDiscountAmount(item) > 0" class="text-xs font-normal opacity-50" title="Importe antes del descuento">
             {{ formatMoney(Number(item.original_price || item.price || 0) * Number(item.quantity || 0)) }}
           </del>
@@ -146,7 +147,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
       v-if="item.discount_enabled"
       class="mt-2 flex items-center justify-end gap-2"
     >
-        <label :for="`item_discount_percentage_${item.branch_product_id}`" class="text-xs text-text opacity-60">Descuento</label>
+        <label :for="`item_discount_percentage_${item.branch_product_id}`" class="text-sm text-text opacity-60">Descuento</label>
         <InputField
           v-model="item.discount_percentage"
           label="Porcentaje"
@@ -170,9 +171,19 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
 
 <style scoped>
 .discount-input :deep(input) {
-  height: 2rem;
+  height: 2.5rem;
   border-radius: 0.5rem;
   padding: 0.25rem 1.75rem 0.25rem 0.5rem;
-  font-size: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.pos-quantity-stepper :deep(button) {
+  height: 2.75rem;
+  width: 2.75rem;
+}
+
+.pos-quantity-stepper :deep(input) {
+  height: 2.75rem;
+  font-size: 1rem;
 }
 </style>

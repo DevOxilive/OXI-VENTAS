@@ -14,6 +14,7 @@ use App\Models\EmployeeCreditCharge;
 use App\Models\PaymentMethod;
 use App\Models\ProductBatch;
 use App\Models\Sale;
+use App\Models\SaleCancellation;
 use App\Models\SaleDetail;
 use App\Models\StockMovement;
 use App\Models\TicketTemplate;
@@ -22,8 +23,8 @@ use App\Search\ProductSearchOptions;
 use App\Search\ProductSearchService;
 use App\Services\SaleCancellationService;
 use App\Services\StockMovementService;
-use App\Support\SystemPermission;
 use App\Support\LocalDateTime;
+use App\Support\SystemPermission;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -148,8 +149,10 @@ class SalesController extends Controller
                 'details.product:id,name,inventory_unit,unit',
                 'details.product.barcodes:id,product_id,code',
                 'details.cancellationDetails',
+                'creditCharge:id,sale_id,employee_credit_account_id',
                 'cancellations.cancelledBy:id,name',
-                'cancellations.details',
+                'cancellations.details.product:id,name,inventory_unit,unit',
+                'cancellations.details.barcode:id,code',
             ])
             ->whereIn('branch_id', $branchIds)
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
@@ -540,16 +543,23 @@ class SalesController extends Controller
             broadcast(new CreditAccountChanged('charge_adjusted', (int) $creditAccountId))->toOthers();
         }
 
-        return back()->with([
+        $responsePayload = [
             'success' => 'Devolucion del ticket '.$sale->folio.' registrada correctamente.',
             'sale_cancellation' => [
                 'id' => $cancellation->id,
                 'sale_id' => $sale->id,
-                'folio' => $sale->folio,
+                'folio' => $this->returnFolio($cancellation),
                 'amount' => (float) $cancellation->amount,
                 'cancelled_at' => LocalDateTime::format($cancellation->cancelled_at, 'd/m/Y H:i'),
+                'print_job' => $this->buildReturnPrintJobPayload($cancellation),
             ],
-        ]);
+        ];
+
+        if ($request->expectsJson()) {
+            return response()->json($responsePayload);
+        }
+
+        return back()->with($responsePayload);
     }
 
     public function ticket(Request $request, Sale $sale)
@@ -559,6 +569,18 @@ class SalesController extends Controller
 
         return response()->json([
             'print_job' => $this->buildPrintJobPayload($sale),
+        ]);
+    }
+
+    public function returnTicket(Request $request, Sale $sale, SaleCancellation $cancellation)
+    {
+        abort_unless((int) $cancellation->sale_id === (int) $sale->id, 404);
+
+        $user = $request->user()->loadMissing(['branches', 'role']);
+        $this->resolveBranchById($sale->branch_id, $user);
+
+        return response()->json([
+            'print_job' => $this->buildReturnPrintJobPayload($cancellation),
         ]);
     }
 
@@ -649,6 +671,9 @@ class SalesController extends Controller
 
     private function mapRecentSale(Sale $sale): array
     {
+        $returnedAmount = (float) $sale->cancellations->sum('amount');
+        $hasReturns = $sale->cancellations->isNotEmpty();
+
         return [
             'id' => (int) $sale->id,
             'folio' => $sale->folio ?: 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
@@ -661,21 +686,43 @@ class SalesController extends Controller
                 : 'Sin metodo',
             'cash_box_number' => $sale->cash_box_number ?: '1',
             'status' => $sale->status,
-            'status_label' => $sale->status === 'cancelled' ? 'Cancelada' : 'Completada',
+            'status_label' => $sale->status === 'cancelled'
+                ? 'Devolución total'
+                : ($hasReturns ? 'Devolución parcial' : 'Completada'),
+            'visual_status' => $sale->status === 'cancelled' ? 'returned' : ($hasReturns ? 'partial_return' : 'completed'),
             'can_cancel' => $sale->status === 'completed' && $sale->details->contains(
                 fn (SaleDetail $detail) => (float) $detail->quantity - (float) $detail->cancellationDetails->sum('quantity') > 0.000001
             ),
             'total' => (float) $sale->total,
+            'returned_amount' => $returnedAmount,
+            'effective_total' => max(0, (float) $sale->total - $returnedAmount),
             'details' => $sale->details
                 ->map(fn (SaleDetail $detail) => $this->mapRecentSaleDetail($detail))
                 ->values()
                 ->all(),
             'returns' => $sale->cancellations
                 ->map(fn ($cancellation) => [
+                    'id' => (int) $cancellation->id,
+                    'folio' => $this->returnFolio($cancellation),
                     'reason' => $cancellation->reason,
                     'amount' => (float) $cancellation->amount,
                     'cancelled_at_display' => LocalDateTime::format($cancellation->cancelled_at, 'd/m/Y H:i') ?? '-',
                     'cancelled_by' => $cancellation->cancelledBy?->name ?? 'Sin usuario',
+                    'application_label' => $this->returnApplicationLabel($cancellation, $sale),
+                    'account_balance_before' => $cancellation->account_balance_before !== null
+                        ? (float) $cancellation->account_balance_before
+                        : null,
+                    'account_balance_after' => $cancellation->account_balance_after !== null
+                        ? (float) $cancellation->account_balance_after
+                        : null,
+                    'items' => $cancellation->details->map(fn ($detail) => [
+                        'product' => $detail->product?->name ?? 'Producto sin nombre',
+                        'code' => $detail->barcode?->code ?? '-',
+                        'quantity' => (float) $detail->quantity,
+                        'quantity_display' => $this->formatReturnQuantity($detail),
+                        'unit_price' => (float) $detail->unit_price,
+                        'subtotal' => (float) $detail->subtotal,
+                    ])->values()->all(),
                 ])
                 ->values()
                 ->all(),
@@ -694,6 +741,7 @@ class SalesController extends Controller
             'code' => $product?->barcodes?->first()?->code ?? '-',
             'quantity_display' => $this->formatQuantityForTicket($baseQuantity, $unit),
             'quantity' => (float) $detail->quantity,
+            'returned_quantity' => (float) $detail->cancellationDetails->sum('quantity'),
             'remaining_quantity' => max(0, (float) $detail->quantity - (float) $detail->cancellationDetails->sum('quantity')),
             'sale_unit' => $detail->sale_unit,
             'unit_price' => (float) $detail->unit_price,
@@ -924,5 +972,85 @@ class SalesController extends Controller
                 ];
             })->values()->all(),
         ];
+    }
+
+    private function buildReturnPrintJobPayload(SaleCancellation $cancellation): array
+    {
+        $cancellation->loadMissing([
+            'sale.branch:id,name',
+            'sale.paymentMethod:id,name',
+            'sale.creditCharge:id,sale_id,employee_credit_account_id',
+            'details.product:id,name,inventory_unit,unit',
+            'cancelledBy:id,name',
+        ]);
+        $sale = $cancellation->sale;
+
+        return [
+            'type' => 'sale_return',
+            'document_title' => 'COMPROBANTE DE DEVOLUCION',
+            'sale_id' => (int) $sale->id,
+            'sale_cancellation_id' => (int) $cancellation->id,
+            'folio' => $this->returnFolio($cancellation),
+            'original_sale_folio' => $sale->folio,
+            'date' => LocalDateTime::format($cancellation->cancelled_at, 'd/m/Y H:i'),
+            'branch_name' => $sale->branch?->name ?? 'Sucursal',
+            'payment_method' => $this->returnApplicationLabel($cancellation, $sale),
+            'user_name' => $cancellation->cancelledBy?->name ?? 'Sin usuario',
+            'cash_box_number' => (string) ($cancellation->cash_box_number ?: '1'),
+            'total' => (float) $cancellation->amount,
+            'cash_received' => 0,
+            'change_due' => 0,
+            'account_balance_before' => $cancellation->account_balance_before !== null
+                ? (float) $cancellation->account_balance_before
+                : null,
+            'account_balance_after' => $cancellation->account_balance_after !== null
+                ? (float) $cancellation->account_balance_after
+                : null,
+            'reason' => $cancellation->reason,
+            'items' => $cancellation->details->map(fn ($detail) => [
+                'product_name' => $detail->product?->name ?? 'Producto',
+                'quantity' => (float) $detail->quantity,
+                'sale_unit' => $detail->sale_unit ?? 'piece',
+                'pieces_per_box' => $detail->pieces_per_box,
+                'unit_price' => (float) $detail->unit_price,
+                'subtotal' => (float) $detail->subtotal,
+                'discount_percentage' => 0,
+                'discount_amount' => 0,
+            ])->values()->all(),
+        ];
+    }
+
+    private function returnFolio(SaleCancellation $cancellation): string
+    {
+        return 'DEV-'.str_pad((string) $cancellation->id, 6, '0', STR_PAD_LEFT);
+    }
+
+    private function returnApplicationLabel(SaleCancellation $cancellation, Sale $sale): string
+    {
+        $type = $cancellation->application_type;
+
+        if ($type === 'account_adjustment' || (! $type && $sale->creditCharge)) {
+            return 'Descuento a estado de cuenta';
+        }
+
+        if ($type === 'cash_refund') {
+            return 'Efectivo devuelto';
+        }
+
+        $method = $sale->paymentMethod
+            ? $this->displayPaymentMethodName($sale->paymentMethod->name)
+            : 'metodo original';
+
+        return 'Reembolso por '.$method;
+    }
+
+    private function formatReturnQuantity($detail): string
+    {
+        $unit = $detail->sale_unit === 'box'
+            ? 'cajas'
+            : (strtolower((string) ($detail->product?->inventory_unit ?? $detail->product?->unit)) === 'kg' ? 'kg' : 'pzas');
+        $quantity = rtrim(rtrim(number_format((float) $detail->quantity, 3, '.', ''), '0'), '.') ?: '0';
+
+        return $quantity.' '.$unit;
     }
 }
