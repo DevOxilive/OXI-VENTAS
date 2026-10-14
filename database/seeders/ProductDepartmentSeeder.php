@@ -47,8 +47,8 @@ class ProductDepartmentSeeder extends Seeder
         [
             'name' => 'Limpieza',
             'icon' => '🧽',
-            'description' => 'Jarceria, detergentes, limpiadores, escobas, trapeadores, fibras, bolsas y desechables.',
-            'categories' => ['Jarceria', 'Detergentes', 'Limpiadores', 'Escobas', 'Trapeadores', 'Fibras', 'Bolsas', 'Desechables'],
+            'description' => 'Jarceria, detergentes, limpiadores, escobas, trapeadores, fibras y bolsas.',
+            'categories' => ['Jarceria', 'Detergentes', 'Limpiadores', 'Escobas', 'Trapeadores', 'Fibras', 'Bolsas'],
         ],
         [
             'name' => 'Hogar',
@@ -77,8 +77,8 @@ class ProductDepartmentSeeder extends Seeder
         [
             'name' => 'Conveniencia',
             'icon' => '🔋',
-            'description' => 'Pilas, cigarros, encendedores, cerillos, cargadores basicos y otros articulos de compra rapida o de mostrador.',
-            'categories' => ['Pilas', 'Cigarros', 'Encendedores', 'Cerillos', 'Cargadores basicos', 'Compra rapida', 'Mostrador'],
+            'description' => 'Pilas, cigarros, encendedores, cerillos, cargadores basicos, desechables y otros articulos de compra rapida o de mostrador.',
+            'categories' => ['Pilas', 'Cigarros', 'Encendedores', 'Cerillos', 'Cargadores basicos', 'Compra rapida', 'Mostrador', 'Desechables'],
         ],
     ];
 
