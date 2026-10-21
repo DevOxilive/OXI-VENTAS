@@ -50,7 +50,7 @@ class CashRegisterClosureController extends Controller
 
         if (! $user->hasPermission('sales.cash-closures.view-expected')) {
             $current = Arr::only($current, [
-                'cash_box_number', 'period_start', 'period_end', 'sales_count', 'refunds_count',
+                'cash_box_number', 'period_start', 'period_end', 'sales_count', 'refunds_count', 'credit_payments_count',
             ]);
         }
 
@@ -325,7 +325,14 @@ class CashRegisterClosureController extends Controller
             ->get();
 
         $creditPayments = EmployeeCreditPayment::query()
-            ->with('paymentMethod:id,name')
+            ->with([
+                'paymentMethod:id,name',
+                'branch:id,name',
+                'receivedBy:id,name',
+                'account.employee:id,first_name,last_name',
+                'account.customer:id,name,first_name,last_name',
+                'allocations.charge.sale:id,folio',
+            ])
             ->where('branch_id', $branch->id)
             ->where('cash_box_number', (string) $cashBoxNumber)
             ->where('paid_at', '>', $periodStart)
@@ -376,6 +383,8 @@ class CashRegisterClosureController extends Controller
             'period_end' => LocalDateTime::format($periodEnd, 'd/m/Y H:i'),
             'sales_count' => $sales->count(),
             'sales_total' => round((float) $sales->sum('total'), 2),
+            'credit_payments_count' => $creditPayments->count(),
+            'credit_payments_total' => round((float) $creditPayments->sum('amount'), 2),
             'refunds_count' => $refunds->count(),
             'refunds_total' => round((float) $refunds->sum('amount'), 2),
             'refund_cash_total' => round((float) $refundCashTotal, 2),
@@ -385,8 +394,9 @@ class CashRegisterClosureController extends Controller
             'other_total' => 0,
             'payment_breakdown' => $paymentBreakdown->all(),
             'refund_breakdown' => $refundBreakdown->all(),
-            'active_users' => $this->activeUsers($sales),
+            'active_users' => $this->activeUsers($sales, $creditPayments),
             'sales' => $sales->map(fn (Sale $sale) => $this->mapSale($sale))->values()->all(),
+            'credit_payments' => $creditPayments->map(fn (EmployeeCreditPayment $payment) => $this->mapCreditPayment($payment))->values()->all(),
             'refunds' => $refunds->map(fn (SaleCancellation $refund) => $this->mapRefund($refund))->values()->all(),
         ];
     }
@@ -409,18 +419,32 @@ class CashRegisterClosureController extends Controller
         return $folio;
     }
 
-    private function activeUsers(Collection $sales): array
+    private function activeUsers(Collection $sales, ?Collection $creditPayments = null): array
     {
-        return $sales
-            ->groupBy(fn (Sale $sale) => $this->cashierName($sale))
+        $operations = $sales->map(fn (Sale $sale) => [
+            'name' => $this->cashierName($sale),
+            'amount' => (float) $sale->total,
+            'date' => $sale->date,
+            'type' => 'sale',
+        ])->concat(($creditPayments ?? collect())->map(fn (EmployeeCreditPayment $payment) => [
+            'name' => $payment->receivedBy?->name ?? 'Sin usuario',
+            'amount' => (float) $payment->amount,
+            'date' => $payment->paid_at,
+            'type' => 'payment',
+        ]));
+
+        return $operations
+            ->groupBy('name')
             ->map(function (Collection $group, string $name) {
-                $lastSale = $group->sortByDesc('date')->first();
+                $lastOperation = $group->sortByDesc('date')->first();
 
                 return [
                     'name' => $name,
-                    'sales_count' => $group->count(),
-                    'sales_total' => round((float) $group->sum('total'), 2),
-                    'last_sale_at' => LocalDateTime::format($lastSale?->date, 'd/m/Y H:i'),
+                    'sales_count' => $group->where('type', 'sale')->count(),
+                    'payments_count' => $group->where('type', 'payment')->count(),
+                    'sales_total' => round((float) $group->where('type', 'sale')->sum('amount'), 2),
+                    'payments_total' => round((float) $group->where('type', 'payment')->sum('amount'), 2),
+                    'last_sale_at' => LocalDateTime::format($lastOperation['date'] ?? null, 'd/m/Y H:i'),
                 ];
             })
             ->values()
@@ -456,6 +480,29 @@ class CashRegisterClosureController extends Controller
         ];
     }
 
+    private function mapCreditPayment(EmployeeCreditPayment $payment): array
+    {
+        $holder = $payment->account?->customer?->name
+            ?: trim(($payment->account?->employee?->first_name ?? '').' '.($payment->account?->employee?->last_name ?? ''));
+
+        return [
+            'id' => $payment->id,
+            'folio' => $payment->folio ?: 'ABO-'.str_pad((string) $payment->id, 6, '0', STR_PAD_LEFT),
+            'date' => LocalDateTime::format($payment->paid_at, 'd/m/Y H:i'),
+            'holder' => $holder ?: 'Titular sin nombre',
+            'received_by' => $payment->receivedBy?->name ?? 'Sin usuario',
+            'payment_method' => $payment->paymentMethod?->name ?? 'Sin método',
+            'cash_box_number' => $payment->cash_box_number ?: '1',
+            'amount' => (float) $payment->amount,
+            'cash_received' => (float) ($payment->cash_received ?? $payment->amount),
+            'change_due' => (float) ($payment->change_due ?? 0),
+            'applied_sales' => $payment->allocations->map(fn ($allocation) => [
+                'folio' => $allocation->charge?->sale?->folio ?? 'Sin ticket vinculado',
+                'amount' => (float) $allocation->amount,
+            ])->values()->all(),
+        ];
+    }
+
     private function mapBranchSelector(Branch $branch): array
     {
         $current = $this->buildCurrentCut($branch);
@@ -465,11 +512,13 @@ class CashRegisterClosureController extends Controller
             'sales_total' => $current['sales_total'],
             'refunds_count' => $current['refunds_count'],
             'refunds_total' => $current['refunds_total'],
+            'credit_payments_count' => $current['credit_payments_count'],
+            'credit_payments_total' => $current['credit_payments_total'],
             'expected_cash' => $current['expected_cash'],
             'card_total' => $current['card_total'],
             'other_total' => $current['other_total'],
             'active_users' => $current['active_users'],
-            'has_activity' => $current['sales_count'] > 0,
+            'has_activity' => $current['sales_count'] > 0 || $current['credit_payments_count'] > 0 || $current['refunds_count'] > 0,
         ]);
     }
 
@@ -547,6 +596,8 @@ class CashRegisterClosureController extends Controller
             'card_difference' => (float) $closure->card_difference,
             'status' => abs((float) $closure->cash_difference) < 0.01 && abs((float) $closure->card_difference) < 0.01 ? 'Cuadrado' : 'Diferencia',
             'notes' => $closure->notes,
+            'payment_breakdown' => $closure->payment_breakdown ?? [],
+            'refund_breakdown' => $closure->refund_breakdown ?? [],
             'record_version' => $closure->updated_at?->toJSON(),
         ];
     }

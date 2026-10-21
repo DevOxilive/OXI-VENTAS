@@ -11,6 +11,7 @@ use App\Models\Customer;
 use App\Models\Employee;
 use App\Models\EmployeeCreditAccount;
 use App\Models\EmployeeCreditCharge;
+use App\Models\EmployeeCreditPayment;
 use App\Models\PaymentMethod;
 use App\Models\ProductBatch;
 use App\Models\Sale;
@@ -27,6 +28,7 @@ use App\Support\LocalDateTime;
 use App\Support\SystemPermission;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -130,7 +132,8 @@ class SalesController extends Controller
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
             'branch_id' => ['nullable', 'integer'],
-            'status' => ['nullable', 'in:completed,cancelled'],
+            'status' => ['nullable', 'in:completed,cancelled,payment'],
+            'payment_method' => ['nullable', 'in:cash,card,credit'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
         ]);
@@ -141,21 +144,24 @@ class SalesController extends Controller
             : $allowedBranchIds->all();
         $search = trim((string) ($filters['search'] ?? ''));
 
-        $sales = Sale::query()
+        $salesQuery = Sale::query()
             ->with([
                 'branch:id,name',
                 'employee:id,first_name,last_name',
+                'customer:id,name',
                 'paymentMethod:id,name',
                 'details.product:id,name,inventory_unit,unit',
                 'details.product.barcodes:id,product_id,code',
                 'details.cancellationDetails',
                 'creditCharge:id,sale_id,employee_credit_account_id',
+                'creditCharge.account.employee:id,first_name,last_name',
+                'creditCharge.account.customer:id,name,first_name,last_name',
                 'cancellations.cancelledBy:id,name',
                 'cancellations.details.product:id,name,inventory_unit,unit',
                 'cancellations.details.barcode:id,code',
             ])
             ->whereIn('branch_id', $branchIds)
-            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when(in_array($filters['status'] ?? null, ['completed', 'cancelled'], true), fn ($query) => $query->where('status', $filters['status']))
             ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->where('date', '>=', LocalDateTime::startOfDay($date)))
             ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->where('date', '<=', LocalDateTime::endOfDay($date)))
             ->when($search !== '', function ($query) use ($search) {
@@ -180,10 +186,62 @@ class SalesController extends Controller
                     }
                 });
             })
-            ->latest('date')
-            ->paginate(25)
-            ->withQueryString()
-            ->through(fn (Sale $sale) => $this->mapRecentSale($sale));
+            ->latest('date');
+
+        if (($filters['status'] ?? '') === 'payment') {
+            $sales = collect();
+        } else {
+            $this->applyHistoryPaymentMethodFilter($salesQuery, $filters['payment_method'] ?? '');
+            $sales = $salesQuery->get()->map(fn (Sale $sale) => $this->mapRecentSale($sale));
+        }
+
+        $paymentsQuery = EmployeeCreditPayment::query()
+            ->with([
+                'branch:id,name',
+                'paymentMethod:id,name',
+                'receivedBy:id,name',
+                'account.employee:id,first_name,last_name',
+                'account.customer:id,name,first_name,last_name',
+                'allocations.charge.sale:id,folio',
+            ])
+            ->whereIn('branch_id', $branchIds)
+            ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->where('paid_at', '>=', LocalDateTime::startOfDay($date)))
+            ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->where('paid_at', '<=', LocalDateTime::endOfDay($date)))
+            ->when($search !== '', function ($query) use ($search) {
+                $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+                $query->where(function ($subQuery) use ($like) {
+                    $subQuery
+                        ->where('folio', 'like', $like)
+                        ->orWhereHas('receivedBy', fn ($userQuery) => $userQuery->where('name', 'like', $like))
+                        ->orWhereHas('account.employee', fn ($employeeQuery) => $employeeQuery
+                            ->where('first_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like))
+                        ->orWhereHas('account.customer', fn ($customerQuery) => $customerQuery
+                            ->where('name', 'like', $like)
+                            ->orWhere('first_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like))
+                        ->orWhereHas('allocations.charge.sale', fn ($saleQuery) => $saleQuery->where('folio', 'like', $like));
+                });
+            });
+
+        $payments = collect();
+        if (! in_array($filters['status'] ?? '', ['completed', 'cancelled'], true) && ($filters['payment_method'] ?? '') !== 'credit') {
+            $this->applyHistoryPaymentMethodFilter($paymentsQuery, $filters['payment_method'] ?? '');
+            $payments = $paymentsQuery->get()->map(fn (EmployeeCreditPayment $payment) => $this->mapRecentPayment($payment));
+        }
+
+        $operations = $sales
+            ->concat($payments)
+            ->sortByDesc(fn (array $operation) => ($operation['date_sort'] ?? '').'|'.($operation['id'] ?? ''))
+            ->values();
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $sales = new LengthAwarePaginator(
+            $operations->forPage($page, 25)->values(),
+            $operations->count(),
+            25,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()],
+        );
 
         $ticketTemplate = TicketTemplate::salesTemplate();
 
@@ -194,6 +252,7 @@ class SalesController extends Controller
                 'search' => $search,
                 'branch_id' => $branchId > 0 ? $branchId : null,
                 'status' => $filters['status'] ?? '',
+                'payment_method' => $filters['payment_method'] ?? '',
                 'date_from' => $filters['date_from'] ?? '',
                 'date_to' => $filters['date_to'] ?? '',
             ],
@@ -676,10 +735,13 @@ class SalesController extends Controller
 
         return [
             'id' => (int) $sale->id,
+            'operation_type' => 'sale',
             'folio' => $sale->folio ?: 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
             'date' => LocalDateTime::iso($sale->date),
             'date_display' => LocalDateTime::format($sale->date, 'd/m/Y H:i') ?? '-',
+            'date_sort' => LocalDateTime::format($sale->date, 'Y-m-d H:i:s') ?? '',
             'branch' => $sale->branch?->name ?? '-',
+            'holder' => $this->creditHolderName($sale->creditCharge?->account) ?: ($sale->customer?->name ?? 'Público en General'),
             'seller' => trim(($sale->employee?->first_name ?? '').' '.($sale->employee?->last_name ?? '')) ?: 'Sin vendedor',
             'payment_method' => $sale->paymentMethod
                 ? $this->displayPaymentMethodName($sale->paymentMethod->name)
@@ -727,6 +789,64 @@ class SalesController extends Controller
                 ->values()
                 ->all(),
         ];
+    }
+
+    private function mapRecentPayment(EmployeeCreditPayment $payment): array
+    {
+        return [
+            'id' => 'payment-'.$payment->id,
+            'operation_type' => 'payment',
+            'folio' => $payment->folio ?: 'ABO-'.str_pad((string) $payment->id, 6, '0', STR_PAD_LEFT),
+            'date_display' => LocalDateTime::format($payment->paid_at, 'd/m/Y H:i') ?? '-',
+            'date_sort' => LocalDateTime::format($payment->paid_at, 'Y-m-d H:i:s') ?? '',
+            'branch' => $payment->branch?->name ?? '-',
+            'holder' => $this->creditHolderName($payment->account) ?: 'Titular sin nombre',
+            'seller' => $payment->receivedBy?->name ?? 'Sin usuario',
+            'payment_method' => $payment->paymentMethod?->name ?? 'Sin método',
+            'cash_box_number' => $payment->cash_box_number ?: '1',
+            'status' => 'payment',
+            'status_label' => 'Abono aplicado',
+            'visual_status' => 'payment',
+            'can_cancel' => false,
+            'total' => (float) $payment->amount,
+            'cash_received' => (float) ($payment->cash_received ?? $payment->amount),
+            'change_due' => (float) ($payment->change_due ?? 0),
+            'applied_sales' => $payment->allocations->map(fn ($allocation) => [
+                'id' => (int) $allocation->id,
+                'folio' => $allocation->charge?->sale?->folio ?? 'Sin ticket vinculado',
+                'amount' => (float) $allocation->amount,
+            ])->values()->all(),
+            'details' => [],
+            'returns' => [],
+        ];
+    }
+
+    private function creditHolderName($account): string
+    {
+        if (! $account) return '';
+        if ($account->customer) return $account->customer->name ?: trim(($account->customer->first_name ?? '').' '.($account->customer->last_name ?? ''));
+
+        return trim(($account->employee?->first_name ?? '').' '.($account->employee?->last_name ?? ''));
+    }
+
+    private function applyHistoryPaymentMethodFilter($query, string $paymentMethod): void
+    {
+        if (! in_array($paymentMethod, ['cash', 'card', 'credit'], true)) return;
+
+        $query->whereHas('paymentMethod', function ($paymentQuery) use ($paymentMethod) {
+            $paymentQuery->where(function ($nameQuery) use ($paymentMethod) {
+                match ($paymentMethod) {
+                    'cash' => $nameQuery->where('name', 'like', '%Efectivo%'),
+                    'card' => $nameQuery
+                        ->where('name', 'like', '%Tarjeta%')
+                        ->orWhere('name', 'like', '%Débito%')
+                        ->orWhere('name', 'like', '%Debito%'),
+                    default => $nameQuery
+                        ->where('name', 'like', '%Crédito empleado%')
+                        ->orWhere('name', 'like', '%Credito empleado%'),
+                };
+            });
+        });
     }
 
     private function mapRecentSaleDetail(SaleDetail $detail): array

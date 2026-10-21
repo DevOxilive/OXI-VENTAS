@@ -119,7 +119,6 @@ export function getSalesReportToolbarConfig({
                     { label: 'Efectivo', value: 'cash' },
                     { label: 'Tarjeta', value: 'card' },
                     { label: 'Credito empleado', value: 'credit' },
-                    { label: 'Abonos', value: 'payment' },
                 ],
             },
             {

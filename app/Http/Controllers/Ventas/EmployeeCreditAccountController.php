@@ -27,9 +27,11 @@ class EmployeeCreditAccountController extends Controller
     {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
+            'status' => ['nullable', 'in:pending,settled'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
         ]);
         $search = trim((string) ($filters['search'] ?? ''));
+        $status = (string) ($filters['status'] ?? '');
         $perPage = (int) ($filters['per_page'] ?? 25);
         $currentPaymentBranch = $this->resolvePaymentBranch($request);
         $ticketTemplate = TicketTemplate::employeeCreditStatementTemplate();
@@ -40,6 +42,7 @@ class EmployeeCreditAccountController extends Controller
                 'customer:id,name,first_name,last_name',
             ])
             ->withSum(['charges as balance' => fn ($query) => $query->where('status', 'open')], 'outstanding_amount')
+            ->where('active', true)
             ->when($search !== '', function ($query) use ($search) {
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
                 $query->where(function ($holderQuery) use ($like) {
@@ -59,15 +62,18 @@ class EmployeeCreditAccountController extends Controller
                         });
                 });
             })
-            ->whereRaw(
-                "((
+            ->when($status !== '', function ($query) use ($status) {
+                $operator = $status === 'pending' ? '>' : '<=';
+                $query->whereRaw(
+                    "((
                     SELECT COALESCE(SUM(employee_credit_charges.outstanding_amount), 0)
                     FROM employee_credit_charges
                     WHERE employee_credit_charges.employee_credit_account_id = employee_credit_accounts.id
                     AND employee_credit_charges.status = ?
-                ) - COALESCE(employee_credit_accounts.credit_balance, 0)) > 0",
-                ['open']
-            )
+                ) - COALESCE(employee_credit_accounts.credit_balance, 0)) {$operator} 0",
+                    ['open']
+                );
+            })
             ->orderByDesc('balance')
             ->paginate($perPage)
             ->withQueryString()
@@ -86,6 +92,7 @@ class EmployeeCreditAccountController extends Controller
             ],
             'filters' => [
                 'search' => $search,
+                'status' => $status,
                 'per_page' => $perPage,
             ],
         ]);
@@ -97,8 +104,6 @@ class EmployeeCreditAccountController extends Controller
             'employee:id,first_name,last_name',
             'customer:id,name,first_name,last_name',
             'charges' => fn ($query) => $query
-                ->where('status', 'open')
-                ->where('outstanding_amount', '>', 0)
                 ->with([
                     'sale.details.barcode:id,product_id,code',
                     'sale.details.product:id,name',
@@ -107,7 +112,12 @@ class EmployeeCreditAccountController extends Controller
                     'sale.branch:id,name',
                 ])
                 ->latest('id'),
-            'payments' => fn ($query) => $query->with('paymentMethod:id,name')->latest('paid_at'),
+            'payments' => fn ($query) => $query->with([
+                'paymentMethod:id,name',
+                'branch:id,name',
+                'receivedBy:id,name',
+                'allocations.charge.sale:id,folio',
+            ])->latest('paid_at'),
         ]);
 
         $returns = SaleCancellation::query()
@@ -133,6 +143,9 @@ class EmployeeCreditAccountController extends Controller
                 'branch' => $charge->sale?->branch?->name,
                 'amount' => (float) $charge->amount,
                 'outstanding_amount' => (float) $charge->outstanding_amount,
+                'paid_amount' => max(0, round((float) $charge->amount - (float) $charge->outstanding_amount, 2)),
+                'status' => $charge->status,
+                'status_label' => $charge->status === 'paid' ? 'Pagada' : 'Pendiente',
                 'estimated_payment_date' => optional($charge->estimated_payment_date)->format('Y-m-d'),
                 'items' => $charge->sale?->details->map(fn ($detail) => [
                     'code' => $detail->barcode?->code ?? $detail->product?->barcodes?->first()?->code ?? '-',
@@ -150,6 +163,17 @@ class EmployeeCreditAccountController extends Controller
                 'date' => LocalDateTime::format($payment->paid_at, 'd/m/Y H:i'),
                 'method' => $payment->paymentMethod?->name,
                 'amount' => (float) $payment->amount,
+                'branch' => $payment->branch?->name ?? 'Sin sucursal',
+                'cash_box_number' => $payment->cash_box_number ?: '1',
+                'received_by' => $payment->receivedBy?->name ?? 'Sin usuario',
+                'cash_received' => (float) ($payment->cash_received ?? $payment->amount),
+                'change_due' => (float) ($payment->change_due ?? 0),
+                'applied_sales' => $payment->allocations
+                    ->map(fn ($allocation) => [
+                        'folio' => $allocation->charge?->sale?->folio ?? 'Sin ticket vinculado',
+                        'amount' => (float) $allocation->amount,
+                    ])
+                    ->values(),
             ])->values(),
             'returns' => $returns->map(fn (SaleCancellation $return) => [
                 'id' => (int) $return->id,
@@ -181,6 +205,7 @@ class EmployeeCreditAccountController extends Controller
             'amount' => ['required', 'numeric', 'gt:0'],
             'cash_received' => ['nullable', 'numeric', 'min:0'],
             'confirmed_card_payment' => ['nullable', 'boolean'],
+            'cash_box_number' => ['required', 'string', 'max:10'],
         ]);
         $branch = $this->resolvePaymentBranch($request);
         $method = $this->paymentMethods()->firstWhere('id', (int) $data['payment_method_id']);
@@ -219,7 +244,7 @@ class EmployeeCreditAccountController extends Controller
             $payment = EmployeeCreditPayment::create([
                 'folio' => 'ABO-PENDING-'.uniqid(), 'employee_credit_account_id' => $account->id,
                 'branch_id' => $branch->id, 'payment_method_id' => $method->id, 'received_by_user_id' => $request->user()->id,
-                'cash_box_number' => '1', 'amount' => $amount,
+                'cash_box_number' => (string) $data['cash_box_number'], 'amount' => $amount,
                 'cash_received' => $received, 'change_due' => $isCash ? round($received - $amount, 2) : 0, 'paid_at' => now(),
             ]);
             $payment->update(['folio' => 'ABO-'.str_pad((string) $payment->id, 6, '0', STR_PAD_LEFT)]);
@@ -317,6 +342,8 @@ class EmployeeCreditAccountController extends Controller
             'holder_contact' => null,
             'employee' => $holderName,
             'balance' => max(0, $chargesBalance - (float) $account->credit_balance),
+            'account_status' => max(0, $chargesBalance - (float) $account->credit_balance) > 0 ? 'pending' : 'settled',
+            'account_status_label' => max(0, $chargesBalance - (float) $account->credit_balance) > 0 ? 'Con adeudo' : 'Al corriente',
             'credit_balance' => (float) $account->credit_balance,
             'credit_limit' => $account->credit_limit === null ? null : (float) $account->credit_limit,
             'credit_limit_label' => $account->credit_limit === null ? 'Sin límite' : '$'.number_format((float) $account->credit_limit, 2),

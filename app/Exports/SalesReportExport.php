@@ -13,6 +13,7 @@ class SalesReportExport implements WithMultipleSheets
         protected Collection $rows,
         protected string $title = 'Ventas',
         protected string $reportType = 'products',
+        protected array $summary = [],
     ) {}
 
     public function sheets(): array
@@ -32,15 +33,13 @@ class SalesReportExport implements WithMultipleSheets
     {
         $rows = $this->sicarHeaderRows();
         $rows[] = ['Concepto', 'Importe'];
-        $lastRow = max($this->detailLastRow(), 6);
-        $detailSheet = "'Detalle de ventas'";
         $rows = [...$rows,
-            ['Ventas en efectivo', "=SUM({$detailSheet}!H6:H{$lastRow})"],
-            ['Ventas con tarjeta', "=SUM({$detailSheet}!I6:I{$lastRow})"],
-            ['Ventas a crédito', "=SUM({$detailSheet}!J6:J{$lastRow})"],
-            ['Abonos a crédito', "=SUM({$detailSheet}!K6:K{$lastRow})"],
-            ['Total vendido', '=B6+B7+B8'],
-            ['Total cobrado', '=B6+B7+B9'],
+            ['Ventas en efectivo', (float) ($this->summary['cash'] ?? 0)],
+            ['Ventas con tarjeta', (float) ($this->summary['card'] ?? 0)],
+            ['Ventas a crédito', (float) ($this->summary['credit'] ?? 0)],
+            ['Abonos a crédito', (float) ($this->summary['credit_payments'] ?? 0)],
+            ['Total vendido', (float) ($this->summary['sold_total'] ?? 0)],
+            ['Total cobrado', (float) ($this->summary['collected_total'] ?? 0)],
         ];
 
         return new SalesReportSheet(
@@ -60,7 +59,7 @@ class SalesReportExport implements WithMultipleSheets
     private function detailsSheet(): SalesReportSheet
     {
         $rows = $this->sicarHeaderRows();
-        $rows[] = ['Fecha', 'Usuario', 'Producto', 'Pza/Kg', 'Precio', 'Importe', 'Estado', 'Efectivo', 'Tarjeta', 'Crédito', 'Abono'];
+        $rows[] = ['Fecha', 'Cliente / empleado', 'Registró', 'Producto', 'Pza/Kg', 'Precio', 'Importe', 'Estado', 'Efectivo', 'Tarjeta', 'Crédito', 'Abono'];
         $sectionRows = [];
         $ticketRows = [];
         $rowsByDate = $this->rows
@@ -76,21 +75,23 @@ class SalesReportExport implements WithMultipleSheets
                 $ticketRows[] = count($rows) + 1;
                 $rows[] = [
                     $excelDate,
-                    'Número de ticket:',
+                    'Número de operación:',
                     $operation['folio'] ?? 'Sin folio',
                     $this->operationLabel($operation),
-                    $operation['payment_folio'] ?? '',
+                    filled($operation['related_folios'] ?? []) ? 'Aplica a '.implode(', ', $operation['related_folios']) : '',
                     'Sucursal:',
                     $operation['branch'] ?? '-',
                     'Caja:',
                     $operation['cash_box'] ?? '-',
                     'Importe total:',
+                    '',
                     (float) ($operation['total'] ?? 0),
                 ];
 
                 foreach ($operation['details'] ?? [] as $detail) {
                     $row = [
                         $excelDate,
+                        $operation['customer'] ?? 'Público en General',
                         $operation['seller'] ?? 'Sin usuario',
                         $detail['product'] ?? 'Producto sin nombre',
                         $detail['quantity_display'] ?? '0',
@@ -112,9 +113,9 @@ class SalesReportExport implements WithMultipleSheets
             $rows,
             'Detalle de ventas',
             headerRow: 5,
-            currencyColumns: ['E', 'F', 'H', 'I', 'J', 'K'],
+            currencyColumns: ['F', 'G', 'I', 'J', 'K', 'L'],
             dateColumns: ['A'],
-            columnWidths: ['A' => 13, 'B' => 24, 'C' => 40, 'D' => 13, 'E' => 14, 'F' => 14, 'G' => 18, 'H' => 14, 'I' => 14, 'J' => 14, 'K' => 14],
+            columnWidths: ['A' => 13, 'B' => 26, 'C' => 24, 'D' => 40, 'E' => 13, 'F' => 14, 'G' => 14, 'H' => 18, 'I' => 14, 'J' => 14, 'K' => 14, 'L' => 14],
             currencyStartRow: 6,
             sectionRows: $sectionRows,
             ticketRows: $ticketRows,
@@ -152,36 +153,21 @@ class SalesReportExport implements WithMultipleSheets
     private function paymentColumnIndex(array $operation): int
     {
         if (($operation['operation_type'] ?? 'sale') === 'payment') {
-            return 10;
+            return 11;
         }
 
         $method = str($operation['payment_method'] ?? '')->lower()->ascii()->toString();
 
         return match (true) {
-            str_contains($method, 'efectivo') => 7,
-            str_contains($method, 'tarjeta') || str_contains($method, 'debito') || str_contains($method, 'credito') && ! str_contains($method, 'empleado') => 8,
-            default => 9,
+            str_contains($method, 'efectivo') => 8,
+            str_contains($method, 'tarjeta') || str_contains($method, 'debito') || str_contains($method, 'credito') && ! str_contains($method, 'empleado') => 9,
+            default => 10,
         };
     }
 
     private function excelDate(?string $date): ?float
     {
         return filled($date) ? ExcelDate::PHPToExcel(new \DateTime($date)) : null;
-    }
-
-    private function detailLastRow(): int
-    {
-        $rows = 5;
-        $groups = $this->rows->groupBy('date_only');
-
-        foreach ($groups as $operations) {
-            $rows++;
-            foreach ($operations as $operation) {
-                $rows += 1 + count($operation['details'] ?? []);
-            }
-        }
-
-        return $rows;
     }
 
     private function singleSheetRows(): array
