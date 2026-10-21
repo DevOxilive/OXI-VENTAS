@@ -668,6 +668,14 @@ onBeforeUnmount(() => {
                   <dt class="opacity-70">Tarjeta esperada</dt>
                   <dd class="font-black">{{ money(selectedClosure.card_total) }}</dd>
                 </div>
+                <div v-for="entry in selectedClosure.payment_breakdown || []" :key="`payment-${entry.method}`" class="flex justify-between gap-3 py-2">
+                  <dt class="opacity-70">{{ entry.method }} · {{ entry.sales_count }} operaciones</dt>
+                  <dd class="font-black">{{ money(entry.total) }}</dd>
+                </div>
+                <div v-for="entry in selectedClosure.refund_breakdown || []" :key="`refund-${entry.method}`" class="flex justify-between gap-3 py-2 text-primary">
+                  <dt>Devoluciones {{ entry.method }} · {{ entry.refunds_count }}</dt>
+                  <dd class="font-black">-{{ money(entry.total) }}</dd>
+                </div>
               </dl>
 
               <div v-if="modalMode === 'edit'" class="mt-4 grid gap-3 sm:grid-cols-2">

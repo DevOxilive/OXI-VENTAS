@@ -89,8 +89,9 @@ const canViewClosureOutcome = computed(() => can("sales.cash-closures.view-expec
 const summaryCards = computed(() => [
   { label: "Caja", value: `#${props.current?.cash_box_number || "1"}`, tone: "neutral" },
   { label: "Ventas pendientes", value: props.current?.sales_count ?? 0, tone: "neutral" },
+  { label: "Abonos recibidos", value: canViewClosureOutcome.value ? `${props.current?.credit_payments_count ?? 0} · ${money(props.current?.credit_payments_total)}` : (props.current?.credit_payments_count ?? 0), tone: "success" },
   { label: "Devoluciones", value: props.current?.refunds_count ?? 0, tone: "danger" },
-  { label: "Corte", value: "Caja", tone: "dark" },
+  { label: "Efectivo esperado", value: canViewClosureOutcome.value ? money(props.current?.expected_cash) : "Restringido", tone: "dark" },
 ]);
 
 const toolbarConfig = computed(() => {
@@ -386,13 +387,13 @@ onMounted(() => {
           :key="item.id"
           :title="item.name"
           subtitle="Corte de caja"
-          :description="item.has_activity ? 'Hay ventas generadas en el periodo actual.' : 'Sin ventas pendientes de corte.'"
+          :description="item.has_activity ? 'Hay ventas, abonos o devoluciones en el periodo actual.' : 'Sin movimientos pendientes de corte.'"
           icon="payments"
           :badge="item.has_activity ? 'Abrir corte' : 'Sin ventas'"
           badge-variant="neutral"
           @click="switchBranch(item.id)"
         >
-          <div class="mt-5 grid grid-cols-2 gap-2 text-xs font-semibold text-text">
+          <div class="mt-5 grid grid-cols-3 gap-2 text-xs font-semibold text-text">
             <div class="rounded-xl bg-secondary px-3 py-2">
               <p class="opacity-60">Ventas</p>
               <p class="mt-1 text-base font-black">{{ item.sales_count }}</p>
@@ -400,6 +401,10 @@ onMounted(() => {
             <div class="rounded-xl bg-secondary px-3 py-2">
               <p class="opacity-60">Total</p>
               <p class="mt-1 text-base font-black">{{ money(item.sales_total) }}</p>
+            </div>
+            <div class="rounded-xl bg-secondary px-3 py-2">
+              <p class="opacity-60">Abonos</p>
+              <p class="mt-1 text-base font-black">{{ item.credit_payments_count }}</p>
             </div>
           </div>
 
@@ -414,7 +419,7 @@ onMounted(() => {
                 class="flex items-center justify-between gap-3 rounded-xl bg-secondary px-3 py-2 text-xs font-semibold text-text"
               >
                 <span class="truncate">{{ activeUser.name }}</span>
-                <span>{{ activeUser.sales_count }} / {{ money(activeUser.sales_total) }}</span>
+                <span>{{ activeUser.sales_count }} ventas · {{ activeUser.payments_count }} abonos</span>
               </div>
             </div>
             <p v-else class="mt-2 text-xs font-semibold text-text opacity-60">
@@ -460,7 +465,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="grid grid-cols-1 gap-3 p-4 md:grid-cols-4">
+          <div class="grid grid-cols-1 gap-3 p-4 md:grid-cols-5">
             <MetricCard
               v-for="card in summaryCards"
               :key="card.label"
@@ -468,6 +473,34 @@ onMounted(() => {
               :value="card.value"
               :tone="card.tone"
             />
+          </div>
+
+          <div v-if="canViewClosureOutcome" class="grid gap-4 border-t border-secondary p-4 lg:grid-cols-2">
+            <section class="rounded-xl border border-secondary bg-secondary/20 p-4">
+              <h3 class="text-sm font-black uppercase tracking-wide text-text">Cómo se integra el corte</h3>
+              <div class="mt-3 divide-y divide-secondary text-sm text-text">
+                <div v-for="entry in current.payment_breakdown || []" :key="entry.method" class="flex justify-between gap-3 py-2">
+                  <span>{{ entry.method }} · {{ entry.sales_count }} operaciones</span>
+                  <strong>{{ money(entry.total) }}</strong>
+                </div>
+                <div v-for="entry in current.refund_breakdown || []" :key="`refund-${entry.method}`" class="flex justify-between gap-3 py-2 text-primary">
+                  <span>Devoluciones {{ entry.method }} · {{ entry.refunds_count }}</span>
+                  <strong>-{{ money(entry.total) }}</strong>
+                </div>
+              </div>
+            </section>
+
+            <section class="rounded-xl border border-secondary bg-secondary/20 p-4">
+              <h3 class="text-sm font-black uppercase tracking-wide text-text">Abonos del periodo</h3>
+              <div v-if="current.credit_payments?.length" class="mt-3 max-h-56 divide-y divide-secondary overflow-y-auto text-sm text-text">
+                <article v-for="entry in current.credit_payments" :key="entry.id" class="py-2">
+                  <div class="flex justify-between gap-3"><strong>{{ entry.folio }} · {{ entry.holder }}</strong><strong>{{ money(entry.amount) }}</strong></div>
+                  <p class="mt-1 text-xs opacity-65">{{ entry.date }} · {{ entry.payment_method }} · Recibió {{ entry.received_by }}</p>
+                  <p class="mt-1 text-xs opacity-65">{{ entry.applied_sales?.map((sale) => sale.folio).join(', ') || 'Sin ticket vinculado' }}</p>
+                </article>
+              </div>
+              <p v-else class="mt-3 text-sm text-text opacity-60">No hubo abonos en este periodo.</p>
+            </section>
           </div>
         </section>
       </div>
@@ -528,6 +561,14 @@ onMounted(() => {
             <div class="flex justify-between gap-3 py-2">
               <dt class="opacity-70">Tarjeta esperada</dt>
               <dd class="font-black">{{ money(current?.card_total) }}</dd>
+            </div>
+            <div v-for="entry in current?.payment_breakdown || []" :key="`modal-${entry.method}`" class="flex justify-between gap-3 py-2">
+              <dt class="opacity-70">{{ entry.method }}</dt>
+              <dd class="font-black">{{ money(entry.total) }}</dd>
+            </div>
+            <div v-for="entry in current?.refund_breakdown || []" :key="`modal-refund-${entry.method}`" class="flex justify-between gap-3 py-2 text-primary">
+              <dt>Devoluciones {{ entry.method }}</dt>
+              <dd class="font-black">-{{ money(entry.total) }}</dd>
             </div>
           </dl>
 

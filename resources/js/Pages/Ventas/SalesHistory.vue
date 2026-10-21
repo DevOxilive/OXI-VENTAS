@@ -50,6 +50,7 @@ const filtersState = reactive({
   search: props.filters?.search || "",
   branchId: props.filters?.branch_id || "",
   status: props.filters?.status || "",
+  paymentMethod: props.filters?.payment_method || "",
   dateFrom: props.filters?.date_from || "",
   dateTo: props.filters?.date_to || "",
 });
@@ -65,7 +66,8 @@ const columns = [
   { key: "folio", label: "Folio", format: "text", mobileSecondary: true },
   { key: "date_display", label: "Fecha", format: "text", mobileDisplay: true },
   { key: "branch", label: "Sucursal", format: "text", mobileDisplay: true },
-  { key: "seller", label: "Vendedor", format: "text", mobileDisplay: true },
+  { key: "holder", label: "Cliente / empleado", format: "text", mobileDisplay: true },
+  { key: "seller", label: "Registró", format: "text", mobileDisplay: true },
   { key: "payment_method", label: "Pago", format: "text", mobileDisplay: true },
   { key: "cash_box_number", label: "Caja", format: "text", mobileDisplay: true },
   {
@@ -78,11 +80,13 @@ const columns = [
         completed: "Completada",
         partial_return: "Devolución parcial",
         returned: "Devolución total",
+        payment: "Abono aplicado",
       },
       statusMap: {
         completed: "green",
         partial_return: "amber",
         returned: "red",
+        payment: "blue",
       },
     },
   },
@@ -102,7 +106,7 @@ const detailColumns = [
 
 const actions = [
   { id: "view", label: "Ver", icon: "visibility", variant: "blue", permission: "sales.view" },
-  { id: "reprint", label: "Reimprimir", icon: "print", variant: "green", permission: "sales.view" },
+  { id: "reprint", label: "Reimprimir", icon: "print", variant: "green", permission: "sales.view", hidden: (row) => row.operation_type === "payment" },
   {
     id: "cancel",
     label: "Registrar devolución",
@@ -116,6 +120,13 @@ const actions = [
 const statusOptions = [
   { value: "completed", label: "Completadas" },
   { value: "cancelled", label: "Canceladas" },
+  { value: "payment", label: "Abonos aplicados" },
+];
+
+const paymentMethodOptions = [
+  { value: "cash", label: "Efectivo" },
+  { value: "card", label: "Tarjeta" },
+  { value: "credit", label: "Crédito empleado" },
 ];
 
 const resolvedTicketTemplate = computed(() =>
@@ -127,9 +138,9 @@ const resolvedTicketTemplate = computed(() =>
 const toolbarConfig = computed(() => ({
   icon: "receipt_long",
   title: "Historial de ventas",
-  subtitle: "Consulta tickets, revisa devoluciones y reimprime comprobantes.",
+  subtitle: "Consulta ventas, abonos, titulares y usuarios que recibieron el dinero.",
   search: filtersState.search,
-  searchPlaceholder: "Buscar folio, producto o vendedor",
+  searchPlaceholder: "Buscar folio, producto, titular o usuario",
   showSearch: true,
   compactFilters: false,
   filters: [
@@ -148,6 +159,13 @@ const toolbarConfig = computed(() => ({
       placeholder: "Todos los estados",
       value: filtersState.status,
       options: statusOptions,
+    },
+    {
+      key: "paymentMethod",
+      label: "Forma de pago",
+      placeholder: "Todas las formas",
+      value: filtersState.paymentMethod,
+      options: paymentMethodOptions,
     },
     {
       key: "dateFrom",
@@ -180,6 +198,7 @@ function currentFilterPayload() {
     search: filtersState.search || undefined,
     branch_id: filtersState.branchId || undefined,
     status: filtersState.status || undefined,
+    payment_method: filtersState.paymentMethod || undefined,
     date_from: filtersState.dateFrom || undefined,
     date_to: filtersState.dateTo || undefined,
   };
@@ -510,7 +529,7 @@ async function reprintReturnTicket(sale, returnedSale) {
         :pagination="sales"
         row-key="id"
         mobile-card-header-field="folio"
-        no-data-message="No hay ventas que coincidan con los filtros."
+        no-data-message="No hay operaciones que coincidan con los filtros."
         @page-change="handlePageChange"
         @action="handleTableAction"
       />
@@ -518,7 +537,7 @@ async function reprintReturnTicket(sale, returnedSale) {
 
     <GlobalModal
       v-if="selectedSale"
-      title="Detalle de ticket"
+      :title="selectedSale.operation_type === 'payment' ? 'Detalle del abono' : 'Detalle de ticket'"
       :subtitle="selectedSale.folio"
       mode="view"
       size="5xl"
@@ -531,16 +550,37 @@ async function reprintReturnTicket(sale, returnedSale) {
         <section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard label="Fecha" :value="selectedSale.date_display" size="sm" />
           <MetricCard label="Sucursal" :value="selectedSale.branch" size="sm" />
-          <MetricCard label="Estado" :value="selectedSale.status_label" :tone="selectedSale.visual_status === 'completed' ? 'success' : 'danger'" size="sm" />
+          <MetricCard label="Estado" :value="selectedSale.status_label" :tone="selectedSale.visual_status === 'completed' || selectedSale.visual_status === 'payment' ? 'success' : 'danger'" size="sm" />
           <MetricCard label="Total" :value="money(selectedSale.total)" tone="dark" size="sm" />
         </section>
 
-        <section v-if="selectedSale.returned_amount > 0" class="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <section v-if="selectedSale.operation_type === 'payment'" class="rounded-2xl border border-secondary bg-secondary/30 p-4 text-sm text-text">
+          <div class="grid gap-2 md:grid-cols-2">
+            <p><span class="font-semibold opacity-60">Titular:</span> {{ selectedSale.holder }}</p>
+            <p><span class="font-semibold opacity-60">Recibió:</span> {{ selectedSale.seller }}</p>
+            <p><span class="font-semibold opacity-60">Forma de pago:</span> {{ selectedSale.payment_method }}</p>
+            <p><span class="font-semibold opacity-60">Caja:</span> #{{ selectedSale.cash_box_number }}</p>
+            <p v-if="Number(selectedSale.change_due || 0) > 0"><span class="font-semibold opacity-60">Efectivo recibido:</span> {{ money(selectedSale.cash_received) }}</p>
+            <p v-if="Number(selectedSale.change_due || 0) > 0"><span class="font-semibold opacity-60">Cambio:</span> {{ money(selectedSale.change_due) }}</p>
+          </div>
+          <div class="mt-3 border-t border-secondary pt-3">
+            <p class="font-black">Tickets liquidados o abonados</p>
+            <p v-if="!selectedSale.applied_sales?.length" class="mt-2 opacity-65">Este abono histórico no tiene un ticket vinculado.</p>
+            <div v-else class="mt-2 flex flex-wrap gap-2">
+              <span v-for="applied in selectedSale.applied_sales" :key="applied.id" class="rounded-full bg-background px-3 py-1 font-semibold">
+                {{ applied.folio }} · {{ money(applied.amount) }}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="selectedSale.operation_type !== 'payment' && selectedSale.returned_amount > 0" class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <MetricCard label="Total devuelto" :value="money(selectedSale.returned_amount)" tone="danger" size="sm" />
           <MetricCard label="Total efectivo del ticket" :value="money(selectedSale.effective_total)" size="sm" />
         </section>
 
         <GlobalTable
+          v-if="selectedSale.operation_type !== 'payment'"
           :items="selectedSale.details || []"
           :columns="detailColumns"
           :actions="[]"

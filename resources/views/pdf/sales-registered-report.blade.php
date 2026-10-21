@@ -93,7 +93,8 @@
         <thead>
             <tr>
                 <th>Fecha</th>
-                <th>Usuario</th>
+                <th>Cliente / empleado</th>
+                <th>Registró</th>
                 <th>Producto</th>
                 <th>Pza/Kg</th>
                 <th>Precio</th>
@@ -109,27 +110,28 @@
             @forelse ($rowsByDate as $date => $operations)
                 <tr class="date-row">
                     <td>{{ $date }}</td>
-                    <td colspan="10">Fecha de operacion: {{ $date }}</td>
+                    <td colspan="11">Fecha de operacion: {{ $date }}</td>
                 </tr>
 
                 @foreach ($operations as $operation)
                     <tr class="ticket-row">
                         <td>{{ $operation['date_only'] ?? '-' }}</td>
-                        <td>Numero de ticket:</td>
+                        <td>Número de operación:</td>
                         <td>{{ $operation['folio'] ?? '-' }}</td>
                         <td>{{ $operationLabel($operation) }}</td>
-                        <td>{{ $operation['payment_folio'] ?? '' }}</td>
+                        <td>{{ filled($operation['related_folios'] ?? []) ? 'Aplica a '.implode(', ', $operation['related_folios']) : '' }}</td>
                         <td>Sucursal:</td>
                         <td>{{ $operation['branch'] ?? '-' }}</td>
                         <td>Caja:</td>
                         <td>{{ $operation['cash_box'] ?? '-' }}</td>
                         <td>Importe total:</td>
-                        <td class="right">{{ $money($operation['total'] ?? 0) }}</td>
+                        <td class="right" colspan="2">{{ $money($operation['total'] ?? 0) }}</td>
                     </tr>
 
                     @foreach (($operation['details'] ?? []) as $detail)
                         <tr>
                             <td>{{ $operation['date_only'] ?? '-' }}</td>
+                        <td>{{ $operation['customer'] ?? 'Público en General' }}</td>
                             <td>{{ $operation['seller'] ?? '-' }}</td>
                             <td>{{ $detail['product'] ?? '-' }}</td>
                             <td class="right">{{ $detail['quantity_display'] ?? '0' }}</td>
@@ -145,7 +147,7 @@
                 @endforeach
             @empty
                 <tr>
-                    <td colspan="11">No se encontraron ventas para este reporte.</td>
+                    <td colspan="12">No se encontraron operaciones para este reporte.</td>
                 </tr>
             @endforelse
         </tbody>

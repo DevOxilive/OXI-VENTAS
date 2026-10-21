@@ -23,6 +23,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -152,10 +153,7 @@ class SalesReportController extends Controller
                     ->through(fn ($row) => $this->mapProductSoldRow($row, $filters))
                 : $this->emptyPaginator(),
             'registeredSales' => $activeTab === self::TAB_SALES
-                ? $this->registeredSalesQuery($filters)
-                    ->paginate((int) $filters['per_page'])
-                    ->withQueryString()
-                    ->through(fn (Sale $sale) => $this->mapSaleRow($sale))
+                ? $this->paginateReportRows($request, $this->salesReportRows($filters), (int) $filters['per_page'])
                 : $this->emptyPaginator(),
             'salesSummary' => $activeTab === self::TAB_SALES
                 ? $this->salesReportSummary($this->salesReportRows($filters))
@@ -207,7 +205,7 @@ class SalesReportController extends Controller
         $fileScope = $branch ? $this->safeSegment($branch->slug ?: $branch->name) : 'global';
 
         return Excel::download(
-            new SalesReportExport($rows, 'Ventas registradas', 'sales'),
+            new SalesReportExport($rows, 'Ventas registradas', 'sales', $this->salesReportSummary($rows)),
             'reporte-ventas-registradas-'.$fileScope.'-'.LocalDateTime::now('Y-m-d-H-i').'.xlsx'
         );
     }
@@ -345,6 +343,8 @@ class SalesReportController extends Controller
                 'branch:id,name,slug',
                 'employee:id,first_name,last_name',
                 'customer:id,name',
+                'creditCharge.account.employee:id,first_name,last_name',
+                'creditCharge.account.customer:id,name,first_name,last_name',
                 'paymentMethod:id,name',
                 'details.barcode:id,code',
                 'details.product.category:id,name',
@@ -384,6 +384,17 @@ class SalesReportController extends Controller
                         $employeeQuery
                             ->where('first_name', 'like', $like)
                             ->orWhere('last_name', 'like', $like);
+                    })
+                    ->orWhereHas('creditCharge.account.employee', function (Builder $employeeQuery) use ($like) {
+                        $employeeQuery
+                            ->where('first_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like);
+                    })
+                    ->orWhereHas('creditCharge.account.customer', function (Builder $customerQuery) use ($like) {
+                        $customerQuery
+                            ->where('name', 'like', $like)
+                            ->orWhere('first_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like);
                     });
 
                 if ($productIds->isNotEmpty()) {
@@ -401,6 +412,8 @@ class SalesReportController extends Controller
         $query = EmployeeCreditPayment::query()
             ->with([
                 'account.employee:id,first_name,last_name',
+                'account.customer:id,name,first_name,last_name',
+                'branch:id,name,slug',
                 'paymentMethod:id,name',
                 'receivedBy:id,name',
                 'allocations.charge.sale.branch:id,name,slug',
@@ -417,7 +430,9 @@ class SalesReportController extends Controller
             return collect();
         }
 
-        if (in_array($filters['payment_method'] ?? null, ['cash', 'card', 'credit'], true)) {
+        if (in_array($filters['payment_method'] ?? null, ['cash', 'card'], true)) {
+            $this->applyPaymentMethodFilter($query, $filters['payment_method']);
+        } elseif (($filters['payment_method'] ?? null) === 'credit') {
             return collect();
         }
 
@@ -444,6 +459,12 @@ class SalesReportController extends Controller
                             ->where('first_name', 'like', $like)
                             ->orWhere('last_name', 'like', $like);
                     })
+                    ->orWhereHas('account.customer', function (Builder $customerQuery) use ($like) {
+                        $customerQuery
+                            ->where('name', 'like', $like)
+                            ->orWhere('first_name', 'like', $like)
+                            ->orWhere('last_name', 'like', $like);
+                    })
                     ->orWhereHas('receivedBy', fn (Builder $userQuery) => $userQuery->where('name', 'like', $like))
                     ->orWhereHas('allocations.charge.sale', function (Builder $saleQuery) use ($like, $productIds) {
                         $saleQuery
@@ -463,11 +484,7 @@ class SalesReportController extends Controller
         }
 
         return $query->get()
-            ->flatMap(function (EmployeeCreditPayment $payment) {
-                return $payment->allocations
-                    ->map(fn ($allocation) => $this->mapEmployeeCreditPaymentRow($payment, $allocation))
-                    ->filter();
-            })
+            ->map(fn (EmployeeCreditPayment $payment) => $this->mapEmployeeCreditPaymentRow($payment))
             ->values();
     }
 
@@ -663,7 +680,7 @@ class SalesReportController extends Controller
             'date_only' => LocalDateTime::format($sale->date, 'd/m/Y') ?? '-',
             'time_only' => LocalDateTime::format($sale->date, 'H:i') ?? '-',
             'branch' => $sale->branch?->name ?? '-',
-            'customer' => $sale->customer?->name ?? 'Público en General',
+            'customer' => $this->saleHolderName($sale),
             'cash_box' => $sale->cash_box_number ? 'Caja '.$sale->cash_box_number : '-',
             'payment_method' => $sale->paymentMethod?->name ?? 'Sin método',
             'cash_received' => (float) ($sale->cash_received ?? 0),
@@ -708,51 +725,95 @@ class SalesReportController extends Controller
         ];
     }
 
-    private function mapEmployeeCreditPaymentRow(EmployeeCreditPayment $payment, $allocation): ?array
+    private function mapEmployeeCreditPaymentRow(EmployeeCreditPayment $payment): array
     {
-        $sale = $allocation->charge?->sale;
+        $details = $payment->allocations->flatMap(function ($allocation) {
+            $sale = $allocation->charge?->sale;
+            if (! $sale) return [];
 
-        if (! $sale) {
-            return null;
+            $appliedAmount = (float) $allocation->amount;
+            $saleTotal = (float) $sale->total;
+            $mappedDetails = $sale->details->map(fn (SaleDetail $detail) => $this->mapSaleDetail($detail))->values();
+            $remainingAmount = $appliedAmount;
+            $lastDetailIndex = $mappedDetails->count() - 1;
+
+            return $mappedDetails->map(function (array $detail, int $index) use ($appliedAmount, $saleTotal, $lastDetailIndex, &$remainingAmount, $sale) {
+                $amount = $index === $lastDetailIndex
+                    ? $remainingAmount
+                    : round(((float) $detail['subtotal'] / max($saleTotal, 0.01)) * $appliedAmount, 2);
+                $remainingAmount = round($remainingAmount - $amount, 2);
+                $detail['id'] = 'payment-detail-'.$sale->id.'-'.$detail['id'];
+                $detail['product'] = ($sale->folio ?: 'Sin folio').' · '.$detail['product'];
+                $detail['report_amount'] = $amount;
+
+                return $detail;
+            });
+        })->values();
+
+        if ($details->isEmpty()) {
+            $details = collect([[
+                'id' => 'payment-'.$payment->id.'-legacy',
+                'product' => 'Abono histórico sin ticket vinculado',
+                'quantity_display' => '1 operación',
+                'unit_price' => (float) $payment->amount,
+                'subtotal' => (float) $payment->amount,
+                'report_amount' => (float) $payment->amount,
+            ]]);
         }
 
-        $appliedAmount = (float) $allocation->amount;
-        $saleTotal = (float) $sale->total;
-        $details = $sale->details->map(fn (SaleDetail $detail) => $this->mapSaleDetail($detail))->values();
-        $remainingAmount = $appliedAmount;
-        $lastDetailIndex = $details->count() - 1;
-
-        $details = $details->map(function (array $detail, int $index) use ($appliedAmount, $saleTotal, $lastDetailIndex, &$remainingAmount) {
-            $amount = $index === $lastDetailIndex
-                ? $remainingAmount
-                : round(((float) $detail['subtotal'] / max($saleTotal, 0.01)) * $appliedAmount, 2);
-            $remainingAmount = round($remainingAmount - $amount, 2);
-            $detail['report_amount'] = $amount;
-
-            return $detail;
-        })->all();
+        $relatedFolios = $payment->allocations
+            ->map(fn ($allocation) => $allocation->charge?->sale?->folio)
+            ->filter()
+            ->unique()
+            ->values();
 
         return [
-            'id' => 'payment-'.$payment->id.'-allocation-'.$allocation->id,
+            'id' => 'payment-'.$payment->id,
             'operation_type' => 'payment',
             'operation_sort' => 'payment-'.str_pad((string) $payment->id, 12, '0', STR_PAD_LEFT),
-            'folio' => $sale->folio ?: 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
+            'folio' => $payment->folio ?: 'ABO-'.str_pad((string) $payment->id, 6, '0', STR_PAD_LEFT),
             'payment_folio' => $payment->folio,
+            'related_folios' => $relatedFolios->all(),
             'date_sort' => LocalDateTime::format($payment->paid_at, 'Y-m-d H:i:s') ?? '',
             'date_display' => LocalDateTime::format($payment->paid_at, 'd/m/Y H:i') ?? '-',
             'date_only' => LocalDateTime::format($payment->paid_at, 'd/m/Y') ?? '-',
             'time_only' => LocalDateTime::format($payment->paid_at, 'H:i') ?? '-',
-            'branch' => $sale->branch?->name ?? '-',
-            'customer' => $payment->account?->employee
-                ? trim($payment->account->employee->first_name.' '.$payment->account->employee->last_name)
-                : 'Empleado sin nombre',
+            'branch' => $payment->branch?->name ?? '-',
+            'customer' => $this->accountHolderName($payment->account),
             'cash_box' => $payment->cash_box_number ? 'Caja '.$payment->cash_box_number : '-',
             'payment_method' => $payment->paymentMethod?->name ?? 'Sin método',
             'seller' => $payment->receivedBy?->name ?? 'Sin usuario',
             'status_label' => 'Abono aplicado',
-            'total' => $appliedAmount,
-            'details' => $details,
+            'total' => (float) $payment->amount,
+            'details' => $details->all(),
         ];
+    }
+
+    private function paginateReportRows(Request $request, \Illuminate\Support\Collection $rows, int $perPage): LengthAwarePaginator
+    {
+        $page = LengthAwarePaginator::resolveCurrentPage();
+
+        return new LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()],
+        );
+    }
+
+    private function saleHolderName(Sale $sale): string
+    {
+        return $this->accountHolderName($sale->creditCharge?->account)
+            ?: ($sale->customer?->name ?? 'Público en General');
+    }
+
+    private function accountHolderName($account): string
+    {
+        if (! $account) return '';
+        if ($account->customer) return $account->customer->name ?: trim(($account->customer->first_name ?? '').' '.($account->customer->last_name ?? ''));
+
+        return trim(($account->employee?->first_name ?? '').' '.($account->employee?->last_name ?? '')) ?: 'Titular sin nombre';
     }
 
     private function mapSaleDetail(SaleDetail $detail, $cancellationDetail = null): array
@@ -823,6 +884,23 @@ class SalesReportController extends Controller
                         ->where('name', 'like', '%Crédito empleado%')
                         ->orWhere('name', 'like', '%Credito empleado%'),
                 };
+            });
+        });
+    }
+
+    private function applyPaymentMethodFilter(Builder $query, string $paymentMethod): void
+    {
+        $query->whereHas('paymentMethod', function (Builder $paymentQuery) use ($paymentMethod) {
+            $paymentQuery->where(function (Builder $nameQuery) use ($paymentMethod) {
+                if ($paymentMethod === 'cash') {
+                    $nameQuery->where('name', 'like', '%Efectivo%');
+                    return;
+                }
+
+                $nameQuery
+                    ->where('name', 'like', '%Tarjeta%')
+                    ->orWhere('name', 'like', '%Débito%')
+                    ->orWhere('name', 'like', '%Debito%');
             });
         });
     }

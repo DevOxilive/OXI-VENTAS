@@ -40,6 +40,7 @@ const selectedLimit = ref(null)
 const pendingChangeReceipt = ref(null)
 const loading = ref(false)
 const search = ref(props.filters.search || '')
+const status = ref(props.filters.status || '')
 const recordsPerPage = ref(Number(props.filters.per_page || props.accounts?.per_page || 25))
 const { handlePageChange } = useGlobalTablePagination()
 const selectedPrinterName = ref('')
@@ -57,6 +58,7 @@ const payment = useForm({
   amount: '',
   cash_received: '',
   confirmed_card_payment: false,
+  cash_box_number: '1',
 })
 
 const limitForm = useForm({
@@ -71,24 +73,42 @@ const compactNumber = (value) => new Intl.NumberFormat('es-MX', { maximumFractio
 const columns = [
   { key: 'holder', label: 'Cliente o empleado', format: 'text', subKey: 'holder_type', minWidth: '240px' },
   { key: 'balance', label: 'Adeudo', format: 'currency', minWidth: '140px', mobileBadge: true },
+  {
+    key: 'account_status',
+    label: 'Estado',
+    format: 'badge',
+    formatOptions: {
+      labelMap: { pending: 'Con adeudo', settled: 'Al corriente' },
+      statusMap: { pending: 'amber', settled: 'green' },
+    },
+  },
   { key: 'credit_limit_label', label: 'Límite', format: 'text', minWidth: '140px' },
   { key: 'estimated_payment_date', label: 'Pago estimado', format: 'text', minWidth: '150px' },
 ]
 
 const actions = [
   { id: 'view', label: 'Ver', icon: 'visibility', variant: 'blue', permission: 'sales.employee-credit.view' },
-  { id: 'pay', label: 'Pagar', icon: 'payments', variant: 'green', permission: 'sales.employee-credit.collect' },
+  { id: 'pay', label: 'Pagar', icon: 'payments', variant: 'green', permission: 'sales.employee-credit.collect', hidden: (row) => Number(row.balance || 0) <= 0 },
   { id: 'limit', label: 'Editar límite', icon: 'edit_note', variant: 'amber', permission: 'sales.employee-credit.create' },
 ]
 
 const toolbarConfig = computed(() => ({
   icon: 'account_balance_wallet',
   title: 'Estados de Cuenta',
-  subtitle: 'Adeudos vigentes, cargos por ticket y abonos recibidos.',
+  subtitle: 'Historial completo de créditos, cargos y abonos recibidos.',
   search: search.value,
   searchPlaceholder: 'Buscar cliente o empleado...',
   showSearch: true,
-  filters: [],
+  filters: [{
+    key: 'status',
+    label: 'Estado',
+    placeholder: 'Todos los estados',
+    value: status.value,
+    options: [
+      { label: 'Con adeudo', value: 'pending' },
+      { label: 'Al corriente', value: 'settled' },
+    ],
+  }],
   recordsPerPage: recordsPerPage.value,
   showRecordsPerPage: true,
   totalRecords: Number(props.accounts?.total || 0),
@@ -100,7 +120,7 @@ const selectedPaymentMethod = computed(() =>
 )
 
 const ticketOptions = computed(() =>
-  (selected.value?.charges || []).map((charge) => ({
+  (selected.value?.charges || []).filter((charge) => charge.status === 'open' && Number(charge.outstanding_amount || 0) > 0).map((charge) => ({
     value: String(charge.id),
     label: `${charge.folio || 'Sin folio'} · ${charge.date || 'Sin fecha'} · ${money(charge.outstanding_amount)}`,
   }))
@@ -108,7 +128,7 @@ const ticketOptions = computed(() =>
 
 const selectedChargesForPayment = computed(() => {
   const selectedIds = new Set((payment.selected_charge_ids || []).map((id) => String(id)))
-  const charges = selected.value?.charges || []
+  const charges = (selected.value?.charges || []).filter((charge) => charge.status === 'open' && Number(charge.outstanding_amount || 0) > 0)
 
   if (!selected.value?.paying) return charges
   if (selectedIds.size === 0) return []
@@ -195,12 +215,17 @@ function quantityLabel(item) {
 function reloadAccounts() {
   router.get(route('ventas.employee-credit.index'), {
     search: search.value || undefined,
+    status: status.value || undefined,
     per_page: recordsPerPage.value,
   }, {
     preserveScroll: true,
     preserveState: true,
     replace: true,
   })
+}
+
+function updateToolbarFilter({ key, value }) {
+  if (key === 'status') status.value = value || ''
 }
 
 async function refreshOpenAccount() {
@@ -232,6 +257,7 @@ function refreshAccountsRealtime(event = null) {
 }
 
 watch(search, reloadAccounts)
+watch(status, reloadAccounts)
 watch(recordsPerPage, reloadAccounts)
 watch(() => payment.payment_method_id, () => {
   payment.confirmed_card_payment = false
@@ -246,11 +272,13 @@ async function openAccount(row, pay = false) {
   try {
     const { data } = await window.axios.get(route('ventas.employee-credit.show', { account: row.id }))
     selected.value = { ...data.account, paying: pay }
-    payment.selected_charge_ids = pay ? (data.account.charges || []).map((charge) => String(charge.id)) : []
-    payment.amount = pay ? Number((data.account.charges || []).reduce((total, charge) => total + Number(charge.outstanding_amount || 0), 0)).toFixed(2) : ''
+    const pendingCharges = (data.account.charges || []).filter((charge) => charge.status === 'open' && Number(charge.outstanding_amount || 0) > 0)
+    payment.selected_charge_ids = pay ? pendingCharges.map((charge) => String(charge.id)) : []
+    payment.amount = pay ? Number(pendingCharges.reduce((total, charge) => total + Number(charge.outstanding_amount || 0), 0)).toFixed(2) : ''
     payment.cash_received = ''
     payment.payment_method_id = props.paymentMethods[0]?.id || ''
     payment.confirmed_card_payment = false
+    payment.cash_box_number = storedCashBoxNumber()
     payment.clearErrors()
     return selected.value
   } catch {
@@ -271,6 +299,17 @@ function handleTableAction({ action, row }) {
   if (action === 'view') void openAccount(row, false)
   if (action === 'pay') void openAccount(row, true)
   if (action === 'limit') openLimit(row)
+}
+
+function storedCashBoxNumber() {
+  if (typeof window === 'undefined') return '1'
+
+  try {
+    const stored = JSON.parse(window.localStorage.getItem('ventas_cash_box_by_branch') || '{}')
+    return String(stored[String(props.currentPaymentBranch?.id)] || '1')
+  } catch {
+    return '1'
+  }
 }
 
 async function initializePrinterBridge({ silent = true } = {}) {
@@ -360,7 +399,13 @@ async function getTicketHeaderDataUrl(cashBoxText = '') {
 
 function buildAccountPrintJob(account) {
   const items = []
-  const creditGroups = groupedCharges.value.map((group) => ({
+  const printableGroups = groupedCharges.value
+    .map((group) => ({
+      ...group,
+      charges: group.charges.filter((charge) => charge.status === 'open' && Number(charge.outstanding_amount || 0) > 0),
+    }))
+    .filter((group) => group.charges.length > 0)
+  const creditGroups = printableGroups.map((group) => ({
     key: group.key,
     label: saleDateLabel(group),
     total: Number(group.total || 0),
@@ -390,7 +435,7 @@ function buildAccountPrintJob(account) {
     })),
   }))
 
-  groupedCharges.value.forEach((group) => {
+  printableGroups.forEach((group) => {
     items.push({
       product_name: `-- ${group.label} --`,
       quantity: 1,
@@ -515,12 +560,16 @@ async function submitPayment() {
   payment.clearErrors()
 
   try {
-    const { data } = await window.axios.post(route('ventas.employee-credit.pay', { account: selected.value.id }), {
+    const { data } = await window.axios.post(route('ventas.employee-credit.pay', {
+      account: selected.value.id,
+      branch_id: props.currentPaymentBranch?.id,
+    }), {
       payment_method_id: payment.payment_method_id,
       selected_charge_ids: payment.selected_charge_ids,
       amount: payment.amount,
       cash_received: payment.cash_received,
       confirmed_card_payment: payment.confirmed_card_payment,
+      cash_box_number: payment.cash_box_number,
     })
     const receipt = data?.print_job
     const change = Number(receipt?.change_due || 0)
@@ -591,6 +640,7 @@ onBeforeUnmount(() => {
       <GlobalToolbar
         v-bind="toolbarConfig"
         @update:search="search = $event"
+        @update:filter="updateToolbarFilter"
         @update:records-per-page="recordsPerPage = $event"
       />
     </template>
@@ -602,7 +652,7 @@ onBeforeUnmount(() => {
       :pagination="accounts"
       row-key="id"
       mobile-card-header-field="holder"
-      no-data-message="No hay clientes ni empleados con adeudo."
+      no-data-message="No hay estados de cuenta que coincidan con los filtros."
       @page-change="handlePageChange"
       @action="handleTableAction"
     >
@@ -724,7 +774,7 @@ onBeforeUnmount(() => {
         </section>
 
         <section>
-          <h2 class="mb-2 text-sm font-black uppercase tracking-[0.18em] text-text opacity-60">Compras pendientes</h2>
+          <h2 class="mb-2 text-sm font-black uppercase tracking-[0.18em] text-text opacity-60">Historial de compras a crédito</h2>
 
           <div class="overflow-x-auto rounded-xl border border-secondary">
             <table class="w-full min-w-[980px] text-sm">
@@ -754,7 +804,7 @@ onBeforeUnmount(() => {
                         Número de ticket: {{ charge.folio || 'Sin folio' }}
                       </td>
                       <td colspan="2" class="px-3 py-2 text-right font-black text-text">
-                        Importe total: {{ money(charge.outstanding_amount) }}
+                        {{ charge.status_label }} · Original {{ money(charge.amount) }} · Pendiente {{ money(charge.outstanding_amount) }}
                       </td>
                     </tr>
 
@@ -800,10 +850,20 @@ onBeforeUnmount(() => {
         <section v-if="selected.payments?.length">
           <h2 class="mb-2 text-sm font-black uppercase tracking-[0.18em] text-text opacity-60">Abonos anteriores</h2>
           <div class="divide-y divide-secondary overflow-hidden rounded-xl border border-secondary bg-background">
-            <p v-for="entry in selected.payments" :key="entry.folio" class="flex justify-between gap-3 px-3 py-2 text-sm text-text">
-              <span>{{ entry.date }} · {{ entry.folio }} · {{ entry.method }}</span>
-              <strong>{{ money(entry.amount) }}</strong>
-            </p>
+            <article v-for="entry in selected.payments" :key="entry.folio" class="px-3 py-3 text-sm text-text">
+              <div class="flex flex-wrap justify-between gap-3">
+                <span><strong>{{ entry.folio }}</strong> · {{ entry.date }} · {{ entry.method }}</span>
+                <strong>{{ money(entry.amount) }}</strong>
+              </div>
+              <p class="mt-1 text-xs opacity-70">{{ entry.branch }} · Caja #{{ entry.cash_box_number }} · Recibió: {{ entry.received_by }}</p>
+              <p v-if="Number(entry.change_due || 0) > 0" class="mt-1 text-xs opacity-70">Recibido {{ money(entry.cash_received) }} · Cambio {{ money(entry.change_due) }}</p>
+              <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                <span v-if="!entry.applied_sales?.length" class="rounded-full bg-secondary px-2 py-1 font-semibold">Sin ticket vinculado en el historial</span>
+                <span v-for="applied in entry.applied_sales || []" :key="`${entry.folio}-${applied.folio}`" class="rounded-full bg-secondary px-2 py-1 font-semibold">
+                  {{ applied.folio }} · {{ money(applied.amount) }}
+                </span>
+              </div>
+            </article>
           </div>
         </section>
       </div>

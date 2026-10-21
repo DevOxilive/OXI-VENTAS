@@ -122,7 +122,8 @@ function goToPage(link) {
                 <thead>
                     <tr class="sticky top-0 z-20 bg-primary text-white">
                         <th class="px-4 py-3 text-left font-black">Fecha</th>
-                        <th class="px-4 py-3 text-left font-black">Usuario</th>
+                        <th class="px-4 py-3 text-left font-black">Cliente / empleado</th>
+                        <th class="px-4 py-3 text-left font-black">Registró</th>
                         <th class="px-4 py-3 text-left font-black">Producto</th>
                         <th class="px-4 py-3 text-right font-black">Pza/Kg</th>
                         <th class="px-4 py-3 text-right font-black">Precio</th>
@@ -144,7 +145,7 @@ function goToPage(link) {
                             <td class="border-b border-primary/20 px-4 py-2 font-black">{{ group.date }}</td>
                             <td
                                 class="border-b border-primary/20 px-4 py-2 font-black"
-                                colspan="10"
+                                colspan="11"
                             >
                                 Fecha de operacion: {{ group.date }}
                             </td>
@@ -156,9 +157,10 @@ function goToPage(link) {
                         >
                             <tr class="bg-[#F2DFE2] text-[#241719]">
                                 <td class="border-b border-primary/20 px-4 py-2">{{ sale.date_only }}</td>
-                                <td class="border-b border-primary/20 px-4 py-2 font-black">Numero de ticket:</td>
+                                <td class="border-b border-primary/20 px-4 py-2 font-black">Número de operación:</td>
                                 <td class="border-b border-primary/20 px-4 py-2 font-black">{{ sale.folio }}</td>
                                 <td class="border-b border-primary/20 px-4 py-2">{{ operationLabel(sale) }}</td>
+                                <td class="border-b border-primary/20 px-4 py-2">{{ sale.related_folios?.length ? `Aplica a ${sale.related_folios.join(', ')}` : '' }}</td>
                                 <td class="border-b border-primary/20 px-4 py-2">Sucursal:</td>
                                 <td class="border-b border-primary/20 px-4 py-2">{{ sale.branch }}</td>
                                 <td class="border-b border-primary/20 px-4 py-2">Caja:</td>
@@ -178,6 +180,7 @@ function goToPage(link) {
                                 class="odd:bg-background even:bg-secondary"
                             >
                                 <td class="border-b border-secondary px-4 py-2">{{ sale.date_only }}</td>
+                                <td class="border-b border-secondary px-4 py-2 font-semibold">{{ sale.customer }}</td>
                                 <td class="border-b border-secondary px-4 py-2">{{ sale.seller }}</td>
                                 <td class="border-b border-secondary px-4 py-2">{{ detail.product }}</td>
                                 <td class="border-b border-secondary px-4 py-2 text-right">{{ detail.quantity_display }}</td>
@@ -194,7 +197,7 @@ function goToPage(link) {
 
                     <tr v-if="!groups.length">
                         <td
-                            colspan="11"
+                            colspan="12"
                             class="px-4 py-10 text-center text-text opacity-70"
                         >
                             No hay ventas registradas que coincidan con los filtros.
