@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { renderTicketHeaderImage } from "@/config/ticketTemplate";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { Head, router, useForm } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
@@ -15,6 +16,7 @@ import {
   connectQzTray,
   findTicketPrinter,
   getQzPrinters,
+  getStoredTicketPrinterName,
   isQzTrayActive,
   printEscPosTicket,
 } from "@/Composables/useQzTray";
@@ -77,7 +79,7 @@ const toolbarConfig = computed(() => getCashRegisterClosureReportsToolbarConfig(
 const selectedClosure = ref(null);
 const modalMode = ref("view");
 const showClosureModal = ref(false);
-const selectedPrinterName = ref("");
+const selectedPrinterName = ref(getStoredTicketPrinterName());
 const printerBridgeReady = ref(false);
 const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
 let ticketLogoDataUrlPromise = null;
@@ -246,57 +248,35 @@ function imageFromDataUrl(dataUrl) {
 }
 
 async function getTicketHeaderDataUrl(cashBoxText = "") {
-  const normalizedCashBoxText = String(cashBoxText || "").trim();
-  const cacheKey = normalizedCashBoxText || "__default__";
-
-  if (ticketHeaderDataUrlPromises.has(cacheKey)) {
-    return ticketHeaderDataUrlPromises.get(cacheKey);
-  }
-
-  const promise = getTicketLogoDataUrl()
-    .then(async (logoDataUrl) => {
+  const settings = resolvedTicketTemplate.value;
+  const cacheKey = JSON.stringify([settings, cashBoxText]);
+  if (!ticketHeaderDataUrlPromises.has(cacheKey)) {
+    const promise = getTicketLogoDataUrl().then(async (logoDataUrl) => {
       if (!logoDataUrl || typeof document === "undefined") return logoDataUrl;
-
-      const logoImage = await imageFromDataUrl(logoDataUrl);
-      const canvas = document.createElement("canvas");
-      canvas.width = 576;
-      canvas.height = 92;
-      const context = canvas.getContext("2d");
-
-      if (!context) return logoDataUrl;
-
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(logoImage, 12, 5, 82, 82);
-      context.fillStyle = "#000000";
-      context.font = "700 27px Arial, sans-serif";
-      context.textAlign = "center";
-      context.textBaseline = "middle";
-      context.fillText("SUPER KAY", Math.round(canvas.width / 2), Math.round(canvas.height / 2));
-
-      if (normalizedCashBoxText) {
-        context.font = "700 21px Arial, sans-serif";
-        context.textAlign = "right";
-        context.fillText(normalizedCashBoxText.toUpperCase(), canvas.width - 12, Math.round(canvas.height / 2));
-      }
-
-      return canvas.toDataURL("image/png");
-    })
-    .catch(() => "");
-
-  ticketHeaderDataUrlPromises.set(cacheKey, promise);
-  return promise;
+      return renderTicketHeaderImage(settings, await imageFromDataUrl(logoDataUrl), cashBoxText);
+    }).catch(() => "");
+    ticketHeaderDataUrlPromises.set(cacheKey, promise);
+  }
+  return ticketHeaderDataUrlPromises.get(cacheKey);
 }
 
 async function initializePrinterBridge() {
   await connectQzTray();
-  selectedPrinterName.value = findTicketPrinter(await getQzPrinters());
+  selectedPrinterName.value = findTicketPrinter(await getQzPrinters({
+    expectedPrinterNames: [selectedPrinterName.value || getStoredTicketPrinterName()],
+  }));
   printerBridgeReady.value = true;
 
   if (!selectedPrinterName.value) {
     throw new Error("No hay una impresora seleccionada para el ticket.");
   }
 }
+
+onMounted(() => {
+  if (!props.selectorMode) {
+    void initializePrinterBridge().catch(() => {});
+  }
+});
 
 async function reprintClosureTicket(closure) {
   if (!closure?.id) return;

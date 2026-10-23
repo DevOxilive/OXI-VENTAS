@@ -1,4 +1,5 @@
 <script setup>
+import { renderTicketHeaderImage } from "@/config/ticketTemplate";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { router, useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
@@ -19,7 +20,6 @@ import {
   getStoredTicketPrinterName,
   getQzPrinters,
   printEscPosTicket,
-  saveStoredTicketPrinterName,
 } from "@/Composables/useQzTray";
 import {
   ToastAlert,
@@ -466,13 +466,6 @@ const cashBoxOptions = [
   { label: "Caja #2", value: "2" },
 ];
 
-const printerOptions = computed(() =>
-  availablePrinters.value.map((printerName) => ({
-    label: printerName,
-    value: printerName,
-  }))
-);
-
 function readStoredCashBoxes() {
   if (typeof window === "undefined") {
     return {};
@@ -553,54 +546,16 @@ function imageFromDataUrl(dataUrl) {
 }
 
 async function getTicketHeaderDataUrl(cashBoxText = "") {
-  const normalizedCashBoxText = String(cashBoxText || "").trim();
-  const cacheKey = normalizedCashBoxText || "__default__";
-
-  if (ticketHeaderDataUrlPromises.has(cacheKey)) {
-    return ticketHeaderDataUrlPromises.get(cacheKey);
+  const settings = resolvedTicketTemplate.value;
+  const cacheKey = JSON.stringify([settings, cashBoxText]);
+  if (!ticketHeaderDataUrlPromises.has(cacheKey)) {
+    const promise = getTicketLogoDataUrl().then(async (logoDataUrl) => {
+      if (!logoDataUrl || typeof document === "undefined") return logoDataUrl;
+      return renderTicketHeaderImage(settings, await imageFromDataUrl(logoDataUrl), cashBoxText);
+    }).catch(() => "");
+    ticketHeaderDataUrlPromises.set(cacheKey, promise);
   }
-
-  const promise = getTicketLogoDataUrl()
-    .then(async (logoDataUrl) => {
-      if (!logoDataUrl || typeof document === "undefined") {
-        return logoDataUrl;
-      }
-
-      const logoImage = await imageFromDataUrl(logoDataUrl);
-      const canvas = document.createElement("canvas");
-      canvas.width = 576;
-      canvas.height = 92;
-      const context = canvas.getContext("2d");
-
-      if (!context) {
-        return logoDataUrl;
-      }
-
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(logoImage, 12, 5, 82, 82);
-
-      context.fillStyle = "#000000";
-      context.font = "700 27px Arial, sans-serif";
-      context.textAlign = "center";
-      context.textBaseline = "middle";
-      context.fillText("SUPER KAY", Math.round(canvas.width / 2), Math.round(canvas.height / 2));
-
-      if (normalizedCashBoxText) {
-        context.fillStyle = "#000000";
-        context.font = "700 21px Arial, sans-serif";
-        context.textAlign = "right";
-        context.textBaseline = "middle";
-        context.fillText(normalizedCashBoxText.toUpperCase(), canvas.width - 12, Math.round(canvas.height / 2));
-      }
-
-      return canvas.toDataURL("image/png");
-    })
-    .catch(() => "");
-
-  ticketHeaderDataUrlPromises.set(cacheKey, promise);
-
-  return promise;
+  return ticketHeaderDataUrlPromises.get(cacheKey);
 }
 
 function isPublicPwaOriginForQz() {
@@ -631,7 +586,9 @@ async function initializePrinterBridge({ silent = true } = {}) {
   try {
     await connectQzTray();
 
-    const printers = await getQzPrinters();
+    const printers = await getQzPrinters({
+      expectedPrinterNames: [selectedPrinterName.value || getStoredTicketPrinterName()],
+    });
     availablePrinters.value = printers;
     printerBridgeReady.value = true;
     selectedPrinterName.value = printers.includes(selectedPrinterName.value)
@@ -652,19 +609,6 @@ async function initializePrinterBridge({ silent = true } = {}) {
         message: readablePrinterBridgeError(error),
       });
     }
-  }
-}
-
-function handlePrinterChange(value) {
-  selectedPrinterName.value = value || "";
-  saveStoredTicketPrinterName(selectedPrinterName.value);
-  printerBridgeReady.value = false;
-  printerBridgeMessage.value = selectedPrinterName.value
-    ? `Impresora seleccionada: ${selectedPrinterName.value}. Verificando conexión.`
-    : "Selecciona una impresora para continuar.";
-
-  if (selectedPrinterName.value) {
-    void initializePrinterBridge({ silent: true });
   }
 }
 
@@ -2045,15 +1989,12 @@ function closeChangeModal() {
             :options="cashBoxOptions"
             @change="handleCashBoxChange"
           />
-          <SelectField
-            v-model="selectedPrinterName"
-            label="Impresora de tickets"
-            field="ticket_printer"
-            :options="printerOptions"
-            :disabled="!printerOptions.length"
-            :placeholder="printerBridgeReady ? 'Selecciona impresora' : 'Conectando QZ Tray...'"
-            @change="handlePrinterChange"
-          />
+          <div class="sm:col-span-2">
+            <p class="mb-1 text-sm font-semibold text-text">Impresora de tickets</p>
+            <div class="rounded-xl border border-secondary bg-secondary px-4 py-3 text-sm font-semibold text-text">
+              {{ selectedPrinterName || "Configúrala en Impresoras > Configurar impresoras" }}
+            </div>
+          </div>
         </div>
 
         <p class="-mt-2 text-xs text-text opacity-65">

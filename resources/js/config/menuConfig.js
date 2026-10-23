@@ -456,52 +456,27 @@ export function generateMenu(role, permissions = [], branches = []) {
             icon: "print",
             isOpen: false,
             children: [
-                ...(canUse("tickets")
-                    ? [
-                          {
-                              text: "Tickets",
-                              key: "printers.tickets",
-                              icon: "receipt_long",
-                              url: route("printers.tickets.index"),
-                          },
-                          {
-                              text: "Estados de cuenta",
-                              key: "printers.employee-credit-statement-tickets",
-                              icon: "account_balance_wallet",
-                              url: route("printers.employee-credit-statement-tickets.index"),
-                          },
-                      ]
-                    : []),
-                ...(canUse("cashClosureTickets")
-                    ? [
-                          {
-                              text: "Tickets de corte",
-                              key: "printers.cash-closure-tickets",
-                              icon: "payments",
-                              url: route("printers.cash-closure-tickets.index"),
-                          },
-                      ]
-                    : []),
-                ...(canUse("labels")
-                    ? [
-                          {
-                              text: "Etiquetas",
-                              key: "printers.labels",
-                              icon: "barcode",
-                              url: route("printers.labels.index"),
-                          },
-                      ]
-                    : []),
-                ...(canUse("qzSetup")
-                    ? [
-                          {
-                              text: "Configurar QZ Tray",
-                              key: "printers.qz-setup",
-                              icon: "settings_input_component",
-                              url: route("printers.qz-setup.index"),
-                          },
-                      ]
-                    : []),
+                ...(canUse("qzSetup") ? [{
+                    text: "Configurar impresoras", key: "printers.qz-setup",
+                    icon: "settings_input_component", url: route("printers.qz-setup.index"),
+                }] : []),
+                ...(canUse("tickets") || canUse("cashClosureTickets") ? [{
+                    text: "Tickets", key: "printers.tickets", icon: "receipt_long",
+                    url: route(canUse("tickets") ? "printers.tickets.index" : "printers.cash-closure-tickets.index"),
+                    activeUrls: [
+                        route("printers.tickets.index"),
+                        route("printers.employee-credit-statement-tickets.index"),
+                        route("printers.cash-closure-tickets.index"),
+                        route("printers.document-tickets.index", {kind: "sale-return"}),
+                        route("printers.document-tickets.index", {kind: "credit-payment"}),
+                        ...["sales", "statement", "closure", "sale-return", "credit-payment"].map(kind => route("printers.visual-editor.show", {kind})),
+                    ],
+                }] : []),
+                ...(canUse("labels") ? [{
+                    text: "Etiquetas", key: "printers.labels", icon: "barcode",
+                    url: route("printers.labels.index"),
+                    activeUrls: [route("printers.labels.index"), route("printers.visual-editor.show", {kind: "label"})],
+                }] : []),
             ],
         });
     }

@@ -56,12 +56,17 @@ class Sale extends Model
 
     public function cancellation()
     {
-        return $this->hasOne(SaleCancellation::class);
+        return $this->hasOne(SaleCancellation::class)->whereNull('voided_at');
     }
 
     public function cancellations()
     {
         return $this->hasMany(SaleCancellation::class);
+    }
+
+    public function activeCancellations()
+    {
+        return $this->hasMany(SaleCancellation::class)->whereNull('voided_at');
     }
 
     public function creditCharge()

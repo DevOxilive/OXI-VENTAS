@@ -28,6 +28,43 @@ class TicketTemplate extends Model
         'settings' => 'array',
     ];
 
+    public const DOCUMENT_TEMPLATES = [
+        'sale-return' => [
+            'slug' => 'sale-return-ticket',
+            'name' => 'Cancelaciones y devoluciones',
+            'title' => 'COMPROBANTE DE DEVOLUCION',
+            'footer' => 'Conserva este comprobante para aclaraciones',
+        ],
+        'credit-payment' => [
+            'slug' => 'credit-payment-ticket',
+            'name' => 'Abonos',
+            'title' => 'COMPROBANTE DE ABONO',
+            'footer' => 'Gracias por tu abono',
+        ],
+    ];
+
+    public static function documentDefaultSettings(string $kind): array
+    {
+        $definition = self::DOCUMENT_TEMPLATES[$kind] ?? throw new \InvalidArgumentException('Tipo de plantilla desconocido.');
+        return array_replace(static::defaultSettings(), [
+            'subheader_text' => $definition['title'],
+            'footer_text' => $definition['footer'],
+            'open_cash_drawer' => false,
+            'items_format' => 'standard',
+        ]);
+    }
+
+    public static function documentTemplate(string $kind): self
+    {
+        $definition = self::DOCUMENT_TEMPLATES[$kind] ?? throw new \InvalidArgumentException('Tipo de plantilla desconocido.');
+        $defaults = static::documentDefaultSettings($kind);
+        $template = static::query()->firstOrCreate(['slug' => $definition['slug']], [
+            'name' => $definition['name'], 'is_active' => true, 'settings' => $defaults,
+        ]);
+        $template->settings = static::sanitizeSettings($template->settings ?? [], $defaults);
+        return $template;
+    }
+
     public static function defaultSettings(): array
     {
         return [
@@ -67,7 +104,7 @@ class TicketTemplate extends Model
     {
         return [
             'label_width_mm' => 62,
-            'label_height_mm' => 18,
+            'label_height_mm' => 29,
             'print_engine' => 'visual',
             'barcode_height_mm' => 6,
             'barcode_width_percent' => 100,
@@ -104,16 +141,12 @@ class TicketTemplate extends Model
         );
 
         $normalizedSettings = static::sanitizeSettings(
-            static::upgradeLegacySettings($template->settings ?? [])
+            $template->settings ?? []
         );
 
-        if (!$template->settings || $normalizedSettings !== ($template->settings ?? [])) {
-            $template->update([
-                'settings' => $normalizedSettings,
-            ]);
-        }
+        $template->settings = $normalizedSettings;
 
-        return $template->fresh();
+        return $template;
     }
 
     public static function cashClosureTemplate(): self
@@ -129,13 +162,9 @@ class TicketTemplate extends Model
 
         $normalizedSettings = static::sanitizeSettings($template->settings ?? static::cashClosureDefaultSettings(), static::cashClosureDefaultSettings());
 
-        if (!$template->settings || $normalizedSettings !== ($template->settings ?? [])) {
-            $template->update([
-                'settings' => $normalizedSettings,
-            ]);
-        }
+        $template->settings = $normalizedSettings;
 
-        return $template->fresh();
+        return $template;
     }
 
     public static function employeeCreditStatementTemplate(): self
@@ -154,13 +183,9 @@ class TicketTemplate extends Model
             static::employeeCreditStatementDefaultSettings()
         );
 
-        if (!$template->settings || $normalizedSettings !== ($template->settings ?? [])) {
-            $template->update([
-                'settings' => $normalizedSettings,
-            ]);
-        }
+        $template->settings = $normalizedSettings;
 
-        return $template->fresh();
+        return $template;
     }
 
     public static function employeeCreditStatementDefaultSettings(): array
@@ -213,13 +238,9 @@ class TicketTemplate extends Model
 
         $normalizedSettings = static::sanitizeLabelSettings($template->settings ?? []);
 
-        if (!$template->settings || $normalizedSettings !== ($template->settings ?? [])) {
-            $template->update([
-                'settings' => $normalizedSettings,
-            ]);
-        }
+        $template->settings = $normalizedSettings;
 
-        return $template->fresh();
+        return $template;
     }
 
     public static function sanitizeSettings(array $settings = [], ?array $customDefaults = null): array
@@ -261,18 +282,18 @@ class TicketTemplate extends Model
             ->all();
 
         return [
-            'paper_width' => 48,
+            'paper_width' => max(24, min(64, (int) ($settings['paper_width'] ?? $defaults['paper_width']))),
             'print_engine' => in_array(($settings['print_engine'] ?? $defaults['print_engine']), ['raw', 'visual'], true)
                 ? (string) ($settings['print_engine'] ?? $defaults['print_engine'])
                 : $defaults['print_engine'],
-            'feed_lines' => 1,
+            'feed_lines' => max(1, min(8, (int) ($settings['feed_lines'] ?? $defaults['feed_lines']))),
             'auto_cut' => filter_var($settings['auto_cut'] ?? $defaults['auto_cut'], FILTER_VALIDATE_BOOLEAN),
             'open_cash_drawer' => filter_var($settings['open_cash_drawer'] ?? $defaults['open_cash_drawer'], FILTER_VALIDATE_BOOLEAN),
             'header_text' => static::nonBlankText($settings['header_text'] ?? null, $defaults['header_text']),
             'subheader_text' => static::nonBlankText($settings['subheader_text'] ?? null, $defaults['subheader_text']),
             'cash_box_text' => static::nonBlankText($settings['cash_box_text'] ?? null, $defaults['cash_box_text']),
             'footer_text' => static::nonBlankText($settings['footer_text'] ?? null, $defaults['footer_text']),
-            'show_dividers' => true,
+            'show_dividers' => filter_var($settings['show_dividers'] ?? $defaults['show_dividers'], FILTER_VALIDATE_BOOLEAN),
             'items_format' => in_array(($settings['items_format'] ?? $defaults['items_format'] ?? 'standard'), ['standard', 'credit_statement'], true)
                 ? (string) ($settings['items_format'] ?? $defaults['items_format'] ?? 'standard')
                 : ($defaults['items_format'] ?? 'standard'),
@@ -304,15 +325,15 @@ class TicketTemplate extends Model
                         ? filter_var($incoming['enabled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $defaultBlock['enabled']
                         : $defaultBlock['enabled'],
                     'position_percent' => max(0, min(100, (int) ($incoming['position_percent'] ?? $defaultBlock['position_percent']))),
-                    'size_percent' => max(50, min(440, (int) ($incoming['size_percent'] ?? $defaultBlock['size_percent']))),
+                    'size_percent' => max(50, min(2000, (int) ($incoming['size_percent'] ?? $defaultBlock['size_percent']))),
                 ];
             })
             ->values()
             ->all();
 
         return [
-            'label_width_mm' => $defaults['label_width_mm'],
-            'label_height_mm' => $defaults['label_height_mm'],
+            'label_width_mm' => max(20, min(210, (int) ($settings['label_width_mm'] ?? $defaults['label_width_mm']))),
+            'label_height_mm' => max(12, min(300, (int) ($settings['label_height_mm'] ?? $defaults['label_height_mm']))),
             'print_engine' => 'visual',
             'barcode_height_mm' => max(6, min(28, (int) ($settings['barcode_height_mm'] ?? $defaults['barcode_height_mm']))),
             'barcode_width_percent' => max(45, min(100, (int) ($settings['barcode_width_percent'] ?? $defaults['barcode_width_percent']))),

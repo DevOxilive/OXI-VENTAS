@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { Head, router, useForm } from "@inertiajs/vue3";
+import { renderTicketHeaderImage } from "@/config/ticketTemplate";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { Head, router, useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
 import GlobalCard from "@/Components/Cards/GlobalCard.vue";
@@ -18,6 +19,7 @@ import {
   connectQzTray,
   findTicketPrinter,
   getQzPrinters,
+  getStoredTicketPrinterName,
   isQzTrayActive,
   printEscPosTicket,
 } from "@/Composables/useQzTray";
@@ -28,6 +30,7 @@ import {
 } from "@/config/ticketTemplate";
 import { usePermissions } from "@/Composables/usePermissions";
 import { cashDenominations, totalCashDenominations } from "@/config/cashDenominations";
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from "@/realtime";
 
 defineOptions({
   layout: AdminLayout,
@@ -42,9 +45,11 @@ const props = defineProps({
 });
 
 const { can } = usePermissions();
+const page = usePage();
+let unsubscribeSaleReturnChanged = null;
 
 const showClosureModal = ref(false);
-const selectedPrinterName = ref("");
+const selectedPrinterName = ref(getStoredTicketPrinterName());
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para imprimir tickets.");
 const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
@@ -90,8 +95,9 @@ const summaryCards = computed(() => [
   { label: "Caja", value: `#${props.current?.cash_box_number || "1"}`, tone: "neutral" },
   { label: "Ventas pendientes", value: props.current?.sales_count ?? 0, tone: "neutral" },
   { label: "Abonos recibidos", value: canViewClosureOutcome.value ? `${props.current?.credit_payments_count ?? 0} · ${money(props.current?.credit_payments_total)}` : (props.current?.credit_payments_count ?? 0), tone: "success" },
-  { label: "Devoluciones", value: props.current?.refunds_count ?? 0, tone: "danger" },
-  { label: "Efectivo esperado", value: canViewClosureOutcome.value ? money(props.current?.expected_cash) : "Restringido", tone: "dark" },
+  { label: "Ventas efectivo", value: canViewClosureOutcome.value ? money(props.current?.cash_sales_total) : "Restringido", tone: "neutral" },
+  { label: "Devuelto efectivo", value: canViewClosureOutcome.value ? `-${money(props.current?.refund_cash_total)}` : "Restringido", tone: "danger" },
+  { label: "Efectivo neto", value: canViewClosureOutcome.value ? money(props.current?.net_cash_sales_total) : "Restringido", tone: "dark" },
 ]);
 
 const toolbarConfig = computed(() => {
@@ -178,54 +184,16 @@ function imageFromDataUrl(dataUrl) {
 }
 
 async function getTicketHeaderDataUrl(cashBoxText = "") {
-  const normalizedCashBoxText = String(cashBoxText || "").trim();
-  const cacheKey = normalizedCashBoxText || "__default__";
-
-  if (ticketHeaderDataUrlPromises.has(cacheKey)) {
-    return ticketHeaderDataUrlPromises.get(cacheKey);
+  const settings = resolvedTicketTemplate.value;
+  const cacheKey = JSON.stringify([settings, cashBoxText]);
+  if (!ticketHeaderDataUrlPromises.has(cacheKey)) {
+    const promise = getTicketLogoDataUrl().then(async (logoDataUrl) => {
+      if (!logoDataUrl || typeof document === "undefined") return logoDataUrl;
+      return renderTicketHeaderImage(settings, await imageFromDataUrl(logoDataUrl), cashBoxText);
+    }).catch(() => "");
+    ticketHeaderDataUrlPromises.set(cacheKey, promise);
   }
-
-  const promise = getTicketLogoDataUrl()
-    .then(async (logoDataUrl) => {
-      if (!logoDataUrl || typeof document === "undefined") {
-        return logoDataUrl;
-      }
-
-      const logoImage = await imageFromDataUrl(logoDataUrl);
-      const canvas = document.createElement("canvas");
-      canvas.width = 576;
-      canvas.height = 92;
-      const context = canvas.getContext("2d");
-
-      if (!context) {
-        return logoDataUrl;
-      }
-
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(logoImage, 12, 5, 82, 82);
-
-      context.fillStyle = "#000000";
-      context.font = "700 27px Arial, sans-serif";
-      context.textAlign = "center";
-      context.textBaseline = "middle";
-      context.fillText("SUPER KAY", Math.round(canvas.width / 2), Math.round(canvas.height / 2));
-
-      if (normalizedCashBoxText) {
-        context.fillStyle = "#000000";
-        context.font = "700 21px Arial, sans-serif";
-        context.textAlign = "right";
-        context.textBaseline = "middle";
-        context.fillText(normalizedCashBoxText.toUpperCase(), canvas.width - 12, Math.round(canvas.height / 2));
-      }
-
-      return canvas.toDataURL("image/png");
-    })
-    .catch(() => "");
-
-  ticketHeaderDataUrlPromises.set(cacheKey, promise);
-
-  return promise;
+  return ticketHeaderDataUrlPromises.get(cacheKey);
 }
 
 function denominationTotal(item) {
@@ -266,7 +234,9 @@ function closeClosureModal() {
 async function initializePrinterBridge({ silent = true } = {}) {
   try {
     await connectQzTray();
-    const printers = await getQzPrinters();
+    const printers = await getQzPrinters({
+      expectedPrinterNames: [selectedPrinterName.value || getStoredTicketPrinterName()],
+    });
     printerBridgeReady.value = true;
     selectedPrinterName.value = findTicketPrinter(printers);
     printerBridgeMessage.value = selectedPrinterName.value
@@ -362,8 +332,15 @@ function saveClosure() {
 onMounted(() => {
   if (!props.selectorMode) {
     initializePrinterBridge({ silent: true });
+    unsubscribeSaleReturnChanged = subscribeRealtime(
+      REALTIME_CHANNELS.salesBranch(props.branch?.id),
+      REALTIME_EVENTS.saleReturnChanged,
+      () => refreshRealtimeProps(page, ['current']),
+    );
   }
 });
+
+onBeforeUnmount(() => unsubscribeSaleReturnChanged?.());
 </script>
 
 <template>
@@ -477,7 +454,13 @@ onMounted(() => {
 
           <div v-if="canViewClosureOutcome" class="grid gap-4 border-t border-secondary p-4 lg:grid-cols-2">
             <section class="rounded-xl border border-secondary bg-secondary/20 p-4">
-              <h3 class="text-sm font-black uppercase tracking-wide text-text">Cómo se integra el corte</h3>
+              <h3 class="text-sm font-black uppercase tracking-wide text-text">Efectivo</h3>
+              <div class="mt-3 divide-y divide-secondary text-sm text-text">
+                <div class="flex justify-between gap-3 py-2"><span>Ventas en efectivo</span><strong>{{ money(current.cash_sales_total) }}</strong></div>
+                <div class="flex justify-between gap-3 py-2 text-primary"><span>Devoluciones en efectivo</span><strong>-{{ money(current.refund_cash_total) }}</strong></div>
+                <div class="flex justify-between gap-3 py-2 font-black"><span>Efectivo neto</span><strong>{{ money(current.net_cash_sales_total) }}</strong></div>
+              </div>
+              <h3 class="mt-5 text-sm font-black uppercase tracking-wide text-text">Operaciones</h3>
               <div class="mt-3 divide-y divide-secondary text-sm text-text">
                 <div v-for="entry in current.payment_breakdown || []" :key="entry.method" class="flex justify-between gap-3 py-2">
                   <span>{{ entry.method }} · {{ entry.sales_count }} operaciones</span>

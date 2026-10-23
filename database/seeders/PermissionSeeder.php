@@ -140,6 +140,7 @@ class PermissionSeeder extends Seeder
             'sales.view',
             'sales.create',
             'sales.update',
+            'sales.returns.void',
             'sales.delete',
             'sales.reports',
             'sales.employee-credit.view',

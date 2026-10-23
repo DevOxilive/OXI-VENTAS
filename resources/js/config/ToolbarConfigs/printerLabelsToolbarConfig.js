@@ -7,13 +7,14 @@ export function getPrinterLabelsToolbarConfig({
   return {
     icon: "barcode",
     title: "Etiquetas",
-    subtitle: "Edita etiquetas de producto con codigo de barras, categoria, nombre, precio y variables.",
+    subtitle: "Productos, papel y diseño en un solo lugar.",
     showSearch: false,
     showRecordsPerPage: false,
     showCounter: false,
     filters: [],
     tabs: [],
     actions: [
+      {id: "visual-editor", label: "Editor visual", icon: "draw", variant: "slate"},
       ...(canSave ? [
         {
           id: "reset",
@@ -31,7 +32,7 @@ export function getPrinterLabelsToolbarConfig({
       ...(canPrint ? [
         {
           id: "print",
-          label: printing ? "Imprimiendo..." : "Probar impresion",
+          label: printing ? "Imprimiendo..." : "Imprimir etiquetas",
           icon: "print",
           variant: "green",
         },

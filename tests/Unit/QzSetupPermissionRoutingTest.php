@@ -39,11 +39,19 @@ class QzSetupPermissionRoutingTest extends TestCase
             $this->assertTrue($zip->open($zipPath) === true);
             $this->assertNotFalse($zip->locateName('qz-public.pem'));
             $this->assertNotFalse($zip->locateName('install-qz-tray-trust.ps1'));
-            $this->assertNotFalse($zip->locateName('INSTALAR-QZ.bat'));
+            $this->assertNotFalse($zip->locateName('CONFIGURAR-IMPRESORAS.bat'));
             $this->assertFalse($zip->locateName('qz-private.pem'));
             $this->assertStringContainsString(
                 '%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
-                (string) $zip->getFromName('INSTALAR-QZ.bat')
+                (string) $zip->getFromName('CONFIGURAR-IMPRESORAS.bat')
+            );
+            $this->assertStringContainsString(
+                'Configurar impresoras',
+                (string) $zip->getFromName('CONFIGURAR-IMPRESORAS.bat')
+            );
+            $this->assertStringContainsString(
+                'Get-PrinterInventory',
+                (string) $zip->getFromName('install-qz-tray-trust.ps1')
             );
         } finally {
             $zip->close();

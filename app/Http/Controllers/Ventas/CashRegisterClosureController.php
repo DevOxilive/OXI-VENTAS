@@ -11,6 +11,7 @@ use App\Models\EmployeeCreditPayment;
 use App\Models\Sale;
 use App\Models\SaleCancellation;
 use App\Models\TicketTemplate;
+use App\Support\VisualPrintLayout;
 use App\Models\User;
 use App\Support\SystemPermission;
 use App\Support\TablePagination;
@@ -317,6 +318,7 @@ class CashRegisterClosureController extends Controller
 
         $refunds = SaleCancellation::query()
             ->with(['paymentMethod:id,name', 'cancelledBy:id,name'])
+            ->whereNull('voided_at')
             ->where('branch_id', $branch->id)
             ->where('cash_box_number', (string) $cashBoxNumber)
             ->where('cancelled_at', '>', $periodStart)
@@ -367,6 +369,9 @@ class CashRegisterClosureController extends Controller
             ->values();
 
         $refundCashTotal = $refundBreakdown->sum('refund_cash');
+        $cashSalesTotal = $sales
+            ->filter(fn (Sale $sale) => $this->isCashMethod($sale->paymentMethod?->name ?? ''))
+            ->sum('total');
         $refundCardTotal = $refundBreakdown
             ->where('type', 'card')
             ->sum('total');
@@ -389,6 +394,8 @@ class CashRegisterClosureController extends Controller
             'refunds_total' => round((float) $refunds->sum('amount'), 2),
             'refund_cash_total' => round((float) $refundCashTotal, 2),
             'refund_card_total' => round((float) $refundCardTotal, 2),
+            'cash_sales_total' => round((float) $cashSalesTotal, 2),
+            'net_cash_sales_total' => round((float) $cashSalesTotal - (float) $refundCashTotal, 2),
             'expected_cash' => round((float) $expectedCash, 2),
             'card_total' => round((float) $cardTotal, 2),
             'other_total' => 0,
@@ -785,7 +792,7 @@ class CashRegisterClosureController extends Controller
             'id' => $template->id,
             'name' => $template->name,
             'slug' => $template->slug,
-            'settings' => TicketTemplate::sanitizeSettings($template->settings ?? []),
+            'settings' => VisualPrintLayout::withActive('closure', TicketTemplate::sanitizeSettings($template->settings ?? [])),
         ];
     }
 

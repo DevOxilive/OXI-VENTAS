@@ -36,12 +36,12 @@ class QzTrayInstallerController extends Controller
 
         $zip->addFile($certificatePath, 'qz-public.pem');
         $zip->addFile($scriptPath, 'install-qz-tray-trust.ps1');
-        $zip->addFromString('INSTALAR-QZ.bat', $this->launcherContents());
+        $zip->addFromString('CONFIGURAR-IMPRESORAS.bat', $this->launcherContents());
         $zip->addFromString('LEEME.txt', $this->readmeContents());
         $zip->close();
 
         return response()
-            ->download($temporaryPath, 'super-kay-qz-tray-installer.zip', [
+            ->download($temporaryPath, 'super-kay-configurar-impresoras.zip', [
                 'Content-Type' => 'application/zip',
                 'Cache-Control' => 'no-store, private',
             ])
@@ -53,10 +53,10 @@ class QzTrayInstallerController extends Controller
         return <<<BAT
 @echo off
 setlocal
-title Super-Kay - Configurar QZ Tray
+title Super-Kay - Configurar impresoras
 
 echo.
-echo Este instalador autorizara QZ Tray para Super-Kay en este usuario de Windows.
+echo Este instalador preparara QZ Tray y revisara las impresoras de esta computadora.
 echo.
 
 set "POWERSHELL_EXE=%SystemRoot%\System32\WindowsPowerShell\\v1.0\powershell.exe"
@@ -69,13 +69,14 @@ if not exist "%POWERSHELL_EXE%" (
 "%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-qz-tray-trust.ps1" -CertificatePath "%~dp0qz-public.pem" -RestartQzTray
 if errorlevel 1 (
     echo.
-    echo No se pudo configurar QZ Tray. Lee el mensaje anterior y vuelve a intentarlo.
+    echo No se pudo preparar la computadora. Lee el mensaje anterior y vuelve a intentarlo.
     pause
     exit /b 1
 )
 
 echo.
-echo QZ Tray quedo listo. Abre Super-Kay e imprime un ticket de prueba.
+echo La preparacion termino. Abre Configurar impresoras en Super-Kay,
+echo asigna las dos colas y realiza ambas pruebas fisicas.
 pause
 BAT;
     }
@@ -83,10 +84,13 @@ BAT;
     private function readmeContents(): string
     {
         return <<<TXT
-1. Instala QZ Tray 2.2.6 o posterior.
-2. Descomprime este archivo ZIP completo.
-3. Haz doble clic en INSTALAR-QZ.bat con el mismo usuario de Windows que usa Super-Kay.
-4. Abre Super-Kay e imprime un ticket de prueba.
+1. Instala los drivers de la impresora de tickets y de la impresora de etiquetas.
+2. Instala QZ Tray 2.2.6 o posterior.
+3. Descomprime este archivo ZIP completo.
+4. Haz doble clic en CONFIGURAR-IMPRESORAS.bat con el mismo usuario de Windows que usa Super-Kay.
+5. Revisa las impresoras encontradas y cualquier advertencia del instalador.
+6. Abre Super-Kay > Impresoras > Configurar impresoras.
+7. Asigna una cola para tickets, otra para etiquetas y realiza ambas pruebas fisicas.
 TXT;
     }
 }

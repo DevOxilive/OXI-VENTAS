@@ -9,6 +9,7 @@ use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductDepartment;
 use App\Models\User;
 use App\Services\InventoryReportService;
 use App\Support\LocalDateTime;
@@ -21,6 +22,22 @@ use Maatwebsite\Excel\Facades\Excel;
 class ReportController extends Controller
 {
     use AuthorizesBranchAccess;
+
+    private const MOVEMENT_TYPE_LABELS = [
+        'IN' => 'Entradas',
+        'OUT' => 'Salidas',
+        'ADJUSTMENT' => 'Ajustes',
+    ];
+
+    private const MOVEMENT_REASON_LABELS = [
+        'SALE' => 'Venta',
+        'PURCHASE' => 'Compra',
+        'RETURN' => 'Reingreso',
+        'DAMAGED' => 'Dañado',
+        'EXPIRED' => 'Caducado',
+        'OTHER' => 'Otros',
+        'INVENTORY_DIFFERENCE' => 'Ajuste manual',
+    ];
 
     private const REPORT_TYPES = [
         'sales' => [
@@ -167,10 +184,11 @@ class ReportController extends Controller
             'currentBranch' => $branch,
             'filters' => $filters,
             'catalogs' => [
+                'productDepartments' => $this->productDepartmentOptions($branch),
                 'categories' => $this->categoryOptions($branch),
                 'users' => $this->movementUserOptions($branch),
-                'movementTypes' => $this->movementTypes(),
-                'movementReasons' => $this->movementReasons(),
+                'movementTypes' => $this->movementTypes($branch),
+                'movementReasons' => $this->movementReasons($branch),
             ],
             'movements' => $reportService->rows($branch, $filters, true),
         ]);
@@ -258,11 +276,17 @@ class ReportController extends Controller
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
             'product_id' => $request->input('product_id'),
+            'department_id' => $request->input('department_id'),
+            'department_ids' => $this->requestFilterValues($request, 'department_ids', 'department_id'),
             'category_id' => $request->input('category_id'),
+            'category_ids' => $this->requestFilterValues($request, 'category_ids', 'category_id'),
             'status' => $request->input('status'),
             'user_id' => $request->input('user_id'),
+            'user_ids' => $this->requestFilterValues($request, 'user_ids', 'user_id'),
             'movement_type' => $request->input('movement_type'),
+            'movement_types' => $this->requestFilterValues($request, 'movement_types', 'movement_type'),
             'movement_reason' => $request->input('movement_reason'),
+            'movement_reasons' => $this->requestFilterValues($request, 'movement_reasons', 'movement_reason'),
             'search' => $request->input('search'),
             'per_page' => TablePagination::resolvePerPage($request),
         ];
@@ -318,12 +342,27 @@ class ReportController extends Controller
     private function categoryOptions(Branch $branch)
     {
         return Category::query()
-            ->select(['categories.id', 'categories.name'])
+            ->select(['categories.id', 'categories.product_department_id', 'categories.name'])
             ->join('products', 'products.category_id', '=', 'categories.id')
             ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
+            ->join('stock_movements', 'stock_movements.branch_product_id', '=', 'branch_products.id')
             ->where('branch_products.branch_id', $branch->id)
             ->distinct()
             ->orderBy('categories.name')
+            ->get();
+    }
+
+    private function productDepartmentOptions(Branch $branch)
+    {
+        return ProductDepartment::query()
+            ->select(['product_departments.id', 'product_departments.name'])
+            ->join('categories', 'categories.product_department_id', '=', 'product_departments.id')
+            ->join('products', 'products.category_id', '=', 'categories.id')
+            ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
+            ->join('stock_movements', 'stock_movements.branch_product_id', '=', 'branch_products.id')
+            ->where('branch_products.branch_id', $branch->id)
+            ->distinct()
+            ->orderBy('product_departments.name')
             ->get();
     }
 
@@ -339,25 +378,54 @@ class ReportController extends Controller
             ->get();
     }
 
-    private function movementTypes(): array
+    private function movementTypes(Branch $branch): array
     {
-        return [
-            ['id' => 'IN', 'label' => 'Entradas'],
-            ['id' => 'OUT', 'label' => 'Salidas'],
-            ['id' => 'ADJUSTMENT', 'label' => 'Ajustes'],
-        ];
+        return collect(array_keys(self::MOVEMENT_TYPE_LABELS))
+            ->merge($this->movementValuesForBranch($branch, 'type'))
+            ->unique()
+            ->map(fn (string $type) => [
+                'id' => $type,
+                'label' => self::MOVEMENT_TYPE_LABELS[$type] ?? $type,
+            ])
+            ->values()
+            ->all();
     }
 
-    private function movementReasons(): array
+    private function movementReasons(Branch $branch): array
     {
-        return [
-            ['id' => 'PURCHASE', 'label' => 'Compra'],
-            ['id' => 'SALE', 'label' => 'Venta'],
-            ['id' => 'DAMAGED', 'label' => 'Danado'],
-            ['id' => 'EXPIRED', 'label' => 'Caducado'],
-            ['id' => 'OTHER', 'label' => 'Otros'],
-            ['id' => 'INVENTORY_DIFFERENCE', 'label' => 'Ajuste manual'],
-        ];
+        return collect(array_keys(self::MOVEMENT_REASON_LABELS))
+            ->merge($this->movementValuesForBranch($branch, 'reason'))
+            ->unique()
+            ->map(fn (string $reason) => [
+                'id' => $reason,
+                'label' => self::MOVEMENT_REASON_LABELS[$reason] ?? $reason,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function movementValuesForBranch(Branch $branch, string $column)
+    {
+        return \App\Models\StockMovement::query()
+            ->join('branch_products', 'branch_products.id', '=', 'stock_movements.branch_product_id')
+            ->where('branch_products.branch_id', $branch->id)
+            ->whereNotNull('stock_movements.'.$column)
+            ->distinct()
+            ->orderBy('stock_movements.'.$column)
+            ->pluck('stock_movements.'.$column);
+    }
+
+    private function requestFilterValues(Request $request, string $pluralKey, string $legacyKey): array
+    {
+        $values = $request->input($pluralKey, $request->input($legacyKey, []));
+        $values = is_array($values) ? $values : [$values];
+
+        return collect($values)
+            ->filter(fn ($value) => $value !== null && $value !== '')
+            ->map(fn ($value) => (string) $value)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function reportBranches(Request $request)

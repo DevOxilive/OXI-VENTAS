@@ -19,6 +19,7 @@ use App\Models\SaleCancellation;
 use App\Models\SaleDetail;
 use App\Models\StockMovement;
 use App\Models\TicketTemplate;
+use App\Support\VisualPrintLayout;
 use App\Models\User;
 use App\Search\ProductSearchOptions;
 use App\Search\ProductSearchService;
@@ -82,7 +83,7 @@ class SalesController extends Controller
                 'id' => $ticketTemplate->id,
                 'name' => $ticketTemplate->name,
                 'slug' => $ticketTemplate->slug,
-                'settings' => TicketTemplate::sanitizeSettings($ticketTemplate->settings ?? []),
+                'settings' => VisualPrintLayout::withActive('sales', TicketTemplate::sanitizeSettings($ticketTemplate->settings ?? [])),
             ],
         ]);
     }
@@ -152,11 +153,12 @@ class SalesController extends Controller
                 'paymentMethod:id,name',
                 'details.product:id,name,inventory_unit,unit',
                 'details.product.barcodes:id,product_id,code',
-                'details.cancellationDetails',
+                'details.activeCancellationDetails',
                 'creditCharge:id,sale_id,employee_credit_account_id',
                 'creditCharge.account.employee:id,first_name,last_name',
                 'creditCharge.account.customer:id,name,first_name,last_name',
                 'cancellations.cancelledBy:id,name',
+                'cancellations.voidedBy:id,name',
                 'cancellations.details.product:id,name,inventory_unit,unit',
                 'cancellations.details.barcode:id,code',
             ])
@@ -260,7 +262,7 @@ class SalesController extends Controller
                 'id' => $ticketTemplate->id,
                 'name' => $ticketTemplate->name,
                 'slug' => $ticketTemplate->slug,
-                'settings' => TicketTemplate::sanitizeSettings($ticketTemplate->settings ?? []),
+                'settings' => VisualPrintLayout::withActive('sales', TicketTemplate::sanitizeSettings($ticketTemplate->settings ?? [])),
             ],
         ]);
     }
@@ -643,6 +645,34 @@ class SalesController extends Controller
         ]);
     }
 
+    public function voidReturn(Request $request, Sale $sale, SaleCancellation $cancellation, SaleCancellationService $cancellationService)
+    {
+        abort_unless((int) $cancellation->sale_id === (int) $sale->id, 404);
+
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $user = $request->user()->loadMissing(['branches', 'role']);
+        $this->resolveBranchById($sale->branch_id, $user);
+
+        $cancellationService->voidCancellation(
+            sale: $sale,
+            cancellation: $cancellation,
+            user: $user,
+            reason: $data['reason'],
+        );
+
+        $creditAccountId = EmployeeCreditCharge::query()
+            ->where('sale_id', $sale->id)
+            ->value('employee_credit_account_id');
+        if ($creditAccountId) {
+            broadcast(new CreditAccountChanged('return_voided', (int) $creditAccountId))->toOthers();
+        }
+
+        return back()->with('success', 'La devolución '.$this->returnFolio($cancellation).' fue anulada correctamente.');
+    }
+
     private function nearExpirationProducts(Branch $branch, int $limit): Collection
     {
         return BranchProduct::query()
@@ -730,8 +760,9 @@ class SalesController extends Controller
 
     private function mapRecentSale(Sale $sale): array
     {
-        $returnedAmount = (float) $sale->cancellations->sum('amount');
-        $hasReturns = $sale->cancellations->isNotEmpty();
+        $activeReturns = $sale->cancellations->whereNull('voided_at');
+        $returnedAmount = (float) $activeReturns->sum('amount');
+        $hasReturns = $activeReturns->isNotEmpty();
 
         return [
             'id' => (int) $sale->id,
@@ -753,7 +784,7 @@ class SalesController extends Controller
                 : ($hasReturns ? 'Devolución parcial' : 'Completada'),
             'visual_status' => $sale->status === 'cancelled' ? 'returned' : ($hasReturns ? 'partial_return' : 'completed'),
             'can_cancel' => $sale->status === 'completed' && $sale->details->contains(
-                fn (SaleDetail $detail) => (float) $detail->quantity - (float) $detail->cancellationDetails->sum('quantity') > 0.000001
+                fn (SaleDetail $detail) => (float) $detail->quantity - (float) $detail->activeCancellationDetails->sum('quantity') > 0.000001
             ),
             'total' => (float) $sale->total,
             'returned_amount' => $returnedAmount,
@@ -770,6 +801,11 @@ class SalesController extends Controller
                     'amount' => (float) $cancellation->amount,
                     'cancelled_at_display' => LocalDateTime::format($cancellation->cancelled_at, 'd/m/Y H:i') ?? '-',
                     'cancelled_by' => $cancellation->cancelledBy?->name ?? 'Sin usuario',
+                    'is_voided' => $cancellation->isVoided(),
+                    'voided_at_display' => LocalDateTime::format($cancellation->voided_at, 'd/m/Y H:i'),
+                    'voided_by' => $cancellation->voidedBy?->name,
+                    'void_reason' => $cancellation->void_reason,
+                    'can_void' => ! $cancellation->isVoided(),
                     'application_label' => $this->returnApplicationLabel($cancellation, $sale),
                     'account_balance_before' => $cancellation->account_balance_before !== null
                         ? (float) $cancellation->account_balance_before
@@ -861,8 +897,8 @@ class SalesController extends Controller
             'code' => $product?->barcodes?->first()?->code ?? '-',
             'quantity_display' => $this->formatQuantityForTicket($baseQuantity, $unit),
             'quantity' => (float) $detail->quantity,
-            'returned_quantity' => (float) $detail->cancellationDetails->sum('quantity'),
-            'remaining_quantity' => max(0, (float) $detail->quantity - (float) $detail->cancellationDetails->sum('quantity')),
+            'returned_quantity' => (float) $detail->activeCancellationDetails->sum('quantity'),
+            'remaining_quantity' => max(0, (float) $detail->quantity - (float) $detail->activeCancellationDetails->sum('quantity')),
             'sale_unit' => $detail->sale_unit,
             'unit_price' => (float) $detail->unit_price,
             'discount_amount' => (float) ($detail->discount_amount ?? 0),
@@ -1105,9 +1141,13 @@ class SalesController extends Controller
         ]);
         $sale = $cancellation->sale;
 
+        $template = TicketTemplate::documentTemplate('sale-return');
+
         return [
             'type' => 'sale_return',
-            'document_title' => 'COMPROBANTE DE DEVOLUCION',
+            'document_title' => $cancellation->isVoided() ? 'COMPROBANTE DE DEVOLUCION ANULADA' : $template->settings['subheader_text'],
+            'template_settings' => VisualPrintLayout::withActive('sale-return', $template->settings),
+            'template_slug' => $template->slug,
             'sale_id' => (int) $sale->id,
             'sale_cancellation_id' => (int) $cancellation->id,
             'folio' => $this->returnFolio($cancellation),
@@ -1127,6 +1167,8 @@ class SalesController extends Controller
                 ? (float) $cancellation->account_balance_after
                 : null,
             'reason' => $cancellation->reason,
+            'is_voided' => $cancellation->isVoided(),
+            'void_reason' => $cancellation->void_reason,
             'items' => $cancellation->details->map(fn ($detail) => [
                 'product_name' => $detail->product?->name ?? 'Producto',
                 'quantity' => (float) $detail->quantity,

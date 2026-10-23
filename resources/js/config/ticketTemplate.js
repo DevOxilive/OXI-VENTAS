@@ -96,13 +96,14 @@ export function createDefaultTicketTemplate() {
   return JSON.parse(JSON.stringify(DEFAULT_TEMPLATE));
 }
 
-export function getStoredTicketTemplateSettings() {
+export function getStoredTicketTemplateSettings(slug = "sales-ticket") {
   if (typeof window === "undefined") {
     return null;
   }
 
   try {
-    const raw = window.localStorage.getItem(TICKET_TEMPLATE_STORAGE_KEY);
+    const raw = window.localStorage.getItem(`${TICKET_TEMPLATE_STORAGE_KEY}:${slug}`)
+      || (slug === "sales-ticket" ? window.localStorage.getItem(TICKET_TEMPLATE_STORAGE_KEY) : null);
 
     if (!raw) {
       return null;
@@ -114,13 +115,13 @@ export function getStoredTicketTemplateSettings() {
   }
 }
 
-export function saveStoredTicketTemplateSettings(settings) {
+export function saveStoredTicketTemplateSettings(settings, slug = "sales-ticket") {
   if (typeof window === "undefined") {
     return;
   }
 
   window.localStorage.setItem(
-    TICKET_TEMPLATE_STORAGE_KEY,
+    `${TICKET_TEMPLATE_STORAGE_KEY}:${slug}`,
     JSON.stringify(normalizeTicketTemplate(settings))
   );
 }
@@ -160,18 +161,19 @@ export function normalizeTicketTemplate(input = {}) {
   });
 
   return {
-    paper_width: 48,
+    paper_width: clampPercent(input.paper_width, base.paper_width, 24, 64),
     print_engine: "raw",
-    feed_lines: 1,
+    feed_lines: clampPercent(input.feed_lines, base.feed_lines, 1, 8),
     auto_cut: Boolean(input.auto_cut),
     open_cash_drawer: input.open_cash_drawer !== false,
     header_text: nonBlankText(input.header_text, base.header_text),
     subheader_text: nonBlankText(input.subheader_text, base.subheader_text),
     cash_box_text: nonBlankText(input.cash_box_text, base.cash_box_text),
     footer_text: nonBlankText(input.footer_text, base.footer_text),
-    show_dividers: true,
+    show_dividers: input.show_dividers !== false,
     items_format: input.items_format === "credit_statement" ? "credit_statement" : "standard",
     blocks: normalizedBlocks,
+    ...(input.visual_layout?.version === 2 ? { visual_layout: input.visual_layout } : {}),
   };
 }
 
@@ -451,9 +453,7 @@ function sizePercentToEsc(sizePercent) {
 }
 
 function lineWidthForPaper(width) {
-  if (Number(width) === 32) return 32;
-  if (Number(width) === 48) return 48;
-  return 42;
+  return clampPercent(width, 48, 24, 64);
 }
 
 function blockGapLines(blockKey) {
@@ -1133,7 +1133,8 @@ export function buildTicketHtmlMarkup(template, printJob) {
 }
 
 export function buildEscPosTicketData(template, printJob) {
-  const resolved = normalizeTicketTemplate(template);
+  const resolved = normalizeTicketTemplate(printJob?.template_settings || template);
+  if (resolved.visual_layout) return [{ type: "visual-layout", layout: resolved.visual_layout, data: printJob, settings: resolved }];
   const width = lineWidthForPaper(resolved.paper_width);
   const lines = [
     "\x1B\x40",
@@ -1283,4 +1284,32 @@ export function buildEscPosTicketData(template, printJob) {
   }
 
   return lines;
+}
+
+// Shared header rendering keeps all ticket flows at the selected ESC/POS width.
+export function renderTicketHeaderImage(template, logoImage, cashBox = "") {
+  const settings = normalizeTicketTemplate(template);
+  const canvas = document.createElement("canvas");
+  const scale = settings.paper_width / 48;
+  canvas.width = Math.round(576 * scale);
+  canvas.height = Math.round(92 * scale);
+  const context = canvas.getContext("2d");
+  if (!context) return "";
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.scale(scale, scale);
+  context.drawImage(logoImage, 12, 5, 82, 82);
+  context.fillStyle = "#000000";
+  context.textBaseline = "middle";
+  if (settings.blocks.some(block => block.key === "brand_title" && block.enabled)) {
+    context.font = "700 27px Arial, sans-serif";
+    context.textAlign = "center";
+    context.fillText(settings.header_text, 288, 46, 260);
+  }
+  if (cashBox && settings.blocks.some(block => block.key === "cash_box" && block.enabled)) {
+    context.font = "700 21px Arial, sans-serif";
+    context.textAlign = "right";
+    context.fillText(String(cashBox).toUpperCase(), 564, 46, 130);
+  }
+  return canvas.toDataURL("image/png");
 }

@@ -16,7 +16,12 @@ class SaleCancellation extends Model
         'application_type',
         'account_balance_before',
         'account_balance_after',
+        'credit_charge_reduction',
+        'credit_balance_increase',
         'reason',
+        'voided_by_user_id',
+        'void_reason',
+        'voided_at',
         'cancelled_at',
     ];
 
@@ -24,7 +29,10 @@ class SaleCancellation extends Model
         'amount' => 'decimal:2',
         'account_balance_before' => 'decimal:2',
         'account_balance_after' => 'decimal:2',
+        'credit_charge_reduction' => 'decimal:2',
+        'credit_balance_increase' => 'decimal:2',
         'cancelled_at' => 'datetime',
+        'voided_at' => 'datetime',
     ];
 
     public function sale()
@@ -50,5 +58,20 @@ class SaleCancellation extends Model
     public function cancelledBy()
     {
         return $this->belongsTo(User::class, 'cancelled_by_user_id');
+    }
+
+    public function voidedBy()
+    {
+        return $this->belongsTo(User::class, 'voided_by_user_id');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->whereNull('voided_at');
+    }
+
+    public function isVoided(): bool
+    {
+        return $this->voided_at !== null;
     }
 }
