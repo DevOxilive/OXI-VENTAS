@@ -2,13 +2,20 @@ import { computed, reactive, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 
+function normalizeMultiValue(value) {
+    return (Array.isArray(value) ? value : value ? [value] : [])
+        .map((item) => String(item))
+        .filter(Boolean)
+}
+
 export function useInventoryMovementReport(props) {
     const { handlePageChange } = useGlobalTablePagination()
     const filtersState = reactive({
-        categoryId: props.filters?.category_id ?? '',
-        userId: props.filters?.user_id ?? '',
-        movementType: props.filters?.movement_type ?? '',
-        movementReason: props.filters?.movement_reason ?? '',
+        departmentIds: normalizeMultiValue(props.filters?.department_ids ?? props.filters?.department_id),
+        categoryIds: normalizeMultiValue(props.filters?.category_ids ?? props.filters?.category_id),
+        userIds: normalizeMultiValue(props.filters?.user_ids ?? props.filters?.user_id),
+        movementTypes: normalizeMultiValue(props.filters?.movement_types ?? props.filters?.movement_type),
+        movementReasons: normalizeMultiValue(props.filters?.movement_reasons ?? props.filters?.movement_reason),
         dateFrom: props.filters?.date_from ?? '',
         dateTo: props.filters?.date_to ?? '',
         search: props.filters?.search ?? '',
@@ -21,7 +28,19 @@ export function useInventoryMovementReport(props) {
         return `Reportes de movimientos - ${props.currentBranch?.name ?? 'Sucursal'}`
     })
 
+    const departmentOptions = computed(() => props.catalogs?.productDepartments ?? [])
     const categoryOptions = computed(() => props.catalogs?.categories ?? [])
+    const filteredCategoryOptions = computed(() => {
+        if (!filtersState.departmentIds.length) {
+            return categoryOptions.value
+        }
+
+        const selectedDepartments = new Set(filtersState.departmentIds.map(String))
+
+        return categoryOptions.value.filter((category) =>
+            selectedDepartments.has(String(category.product_department_id)),
+        )
+    })
     const userOptions = computed(() => props.catalogs?.users ?? [])
     const movementTypeOptions = computed(() => props.catalogs?.movementTypes ?? [])
     const movementReasonOptions = computed(() => props.catalogs?.movementReasons ?? [])
@@ -40,15 +59,30 @@ export function useInventoryMovementReport(props) {
     }
 
     function updateFilter({ key, value }) {
+        if (key === 'departmentIds') {
+            filtersState.departmentIds = normalizeMultiValue(value)
+
+            const validCategories = new Set(
+                filteredCategoryOptions.value.map((category) => String(category.id)),
+            )
+
+            filtersState.categoryIds = filtersState.categoryIds.filter((categoryId) =>
+                validCategories.has(String(categoryId)),
+            )
+
+            return
+        }
+
         filtersState[key] = value
     }
 
     function getRequestFilters() {
         return {
-            category_id: filtersState.categoryId || undefined,
-            user_id: filtersState.userId || undefined,
-            movement_type: filtersState.movementType || undefined,
-            movement_reason: filtersState.movementReason || undefined,
+            department_ids: filtersState.departmentIds.length ? filtersState.departmentIds : undefined,
+            category_ids: filtersState.categoryIds.length ? filtersState.categoryIds : undefined,
+            user_ids: filtersState.userIds.length ? filtersState.userIds : undefined,
+            movement_types: filtersState.movementTypes.length ? filtersState.movementTypes : undefined,
+            movement_reasons: filtersState.movementReasons.length ? filtersState.movementReasons : undefined,
             search: filtersState.search || undefined,
             date_from: filtersState.dateFrom || undefined,
             date_to: filtersState.dateTo || undefined,
@@ -113,7 +147,9 @@ export function useInventoryMovementReport(props) {
     return {
         filtersState,
         pageTitle,
+        departmentOptions,
         categoryOptions,
+        filteredCategoryOptions,
         userOptions,
         movementTypeOptions,
         movementReasonOptions,

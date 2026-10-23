@@ -232,7 +232,8 @@ class InventoryReportService
                     CASE stock_movements.reason
                         WHEN "PURCHASE" THEN "Compra"
                         WHEN "SALE" THEN "Venta"
-                        WHEN "DAMAGED" THEN "Danado"
+                        WHEN "RETURN" THEN "Reingreso"
+                        WHEN "DAMAGED" THEN "Dañado"
                         WHEN "EXPIRED" THEN "Caducado"
                         WHEN "OTHER" THEN "Otros"
                         WHEN "INVENTORY_DIFFERENCE" THEN "Ajuste manual"
@@ -281,16 +282,16 @@ class InventoryReportService
             ],
         );
 
-        if (! empty($filters['user_id'])) {
-            $query->where('stock_movements.user_id', $filters['user_id']);
+        if ($userIds = $this->filterValues($filters, 'user_ids', 'user_id')) {
+            $query->whereIn('stock_movements.user_id', $userIds);
         }
 
-        if (! empty($filters['movement_type'])) {
-            $query->where('stock_movements.type', $filters['movement_type']);
+        if ($movementTypes = $this->filterValues($filters, 'movement_types', 'movement_type')) {
+            $query->whereIn('stock_movements.type', $movementTypes);
         }
 
-        if (! empty($filters['movement_reason'])) {
-            $query->where('stock_movements.reason', $filters['movement_reason']);
+        if ($movementReasons = $this->filterValues($filters, 'movement_reasons', 'movement_reason')) {
+            $query->whereIn('stock_movements.reason', $movementReasons);
         }
 
         return $this->resolveTableResult($query, $filters, $paginate);
@@ -514,9 +515,24 @@ class InventoryReportService
             $query->where('branch_products.id', $filters['product_id']);
         }
 
-        if (! empty($filters['category_id'])) {
-            $query->where('products.category_id', $filters['category_id']);
+        if ($departmentIds = $this->filterValues($filters, 'department_ids', 'department_id')) {
+            $query->whereIn('categories.product_department_id', $departmentIds);
         }
+
+        if ($categoryIds = $this->filterValues($filters, 'category_ids', 'category_id')) {
+            $query->whereIn('products.category_id', $categoryIds);
+        }
+    }
+
+    private function filterValues(array $filters, string $pluralKey, string $legacyKey): array
+    {
+        $values = $filters[$pluralKey] ?? $filters[$legacyKey] ?? [];
+        $values = is_array($values) ? $values : [$values];
+
+        return collect($values)
+            ->filter(fn ($value) => $value !== null && $value !== '')
+            ->values()
+            ->all();
     }
 
     private function applySearchFilter(

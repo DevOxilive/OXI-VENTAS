@@ -9,6 +9,10 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    productDepartments: {
+        type: Array,
+        default: () => [],
+    },
     categories: {
         type: Array,
         default: () => [],
@@ -38,6 +42,7 @@ defineEmits([
 const toolbarConfig = computed(() =>
     getInventoryMovementReportToolbarConfig({
         filters: props.filters,
+        productDepartments: props.productDepartments,
         categories: props.categories,
         users: props.users,
         movementTypes: props.movementTypes,
