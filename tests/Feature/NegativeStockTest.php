@@ -3,11 +3,14 @@
 namespace Tests\Feature;
 
 use App\Events\InventoryStockUpdated;
+use App\Events\SaleReturnChanged;
 use App\Http\Controllers\Inventory\BranchInventoryController;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\Employee;
+use App\Models\EmployeeCreditAccount;
+use App\Models\EmployeeCreditCharge;
 use App\Models\PaymentMethod;
 use App\Models\Permission;
 use App\Models\PhysicalCount;
@@ -16,6 +19,8 @@ use App\Models\Product;
 use App\Models\ProductBatch;
 use App\Models\Role;
 use App\Models\Sale;
+use App\Models\SaleCancellation;
+use App\Models\SaleCancellationDetail;
 use App\Models\StockMovement;
 use App\Models\User;
 use App\Search\ProductIdentifierSearch;
@@ -28,6 +33,7 @@ use App\Services\StockMovementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -108,6 +114,155 @@ class NegativeStockTest extends TestCase
         $service->cancel($sale->fresh(), $this->user, 'Resto de la devolución', [['sale_detail_id' => $detail->id, 'quantity' => 3]]);
         $this->assertStock(4);
         $this->assertSame('cancelled', $sale->fresh()->status);
+    }
+
+    public function test_return_records_inventory_financial_effect_and_reprintable_receipt_together(): void
+    {
+        $this->batch(3);
+        $this->inventory->update(['stock' => 3]);
+        $sale = $this->sell(2);
+        $detail = $sale->details()->firstOrFail();
+
+        $cancellation = app(SaleCancellationService::class)->cancel(
+            $sale,
+            $this->user,
+            'Producto entregado por equivocación',
+            [['sale_detail_id' => $detail->id, 'quantity' => 1]],
+        );
+
+        $this->assertSame('cash_refund', $cancellation->application_type);
+        $this->assertEquals(10, $cancellation->amount);
+        $this->assertSame('completed', $sale->fresh()->status);
+        $this->assertSame(1, $cancellation->details()->count());
+        $this->assertSame(1, $cancellation->details()->firstOrFail()->returnStockMovement()->count());
+        $this->assertStock(2);
+
+        Event::assertDispatched(SaleReturnChanged::class, fn (SaleReturnChanged $event) => $event->action === 'registered'
+            && $event->saleId === (int) $sale->id
+            && $event->cancellationId === (int) $cancellation->id
+            && $event->amount === 10.0
+        );
+
+        $this->getJson(route('ventas.returns.ticket', [
+            'sale' => $sale->id,
+            'cancellation' => $cancellation->id,
+        ]))
+            ->assertOk()
+            ->assertJsonPath('print_job.type', 'sale_return')
+            ->assertJsonPath('print_job.folio', 'DEV-'.str_pad((string) $cancellation->id, 6, '0', STR_PAD_LEFT))
+            ->assertJsonPath('print_job.original_sale_folio', $sale->folio)
+            ->assertJsonPath('print_job.total', 10);
+    }
+
+    public function test_invalid_return_leaves_no_partial_records_or_inventory_changes(): void
+    {
+        $this->batch(2);
+        $this->inventory->update(['stock' => 2]);
+        $sale = $this->sell(1);
+        $detail = $sale->details()->firstOrFail();
+        $sale->stockMovements()->firstOrFail()->update(['reason' => StockMovement::REASON_OTHER]);
+        $stockBefore = (float) $this->inventory->fresh()->stock;
+
+        try {
+            app(SaleCancellationService::class)->cancel(
+                $sale,
+                $this->user,
+                'Intento que debe cancelarse completo',
+                [['sale_detail_id' => $detail->id, 'quantity' => 1]],
+            );
+            $this->fail('La devolución inválida debió rechazarse.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('items', $exception->errors());
+        }
+
+        $this->assertSame(0, SaleCancellation::count());
+        $this->assertSame(0, SaleCancellationDetail::count());
+        $this->assertEquals($stockBefore, (float) $this->inventory->fresh()->stock);
+        $this->assertSame('completed', $sale->fresh()->status);
+    }
+
+    public function test_credit_return_reduces_the_pending_charge_inside_the_same_operation(): void
+    {
+        $this->batch(3);
+        $this->inventory->update(['stock' => 3]);
+        $sale = $this->sell(2);
+        $creditMethod = PaymentMethod::create(['name' => 'Crédito empleado', 'active' => true]);
+        $sale->update(['payment_method_id' => $creditMethod->id]);
+        $account = EmployeeCreditAccount::create([
+            'employee_id' => $this->user->employee_id,
+            'credit_balance' => 0,
+            'active' => true,
+        ]);
+        $charge = EmployeeCreditCharge::create([
+            'employee_credit_account_id' => $account->id,
+            'sale_id' => $sale->id,
+            'branch_id' => $this->branch->id,
+            'amount' => 20,
+            'outstanding_amount' => 20,
+            'status' => 'open',
+        ]);
+
+        $cancellation = app(SaleCancellationService::class)->cancel(
+            $sale->fresh(),
+            $this->user,
+            'Devolución aplicada al adeudo',
+            [['sale_detail_id' => $sale->details()->firstOrFail()->id, 'quantity' => 1]],
+        );
+
+        $this->assertSame('account_adjustment', $cancellation->application_type);
+        $this->assertEquals(20, $cancellation->account_balance_before);
+        $this->assertEquals(10, $cancellation->account_balance_after);
+        $this->assertEquals(10, $charge->fresh()->outstanding_amount);
+        $this->assertSame('open', $charge->fresh()->status);
+        $this->assertStock(2);
+
+        app(SaleCancellationService::class)->voidCancellation(
+            $sale->fresh(),
+            $cancellation,
+            $this->user,
+            'La devolución se capturó en el ticket equivocado',
+        );
+
+        $this->assertEquals(20, $charge->fresh()->outstanding_amount);
+        $this->assertSame('open', $charge->fresh()->status);
+        $this->assertNotNull($cancellation->fresh()->voided_at);
+        $this->assertStock(1);
+    }
+
+    public function test_voiding_cash_return_restores_sale_and_keeps_auditable_inventory_countermovement(): void
+    {
+        $this->batch(2);
+        $this->inventory->update(['stock' => 2]);
+        $sale = $this->sell(1);
+        $service = app(SaleCancellationService::class);
+        $cancellation = $service->cancel(
+            $sale,
+            $this->user,
+            'Devolución que se anulará',
+            [['sale_detail_id' => $sale->details()->firstOrFail()->id, 'quantity' => 1]],
+        );
+
+        $this->assertSame('cancelled', $sale->fresh()->status);
+        $this->assertStock(2);
+
+        $voided = $service->voidCancellation(
+            $sale->fresh(),
+            $cancellation,
+            $this->user,
+            'La devolución pertenecía a otro ticket',
+        );
+
+        $this->assertSame('completed', $sale->fresh()->status);
+        $this->assertSame($this->user->id, $voided->voided_by_user_id);
+        $this->assertSame('La devolución pertenecía a otro ticket', $voided->void_reason);
+        $this->assertNotNull($voided->voided_at);
+        $this->assertNotNull($voided->details->first()->void_stock_movement_id);
+        $this->assertSame(0, $sale->activeCancellations()->count());
+        $this->assertStock(1);
+
+        Event::assertDispatched(SaleReturnChanged::class, fn (SaleReturnChanged $event) =>
+            $event->action === 'voided' && $event->cancellationId === (int) $cancellation->id
+        );
     }
 
     public function test_boxes_and_kilograms_deduct_the_correct_base_quantity(): void

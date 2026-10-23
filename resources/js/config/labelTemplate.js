@@ -27,16 +27,16 @@ const DEFAULT_POSITIONS = {
   footer_text: 50,
 };
 
-const FIXED_LABEL_WIDTH_MM = 75;
-const FIXED_LABEL_HEIGHT_MM = 29;
+const DEFAULT_LABEL_WIDTH_MM = 62;
+const DEFAULT_LABEL_HEIGHT_MM = 29;
 
 const DEFAULT_SIZES = {
   brand_title: 100,
-  product_name: 800,
+  product_name: 440,
   category: 72,
   barcode: 100,
   barcode_text: 74,
-  price: 800,
+  price: 440,
   sku: 72,
   stock: 72,
   branch: 72,
@@ -61,8 +61,8 @@ const DEFAULT_ENABLED = {
 };
 
 const DEFAULT_TEMPLATE = {
-  label_width_mm: FIXED_LABEL_WIDTH_MM,
-  label_height_mm: FIXED_LABEL_HEIGHT_MM,
+  label_width_mm: DEFAULT_LABEL_WIDTH_MM,
+  label_height_mm: DEFAULT_LABEL_HEIGHT_MM,
   print_engine: "visual",
   barcode_height_mm: 6,
   barcode_width_percent: 100,
@@ -147,8 +147,8 @@ export function normalizeLabelTemplate(input = {}) {
   });
 
   return {
-    label_width_mm: FIXED_LABEL_WIDTH_MM,
-    label_height_mm: FIXED_LABEL_HEIGHT_MM,
+    label_width_mm: clampNumber(input.label_width_mm, base.label_width_mm, 20, 210),
+    label_height_mm: clampNumber(input.label_height_mm, base.label_height_mm, 12, 300),
     print_engine: "visual",
     barcode_height_mm: clampNumber(input.barcode_height_mm, base.barcode_height_mm, 6, 28),
     barcode_width_percent: clampNumber(input.barcode_width_percent, base.barcode_width_percent, 45, 100),
@@ -399,64 +399,25 @@ const availableHeight = Math.max(1, frameHeight - innerPaddingY * 2);
   return canvas.toDataURL("image/png").split(",")[1];
 }
 function drawTextOnlyLabelRows(context, rows, bounds) {
-  const priceRow = rows.find((row) => row.block_key === "price");
-  const textRows = rows.filter((row) => row.block_key !== "price");
-
-  const gap = Math.max(1, Math.round(bounds.availableHeight * 0.015));
-
-  const priceHeight = priceRow
-    ? Math.round(bounds.availableHeight * 0.50)
-    : 0;
-
-  const textHeight = priceRow
-    ? Math.max(1, bounds.availableHeight - priceHeight - gap)
-    : bounds.availableHeight;
-
+  const weights = rows.map((row) => row.block_key === "product_name" ? 1.4 : 1);
+  const total = weights.reduce((sum, value) => sum + value, 0);
   let y = bounds.contentTop;
-
-  textRows.forEach((row) => {
-    const rowHeight = textHeight / Math.max(1, textRows.length);
-    const text = row.type === "pair"
-      ? `${cleanText(row.label)}: ${cleanText(row.value)}`
-      : cleanText(row.text);
-
-  drawFreeTextBlock(context, text, {
-  x: textX(bounds.contentLeft, bounds.contentWidth, row.position_percent),
-  clipX: bounds.contentLeft,
-  y,
-  width: bounds.contentWidth,
-  height: rowHeight,
-  align: canvasTextAlign(row.position_percent),
-  bold: row.bold,
-  fontSize: (row.size_percent / 100) * (
-    row.block_key === "product_name" ? 10.5 : 8.5
-  ),
-  maxLines: row.block_key === "product_name" ? 2 : 1,
-});
-
-    y += rowHeight;
+  rows.forEach((row, index) => {
+    const height = bounds.availableHeight * weights[index] / total;
+    const text = row.type === "pair" ? `${cleanText(row.label)}: ${cleanText(row.value)}` : cleanText(row.text);
+    drawFreeTextBlock(context, text, {
+      x: textX(bounds.contentLeft, bounds.contentWidth, row.position_percent),
+      clipX: bounds.contentLeft, y, width: bounds.contentWidth, height,
+      align: canvasTextAlign(row.position_percent), bold: row.bold,
+      fontSize: (row.size_percent / 100) * (row.block_key === "price" ? 14 : 10.5),
+      maxLines: row.block_key === "product_name" ? 2 : 1,
+    });
+    y += height;
   });
-
-  if (priceRow) {
-    const text = priceRow.type === "pair"
-      ? `${cleanText(priceRow.label)}: ${cleanText(priceRow.value)}`
-      : cleanText(priceRow.text);
-drawFreeTextBlock(context, text, {
-  x: textX(bounds.contentLeft, bounds.contentWidth, priceRow.position_percent),
-  clipX: bounds.contentLeft,
-  y: bounds.contentTop + bounds.availableHeight - priceHeight,
-  width: bounds.contentWidth,
-  height: priceHeight,
-  align: canvasTextAlign(priceRow.position_percent),
-  bold: true,
-  fontSize: (priceRow.size_percent / 100) * 14,
-  maxLines: 1,
-});
-  }
 }
+
 function drawFreeTextBlock(context, text, options) {
-  const fontSize = Math.max(8, options.fontSize);
-  const lineHeight = fontSize * 0.9;
+  let fontSize = Math.max(8, Math.min(options.fontSize, options.height / options.maxLines));
 
   context.save();
 
@@ -468,8 +429,14 @@ function drawFreeTextBlock(context, text, options) {
   context.textBaseline = "middle";
   context.textAlign = options.align;
 
-  const lines = wrapCanvasText(context, text, options.width, options.maxLines)
-    .slice(0, options.maxLines);
+  let lines = wrapCanvasText(context, text, options.width, options.maxLines);
+  while (fontSize > 8 && (lines.length > options.maxLines || lines.some(line => context.measureText(line).width > options.width))) {
+    fontSize -= 1;
+    context.font = `${options.bold ? 900 : 700} ${fontSize}px Arial, sans-serif`;
+    lines = wrapCanvasText(context, text, options.width, options.maxLines);
+  }
+  lines = lines.slice(0, options.maxLines);
+  const lineHeight = fontSize * 0.9;
 
   const totalHeight = lines.length * lineHeight;
   const startY = options.y + (options.height - totalHeight) / 2 + lineHeight / 2;
@@ -624,7 +591,7 @@ function barcodeMarkup(value, widthPercent = 82, heightMm = 11) {
   `;
 }
 
-function code128Svg(value) {
+export function code128Svg(value) {
   const text = cleanBarcodeText(value);
   const codes = [104];
 

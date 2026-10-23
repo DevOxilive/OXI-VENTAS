@@ -64,7 +64,7 @@ function isActiveItem(item) {
 
     const target = normalizeUrl(item.url)
 
-    return currentPath.value === target
+    return currentPath.value === target || (item.activeUrls || []).some(url => normalizeUrl(url) === currentPath.value)
 }
 
 function hasActiveChild(item) {
