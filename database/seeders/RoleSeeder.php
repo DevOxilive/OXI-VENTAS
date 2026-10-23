@@ -122,6 +122,12 @@ class RoleSeeder extends Seeder
 
         $this->collectRolePermissions($rolePermissions, $roles['Ventas']->id, $salesPermissions, $permissionIdsByName);
         $this->collectRolePermissions($rolePermissions, $roles['Vendedor']->id, $salesPermissions, $permissionIdsByName);
+        $this->collectRolePermissions(
+            $rolePermissions,
+            $roles['Vendedor']->id,
+            ['sales.returns.void'],
+            $permissionIdsByName
+        );
 
         $this->collectRolePermissions(
             $rolePermissions,

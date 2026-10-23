@@ -192,6 +192,21 @@ function goToPage(link) {
                                 <td class="border-b border-secondary px-4 py-2 text-right">{{ money(paymentAmount(sale, detail, 'credit')) }}</td>
                                 <td class="border-b border-secondary px-4 py-2 text-right">{{ money(paymentAmount(sale, detail, 'abono')) }}</td>
                             </tr>
+                            <tr
+                                v-for="returnedSale in (sale.returns || []).filter((item) => !item.is_voided)"
+                                :key="`${sale.id}-return-${returnedSale.id}`"
+                                class="bg-primary/5 text-primary"
+                            >
+                                <td class="border-b border-secondary px-4 py-2">{{ returnedSale.cancelled_at_display }}</td>
+                                <td class="border-b border-secondary px-4 py-2 font-black" colspan="2">{{ returnedSale.folio }}</td>
+                                <td class="border-b border-secondary px-4 py-2" colspan="4">{{ returnedSale.items.map((item) => `${item.quantity} · ${item.product}`).join(', ') }}</td>
+                                <td class="border-b border-secondary px-4 py-2 font-black">Devolución</td>
+                                <td class="border-b border-secondary px-4 py-2 text-right font-black" colspan="4">-{{ money(returnedSale.amount) }}</td>
+                            </tr>
+                            <tr v-if="sale.operation_type !== 'payment' && Number(sale.returned_amount || 0) > 0" class="bg-secondary/70 font-black text-text">
+                                <td class="border-b border-secondary px-4 py-2" colspan="10">Neto {{ sale.folio }}</td>
+                                <td class="border-b border-secondary px-4 py-2 text-right" colspan="2">{{ money(sale.net_total) }}</td>
+                            </tr>
                         </template>
                     </template>
 

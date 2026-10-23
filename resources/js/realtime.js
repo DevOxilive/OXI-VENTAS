@@ -21,6 +21,7 @@ export const REALTIME_CHANNELS = Object.freeze({
     inventoryProducts: 'inventory.products',
     systems: 'systems',
     inventoryBranch: (branchId) => `inventory.branch.${branchId}`,
+    salesBranch: (branchId) => `sales.branch.${branchId}`,
     user: (userId) => `users.${userId}`,
 })
 
@@ -35,6 +36,7 @@ export const REALTIME_EVENTS = Object.freeze({
     physicalCountChanged: '.PhysicalCountChanged',
     productChanged: '.product.changed',
     stockUpdated: '.stock.updated',
+    saleReturnChanged: '.sale-return.changed',
     attendanceChanged: '.attendance.changed',
     systemAuditChanged: '.system.audit.changed',
     systemTrashChanged: '.system.trash.changed',

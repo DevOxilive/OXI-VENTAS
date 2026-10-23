@@ -1,5 +1,6 @@
 <script setup>
-import { computed, reactive, ref, watch } from "vue";
+import { renderTicketHeaderImage } from "@/config/ticketTemplate";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { Head, router, useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
@@ -7,7 +8,6 @@ import { GlobalTable } from "@/Components/Tables";
 import { GlobalToolbar } from "@/Components/Toolbars";
 import { GlobalModal, getModalRequestOptions } from "@/Components/Modales";
 import TextareaField from "@/Components/Forms/TextareaField.vue";
-import MetricCard from "@/Components/Cards/MetricCard.vue";
 import {
   ErrorAlert,
   ToastAlert,
@@ -16,6 +16,7 @@ import {
   connectQzTray,
   findTicketPrinter,
   getQzPrinters,
+  getStoredTicketPrinterName,
   printEscPosTicket,
 } from "@/Composables/useQzTray";
 import {
@@ -37,8 +38,16 @@ const props = defineProps({
 
 const page = usePage();
 const selectedSale = ref(null);
+const historySale = ref(null);
+const historyTab = ref('applied');
+const historyReturns = computed(() => (historySale.value?.returns || []).filter((item) => Boolean(item.is_voided) === (historyTab.value === 'voided')));
+const historySections = computed(() => [
+  { id: 'applied', label: `Devoluciones aplicadas (${(historySale.value?.returns || []).filter(item => !item.is_voided).length})` },
+  { id: 'voided', label: `Devoluciones anuladas (${(historySale.value?.returns || []).filter(item => item.is_voided).length})` },
+]);
 const cancellationSale = ref(null);
-const selectedPrinterName = ref("");
+const returnToVoid = ref(null);
+const selectedPrinterName = ref(getStoredTicketPrinterName());
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para reimprimir tickets.");
 const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
@@ -59,6 +68,8 @@ const cancellationForm = useForm({
   reason: "",
   items: [],
 });
+const voidReturnForm = useForm({ reason: "" });
+const canVoidReturns = computed(() => (page.props.auth?.permissions || []).includes("sales.returns.void"));
 
 const returnQuantities = reactive({});
 
@@ -93,19 +104,9 @@ const columns = [
   { key: "total", label: "Total", format: "currency", mobileDisplay: true },
 ];
 
-const detailColumns = [
-  { key: "product", label: "Producto", format: "text", mobileSecondary: true },
-  { key: "code", label: "Codigo", format: "text", mobileDisplay: true },
-  { key: "quantity_display", label: "Cantidad", format: "text", mobileDisplay: true },
-  { key: "returned_quantity", label: "Devuelto", format: "number", formatOptions: { unitKey: "sale_unit" }, mobileDisplay: true },
-  { key: "remaining_quantity", label: "Conserva", format: "number", formatOptions: { unitKey: "sale_unit" }, mobileDisplay: true },
-  { key: "unit_price", label: "Precio", format: "currency", mobileDisplay: true },
-  { key: "discount_amount", label: "Descuento", format: "currency", mobileDisplay: true },
-  { key: "subtotal", label: "Subtotal", format: "currency", mobileDisplay: true },
-];
-
 const actions = [
   { id: "view", label: "Ver", icon: "visibility", variant: "blue", permission: "sales.view" },
+  { id: "returns", label: "Historial de devoluciones", icon: "history", variant: "blue", permission: "sales.view", hidden: (row) => row.operation_type === "payment" },
   { id: "reprint", label: "Reimprimir", icon: "print", variant: "green", permission: "sales.view", hidden: (row) => row.operation_type === "payment" },
   {
     id: "cancel",
@@ -252,6 +253,11 @@ function handlePageChange(url) {
 }
 
 function handleTableAction({ action, row }) {
+  if (action === "returns") {
+    historySale.value = row;
+    historyTab.value = 'applied';
+    return;
+  }
   if (action === "view") {
     selectedSale.value = row;
     return;
@@ -294,6 +300,40 @@ function closeCancellationModal() {
   cancellationSale.value = null;
   Object.keys(returnQuantities).forEach((key) => delete returnQuantities[key]);
   cancellationForm.clearErrors();
+}
+
+function openVoidReturn(returnedSale) {
+  if (!returnedSale?.can_void || !canVoidReturns.value) return;
+  returnToVoid.value = returnedSale;
+  voidReturnForm.reason = "";
+  voidReturnForm.clearErrors();
+}
+
+function closeVoidReturnModal() {
+  returnToVoid.value = null;
+  voidReturnForm.reset();
+  voidReturnForm.clearErrors();
+}
+
+function saveVoidReturn() {
+  if (!historySale.value?.id || !returnToVoid.value?.id || voidReturnForm.processing) return;
+
+  voidReturnForm.patch(route("ventas.returns.void", {
+    sale: historySale.value.id,
+    cancellation: returnToVoid.value.id,
+  }), getModalRequestOptions({
+    entityName: "Devolución",
+    successTitle: "Devolución anulada correctamente",
+    errorTitle: "No se pudo anular la devolución",
+    errorMessage: "Revisa el motivo y confirma que la devolución siga activa.",
+    preserveScroll: true,
+    onSuccess: () => {
+      closeVoidReturnModal();
+      historySale.value = null;
+      selectedSale.value = null;
+      applyFilters();
+    },
+  }));
 }
 
 function saveCancellation() {
@@ -363,54 +403,24 @@ function imageFromDataUrl(dataUrl) {
   });
 }
 
-async function getTicketHeaderDataUrl(cashBoxText = "") {
-  const normalizedCashBoxText = String(cashBoxText || "").trim();
-  const cacheKey = normalizedCashBoxText || "__default__";
-
-  if (ticketHeaderDataUrlPromises.has(cacheKey)) {
-    return ticketHeaderDataUrlPromises.get(cacheKey);
-  }
-
-  const promise = getTicketLogoDataUrl()
-    .then(async (logoDataUrl) => {
+async function getTicketHeaderDataUrl(cashBoxText = "", settings = resolvedTicketTemplate.value) {
+  const cacheKey = JSON.stringify([settings, cashBoxText]);
+  if (!ticketHeaderDataUrlPromises.has(cacheKey)) {
+    const promise = getTicketLogoDataUrl().then(async (logoDataUrl) => {
       if (!logoDataUrl || typeof document === "undefined") return logoDataUrl;
-
-      const logoImage = await imageFromDataUrl(logoDataUrl);
-      const canvas = document.createElement("canvas");
-      canvas.width = 576;
-      canvas.height = 92;
-      const context = canvas.getContext("2d");
-
-      if (!context) return logoDataUrl;
-
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(logoImage, 12, 5, 82, 82);
-      context.fillStyle = "#000000";
-      context.font = "700 27px Arial, sans-serif";
-      context.textAlign = "center";
-      context.textBaseline = "middle";
-      context.fillText("SUPER KAY", Math.round(canvas.width / 2), Math.round(canvas.height / 2));
-
-      if (normalizedCashBoxText) {
-        context.font = "700 21px Arial, sans-serif";
-        context.textAlign = "right";
-        context.fillText(normalizedCashBoxText.toUpperCase(), canvas.width - 12, Math.round(canvas.height / 2));
-      }
-
-      return canvas.toDataURL("image/png");
-    })
-    .catch(() => "");
-
-  ticketHeaderDataUrlPromises.set(cacheKey, promise);
-
-  return promise;
+      return renderTicketHeaderImage(settings, await imageFromDataUrl(logoDataUrl), cashBoxText);
+    }).catch(() => "");
+    ticketHeaderDataUrlPromises.set(cacheKey, promise);
+  }
+  return ticketHeaderDataUrlPromises.get(cacheKey);
 }
 
 async function initializePrinterBridge() {
   try {
     await connectQzTray();
-    const printers = await getQzPrinters();
+    const printers = await getQzPrinters({
+      expectedPrinterNames: [selectedPrinterName.value || getStoredTicketPrinterName()],
+    });
     selectedPrinterName.value = findTicketPrinter(printers);
     printerBridgeReady.value = true;
     printerBridgeMessage.value = selectedPrinterName.value
@@ -422,6 +432,10 @@ async function initializePrinterBridge() {
     throw error;
   }
 }
+
+onMounted(() => {
+  void initializePrinterBridge().catch(() => {});
+});
 
 async function printTicket(printJob) {
   if (!selectedPrinterName.value || !printerBridgeReady.value) {
@@ -440,7 +454,7 @@ async function printTicket(printJob) {
     cash_box_number: cashBoxNumber,
     cash_box_text: cashBoxText,
     ticket_logo_data_url: printJob?.ticket_logo_data_url || await getTicketLogoDataUrl(),
-    ticket_header_data_url: printJob?.ticket_header_data_url || await getTicketHeaderDataUrl(cashBoxText),
+    ticket_header_data_url: printJob?.ticket_header_data_url || await getTicketHeaderDataUrl(cashBoxText, printJob.template_settings || resolvedTicketTemplate.value),
   };
 
   await printEscPosTicket(
@@ -540,18 +554,17 @@ async function reprintReturnTicket(sale, returnedSale) {
       :title="selectedSale.operation_type === 'payment' ? 'Detalle del abono' : 'Detalle de ticket'"
       :subtitle="selectedSale.folio"
       mode="view"
-      size="5xl"
+      size="md"
+      height="auto"
       :columns="1"
       :show-save="false"
       close-button-text="Cerrar"
       @close="closeSaleModal"
     >
       <div class="space-y-5">
-        <section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard label="Fecha" :value="selectedSale.date_display" size="sm" />
-          <MetricCard label="Sucursal" :value="selectedSale.branch" size="sm" />
-          <MetricCard label="Estado" :value="selectedSale.status_label" :tone="selectedSale.visual_status === 'completed' || selectedSale.visual_status === 'payment' ? 'success' : 'danger'" size="sm" />
-          <MetricCard label="Total" :value="money(selectedSale.total)" tone="dark" size="sm" />
+        <section class="flex flex-wrap items-center justify-between gap-2 text-sm text-text">
+          <div><p>{{ selectedSale.date_display }}</p><p class="text-xs opacity-60">{{ selectedSale.branch }}</p></div>
+          <span class="rounded-full bg-secondary px-3 py-1 text-xs font-semibold">{{ selectedSale.status_label }}</span>
         </section>
 
         <section v-if="selectedSale.operation_type === 'payment'" class="rounded-2xl border border-secondary bg-secondary/30 p-4 text-sm text-text">
@@ -574,54 +587,77 @@ async function reprintReturnTicket(sale, returnedSale) {
           </div>
         </section>
 
-        <section v-if="selectedSale.operation_type !== 'payment' && selectedSale.returned_amount > 0" class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <MetricCard label="Total devuelto" :value="money(selectedSale.returned_amount)" tone="danger" size="sm" />
-          <MetricCard label="Total efectivo del ticket" :value="money(selectedSale.effective_total)" size="sm" />
-        </section>
+        <table v-if="selectedSale.operation_type !== 'payment'" class="w-full table-fixed text-sm text-text">
+          <thead class="border-b border-secondary text-left text-xs opacity-60"><tr><th class="w-1/2 pb-2 font-medium">Producto</th><th class="pb-2 text-center font-medium">Cant.</th><th class="pb-2 text-right font-medium">Importe</th></tr></thead>
+          <tbody class="divide-y divide-secondary">
+            <tr v-for="item in selectedSale.details || []" :key="item.id">
+              <td class="py-3 pr-3 break-words"><p class="font-medium">{{ item.product }}</p><p class="text-xs opacity-60">{{ item.code }} · {{ money(item.unit_price) }}</p><p v-if="Number(item.discount_amount) > 0" class="text-xs opacity-60">Descuento: {{ money(item.discount_amount) }}</p></td>
+              <td class="py-3 text-center align-top">{{ item.quantity_display }}<span v-if="Number(item.returned_quantity) > 0" class="block text-xs text-primary">{{ item.returned_quantity }} devueltos</span></td>
+              <td class="py-3 text-right align-top tabular-nums">{{ money(item.subtotal) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <dl class="ml-auto w-full max-w-xs space-y-2 border-t border-secondary pt-3 text-sm text-text">
+          <div class="flex justify-between"><dt>Total</dt><dd class="tabular-nums">{{ money(selectedSale.total) }}</dd></div>
+          <template v-if="selectedSale.returned_amount > 0">
+            <div class="flex justify-between text-primary"><dt>Devuelto</dt><dd class="tabular-nums">−{{ money(selectedSale.returned_amount) }}</dd></div>
+            <div class="flex justify-between font-bold"><dt>Neto</dt><dd class="tabular-nums">{{ money(selectedSale.effective_total) }}</dd></div>
+          </template>
+        </dl>
+      </div>
+    </GlobalModal>
 
-        <GlobalTable
-          v-if="selectedSale.operation_type !== 'payment'"
-          :items="selectedSale.details || []"
-          :columns="detailColumns"
-          :actions="[]"
-          row-key="id"
-          mobile-card-header-field="product"
-          no-data-message="Esta venta no tiene productos registrados."
-          :show-pagination="false"
-        />
-
-        <section
-          v-if="selectedSale.returns?.length"
-          class="rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-text"
-        >
-          <p class="font-black">Devoluciones registradas</p>
-          <article v-for="returnedSale in selectedSale.returns" :key="returnedSale.id" class="mt-3 border-t border-primary/20 pt-3 first:border-0 first:pt-0">
+    <GlobalModal
+      v-if="historySale"
+      title="Historial de devoluciones"
+      :subtitle="historySale.folio"
+      mode="view"
+      size="md"
+      height="auto"
+      :columns="1"
+      :show-save="false"
+      :sections="historySections"
+      :active-section="historyTab"
+      close-button-text="Cerrar"
+      @select-section="historyTab = $event"
+      @close="historySale = null"
+    >
+        <section class="text-sm text-text">
+          <p v-if="!historyReturns.length" class="py-6 text-center text-sm opacity-60">Sin devoluciones {{ historyTab === 'voided' ? 'anuladas' : 'aplicadas' }}</p>
+          <article v-for="returnedSale in historyReturns" :key="returnedSale.id" class="border-b border-secondary py-4 first:pt-0 last:border-0 last:pb-0">
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p class="font-black">{{ returnedSale.folio }}</p>
-                <p class="text-xs opacity-70">Vinculada con {{ selectedSale.folio }}</p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="font-black">{{ returnedSale.folio }}</p>
+                  <span v-if="returnedSale.is_voided" class="rounded-full bg-secondary px-2 py-1 text-[10px] font-black uppercase text-primary">Anulada</span>
+                </div>
+                <p class="mt-1 text-xs opacity-60">{{ returnedSale.cancelled_at_display }} · {{ returnedSale.cancelled_by }}</p>
               </div>
-              <button type="button" class="inline-flex items-center gap-2 rounded-xl border border-primary px-3 py-2 font-bold text-primary transition hover:bg-primary hover:text-white" @click="reprintReturnTicket(selectedSale, returnedSale)">
-                <span class="material-symbols-outlined text-[18px]">print</span>
-                Reimprimir devolución
-              </button>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg px-2 py-1 font-medium text-primary transition hover:bg-secondary" @click="reprintReturnTicket(historySale, returnedSale)">
+                  <span class="material-symbols-outlined text-[18px]">print</span>
+                  Reimprimir
+                </button>
+                <button v-if="returnedSale.can_void && canVoidReturns" type="button" class="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 font-bold text-white transition hover:opacity-85" @click="openVoidReturn(returnedSale)">
+                  <span class="material-symbols-outlined text-[18px]">undo</span>
+                  Anular
+                </button>
+              </div>
             </div>
-            <div class="mt-3 grid gap-2 md:grid-cols-3">
-              <p><span class="font-semibold opacity-60">Fecha:</span> {{ returnedSale.cancelled_at_display }}</p>
-              <p><span class="font-semibold opacity-60">Usuario:</span> {{ returnedSale.cancelled_by }}</p>
-              <p><span class="font-semibold opacity-60">Monto:</span> {{ money(returnedSale.amount) }}</p>
+            <div class="mt-3 flex flex-wrap justify-between gap-2">
+              <p class="opacity-60">{{ returnedSale.application_label }}</p>
+              <p class="font-semibold tabular-nums">{{ money(returnedSale.amount) }}</p>
             </div>
-            <p class="mt-2"><span class="font-semibold opacity-60">Aplicación:</span> {{ returnedSale.application_label }}</p>
             <div v-if="returnedSale.account_balance_before !== null" class="mt-2 grid gap-2 md:grid-cols-2">
               <p><span class="font-semibold opacity-60">Adeudo anterior:</span> {{ money(returnedSale.account_balance_before) }}</p>
               <p><span class="font-semibold opacity-60">Adeudo nuevo:</span> {{ money(returnedSale.account_balance_after) }}</p>
             </div>
-            <div class="mt-3 overflow-x-auto rounded-xl border border-primary/20 bg-background">
-              <table class="min-w-full text-xs">
-                <thead class="bg-primary/10 text-left"><tr><th class="px-3 py-2">Producto</th><th class="px-3 py-2">Cantidad</th><th class="px-3 py-2 text-right">Importe</th></tr></thead>
+            <div class="mt-3">
+              <table class="w-full table-fixed text-xs">
+                <thead class="border-b border-secondary text-left"><tr><th class="w-1/2 py-2 font-medium">Producto</th><th class="px-2 py-2 font-medium">Cantidad</th><th class="py-2 text-right font-medium">Importe</th></tr></thead>
                 <tbody class="divide-y divide-primary/10">
                   <tr v-for="(item, itemIndex) in returnedSale.items" :key="`${returnedSale.id}-${itemIndex}`">
-                    <td class="px-3 py-2"><strong>{{ item.product }}</strong><span class="block opacity-60">{{ item.code }}</span></td>
+                    <td class="py-2 pr-2 break-words"><span>{{ item.product }}</span><span class="block opacity-60">{{ item.code }}</span></td>
                     <td class="px-3 py-2">{{ item.quantity_display }}</td>
                     <td class="px-3 py-2 text-right">{{ money(item.subtotal) }}</td>
                   </tr>
@@ -629,9 +665,12 @@ async function reprintReturnTicket(sale, returnedSale) {
               </table>
             </div>
             <p class="mt-2 whitespace-pre-line">{{ returnedSale.reason }}</p>
+            <div v-if="returnedSale.is_voided" class="mt-3 border-l-2 border-primary/30 pl-3 text-xs">
+              <p class="font-black">Anulada por {{ returnedSale.voided_by || 'Sin usuario' }} · {{ returnedSale.voided_at_display || '-' }}</p>
+              <p class="mt-1 whitespace-pre-line">{{ returnedSale.void_reason }}</p>
+            </div>
           </article>
         </section>
-      </div>
     </GlobalModal>
 
     <GlobalModal
@@ -639,7 +678,8 @@ async function reprintReturnTicket(sale, returnedSale) {
       title="Registrar devolución"
       :subtitle="`${cancellationSale.folio} · ${money(cancellationSale.total)}`"
       mode="delete"
-      size="2xl"
+      size="md"
+      height="auto"
       :columns="1"
       :processing="cancellationForm.processing"
       :total-errors="Object.keys(cancellationForm.errors).length"
@@ -648,25 +688,18 @@ async function reprintReturnTicket(sale, returnedSale) {
       @close="closeCancellationModal"
       @save="saveCancellation"
     >
-      <div class="space-y-4">
-        <section class="rounded-2xl border border-secondary bg-secondary p-4 text-sm text-text">
-          <p class="font-black">Productos que volverán al inventario</p>
-          <p class="mt-1 opacity-65">
-            La devolucion se registrara con la fecha actual y quedara vinculada a este ticket.
-          </p>
-        </section>
-
-        <div class="overflow-x-auto rounded-2xl border border-secondary">
+      <div class="space-y-3">
+        <div class="overflow-x-auto border-y border-secondary">
           <table class="min-w-full text-sm text-text">
-            <thead class="bg-secondary text-left text-xs uppercase opacity-70">
-              <tr><th class="px-3 py-3">Producto</th><th class="px-3 py-3">Comprado</th><th class="px-3 py-3">Pendiente</th><th class="px-3 py-3">Devolver</th></tr>
+            <thead class="text-left text-xs uppercase opacity-60">
+              <tr><th class="py-2 pr-3">Producto</th><th class="px-2 py-2">Comprado</th><th class="px-2 py-2">Pendiente</th><th class="py-2 pl-2">Devolver</th></tr>
             </thead>
             <tbody>
               <tr v-for="detail in cancellationSale.details || []" :key="detail.id" class="border-t border-secondary">
-                <td class="px-3 py-3 font-semibold">{{ detail.product }}</td>
-                <td class="px-3 py-3">{{ detail.quantity_display }}</td>
-                <td class="px-3 py-3">{{ detail.remaining_quantity }} {{ detail.sale_unit === 'box' ? 'cajas' : detail.sale_unit === 'kg' ? 'kg' : 'pzas' }}</td>
-                <td class="px-3 py-3">
+                <td class="py-3 pr-3 font-medium">{{ detail.product }}</td>
+                <td class="px-2 py-3">{{ detail.quantity_display }}</td>
+                <td class="px-2 py-3">{{ detail.remaining_quantity }} {{ detail.sale_unit === 'box' ? 'cajas' : detail.sale_unit === 'kg' ? 'kg' : 'pzas' }}</td>
+                <td class="py-3 pl-2">
                   <input v-model.number="returnQuantities[detail.id]" type="number" min="0" :max="detail.remaining_quantity" :step="detail.sale_unit === 'kg' ? '0.001' : '1'" class="w-28 rounded-lg border border-secondary bg-background px-3 py-2 text-text" :disabled="Number(detail.remaining_quantity) <= 0" />
                 </td>
               </tr>
@@ -678,9 +711,36 @@ async function reprintReturnTicket(sale, returnedSale) {
           v-model="cancellationForm.reason"
           label="Motivo de cancelacion"
           field="reason"
-          :rows="4"
-          placeholder="Ej. Botella rota, producto caducado, devolucion autorizada."
+          :rows="2"
+          placeholder="Motivo"
           :error="cancellationForm.errors.reason"
+        />
+      </div>
+    </GlobalModal>
+
+    <GlobalModal
+      v-if="returnToVoid"
+      title="Anular devolución"
+      size="sm"
+      height="auto"
+      :columns="1"
+      :subtitle="`${returnToVoid.folio} · ${money(returnToVoid.amount)}`"
+      mode="delete"
+      :processing="voidReturnForm.processing"
+      :total-errors="Object.keys(voidReturnForm.errors).length"
+      save-button-text="Confirmar anulación"
+      close-button-text="Conservar devolución"
+      @close="closeVoidReturnModal"
+      @save="saveVoidReturn"
+    >
+      <div class="space-y-4">
+        <TextareaField
+          v-model="voidReturnForm.reason"
+          label="Motivo de la anulación"
+          field="reason"
+          :rows="4"
+          placeholder="Ej. La devolución fue registrada en el ticket equivocado."
+          :error="voidReturnForm.errors.reason || voidReturnForm.errors.return"
         />
       </div>
     </GlobalModal>

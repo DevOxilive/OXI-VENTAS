@@ -22,6 +22,13 @@ class TicketTemplateController extends Controller
         $template = TicketTemplate::salesTemplate();
 
         return Inertia::render('Printers/Tickets', [
+            'visualLayoutActive' => \App\Support\VisualPrintLayout::active(match ($template->slug) {
+                'cash-closure-ticket' => 'closure',
+                'employee-credit-statement-ticket' => 'statement',
+                'sale-return-ticket' => 'sale-return',
+                'credit-payment-ticket' => 'credit-payment',
+                default => 'sales',
+            }) !== null,
             'template' => [
                 'id' => $template->id,
                 'name' => $template->name,
@@ -71,6 +78,7 @@ class TicketTemplateController extends Controller
             ->values();
 
         return Inertia::render('Printers/Labels', [
+            'visualLayout' => \App\Support\VisualPrintLayout::active('label'),
             'template' => [
                 'id' => $template->id,
                 'name' => $template->name,
@@ -103,6 +111,13 @@ class TicketTemplateController extends Controller
         $template = TicketTemplate::cashClosureTemplate();
 
         return Inertia::render('Printers/Tickets', [
+            'visualLayoutActive' => \App\Support\VisualPrintLayout::active(match ($template->slug) {
+                'cash-closure-ticket' => 'closure',
+                'employee-credit-statement-ticket' => 'statement',
+                'sale-return-ticket' => 'sale-return',
+                'credit-payment-ticket' => 'credit-payment',
+                default => 'sales',
+            }) !== null,
             'template' => [
                 'id' => $template->id,
                 'name' => $template->name,
@@ -151,6 +166,13 @@ class TicketTemplateController extends Controller
         $template = TicketTemplate::employeeCreditStatementTemplate();
 
         return Inertia::render('Printers/Tickets', [
+            'visualLayoutActive' => \App\Support\VisualPrintLayout::active(match ($template->slug) {
+                'cash-closure-ticket' => 'closure',
+                'employee-credit-statement-ticket' => 'statement',
+                'sale-return-ticket' => 'sale-return',
+                'credit-payment-ticket' => 'credit-payment',
+                default => 'sales',
+            }) !== null,
             'template' => [
                 'id' => $template->id,
                 'name' => $template->name,
@@ -180,11 +202,60 @@ class TicketTemplateController extends Controller
         ]);
     }
 
+    public function document(string $kind)
+    {
+        abort_unless(isset(TicketTemplate::DOCUMENT_TEMPLATES[$kind]), 404);
+        $definition = TicketTemplate::DOCUMENT_TEMPLATES[$kind];
+        $template = TicketTemplate::documentTemplate($kind);
+        $sample = $this->samplePrintJob();
+        $sample['type'] = $kind === 'sale-return' ? 'sale_return' : 'employee_credit_payment';
+        $sample['folio'] = $kind === 'sale-return' ? 'DEV-000001' : 'ABO-000001';
+        $sample['original_sale_folio'] = 'V-000001';
+        $sample['reason'] = 'Producto devuelto por el cliente';
+        $sample['balance_before'] = 300;
+        $sample['balance_after'] = 116.50;
+        $sample['payment_amount'] = 183.50;
+        $sample['paid_charges'] = [['folio' => 'V-000001', 'amount' => 183.50]];
+
+        return Inertia::render('Printers/Tickets', [
+            'visualLayoutActive' => \App\Support\VisualPrintLayout::active(match ($template->slug) {
+                'cash-closure-ticket' => 'closure',
+                'employee-credit-statement-ticket' => 'statement',
+                'sale-return-ticket' => 'sale-return',
+                'credit-payment-ticket' => 'credit-payment',
+                default => 'sales',
+            }) !== null,
+            'template' => [
+                'id' => $template->id, 'name' => $template->name, 'slug' => $template->slug,
+                'is_active' => $template->is_active, 'settings' => $template->settings,
+                'updated_at' => $template->updated_at?->toJSON(),
+            ],
+            'samplePrintJob' => $sample,
+            'templateContext' => [
+                'title' => $definition['name'], 'defaultName' => $definition['name'],
+                'defaultSubheader' => $definition['title'], 'defaultFooter' => $definition['footer'],
+                'openCashDrawer' => false,
+                'documentKind' => $kind,
+                'subtitle' => 'Esta plantilla se aplica automáticamente a este tipo de comprobante.',
+            ],
+        ]);
+    }
+
+    public function updateDocument(Request $request, string $kind, TicketTemplate $ticketTemplate)
+    {
+        abort_unless(isset(TicketTemplate::DOCUMENT_TEMPLATES[$kind]), 404);
+        abort_unless($ticketTemplate->slug === TicketTemplate::DOCUMENT_TEMPLATES[$kind]['slug'], 404);
+        return $this->update($request, $ticketTemplate);
+    }
+
     public function update(Request $request, TicketTemplate $ticketTemplate)
     {
         $routeName = (string) $request->route()?->getName();
 
-        if (str_contains($routeName, 'cash-closure-tickets.')) {
+        if (str_contains($routeName, 'document-tickets.')) {
+            $kind = (string) $request->route('kind');
+            abort_unless(isset(TicketTemplate::DOCUMENT_TEMPLATES[$kind]) && $ticketTemplate->slug === TicketTemplate::DOCUMENT_TEMPLATES[$kind]['slug'], 404);
+        } elseif (str_contains($routeName, 'cash-closure-tickets.')) {
             abort_unless($ticketTemplate->slug === 'cash-closure-ticket', 404);
         } elseif (str_contains($routeName, 'employee-credit-statement-tickets.')) {
             abort_unless($ticketTemplate->slug === 'employee-credit-statement-ticket', 404);
@@ -196,9 +267,9 @@ class TicketTemplateController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'is_active' => ['required', 'boolean'],
             'settings' => ['required', 'array'],
-            'settings.paper_width' => ['required', 'integer', 'in:32,42,48'],
+            'settings.paper_width' => ['required', 'integer', 'min:24', 'max:64'],
             'settings.print_engine' => ['required', 'string', 'in:raw,visual'],
-            'settings.feed_lines' => ['required', 'integer', 'min:1', 'max:1'],
+            'settings.feed_lines' => ['required', 'integer', 'min:1', 'max:8'],
             'settings.auto_cut' => ['required', 'boolean'],
             'settings.open_cash_drawer' => ['required', 'boolean'],
             'settings.header_text' => ['nullable', 'string', 'max:120'],
@@ -215,6 +286,8 @@ class TicketTemplateController extends Controller
         ]);
 
         $defaults = match ($ticketTemplate->slug) {
+            'sale-return-ticket' => TicketTemplate::documentDefaultSettings('sale-return'),
+            'credit-payment-ticket' => TicketTemplate::documentDefaultSettings('credit-payment'),
             'cash-closure-ticket' => TicketTemplate::cashClosureDefaultSettings(),
             'employee-credit-statement-ticket' => TicketTemplate::employeeCreditStatementDefaultSettings(),
             default => TicketTemplate::defaultSettings(),
@@ -240,8 +313,8 @@ class TicketTemplateController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'is_active' => ['required', 'boolean'],
             'settings' => ['required', 'array'],
-            'settings.label_width_mm' => ['required', 'integer', 'min:20', 'max:110'],
-            'settings.label_height_mm' => ['required', 'integer', 'min:12', 'max:90'],
+            'settings.label_width_mm' => ['required', 'integer', 'min:20', 'max:210'],
+            'settings.label_height_mm' => ['required', 'integer', 'min:12', 'max:300'],
             'settings.print_engine' => ['required', 'string', 'in:visual'],
             'settings.barcode_height_mm' => ['required', 'integer', 'min:6', 'max:28'],
             'settings.barcode_width_percent' => ['required', 'integer', 'min:45', 'max:100'],

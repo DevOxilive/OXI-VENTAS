@@ -1,4 +1,5 @@
 <script setup>
+import { renderTicketHeaderImage } from "@/config/ticketTemplate";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -7,6 +8,7 @@ import { GlobalTable } from '@/Components/Tables'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import { ChangeDueModal, GlobalModal } from '@/Components/Modales'
 import InputField from '@/Components/Forms/InputField.vue'
+import SelectField from '@/Components/Forms/SelectField.vue'
 import MultiSelectDropdown from '@/Components/Forms/MultiSelectDropdown.vue'
 import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
@@ -15,6 +17,7 @@ import {
   connectQzTray,
   findTicketPrinter,
   getQzPrinters,
+  getStoredTicketPrinterName,
   printEscPosTicket,
 } from '@/Composables/useQzTray'
 import {
@@ -43,7 +46,7 @@ const search = ref(props.filters.search || '')
 const status = ref(props.filters.status || '')
 const recordsPerPage = ref(Number(props.filters.per_page || props.accounts?.per_page || 25))
 const { handlePageChange } = useGlobalTablePagination()
-const selectedPrinterName = ref('')
+const selectedPrinterName = ref(getStoredTicketPrinterName())
 const printerBridgeReady = ref(false)
 const printerBridgeMessage = ref('Conecta QZ Tray para imprimir tickets.')
 const TICKET_LOGO_URL = '/icons/super-kay-ticket-bw.png'
@@ -315,7 +318,9 @@ function storedCashBoxNumber() {
 async function initializePrinterBridge({ silent = true } = {}) {
   try {
     await connectQzTray()
-    const printers = await getQzPrinters()
+    const printers = await getQzPrinters({
+      expectedPrinterNames: [selectedPrinterName.value || getStoredTicketPrinterName()],
+    })
     printerBridgeReady.value = true
     selectedPrinterName.value = findTicketPrinter(printers)
     printerBridgeMessage.value = selectedPrinterName.value
@@ -361,40 +366,16 @@ function imageFromDataUrl(dataUrl) {
   })
 }
 
-async function getTicketHeaderDataUrl(cashBoxText = '') {
-  const normalizedCashBoxText = String(cashBoxText || '').trim()
-  const cacheKey = normalizedCashBoxText || '__default__'
-  if (ticketHeaderDataUrlPromises.has(cacheKey)) return ticketHeaderDataUrlPromises.get(cacheKey)
-
-  const promise = getTicketLogoDataUrl().then(async (logoDataUrl) => {
-    if (!logoDataUrl || typeof document === 'undefined') return logoDataUrl
-
-    const logoImage = await imageFromDataUrl(logoDataUrl)
-    const canvas = document.createElement('canvas')
-    canvas.width = 576
-    canvas.height = 92
-    const context = canvas.getContext('2d')
-    if (!context) return logoDataUrl
-
-    context.fillStyle = '#ffffff'
-    context.fillRect(0, 0, canvas.width, canvas.height)
-    context.drawImage(logoImage, 12, 5, 82, 82)
-    context.fillStyle = '#000000'
-    context.font = '700 27px Arial, sans-serif'
-    context.textAlign = 'center'
-    context.textBaseline = 'middle'
-    context.fillText('SUPER KAY', Math.round(canvas.width / 2), Math.round(canvas.height / 2))
-    if (normalizedCashBoxText) {
-      context.font = '700 21px Arial, sans-serif'
-      context.textAlign = 'right'
-      context.fillText(normalizedCashBoxText.toUpperCase(), canvas.width - 12, Math.round(canvas.height / 2))
-    }
-
-    return canvas.toDataURL('image/png')
-  }).catch(() => '')
-
-  ticketHeaderDataUrlPromises.set(cacheKey, promise)
-  return promise
+async function getTicketHeaderDataUrl(cashBoxText = "", settings = resolvedTicketTemplate.value) {
+  const cacheKey = JSON.stringify([settings, cashBoxText]);
+  if (!ticketHeaderDataUrlPromises.has(cacheKey)) {
+    const promise = getTicketLogoDataUrl().then(async (logoDataUrl) => {
+      if (!logoDataUrl || typeof document === "undefined") return logoDataUrl;
+      return renderTicketHeaderImage(settings, await imageFromDataUrl(logoDataUrl), cashBoxText);
+    }).catch(() => "");
+    ticketHeaderDataUrlPromises.set(cacheKey, promise);
+  }
+  return ticketHeaderDataUrlPromises.get(cacheKey);
 }
 
 function buildAccountPrintJob(account) {
@@ -522,7 +503,7 @@ async function printCreditPaymentTicket(receipt) {
     const printJob = {
       ...receipt,
       ticket_logo_data_url: await getTicketLogoDataUrl(),
-      ticket_header_data_url: await getTicketHeaderDataUrl(`CAJA #${receipt.cash_box_number || '1'}`),
+      ticket_header_data_url: await getTicketHeaderDataUrl(`CAJA #${receipt.cash_box_number || '1'}`, receipt.template_settings || resolvedTicketTemplate.value),
     }
     const printData = buildEscPosTicketData(resolvedTicketTemplate.value, printJob)
     await printEscPosTicket(selectedPrinterName.value, printData, { timeoutMs: 10000 })
@@ -533,6 +514,28 @@ async function printCreditPaymentTicket(receipt) {
     printerBridgeReady.value = false
     printerBridgeMessage.value = error?.message || 'QZ Tray no pudo imprimir el comprobante del abono.'
     ErrorAlert({ title: 'Abono registrado, pero no se pudo imprimir', message: printerBridgeMessage.value })
+  }
+}
+
+async function reprintReturnTicket(returnedSale) {
+  if (!returnedSale?.sale_id || !returnedSale?.id) return
+  if (!selectedPrinterName.value || !printerBridgeReady.value) {
+    ErrorAlert({ title: 'Impresora requerida', message: 'Conecta la impresora para reimprimir la devolución.' })
+    return
+  }
+  try {
+    const { data } = await window.axios.get(route('ventas.returns.ticket', { sale: returnedSale.sale_id, cancellation: returnedSale.id }))
+    const printJob = data?.print_job
+    if (!printJob) throw new Error('No se encontró el comprobante.')
+    const printData = buildEscPosTicketData(normalizeTicketTemplate(printJob.template_settings || {}), {
+      ...printJob,
+      ticket_logo_data_url: await getTicketLogoDataUrl(),
+      ticket_header_data_url: await getTicketHeaderDataUrl(`CAJA #${printJob.cash_box_number || '1'}`, printJob.template_settings),
+    })
+    await printEscPosTicket(selectedPrinterName.value, printData, { timeoutMs: 10000 })
+    ToastAlert({ title: `Comprobante ${printJob.folio} enviado a la impresora` })
+  } catch (error) {
+    ErrorAlert({ title: 'No se pudo reimprimir', message: error?.message || 'Intenta nuevamente.' })
   }
 }
 
@@ -825,12 +828,12 @@ onBeforeUnmount(() => {
         </section>
 
         <section v-if="selected.returns?.length">
-          <h2 class="mb-2 text-sm font-black uppercase tracking-[0.18em] text-primary">Devoluciones aplicadas</h2>
+          <h2 class="mb-2 text-sm font-black uppercase tracking-[0.18em] text-primary">Devoluciones</h2>
           <div class="space-y-3">
             <article v-for="returnedSale in selected.returns" :key="returnedSale.id" class="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm text-text">
               <div class="flex flex-wrap justify-between gap-2 font-black">
                 <span>{{ returnedSale.folio }} · Ticket {{ returnedSale.sale_folio }}</span>
-                <span>-{{ money(returnedSale.amount) }}</span>
+                <span :class="returnedSale.is_voided ? 'opacity-60' : 'text-primary'">{{ returnedSale.is_voided ? 'Anulada' : `-${money(returnedSale.amount)}` }}</span>
               </div>
               <p class="mt-1 text-xs opacity-65">{{ returnedSale.date }}</p>
               <div class="mt-3 space-y-1">
@@ -842,6 +845,11 @@ onBeforeUnmount(() => {
               <div v-if="returnedSale.account_balance_before !== null" class="mt-3 flex flex-wrap justify-between gap-3 border-t border-primary/20 pt-2 text-xs">
                 <span>Adeudo anterior: <strong>{{ money(returnedSale.account_balance_before) }}</strong></span>
                 <span>Adeudo nuevo: <strong>{{ money(returnedSale.account_balance_after) }}</strong></span>
+              </div>
+              <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-primary/20 pt-2 text-xs">
+                <span v-if="returnedSale.is_voided">Anulada por {{ returnedSale.voided_by || 'Sin usuario' }} · {{ returnedSale.voided_at || '-' }}</span>
+                <span v-else>Aplicada al adeudo</span>
+                <button type="button" class="font-black text-primary hover:underline" @click="reprintReturnTicket(returnedSale)">Reimprimir</button>
               </div>
             </article>
           </div>

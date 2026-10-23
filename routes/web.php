@@ -449,6 +449,10 @@ Route::middleware([
                 ->middleware($salesAccess)
                 ->name('returns.ticket');
 
+            Route::patch('/{sale}/devoluciones/{cancellation}/anular', [SalesController::class, 'voidReturn'])
+                ->middleware(['permission:sales.returns.void', 'idempotent'])
+                ->name('returns.void');
+
             Route::get('/estados-cuenta', [EmployeeCreditAccountController::class, 'index'])
                 ->middleware('permission:sales.employee-credit.view')
                 ->name('employee-credit.index');
@@ -519,6 +523,20 @@ Route::middleware([
         $labelsAccess,
         $qzSetupAccess
     ) {
+        Route::get('/visual-editor/{kind}', [\App\Http\Controllers\VisualPrintTemplateController::class, 'show'])->name('visual-editor.show');
+        Route::put('/visual-editor/{kind}', [\App\Http\Controllers\VisualPrintTemplateController::class, 'save'])->name('visual-editor.save');
+        Route::post('/visual-editor/{kind}/activate', [\App\Http\Controllers\VisualPrintTemplateController::class, 'activate'])->name('visual-editor.activate');
+
+        Route::get('/tickets/templates/{kind}', [TicketTemplateController::class, 'document'])
+            ->whereIn('kind', ['sale-return', 'credit-payment'])
+            ->middleware($ticketsAccess)
+            ->name('document-tickets.index');
+
+        Route::put('/tickets/templates/{kind}/{ticketTemplate}', [TicketTemplateController::class, 'updateDocument'])
+            ->whereIn('kind', ['sale-return', 'credit-payment'])
+            ->middleware('permission:systems.tickets.update')
+            ->name('document-tickets.update');
+
         Route::get('/tickets', [TicketTemplateController::class, 'index'])
             ->middleware($ticketsAccess)
             ->name('tickets.index');

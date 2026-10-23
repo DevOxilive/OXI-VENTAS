@@ -13,6 +13,7 @@ use App\Models\EmployeeCreditPayment;
 use App\Models\PaymentMethod;
 use App\Models\SaleCancellation;
 use App\Models\TicketTemplate;
+use App\Support\VisualPrintLayout;
 use App\Support\LocalDateTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -88,7 +89,7 @@ class EmployeeCreditAccountController extends Controller
             ],
             'ticketTemplate' => [
                 'id' => $ticketTemplate->id,
-                'settings' => TicketTemplate::sanitizeSettings($ticketTemplate->settings ?? []),
+                'settings' => VisualPrintLayout::withActive('statement', TicketTemplate::sanitizeSettings($ticketTemplate->settings ?? [])),
             ],
             'filters' => [
                 'search' => $search,
@@ -108,7 +109,7 @@ class EmployeeCreditAccountController extends Controller
                     'sale.details.barcode:id,product_id,code',
                     'sale.details.product:id,name',
                     'sale.details.product.barcodes:id,product_id,code',
-                    'sale.details.cancellationDetails:id,sale_detail_id,quantity',
+                    'sale.details.activeCancellationDetails:id,sale_detail_id,quantity',
                     'sale.branch:id,name',
                 ])
                 ->latest('id'),
@@ -128,6 +129,7 @@ class EmployeeCreditAccountController extends Controller
                 'sale.branch:id,name',
                 'details.product:id,name,inventory_unit,unit',
                 'details.barcode:id,code',
+                'voidedBy:id,name',
             ])
             ->latest('cancelled_at')
             ->get();
@@ -151,8 +153,8 @@ class EmployeeCreditAccountController extends Controller
                     'code' => $detail->barcode?->code ?? $detail->product?->barcodes?->first()?->code ?? '-',
                     'product' => $detail->product?->name,
                     'quantity' => (float) $detail->quantity,
-                    'returned_quantity' => (float) $detail->cancellationDetails->sum('quantity'),
-                    'remaining_quantity' => max(0, (float) $detail->quantity - (float) $detail->cancellationDetails->sum('quantity')),
+                'returned_quantity' => (float) $detail->activeCancellationDetails->sum('quantity'),
+                'remaining_quantity' => max(0, (float) $detail->quantity - (float) $detail->activeCancellationDetails->sum('quantity')),
                     'sale_unit' => $detail->sale_unit,
                     'unit_price' => (float) $detail->unit_price,
                     'subtotal' => (float) $detail->subtotal,
@@ -177,6 +179,7 @@ class EmployeeCreditAccountController extends Controller
             ])->values(),
             'returns' => $returns->map(fn (SaleCancellation $return) => [
                 'id' => (int) $return->id,
+                'sale_id' => (int) $return->sale_id,
                 'folio' => 'DEV-'.str_pad((string) $return->id, 6, '0', STR_PAD_LEFT),
                 'sale_folio' => $return->sale?->folio,
                 'date' => LocalDateTime::format($return->cancelled_at, 'd/m/Y H:i'),
@@ -184,6 +187,10 @@ class EmployeeCreditAccountController extends Controller
                 'amount' => (float) $return->amount,
                 'account_balance_before' => $return->account_balance_before !== null ? (float) $return->account_balance_before : null,
                 'account_balance_after' => $return->account_balance_after !== null ? (float) $return->account_balance_after : null,
+                'is_voided' => $return->isVoided(),
+                'voided_at' => LocalDateTime::format($return->voided_at, 'd/m/Y H:i'),
+                'voided_by' => $return->voidedBy?->name,
+                'void_reason' => $return->void_reason,
                 'items' => $return->details->map(fn ($detail) => [
                     'code' => $detail->barcode?->code ?? '-',
                     'product' => $detail->product?->name ?? 'Producto',
@@ -287,6 +294,10 @@ class EmployeeCreditAccountController extends Controller
         }, 3);
 
         $payment = $paymentResult['payment'];
+        $paymentTemplate = TicketTemplate::documentTemplate('credit-payment');
+        $paymentResult['print_job']['template_settings'] = VisualPrintLayout::withActive('credit-payment', $paymentTemplate->settings);
+        $paymentResult['print_job']['template_slug'] = $paymentTemplate->slug;
+        $paymentResult['print_job']['document_title'] = $paymentTemplate->settings['subheader_text'];
 
         broadcast(new CreditAccountChanged('payment_created', $account->id))->toOthers();
 

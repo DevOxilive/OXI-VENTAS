@@ -57,11 +57,18 @@ class SaleDetail extends Model
 
     public function cancellationDetail()
     {
-        return $this->hasOne(SaleCancellationDetail::class);
+        return $this->hasOne(SaleCancellationDetail::class)
+            ->whereHas('cancellation', fn ($query) => $query->whereNull('voided_at'));
     }
 
     public function cancellationDetails()
     {
         return $this->hasMany(SaleCancellationDetail::class);
+    }
+
+    public function activeCancellationDetails()
+    {
+        return $this->hasMany(SaleCancellationDetail::class)
+            ->whereHas('cancellation', fn ($query) => $query->whereNull('voided_at'));
     }
 }

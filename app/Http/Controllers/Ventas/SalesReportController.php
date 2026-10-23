@@ -246,8 +246,10 @@ class SalesReportController extends Controller
             'details.barcode:id,code',
             'details.product.category:id,name',
             'details.product.barcodes:id,product_id,code',
-            'cancellation.paymentMethod:id,name',
-            'cancellation.details.product:id,name',
+            'cancellations.cancelledBy:id,name',
+            'cancellations.voidedBy:id,name',
+            'cancellations.paymentMethod:id,name',
+            'cancellations.details.product:id,name',
         ]);
 
         return Excel::download(
@@ -268,8 +270,10 @@ class SalesReportController extends Controller
             'details.barcode:id,code',
             'details.product.category:id,name',
             'details.product.barcodes:id,product_id,code',
-            'cancellation.paymentMethod:id,name',
-            'cancellation.details.product:id,name',
+            'cancellations.cancelledBy:id,name',
+            'cancellations.voidedBy:id,name',
+            'cancellations.paymentMethod:id,name',
+            'cancellations.details.product:id,name',
         ]);
 
         $pdf = Pdf::loadView('pdf.sale-detail-report', [
@@ -349,9 +353,10 @@ class SalesReportController extends Controller
                 'details.barcode:id,code',
                 'details.product.category:id,name',
                 'details.product.barcodes:id,product_id,code',
-                'cancellation.cancelledBy:id,name',
-                'cancellation.paymentMethod:id,name',
-                'cancellation.details.product:id,name',
+                'cancellations.cancelledBy:id,name',
+                'cancellations.voidedBy:id,name',
+                'cancellations.paymentMethod:id,name',
+                'cancellations.details.product:id,name',
             ])
             ->select('sales.*')
             ->selectSub($totalProductsSubquery, 'total_products_sold')
@@ -507,8 +512,8 @@ class SalesReportController extends Controller
         $summary = $this->emptySalesSummary();
 
         foreach ($rows as $operation) {
-            $amount = collect($operation['details'] ?? [])
-                ->sum(fn (array $detail) => (float) ($detail['report_amount'] ?? $detail['subtotal'] ?? 0));
+            $amount = (float) ($operation['net_total'] ?? collect($operation['details'] ?? [])
+                ->sum(fn (array $detail) => (float) ($detail['report_amount'] ?? $detail['subtotal'] ?? 0)));
 
             if (($operation['operation_type'] ?? 'sale') === 'payment') {
                 $summary['credit_payments'] += $amount;
@@ -669,6 +674,27 @@ class SalesReportController extends Controller
         $totalProductsSold = (float) ($sale->total_products_sold
             ?? $sale->details->sum(fn (SaleDetail $detail) => (float) ($detail->base_quantity ?? $detail->quantity)));
 
+        $returns = $sale->cancellations->map(function ($return) {
+            return [
+                'id' => (int) $return->id,
+                'folio' => 'DEV-'.str_pad((string) $return->id, 6, '0', STR_PAD_LEFT),
+                'amount' => (float) $return->amount,
+                'is_voided' => $return->isVoided(),
+                'cancelled_at_display' => LocalDateTime::format($return->cancelled_at, 'd/m/Y H:i') ?? '-',
+                'voided_at_display' => LocalDateTime::format($return->voided_at, 'd/m/Y H:i'),
+                'items' => $return->details->map(fn ($detail) => [
+                    'sale_detail_id' => (int) $detail->sale_detail_id,
+                    'product' => $detail->product?->name ?? 'Producto sin nombre',
+                    'quantity' => (float) $detail->quantity,
+                    'subtotal' => (float) $detail->subtotal,
+                ])->values()->all(),
+            ];
+        })->values();
+        $activeReturns = $returns->where('is_voided', false)->values();
+        $returnedAmount = (float) $activeReturns->sum('amount');
+        $returnedByDetail = $activeReturns->flatMap(fn (array $return) => $return['items'])
+            ->groupBy('sale_detail_id');
+
         return [
             'id' => (int) $sale->id,
             'operation_type' => 'sale',
@@ -687,8 +713,8 @@ class SalesReportController extends Controller
             'change_due' => (float) ($sale->change_due ?? 0),
             'seller' => $this->employeeName($sale),
             'status' => $sale->status,
-            'status_label' => $sale->status === 'cancelled' ? 'Cancelada' : 'Completada',
-            'status_tone' => $sale->status === 'cancelled' ? 'danger' : 'success',
+            'status_label' => $returnedAmount <= 0 ? ($sale->status === 'cancelled' ? 'Cancelada' : 'Completada') : ($returnedAmount + 0.009 >= (float) $sale->total ? 'Devolución total' : 'Devolución parcial'),
+            'status_tone' => $returnedAmount > 0 ? 'danger' : ($sale->status === 'cancelled' ? 'danger' : 'success'),
             'cancelled_at' => LocalDateTime::iso($sale->cancelled_at),
             'cancelled_at_display' => LocalDateTime::format($sale->cancelled_at, 'd/m/Y H:i') ?? null,
             'cancellation' => $sale->cancellation ? [
@@ -711,6 +737,9 @@ class SalesReportController extends Controller
                     ->values()
                     ->all(),
             ] : null,
+            'returns' => $returns->all(),
+            'returned_amount' => $returnedAmount,
+            'net_total' => max(0, round((float) $sale->total - $returnedAmount, 2)),
             'items_count' => $sale->details->count(),
             'total_products_sold' => $totalProductsSold,
             'total_products_sold_display' => $this->saleTotalQuantityDisplay($sale, $totalProductsSold),
@@ -718,7 +747,7 @@ class SalesReportController extends Controller
             'details' => $sale->details
                 ->map(fn (SaleDetail $detail) => $this->mapSaleDetail(
                     $detail,
-                    $sale->cancellation?->details->firstWhere('sale_detail_id', $detail->id),
+                    (object) ['quantity' => (float) ($returnedByDetail->get($detail->id)?->sum('quantity') ?? 0), 'subtotal' => (float) ($returnedByDetail->get($detail->id)?->sum('subtotal') ?? 0)],
                 ))
                 ->values()
                 ->all(),

@@ -13,6 +13,7 @@ class SaleCancellationDetail extends Model
         'product_id',
         'barcode_id',
         'return_stock_movement_id',
+        'void_stock_movement_id',
         'quantity',
         'sale_unit',
         'base_quantity',
@@ -57,5 +58,10 @@ class SaleCancellationDetail extends Model
     public function returnStockMovement()
     {
         return $this->belongsTo(StockMovement::class, 'return_stock_movement_id');
+    }
+
+    public function voidStockMovement()
+    {
+        return $this->belongsTo(StockMovement::class, 'void_stock_movement_id');
     }
 }
