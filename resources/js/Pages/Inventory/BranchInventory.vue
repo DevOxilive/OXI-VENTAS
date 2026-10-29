@@ -100,6 +100,7 @@ const {
     showConfigModal,
 
     liveSelectedMovementProduct,
+    selectedMovementBranch,
     liveSelectedMovementsProduct,
     liveSelectedConfigProduct,
     liveSelectedBatch,
@@ -120,6 +121,10 @@ const {
     hasPagination,
     visualProducts,
     filteredProducts,
+    inventoryPagination,
+    movementLoading,
+    loadMovementPage,
+    handleSearchEnter,
     alerts,
 
     selectedAlertType,
@@ -231,6 +236,7 @@ function handleInventoryAction({ action, row }) {
                 <InventoryStatsCards :alerts="alerts" @open-alert="openAlertModal" />
 
                 <GlobalToolbar v-bind="inventoryToolbarConfig" :search="search" :records-per-page="recordsToShow"
+                    @keydown="handleSearchEnter($event, inventoryToolbarConfig.searchPlaceholder)"
                     select-search-on-enter
                     :filtered-records="filteredProducts.length" :total-records="visualProducts.length"
                     @update:search="search = $event" @update:filter="handleInventoryToolbarFilter"
@@ -238,11 +244,11 @@ function handleInventoryAction({ action, row }) {
             </div>
         </template>
 
-        <GlobalTable :items="filteredProducts" v-bind="inventoryTableConfig" :pagination="branchProductsDB"
+        <GlobalTable :items="filteredProducts" v-bind="inventoryTableConfig" :pagination="inventoryPagination"
             @page-change="goToPage" @action="handleInventoryAction" />
 
         <StockEntryModal v-if="showEntryModal && liveSelectedMovementProduct && can('inventory.branches.stock-in')"
-            :product="liveSelectedMovementProduct" :branches="branchesDB" :current-branch="currentBranch"
+            :product="liveSelectedMovementProduct" :branches="branchesDB" :current-branch="selectedMovementBranch"
             @close="closeEntryModal" />
 
         <StockExitModal v-if="showExitModal && liveSelectedMovementProduct && can('inventory.branches.stock-out')"
@@ -250,7 +256,7 @@ function handleInventoryAction({ action, row }) {
 
         <ProductMovementsModal
             v-if="showMovementsModal && liveSelectedMovementsProduct && can('inventory.branches.view')"
-            :product="liveSelectedMovementsProduct" @close="closeMovementsModal" />
+            :product="liveSelectedMovementsProduct" :loading="movementLoading" @load-page="loadMovementPage" @close="closeMovementsModal" />
 
         <ProductBatchesModal
             v-if="showProductBatchesModal && liveSelectedBatchesProduct && can('inventory.branches.batches.update')"

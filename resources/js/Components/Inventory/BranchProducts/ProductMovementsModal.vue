@@ -9,9 +9,10 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    loading: Boolean,
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'load-page'])
 
 const {
     productName,
@@ -28,6 +29,8 @@ const {
     movementSummary,
     quantityClass,
     formatNumber,
+    pagination,
+    loadPage,
     closeModal,
 } = useProductMovementsModal(props, emit)
 
@@ -98,7 +101,7 @@ function summaryTextClass(item) {
                             Usuario
                         </span>
 
-                        <select v-model="filters.userName"
+                        <select v-model="filters.userId"
                             class="h-10 w-full rounded-lg border border-secondary bg-background px-3 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-secondary">
                             <option v-for="option in userOptions" :key="option.value" :value="option.value">
                                 {{ option.label }}
@@ -134,6 +137,7 @@ function summaryTextClass(item) {
                     mobile-card-header-field="displayReason"
                     no-data-message="No hay movimientos que coincidan con los filtros."
                     :show-pagination="false"
+                    :loading="loading"
                 >
                     <template #cell-displayQuantity="{ row }">
                         <span class="font-semibold" :class="quantityClass(row)">
@@ -151,6 +155,14 @@ function summaryTextClass(item) {
                     </template>
                 </GlobalTable>
             </section>
+
+            <div v-if="pagination && pagination.last_page > 1" class="flex shrink-0 items-center justify-end gap-3 border-t border-secondary py-3 text-sm">
+                <button type="button" class="rounded-lg border border-secondary px-3 py-2 disabled:opacity-40"
+                    :disabled="loading || pagination.current_page <= 1" @click="loadPage(pagination.current_page - 1)">Anterior</button>
+                <span>{{ pagination.current_page }} de {{ pagination.last_page }}</span>
+                <button type="button" class="rounded-lg border border-secondary px-3 py-2 disabled:opacity-40"
+                    :disabled="loading || !pagination.has_more" @click="loadPage(pagination.current_page + 1)">Siguiente</button>
+            </div>
 
         </div>
 

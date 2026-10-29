@@ -55,6 +55,7 @@ export function useProductActions() {
                 data: {
                     delete_globally: deleteGlobally,
                     record_version: product.record_version,
+                    catalog_version: product.catalog_version,
                 },
                 mode: "delete",
                 entityName: "Producto",

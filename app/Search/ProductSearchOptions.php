@@ -18,6 +18,7 @@ final readonly class ProductSearchOptions
         public bool $includeLotNumbers = false,
         public array $lotStatuses = [ProductBatch::STATUS_ACTIVE],
         public bool $onlyLotsWithStock = false,
+        public bool $inventorySqlPrefilter = false,
     ) {}
 
     /**
@@ -43,6 +44,7 @@ final readonly class ProductSearchOptions
             includeLotNumbers: false,
             lotStatuses: $this->lotStatuses,
             onlyLotsWithStock: $this->onlyLotsWithStock,
+            inventorySqlPrefilter: $this->inventorySqlPrefilter,
         );
     }
 }

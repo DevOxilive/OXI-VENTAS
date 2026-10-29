@@ -20,6 +20,7 @@ class IndependentProductPricingTest extends TestCase
     use RefreshDatabase;
 
     private Branch $branch;
+
     private Category $category;
 
     protected function setUp(): void
@@ -55,6 +56,7 @@ class IndependentProductPricingTest extends TestCase
     {
         $this->post(route('inventory.branches.products.store', $this->branch->slug), $this->payload($overrides))
             ->assertSessionHasNoErrors()->assertRedirect();
+
         return Product::latest('id')->firstOrFail();
     }
 
@@ -70,7 +72,7 @@ class IndependentProductPricingTest extends TestCase
             ->assertJsonPath('product.box_margin_percentage', '30.0000');
 
         $this->put(route('inventory.branches.products.update', [$this->branch->slug, $product->id]),
-            $this->payload(['sale_price_per_piece' => 20, 'record_version' => $product->updated_at->toJSON()]))
+            $this->payload(['sale_price_per_piece' => 20, 'record_version' => $product->updated_at->toJSON(), 'catalog_version' => $product->catalog_version]))
             ->assertSessionHasNoErrors();
         $this->assertEquals(20, $product->fresh()->sale_price_per_piece);
         $this->assertEquals(234, $product->fresh()->sale_price_per_box);
@@ -126,6 +128,7 @@ class IndependentProductPricingTest extends TestCase
                 'sale_price_per_piece' => 99, 'piece_pricing_mode' => 'percentage', 'piece_margin_percentage' => 90,
                 'box_pricing_mode' => 'manual', 'sale_price_per_box' => 999, 'cost_per_box' => 200,
                 'box_margin_percentage' => 80, 'record_version' => $product->updated_at->toJSON(),
+                'catalog_version' => $product->catalog_version,
             ]))->assertSessionHasNoErrors();
         $product->refresh();
         $this->assertSame('manual', $product->piece_pricing_mode);
@@ -151,6 +154,7 @@ class IndependentProductPricingTest extends TestCase
                 'box_pricing_mode' => 'manual',
                 'sale_price_per_box' => 280,
                 'record_version' => $product->updated_at->toJSON(),
+                'catalog_version' => $product->catalog_version,
             ]))->assertSessionHasNoErrors();
 
         $product->refresh();

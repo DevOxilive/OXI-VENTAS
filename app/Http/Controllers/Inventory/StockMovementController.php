@@ -12,6 +12,7 @@ use App\Services\StockMovementService;
 use App\Support\FlexibleSearch;
 use App\Support\TablePagination;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\DeadlockException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -203,6 +204,11 @@ class StockMovementController extends Controller
                 );
             }
         } catch (Throwable $e) {
+            // La transacción exterior de inventario puede reintentar el movimiento completo.
+            if ($e instanceof DeadlockException) {
+                throw $e;
+            }
+
             return back()->withErrors([
                 'stock' => $e->getMessage(),
             ]);
@@ -355,6 +361,7 @@ class StockMovementController extends Controller
                 onlyActiveBranchProducts: true,
                 limit: 100,
                 includeLotNumbers: true,
+                inventorySqlPrefilter: true,
             ),
         );
 

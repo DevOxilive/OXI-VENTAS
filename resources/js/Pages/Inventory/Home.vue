@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ProductModal from '@/Components/Inventory/ProductModal.vue'
@@ -15,11 +15,19 @@ import { useProductActions } from '@/Composables/Inventory/useProductActions'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { usePermissions } from '@/Composables/usePermissions'
 import { getProductToolbarConfig } from '@/config/ToolbarConfigs/productToolbarConfig'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime, subscribeRealtimeReconnect } from '@/realtime'
+import { createInventoryRealtimeState } from '@/utils/inventoryRealtimeState.mjs'
+import { createInventoryRealtimeBatch, createInventoryPageRefresh, readInventoryPage, inventoryPartialHeaders } from '@/utils/inventoryRealtimeBatch.mjs'
 
 defineOptions({ layout: AdminLayout })
 
 let unsubscribeProductChanged = null
+let unsubscribeStockUpdated = null
+let unsubscribeReconnect = null
+let lastSearchVisit = { key: '', at: 0 }
+let realtimeMounted = false
+const realtimeState = createInventoryRealtimeState()
+const page = usePage()
 
 function cloneProductsPayload(payload) {
   return {
@@ -29,12 +37,6 @@ function cloneProductsPayload(payload) {
       : [],
     links: Array.isArray(payload?.links) ? [...payload.links] : [],
   }
-}
-
-function sortProducts(items) {
-  return [...items].sort((left, right) => {
-    return Number(right?.branch_product_id ?? 0) - Number(left?.branch_product_id ?? 0)
-  })
 }
 
 function normalizeFilterIds(value) {
@@ -79,6 +81,7 @@ const props = defineProps({
 const productsState = ref(cloneProductsPayload(props.productsDB))
 const showStockEntryModal = ref(false)
 const selectedStockProduct = ref(null)
+const selectedStockBranch = ref(null)
 const branch = computed(() => props.branch ?? {})
 const categoriesDB = computed(() => props.categoriesDB ?? [])
 const productDepartmentsDB = computed(() => props.productDepartmentsDB ?? [])
@@ -87,6 +90,8 @@ const branchesDB = computed(() => props.branchesDB ?? [])
 watch(
   () => props.productsDB,
   (value) => {
+    realtimeState.invalidateAll()
+    pageRefresh.invalidate()
     productsState.value = cloneProductsPayload(value)
   },
   { deep: true }
@@ -96,9 +101,13 @@ const search = ref(props.filters.search ?? '')
 const productDepartmentFilter = ref(normalizeFilterIds(props.filters.product_department_id))
 const categoryFilter = ref(normalizeFilterIds(props.filters.category_id))
 const recordsToShow = ref(Number(props.filters.per_page ?? 25))
-const { handlePageChange } = useGlobalTablePagination({
-  only: ['productsDB', 'filters', 'categoriesDB', 'productDepartmentsDB'],
+const { handlePageChange: visitProductPage } = useGlobalTablePagination({
+  only: ['productsDB', 'filters'],
 })
+function handlePageChange(url) {
+  pageRefresh.invalidate()
+  visitProductPage(url)
+}
 
 const products = computed(() => productsState.value?.data ?? [])
 const currentPage = computed(() => productsState.value?.current_page ?? 1)
@@ -195,13 +204,17 @@ function handleProductAction({ action, row }) {
 
 async function openProductBatchesModal(product) {
   if (!product?.branch_product_id) return
+  const branchId = branch.value.id
 
   try {
     const { data } = await window.axios.get(
       route('inventory.branch-inventory.details', {
         branchProduct: product.branch_product_id,
-      })
+      }),
+      { params: { include_movements: 0 } }
     )
+
+    if (!realtimeState.isActive() || Number(branch.value.id) !== Number(branchId)) return
 
     clearSelectedBatch()
     selectedBatchesProduct.value = {
@@ -216,6 +229,7 @@ async function openProductBatchesModal(product) {
     }
     showProductBatchesModal.value = true
   } catch (error) {
+    if (!realtimeState.isActive() || Number(branch.value.id) !== Number(branchId)) return
     console.error('No se pudieron cargar los lotes del producto', error)
     ErrorAlert({
       title: 'No se pudieron cargar los lotes',
@@ -247,15 +261,19 @@ function openStockEntryModal(product) {
   if (!product?.branch_product_id) return
 
   selectedStockProduct.value = buildStockEntryProduct(product)
+  selectedStockBranch.value = { ...branch.value }
   showStockEntryModal.value = true
 }
 
 function closeStockEntryModal() {
   showStockEntryModal.value = false
   selectedStockProduct.value = null
+  selectedStockBranch.value = null
 }
 
 function reloadProducts(pageOrUrl = 1) {
+  clearTimeout(searchTimer)
+  pageRefresh.invalidate()
   const isUrl = typeof pageOrUrl === 'string'
   const requestUrl = isUrl
     ? pageOrUrl
@@ -271,6 +289,9 @@ function reloadProducts(pageOrUrl = 1) {
       per_page: recordsToShow.value,
       page: pageOrUrl,
     }
+  const requestKey = JSON.stringify([requestUrl, requestData])
+  if (requestKey === lastSearchVisit.key && Date.now() - lastSearchVisit.at < 300) return
+  lastSearchVisit = { key: requestKey, at: Date.now() }
 
   router.get(
     requestUrl,
@@ -279,36 +300,9 @@ function reloadProducts(pageOrUrl = 1) {
       preserveState: true,
       preserveScroll: true,
       replace: true,
-      only: ['productsDB', 'filters', 'categoriesDB', 'productDepartmentsDB'],
+      only: ['productsDB', 'filters'],
     }
   )
-}
-
-function upsertProduct(product) {
-  if (!product?.branch_product_id) return
-
-  const nextItems = [...products.value]
-  const existingIndex = nextItems.findIndex((item) => {
-    return Number(item.branch_product_id) === Number(product.branch_product_id)
-  })
-
-  if (existingIndex >= 0) {
-    nextItems[existingIndex] = {
-      ...nextItems[existingIndex],
-      ...product,
-    }
-  } else {
-    nextItems.push(product)
-  }
-
-  const sortedItems = sortProducts(nextItems)
-  const currentTotal = Number(productsState.value?.total ?? nextItems.length)
-
-  productsState.value = {
-    ...(productsState.value ?? {}),
-    data: sortedItems,
-    total: existingIndex >= 0 ? currentTotal : currentTotal + 1,
-  }
 }
 
 function removeProduct(productId) {
@@ -326,32 +320,60 @@ function removeProduct(productId) {
   }
 }
 
-async function fetchProductSnapshot(productId) {
-  if (!productId || !branch.value?.slug) return null
-
-  try {
-    const { data } = await window.axios.get(
-      route('inventory.branches.products.snapshot', {
-        branch: branch.value.slug,
-        productId,
-      })
-    )
-
-    return data?.product ?? null
-  } catch (error) {
-    console.error('No se pudo actualizar el producto en tiempo real', error)
-    return null
-  }
-}
-
 let searchTimer = null
+const pageRefresh = createInventoryPageRefresh({
+  getContext: () => JSON.stringify([window.location.href, page.component, branch.value.id, search.value,
+    productDepartmentFilter.value, categoryFilter.value, recordsToShow.value]),
+  load: async ({ signal }) => {
+    const { data } = await window.axios.get(window.location.href, {
+      signal,
+      headers: inventoryPartialHeaders(page, ['productsDB', 'filters']),
+    })
+    return readInventoryPage(data, page.component, 'productsDB')
+  },
+  apply: (value) => { productsState.value = cloneProductsPayload(value) },
+  onError: (error) => console.error('No se pudieron actualizar los productos', error),
+})
+const realtimeBatch = createInventoryRealtimeBatch({
+  flush: async (events) => {
+    const branchId = branch.value.id
+    // La búsqueda pendiente traerá su propia página con los filtros nuevos.
+    if (search.value === (props.filters.search ?? '')) await pageRefresh.refresh()
+    if (!realtimeState.isActive() || Number(branch.value.id) !== Number(branchId)) return
+    if (showProductBatchesModal.value && selectedBatchesProduct.value && events.some((event) => (
+      event.reconnect || Number(event.productId ?? event.product_id) === Number(selectedBatchesProduct.value.id)
+    ))) {
+      const product = selectedBatchesProduct.value
+      await realtimeState.request(`details:${product.branch_product_id}`, {
+        load: async () => {
+          const { data } = await window.axios.get(route('inventory.branch-inventory.details', {
+            branchProduct: product.branch_product_id,
+          }), { params: { include_movements: 0 } })
+          return data
+        },
+        onSuccess: (data) => {
+          if (selectedBatchesProduct.value?.branch_product_id === product.branch_product_id) {
+            selectedBatchesProduct.value = { ...product, ...data, id: product.id, batches: data.batches ?? [] }
+          }
+        },
+        onError: (error) => console.error('No se pudieron actualizar los lotes', error),
+      })
+    }
+  },
+})
+
+function handleSearchEnter(event) {
+  if (event.key !== 'Enter' || event.target?.tagName !== 'INPUT' || event.target?.placeholder !== productToolbarConfig.value.searchPlaceholder) return
+  reloadProducts(1)
+}
 
 watch(search, () => {
   clearTimeout(searchTimer)
+  pageRefresh.invalidate()
 
   searchTimer = setTimeout(() => {
     reloadProducts(1)
-  }, 150)
+  }, /^\d{8,14}$/.test(search.value.trim()) ? 0 : 250)
 })
 
 watch([productDepartmentFilter, categoryFilter, recordsToShow], () => {
@@ -368,6 +390,10 @@ const {
   closeModal,
   deleteProduct,
 } = useProductActions()
+const selectedProductBranch = ref({ ...branch.value })
+watch(showModal, (open) => {
+  if (open) selectedProductBranch.value = { ...branch.value }
+})
 
 function shouldReloadForProductEvent(event) {
   const branchIds = event.branchIds ?? event.branch_ids ?? []
@@ -377,30 +403,33 @@ function shouldReloadForProductEvent(event) {
   return branchIds.map(Number).includes(Number(branch.value.id))
 }
 
-onMounted(() => {
+function subscribeForCurrentBranch() {
+  unsubscribeProductChanged?.()
+  unsubscribeStockUpdated?.()
+  unsubscribeProductChanged = null
+  unsubscribeStockUpdated = null
+  const subscribedBranchId = branch.value.id
   const updateOnProductChange = async (event) => {
+    if (Number(branch.value.id) !== Number(subscribedBranchId)) return
     if (!shouldReloadForProductEvent(event)) return
+    const productId = event.productId ?? event.product_id
+    if (!productId) return
 
     if (
       event.action === 'deleted' &&
-      selectedProduct.value?.id === event.productId
+      Number(selectedProduct.value?.id) === Number(productId)
     ) {
       closeModal()
     }
 
     if (event.action === 'deleted') {
-      removeProduct(event.productId ?? event.product_id)
+      realtimeState.invalidate(`product:${productId}`)
+      removeProduct(productId)
+      realtimeBatch.add(event)
       return
     }
 
-    const product = await fetchProductSnapshot(event.productId ?? event.product_id)
-
-    if (!product) {
-      removeProduct(event.productId ?? event.product_id)
-      return
-    }
-
-    upsertProduct(product)
+    realtimeBatch.add(event)
   }
 
   unsubscribeProductChanged = subscribeRealtime(
@@ -408,19 +437,49 @@ onMounted(() => {
     REALTIME_EVENTS.productChanged,
     updateOnProductChange,
   )
+  if (branch.value.id) {
+    unsubscribeStockUpdated = subscribeRealtime(
+      REALTIME_CHANNELS.inventoryBranch(branch.value.id),
+      REALTIME_EVENTS.stockUpdated,
+      (event) => {
+        if (Number(branch.value.id) === Number(subscribedBranchId)) realtimeBatch.add(event)
+      },
+    )
+  }
+}
+
+watch(() => branch.value.id, () => {
+  clearTimeout(searchTimer)
+  realtimeState.invalidateAll()
+  pageRefresh.invalidate()
+  realtimeBatch.clear()
+  lastSearchVisit = { key: '', at: 0 }
+  if (realtimeMounted) subscribeForCurrentBranch()
+}, { flush: 'post' })
+
+onMounted(() => {
+  realtimeMounted = true
+  subscribeForCurrentBranch()
+  unsubscribeReconnect = subscribeRealtimeReconnect(() => realtimeBatch.add({ reconnect: true }))
 })
 
 onBeforeUnmount(() => {
   clearTimeout(searchTimer)
+  realtimeMounted = false
+  realtimeState.dispose()
+  pageRefresh.dispose()
+  realtimeBatch.dispose()
 
   unsubscribeProductChanged?.()
+  unsubscribeStockUpdated?.()
+  unsubscribeReconnect?.()
 })
 </script>
 
 <template>
   <PageLayout>
     <template #toolbar>
-      <GlobalToolbar v-bind="productToolbarConfig" :search="search" :records-per-page="recordsToShow"
+      <GlobalToolbar v-bind="productToolbarConfig" :search="search" :records-per-page="recordsToShow" @keydown="handleSearchEnter"
         select-search-on-enter
         :filtered-records="products.length" :total-records="totalProducts"
         @update:search="search = $event" @update:filter="handleProductToolbarFilter"
@@ -431,7 +490,7 @@ onBeforeUnmount(() => {
       @action="handleProductAction" />
 
     <StockEntryModal v-if="showStockEntryModal && selectedStockProduct && can('inventory.branches.stock-in')"
-      :product="selectedStockProduct" :branches="branchesDB" :current-branch="branch" @close="closeStockEntryModal" />
+      :product="selectedStockProduct" :branches="branchesDB" :current-branch="selectedStockBranch" @close="closeStockEntryModal" />
 
     <ProductBatchesModal
       v-if="showProductBatchesModal && selectedBatchesProduct && can('inventory.branches.batches.update')"
@@ -452,6 +511,6 @@ onBeforeUnmount(() => {
       )
     " :mode="modalMode" :product="selectedProduct" :categoriesDB="categoriesDB"
       :productDepartmentsDB="productDepartmentsDB"
-      :branchesDB="branchesDB" :branch="branch" :can-manage-pricing="canManagePricing" @close="closeModal" />
+      :branchesDB="branchesDB" :branch="selectedProductBranch" :can-manage-pricing="canManagePricing" @close="closeModal" />
   </PageLayout>
 </template>

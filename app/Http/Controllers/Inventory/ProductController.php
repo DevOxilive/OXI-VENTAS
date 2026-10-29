@@ -2,10 +2,7 @@
 
 namespace App\Http\Controllers\Inventory;
 
-use App\Events\ProductChanged;
-use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
-use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Http\Controllers\Controller;
 use App\Models\Barcode;
 use App\Models\Branch;
@@ -16,6 +13,8 @@ use App\Models\ProductBatch;
 use App\Models\ProductDepartment;
 use App\Search\ProductSearchOptions;
 use App\Search\ProductSearchService;
+use App\Services\InventoryBackgroundContext;
+use App\Services\InventoryOutbox;
 use App\Support\SystemPermission;
 use App\Support\TablePagination;
 use Illuminate\Http\JsonResponse;
@@ -29,7 +28,7 @@ use Throwable;
 
 class ProductController extends Controller
 {
-    use AuthorizesBranchAccess, ValidatesRecordVersion;
+    use AuthorizesBranchAccess;
 
     public function __construct(
         private readonly ProductSearchService $productSearch,
@@ -71,6 +70,7 @@ class ProductController extends Controller
             if ($presentation === 'box' && ! $hasBoxPresentation) {
                 $data[$modeKey] = 'manual';
                 $data[$marginKey] = null;
+
                 continue;
             }
 
@@ -86,6 +86,7 @@ class ProductController extends Controller
                     $data[$modeKey] = 'manual';
                     $data[$marginKey] = null;
                 }
+
                 continue;
             }
 
@@ -153,75 +154,82 @@ class ProductController extends Controller
 
         $perPage = TablePagination::resolvePerPage($request);
 
-        $query = BranchProduct::query()
-            ->with([
-                'branch:id,name,slug',
-                'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at,updated_at',
-                'product.category:id,product_department_id,name',
-                'product.category.productDepartment:id,name',
-                'product.barcodes:id,product_id,code',
-            ])
-            ->withCount(['activeBatches as active_batches_count'])
-            ->where('branch_id', $branch->id)
-            ->where('status', BranchProduct::STATUS_ACTIVE)
-            ->orderByDesc('id');
-
         $categoryIds = $this->selectedIntegerIds($request->input('category_id'));
         $productDepartmentIds = $this->selectedIntegerIds($request->input('product_department_id'));
 
-        if ($categoryIds !== []) {
-            $query->whereHas('product', function ($productQuery) use ($categoryIds) {
-                $productQuery->whereIn('category_id', $categoryIds);
-            });
-        }
+        // Inertia sólo ejecuta esta consulta cuando la pantalla solicita sus filas.
+        $productsDB = function () use ($request, $branch, $perPage, $categoryIds, $productDepartmentIds) {
 
-        if ($productDepartmentIds !== []) {
-            $query->whereHas('product.category', function ($categoryQuery) use ($productDepartmentIds) {
-                $categoryQuery->whereIn('product_department_id', $productDepartmentIds);
-            });
-        }
+            $query = BranchProduct::query()
+                ->with([
+                    'branch:id,name,slug',
+                    'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at,updated_at,catalog_version',
+                    'product.category:id,product_department_id,name',
+                    'product.category.productDepartment:id,name',
+                    'product.barcodes:id,product_id,code',
+                ])
+                ->withCount(['activeBatches as active_batches_count'])
+                ->where('branch_id', $branch->id)
+                ->where('status', BranchProduct::STATUS_ACTIVE)
+                ->orderByDesc('id');
 
-        if ($request->filled('search')) {
-            $this->productSearch->constrainBranchProducts(
-                $query,
-                (string) $request->search,
-                'branch_products.product_id',
-                'batches',
-                new ProductSearchOptions(
-                    branchIds: [$branch->id],
-                    onlyActiveBranchProducts: true,
-                    limit: (int) config('product_search.max_results'),
-                    includeLotNumbers: true,
-                ),
-                orderByRelevance: true,
-                resetExistingOrder: true,
+            if ($categoryIds !== []) {
+                $query->whereHas('product', function ($productQuery) use ($categoryIds) {
+                    $productQuery->whereIn('category_id', $categoryIds);
+                });
+            }
+
+            if ($productDepartmentIds !== []) {
+                $query->whereHas('product.category', function ($categoryQuery) use ($productDepartmentIds) {
+                    $categoryQuery->whereIn('product_department_id', $productDepartmentIds);
+                });
+            }
+
+            if ($request->filled('search')) {
+                $this->productSearch->constrainBranchProducts(
+                    $query,
+                    (string) $request->search,
+                    'branch_products.product_id',
+                    'batches',
+                    new ProductSearchOptions(
+                        branchIds: [$branch->id],
+                        onlyActiveBranchProducts: true,
+                        limit: (int) config('product_search.max_results'),
+                        includeLotNumbers: true,
+                        inventorySqlPrefilter: true,
+                    ),
+                    orderByRelevance: true,
+                    resetExistingOrder: true,
+                );
+            }
+
+            $productsDB = $query->paginate($perPage)->withQueryString();
+            $productIds = $productsDB->getCollection()
+                ->pluck('product_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            $branchIdsByProduct = BranchProduct::query()
+                ->whereIn('product_id', $productIds)
+                ->where('status', BranchProduct::STATUS_ACTIVE)
+                ->get(['product_id', 'branch_id'])
+                ->groupBy('product_id')
+                ->map(fn ($items) => $items
+                    ->pluck('branch_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all());
+
+            $productsDB->getCollection()->transform(
+                fn ($item) => $this->serializeProductRow(
+                    $item,
+                    $branchIdsByProduct->get($item->product_id, []),
+                )
             );
-        }
 
-        $productsDB = $query->paginate($perPage)->withQueryString();
-        $productIds = $productsDB->getCollection()
-            ->pluck('product_id')
-            ->filter()
-            ->unique()
-            ->values();
-
-        $branchIdsByProduct = BranchProduct::query()
-            ->whereIn('product_id', $productIds)
-            ->where('status', BranchProduct::STATUS_ACTIVE)
-            ->get(['product_id', 'branch_id'])
-            ->groupBy('product_id')
-            ->map(fn ($items) => $items
-                ->pluck('branch_id')
-                ->map(fn ($id) => (int) $id)
-                ->values()
-                ->all());
-
-        $productsDB->getCollection()->transform(
-            fn ($item) => $this->serializeProductRow(
-                $item,
-                $branchIdsByProduct->get($item->product_id, []),
-            )
-        );
+            return $productsDB;
+        };
 
         return Inertia::render('Inventory/Home', [
             'branch' => [
@@ -230,9 +238,9 @@ class ProductController extends Controller
                 'slug' => $branch->slug,
             ],
             'productsDB' => $productsDB,
-            'productDepartmentsDB' => $this->productDepartmentOptions(),
-            'categoriesDB' => $this->categoryOptions(),
-            'branchesDB' => Branch::select('id', 'name', 'slug')
+            'productDepartmentsDB' => fn () => $this->productDepartmentOptions(),
+            'categoriesDB' => fn () => $this->categoryOptions(),
+            'branchesDB' => fn () => Branch::select('id', 'name', 'slug')
                 ->where('active', true)
                 ->orderBy('name')
                 ->get(),
@@ -242,7 +250,7 @@ class ProductController extends Controller
                 'category_id' => $categoryIds,
                 'per_page' => $perPage,
             ],
-            'canManagePricing' => $this->canManagePricing($request),
+            'canManagePricing' => fn () => $this->canManagePricing($request),
         ]);
     }
 
@@ -253,7 +261,7 @@ class ProductController extends Controller
         $branchProduct = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
-                'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at',
+                'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at,updated_at,catalog_version',
                 'product.category:id,product_department_id,name',
                 'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
@@ -372,13 +380,20 @@ class ProductController extends Controller
         $previousImagePath = $reusableDeletedProduct?->image;
 
         try {
-            [$product, $branchIds, $activityAction] = DB::transaction(function () use ($data, $imagePath, $barcodes, $requestedBranchIds, $reusableDeletedProduct) {
+            $product = $this->persistProductChange(function () use ($data, $imagePath, $barcodes, $requestedBranchIds, $reusableDeletedProduct) {
                 $product = $reusableDeletedProduct
                     ? Product::withTrashed()->lockForUpdate()->findOrFail($reusableDeletedProduct->id)
                     : new Product;
                 $activityAction = $product->exists ? 'restored' : 'created';
 
+                if ($reusableDeletedProduct && ! $product->trashed()) {
+                    throw ValidationException::withMessages([
+                        'barcodes.0' => 'Otra persona ya reactivó este producto. Consulta la información actual antes de volver a registrarlo.',
+                    ]);
+                }
+
                 if ($product->trashed()) {
+                    $product->catalog_version++;
                     $product->restore();
                 }
 
@@ -417,7 +432,16 @@ class ProductController extends Controller
                     ]);
                 }
 
-                return [$product, $requestedBranchIds->all(), $activityAction];
+                app(InventoryOutbox::class)->productChanged(
+                    $activityAction,
+                    $product->id,
+                    $requestedBranchIds->all(),
+                    $activityAction === 'restored' ? 'reactivó' : 'creó',
+                    'el producto',
+                    $product->name,
+                );
+
+                return $product;
             });
         } catch (Throwable $exception) {
             $this->deleteProductImage($imagePath);
@@ -427,15 +451,6 @@ class ProductController extends Controller
         if ($imagePath && $previousImagePath && $imagePath !== $previousImagePath) {
             $this->deleteProductImage($previousImagePath);
         }
-
-        broadcast(new ProductChanged($activityAction, $product->id, $branchIds))->toOthers();
-        event(RealtimeActivityLogged::message(
-            $activityAction === 'restored' ? 'reactivó' : 'creó',
-            'el producto',
-            $product->name,
-            'Inventario',
-            $activityAction,
-        ));
 
         return back()->with('success', 'Producto creado correctamente');
     }
@@ -569,11 +584,12 @@ class ProductController extends Controller
             : $previousImagePath;
 
         try {
-            $branchIds = DB::transaction(function () use ($request, $data, $product, $barcodes, $branchIds, $newImagePath, $storageUnit, $isLegacyPresentationProduct) {
+            $this->persistProductChange(function () use ($request, $data, $product, $barcodes, $branchIds, $previousBranchIds, $newImagePath, $storageUnit, $isLegacyPresentationProduct) {
 
-                $product = $this->lockCurrentVersion($request, $product);
+                $product = $this->lockCatalogVersion($request, $product);
+                $this->assertRetirementsHaveNoInventory($product, $branchIds->all(), 'branch_ids');
 
-                $product->update([
+                $product->fill([
                     'name' => $data['name'],
                     'search_aliases' => $data['search_aliases'],
                     'image' => $newImagePath,
@@ -597,6 +613,10 @@ class ProductController extends Controller
                     'active' => $data['active'] ?? true,
                 ]);
 
+                // La versión también cambia si solo se editaron códigos o sucursales.
+                $product->catalog_version++;
+                $product->save();
+
                 $this->syncProductBarcodes($product, $barcodes);
 
                 foreach ($branchIds as $branchId) {
@@ -608,6 +628,15 @@ class ProductController extends Controller
                     ->update([
                         'status' => BranchProduct::STATUS_INACTIVE,
                     ]);
+
+                app(InventoryOutbox::class)->productChanged(
+                    'updated',
+                    $product->id,
+                    $previousBranchIds->merge($branchIds)->unique()->values()->all(),
+                    'actualizó',
+                    'el producto',
+                    $product->name,
+                );
 
                 return $branchIds->all();
             });
@@ -621,15 +650,6 @@ class ProductController extends Controller
         if ($newImagePath !== $previousImagePath) {
             $this->deleteProductImage($previousImagePath);
         }
-
-        $affectedBranchIds = $previousBranchIds
-            ->merge($branchIds)
-            ->unique()
-            ->values()
-            ->all();
-
-        broadcast(new ProductChanged('updated', $product->id, $affectedBranchIds))->toOthers();
-        event(RealtimeActivityLogged::message('actualizó', 'el producto', $product->name, 'Inventario', 'updated'));
 
         return back()->with('success', 'Producto actualizado correctamente');
     }
@@ -652,7 +672,6 @@ class ProductController extends Controller
             ->where('product_id', $product->id)
             ->firstOrFail();
 
-        $productId = $product->id;
         $productName = $product->name;
 
         if (! $deleteGlobally) {
@@ -662,8 +681,8 @@ class ProductController extends Controller
                 ]);
             }
 
-            DB::transaction(function () use ($request, $product, $branchProduct) {
-                $this->lockCurrentVersion($request, $product);
+            $this->persistProductChange(function () use ($request, $product, $branchProduct, $branch, $productName) {
+                $product = $this->lockCatalogVersion($request, $product);
                 $lockedBranchProduct = BranchProduct::query()->whereKey($branchProduct->id)->lockForUpdate()->firstOrFail();
 
                 if ($this->hasProtectedInventory($lockedBranchProduct)) {
@@ -673,16 +692,14 @@ class ProductController extends Controller
                 }
 
                 $lockedBranchProduct->delete();
-            });
+                $product->catalog_version++;
+                $product->save();
 
-            broadcast(new ProductChanged('deleted', $productId, [$branch->id]))->toOthers();
-            event(RealtimeActivityLogged::message(
-                'retiro',
-                'el producto de la sucursal',
-                "{$productName} ({$branch->name})",
-                'Inventario',
-                'deleted',
-            ));
+                app(InventoryOutbox::class)->productChanged(
+                    'deleted', $product->id, [$branch->id], 'retiro',
+                    'el producto de la sucursal', "{$productName} ({$branch->name})",
+                );
+            });
 
             return back()->with('success', "Producto retirado de {$branch->name} correctamente");
         }
@@ -707,16 +724,20 @@ class ProductController extends Controller
             ->values()
             ->all();
 
-        DB::transaction(function () use ($request, $product) {
-            $product = $this->lockCurrentVersion($request, $product);
+        $this->persistProductChange(function () use ($request, $product, $branchIds, $productName) {
+            $product = $this->lockCatalogVersion($request, $product);
+            $this->assertRetirementsHaveNoInventory($product, [], 'product');
+            $product->catalog_version++;
+            $product->save();
             // La eliminacion global retira el producto maestro y sus asignaciones.
             $product->branchProducts()->delete();
             $product->barcodes()->delete();
             $product->delete();
-        });
 
-        broadcast(new ProductChanged('deleted', $productId, $branchIds))->toOthers();
-        event(RealtimeActivityLogged::message('eliminó', 'el producto', $productName, 'Inventario', 'deleted'));
+            app(InventoryOutbox::class)->productChanged(
+                'deleted', $product->id, $branchIds, 'eliminó', 'el producto', $productName,
+            );
+        });
 
         return back()->with('success', 'Producto eliminado de todas las sucursales correctamente');
     }
@@ -745,6 +766,75 @@ class ProductController extends Controller
         $branchProduct->save();
 
         return $branchProduct;
+    }
+
+    private function lockCatalogVersion(Request $request, Product $product): Product
+    {
+        $data = $request->validate([
+            'catalog_version' => ['required', 'integer', 'min:1'],
+            'record_version' => ['required', 'date'],
+        ], [
+            'catalog_version.required' => 'Vuelve a abrir el producto para consultar su información actual antes de guardar.',
+            'record_version.required' => 'Vuelve a abrir el producto para consultar su información actual antes de guardar.',
+        ]);
+
+        $current = Product::query()->whereKey($product->id)->lockForUpdate()->firstOrFail();
+
+        if ($current->catalog_version !== (int) $data['catalog_version']
+            || ! $current->updated_at?->equalTo($request->date('record_version'))) {
+            throw ValidationException::withMessages([
+                'catalog_version' => 'Otra persona modificó este producto. Tus datos siguen en el formulario; consulta la información actual antes de volver a guardar.',
+            ]);
+        }
+
+        return $current;
+    }
+
+    private function assertRetirementsHaveNoInventory(Product $product, array $keptBranchIds, string $errorField): void
+    {
+        // Reservar también las sucursales conservadas mantiene el orden de los movimientos.
+        $inventories = BranchProduct::query()
+            ->with('branch:id,name')
+            ->where('product_id', $product->id)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $retirements = $inventories->reject(fn (BranchProduct $inventory) => in_array((int) $inventory->branch_id, $keptBranchIds, true));
+        $blocked = $retirements->filter(fn (BranchProduct $branchProduct) => $this->hasProtectedInventory($branchProduct));
+
+        if ($blocked->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                $errorField => $this->protectedInventoryMessage($blocked),
+            ]);
+        }
+    }
+
+    private function persistProductChange(\Closure $operation): mixed
+    {
+        $committed = false;
+        $result = null;
+
+        try {
+            return app(InventoryBackgroundContext::class)->run(function () use ($operation, &$committed, &$result) {
+                return DB::transaction(function () use ($operation, &$committed, &$result) {
+                    // Registrar primero permite reconocer errores de observadores posteriores al commit.
+                    DB::afterCommit(function () use (&$committed): void {
+                        $committed = true;
+                    });
+
+                    return $result = $operation();
+                });
+            });
+        } catch (Throwable $exception) {
+            if (! $committed) {
+                throw $exception;
+            }
+
+            report($exception);
+
+            return $result;
+        }
     }
 
     private function resolveReusableDeletedProduct($barcodes): ?Product
@@ -1110,6 +1200,7 @@ class ProductController extends Controller
             ),
             'active' => $product?->active ?? true,
             'record_version' => $product?->updated_at?->toJSON(),
+            'catalog_version' => $product?->catalog_version,
             'status' => $branchProduct->status,
             'tracks_batches' => $branchProduct->tracks_batches,
             'tracks_expiration' => $branchProduct->tracks_expiration,

@@ -5,10 +5,12 @@ import {
 } from "@/Components/Modales/UniversalActionModal";
 import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 import { validateSingleField, validateForm } from "@/Validation/schemaBuilder";
+import { createInventoryOperationKey } from "@/utils/inventoryOperationKey";
 
 const adjustmentFields = ["type", "reason", "notes"];
 
 export function useAdjustStockForm(props, emit) {
+    const operationKey = createInventoryOperationKey();
     const form = useForm({
         branch_product_id: props.product.id,
         type: "IN",
@@ -22,6 +24,8 @@ export function useAdjustStockForm(props, emit) {
     });
 
     const frontendErrors = reactive({});
+
+    watch(() => props.product.id, () => operationKey.reset());
 
     const typeOptions = [
         { label: "Entrada", value: "IN" },
@@ -308,6 +312,7 @@ export function useAdjustStockForm(props, emit) {
     }
 
     function resetForm() {
+        operationKey.reset();
         form.reset();
         form.branch_product_id = props.product.id;
         form.type = "IN";
@@ -323,6 +328,8 @@ export function useAdjustStockForm(props, emit) {
     }
 
     function saveAdjustment(transformPayload = null, options = {}) {
+        if (form.processing) return;
+
         const { skipValidation = false, onSuccess = null } = options;
 
         if (!skipValidation && !validateCompleteForm()) {
@@ -334,14 +341,16 @@ export function useAdjustStockForm(props, emit) {
 
             return;
         }
-        const requestForm = typeof transformPayload === "function"
-            ? form.transform(transformPayload)
-            : form;
+        const payload = typeof transformPayload === "function"
+            ? transformPayload(form.data())
+            : form.data();
+        const requestForm = form.transform(() => payload);
 
         requestForm.post(route("inventory.stock-movements.store"), getModalRequestOptions({
             mode: "create",
             entityName: "Movimiento de stock",
             closeOnSuccess: false,
+            headers: { "Idempotency-Key": operationKey.get() },
             successTitle: "Movimiento registrado correctamente",
             errorTitle: "Error en la operación",
             errorMessage: "No fue posible registrar el movimiento de stock",

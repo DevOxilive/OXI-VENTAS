@@ -34,7 +34,7 @@ class StockMovementService
             throw new InvalidArgumentException('La cantidad no puede ser 0.');
         }
 
-        $movement = DB::transaction(function () use (
+        $operation = fn () => DB::transaction(function () use (
             $branchProduct,
             $type,
             $reason,
@@ -64,9 +64,16 @@ class StockMovementService
                 saleCancellationId: $saleCancellationId,
                 saleCancellationDetailId: $saleCancellationDetailId,
             );
-        });
+        }, attempts: 3);
 
-        $this->broadcastInventoryRefresh($branchProduct->id, $type);
+        $isInventoryOperation = $saleId === null && $saleCancellationId === null;
+        $movement = $isInventoryOperation
+            ? app(InventoryBackgroundContext::class)->run($operation)
+            : $operation();
+
+        if (! $isInventoryOperation) {
+            $this->broadcastInventoryRefresh($branchProduct->id, $type);
+        }
 
         return $movement;
     }
@@ -102,7 +109,7 @@ class StockMovementService
             throw new InvalidArgumentException('La suma asignada a sucursales debe coincidir con la cantidad total.');
         }
 
-        $movements = DB::transaction(function () use (
+        $movements = app(InventoryBackgroundContext::class)->run(fn () => DB::transaction(function () use (
             $sourceBranchProduct,
             $reason,
             $notes,
@@ -110,9 +117,19 @@ class StockMovementService
             $batch,
             $normalizedAllocations
         ) {
-            $sourceBranchProduct = BranchProduct::whereKey($sourceBranchProduct->id)
+            // Reservar las sucursales en el mismo orden evita cruces entre distribuciones.
+            $branchIds = $normalizedAllocations->pluck('branch_id')
+                ->push($sourceBranchProduct->branch_id)->unique()->all();
+            $lockedInventories = BranchProduct::query()
+                ->where('product_id', $sourceBranchProduct->product_id)
+                ->whereIn('branch_id', $branchIds)
+                ->orderBy('id')
                 ->lockForUpdate()
-                ->firstOrFail();
+                ->get()->keyBy('id');
+            $sourceBranchProduct = $lockedInventories->get($sourceBranchProduct->id);
+            if (! $sourceBranchProduct || $sourceBranchProduct->isInactive()) {
+                throw new InvalidArgumentException('El producto fue deshabilitado en esta sucursal. Consulta su estado antes de registrar una entrada.');
+            }
 
             return $normalizedAllocations
                 ->map(function ($allocation) use ($sourceBranchProduct, $reason, $notes, $userId, $batch) {
@@ -145,16 +162,7 @@ class StockMovementService
                     ];
                 })
                 ->all();
-        });
-
-        collect($movements)
-            ->pluck('branch_product_id')
-            ->filter()
-            ->unique()
-            ->each(fn ($branchProductId) => $this->broadcastInventoryRefresh(
-                $branchProductId,
-                StockMovement::TYPE_IN,
-            ));
+        }, attempts: 3));
 
         return $movements;
     }
@@ -402,6 +410,10 @@ class StockMovementService
             ->lockForUpdate()
             ->firstOrFail();
 
+        if ($type === StockMovement::TYPE_IN && $branchProduct->isInactive()) {
+            throw new InvalidArgumentException('El producto fue deshabilitado en esta sucursal. Consulta su estado antes de registrar una entrada.');
+        }
+
         $this->validateMovement($type, $reason, $quantity);
 
         // Conserva el saldo previo cuando un producto empieza a manejar lotes,
@@ -499,6 +511,15 @@ class StockMovementService
             $branchProduct->update([
                 'last_restocked_at' => now(),
             ]);
+        }
+
+        if ($saleId === null && $saleCancellationId === null) {
+            app(InventoryOutbox::class)->stockChanged(
+                $branchProduct,
+                $this->activityActionLabel($type),
+                'stock del producto',
+                $type,
+            );
         }
 
         return $movement;
