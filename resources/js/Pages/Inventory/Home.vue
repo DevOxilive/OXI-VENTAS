@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -391,6 +391,14 @@ const {
   deleteProduct,
 } = useProductActions()
 const selectedProductBranch = ref({ ...branch.value })
+const productToolbar = ref(null)
+const productModals = [showModal, showStockEntryModal, showProductBatchesModal]
+watch(productModals, async (open, previous) => {
+  if (!previous.some(Boolean) || open.some(Boolean)) return
+  await nextTick()
+  if (!productModals.some((modal) => modal.value)) productToolbar.value?.focusSearch({ select: true })
+}, { flush: 'post' })
+
 watch(showModal, (open) => {
   if (open) selectedProductBranch.value = { ...branch.value }
 })
@@ -479,7 +487,7 @@ onBeforeUnmount(() => {
 <template>
   <PageLayout>
     <template #toolbar>
-      <GlobalToolbar v-bind="productToolbarConfig" :search="search" :records-per-page="recordsToShow" @keydown="handleSearchEnter"
+      <GlobalToolbar ref="productToolbar" v-bind="productToolbarConfig" :search="search" :records-per-page="recordsToShow" @keydown="handleSearchEnter"
         select-search-on-enter
         :filtered-records="products.length" :total-records="totalProducts"
         @update:search="search = $event" @update:filter="handleProductToolbarFilter"

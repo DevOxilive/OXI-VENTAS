@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
@@ -161,6 +161,14 @@ const {
     saveEditedBatch,
 } = useBranchInventory(props)
 
+const inventoryToolbar = ref(null)
+const inventoryModals = [showEntryModal, showExitModal, showConfigModal, showProductBatchesModal, showMovementsModal, showAlertModal]
+watch(inventoryModals, async (open, previous) => {
+    if (!previous.some(Boolean) || open.some(Boolean)) return
+    await nextTick()
+    if (!inventoryModals.some((modal) => modal.value)) inventoryToolbar.value?.focusSearch({ select: true })
+}, { flush: 'post' })
+
 const toolbarCategories = computed(() => {
     if (!productDepartmentFilter.value.length) {
         return categories.value
@@ -235,7 +243,7 @@ function handleInventoryAction({ action, row }) {
             <div class="space-y-5">
                 <InventoryStatsCards :alerts="alerts" @open-alert="openAlertModal" />
 
-                <GlobalToolbar v-bind="inventoryToolbarConfig" :search="search" :records-per-page="recordsToShow"
+                <GlobalToolbar ref="inventoryToolbar" v-bind="inventoryToolbarConfig" :search="search" :records-per-page="recordsToShow"
                     @keydown="handleSearchEnter($event, inventoryToolbarConfig.searchPlaceholder)"
                     select-search-on-enter
                     :filtered-records="filteredProducts.length" :total-records="visualProducts.length"

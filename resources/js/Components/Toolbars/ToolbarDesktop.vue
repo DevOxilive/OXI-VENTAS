@@ -205,7 +205,7 @@ function updateMultiFilter(filter, value) {
 
         <div v-if="hasSearch || hasRecordsPerPage || visibleFilters.length"
             class="flex flex-wrap items-end gap-3">
-            <input v-if="hasSearch" :value="search" type="text" :placeholder="searchPlaceholder"
+            <input v-if="hasSearch" data-toolbar-search :value="search" type="text" :placeholder="searchPlaceholder"
                 maxlength="120"
                 class="h-11 w-full min-w-[280px] flex-[2_1_360px] rounded-xl border border-secondary bg-background px-4 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
                 @keydown="handleSearchKeydown"
