@@ -6,6 +6,8 @@ use App\Events\SystemTrashChanged;
 use App\Jobs\PurgeTrashRecord;
 use App\Models\SystemAudit;
 use App\Services\SystemAuditService;
+use App\Services\InventoryBackgroundContext;
+use App\Services\InventoryOutbox;
 use App\Support\TrashRegistry;
 use App\Support\TrashRetentionPolicy;
 use Illuminate\Database\Eloquent\Model;
@@ -76,8 +78,27 @@ class SystemAuditObserver
             $expiresAt = TrashRetentionPolicy::expiresAt($resource, $model->deleted_at);
 
             if ($expiresAt) {
-                PurgeTrashRecord::dispatch($resource, $model->getKey())->delay($expiresAt);
+                if (app(InventoryBackgroundContext::class)->active()) {
+                    app(InventoryOutbox::class)->record('trash.purge', [
+                        'resource' => $resource,
+                        'record_id' => $model->getKey(),
+                        'purge_after' => $expiresAt->toIso8601String(),
+                    ]);
+                } else {
+                    PurgeTrashRecord::dispatch($resource, $model->getKey())->delay($expiresAt);
+                }
             }
+        }
+
+        if ($resource && in_array($action, ['delete', 'restore', 'force_delete'], true)
+            && app(InventoryBackgroundContext::class)->active()) {
+            app(InventoryOutbox::class)->record('system.trash.changed', [
+                'resource' => $resource,
+                'action' => $action,
+                'record_ids' => [$model->getKey()],
+            ]);
+
+            return;
         }
 
         DB::afterCommit(function () use ($resource, $action, $model): void {

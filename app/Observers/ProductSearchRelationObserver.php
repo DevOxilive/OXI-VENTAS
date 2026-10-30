@@ -5,10 +5,12 @@ namespace App\Observers;
 use App\Models\Barcode;
 use App\Models\BranchProduct;
 use App\Models\Product;
-use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
+use App\Services\InventoryBackgroundContext;
+use App\Services\InventoryOutbox;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
-class ProductSearchRelationObserver implements ShouldHandleEventsAfterCommit
+class ProductSearchRelationObserver
 {
     public function saved(Model $relation): void
     {
@@ -56,7 +58,15 @@ class ProductSearchRelationObserver implements ShouldHandleEventsAfterCommit
             ->all();
 
         if ($productIds !== []) {
-            Product::query()->whereIntegerInRaw('id', $productIds)->searchable();
+            if (app(InventoryBackgroundContext::class)->active()) {
+                foreach ($productIds as $productId) {
+                    app(InventoryOutbox::class)->searchProduct($productId);
+                }
+
+                return;
+            }
+
+            DB::afterCommit(fn () => Product::query()->whereIntegerInRaw('id', $productIds)->searchable());
         }
     }
 }

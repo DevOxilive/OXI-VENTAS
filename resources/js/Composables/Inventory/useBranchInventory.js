@@ -1,8 +1,10 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { router } from "@inertiajs/vue3";
+import { router, usePage } from "@inertiajs/vue3";
 import { useBatchAdjustmentModal } from "@/Composables/Inventory/useBatchAdjustmentModal";
 import { useGlobalTablePagination } from "@/Composables/useGlobalTablePagination";
-import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime } from "@/realtime";
+import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime, subscribeRealtimeReconnect } from "@/realtime";
+import { createInventoryRealtimeState } from "@/utils/inventoryRealtimeState.mjs";
+import { createInventoryRealtimeBatch, createInventoryPageRefresh, readInventoryPage, inventoryPartialHeaders } from "@/utils/inventoryRealtimeBatch.mjs";
 
 function cloneBranchProductsPayload(payload) {
     if (Array.isArray(payload)) {
@@ -40,19 +42,13 @@ function cloneInventoryAlerts(alerts) {
     };
 }
 
-function sortBranchProducts(items) {
-    return [...items].sort((left, right) => {
-        const leftName = String(left?.product?.name ?? left?.name ?? "");
-        const rightName = String(right?.product?.name ?? right?.name ?? "");
-
-        return leftName.localeCompare(rightName, "es");
-    });
-}
-
 export function useBranchInventory(props) {
     let unsubscribeStockUpdated = null;
     let unsubscribeProductChanged = null;
-    const { handlePageChange } = useGlobalTablePagination();
+    let unsubscribeReconnect = null;
+    let realtimeMounted = false;
+    const page = usePage();
+    const { handlePageChange } = useGlobalTablePagination({ only: ["branchProductsDB", "filters"] });
     const showCreateModal = ref(false);
     const showEntryModal = ref(false);
     const showExitModal = ref(false);
@@ -60,6 +56,7 @@ export function useBranchInventory(props) {
     const showConfigModal = ref(false);
 
     const selectedMovementProduct = ref(null);
+    const selectedMovementBranch = ref(null);
     const selectedMovementsProduct = ref(null);
     const selectedConfigProduct = ref(null);
     const selectedAlertType = ref(null);
@@ -82,6 +79,15 @@ export function useBranchInventory(props) {
     const inventoryAlertsState = ref(cloneInventoryAlerts(props.inventoryAlerts));
     const detailCache = ref({});
     const detailRequests = ref({});
+    const staleDetails = new Set();
+    const detailRevisions = new Map();
+    const movementLoading = ref(false);
+    const movementParams = ref({});
+    let movementLoadSequence = 0;
+    let lastSearchVisit = { key: "", at: 0 };
+    const realtimeState = createInventoryRealtimeState();
+    const detailState = createInventoryRealtimeState();
+    const summaryState = createInventoryRealtimeState();
     let searchTimeout = null;
 
     const products = computed(() => props.productsDB ?? []);
@@ -94,6 +100,9 @@ export function useBranchInventory(props) {
     watch(
         () => props.branchProductsDB,
         (value) => {
+            realtimeState.invalidateAll();
+            detailState.invalidateAll();
+            pageRefresh.invalidate();
             branchProductsState.value = cloneBranchProductsPayload(value);
         },
         { deep: true },
@@ -102,6 +111,7 @@ export function useBranchInventory(props) {
     watch(
         () => props.inventoryStats,
         (value) => {
+            summaryState.invalidateAll();
             inventoryStatsState.value = { ...(value ?? {}) };
         },
         { deep: true },
@@ -110,6 +120,7 @@ export function useBranchInventory(props) {
     watch(
         () => props.inventoryAlerts,
         (value) => {
+            summaryState.invalidateAll();
             inventoryAlertsState.value = cloneInventoryAlerts(value);
         },
         { deep: true },
@@ -215,6 +226,10 @@ export function useBranchInventory(props) {
                 activeBatchesCount: item.active_batches_count ?? 0,
                 batches: detail.batches ?? item.batches ?? [],
                 recentMovements: detail.movements ?? item.movements ?? [],
+                movementsPagination: detail.movements_pagination ?? null,
+                movementsTotal: detail.movements_total ?? null,
+                movementsUsers: detail.movements_users ?? [],
+                movementsSummary: detail.movements_summary ?? [],
                 raw: {
                     ...item,
                     ...detail,
@@ -242,21 +257,38 @@ export function useBranchInventory(props) {
 
     const showProductBatchesModal = ref(false);
     const selectedBatchesProductId = ref(null);
+    const selectedBatchesProduct = ref(null);
+
+    function detailedSelectedProduct(product) {
+        if (!product) return null;
+        const current = visualProducts.value.find((item) => Number(item.id) === Number(product.id));
+        if (current) return current;
+        const detail = detailCache.value[product.id];
+        return detail ? {
+            ...product,
+            stock: Number(detail.stock ?? product.stock ?? 0),
+            batches: detail.batches ?? product.batches,
+            recentMovements: detail.movements ?? product.recentMovements,
+            movementsPagination: detail.movements_pagination ?? product.movementsPagination,
+            movementsTotal: detail.movements_total ?? product.movementsTotal,
+            movementsUsers: detail.movements_users ?? product.movementsUsers,
+            movementsSummary: detail.movements_summary ?? product.movementsSummary,
+        } : product;
+    }
 
     const liveSelectedBatchesProduct = computed(() => {
         if (!selectedBatchesProductId.value) return null;
 
-        return (
-            visualProducts.value.find((product) => {
-                return product.id === selectedBatchesProductId.value;
-            }) ?? null
-        );
+        return detailedSelectedProduct(selectedBatchesProduct.value);
     });
 
     async function openProductBatchesModal(product) {
+        const branchId = currentBranch.value?.id;
         const detailedProduct = await ensureProductDetails(product);
+        if (!realtimeState.isActive() || Number(currentBranch.value?.id) !== Number(branchId)) return;
         clearSelectedBatch();
         selectedBatchesProductId.value = detailedProduct?.id ?? product.id;
+        selectedBatchesProduct.value = detailedProduct;
         showProductBatchesModal.value = true;
     }
 
@@ -264,26 +296,19 @@ export function useBranchInventory(props) {
         clearSelectedBatch();
         showProductBatchesModal.value = false;
         selectedBatchesProductId.value = null;
+        selectedBatchesProduct.value = null;
     }
 
     const liveSelectedMovementProduct = computed(() => {
         if (!selectedMovementProduct.value) return null;
 
-        return (
-            visualProducts.value.find((product) => {
-                return product.id === selectedMovementProduct.value.id;
-            }) ?? selectedMovementProduct.value
-        );
+        return detailedSelectedProduct(selectedMovementProduct.value);
     });
 
     const liveSelectedMovementsProduct = computed(() => {
         if (!selectedMovementsProduct.value) return null;
 
-        return (
-            visualProducts.value.find((product) => {
-                return product.id === selectedMovementsProduct.value.id;
-            }) ?? selectedMovementsProduct.value
-        );
+        return detailedSelectedProduct(selectedMovementsProduct.value);
     });
 
     const liveSelectedConfigProduct = computed(() => {
@@ -360,6 +385,12 @@ export function useBranchInventory(props) {
     const showAlertModal = computed(() => Boolean(selectedAlertType.value));
 
     const reloadInventory = () => {
+        clearTimeout(searchTimeout);
+        pageRefresh.invalidate();
+        const requestKey = JSON.stringify([search.value, productDepartmentFilter.value, categoryFilter.value,
+            stockFilter.value, statusFilter.value, expirationStatusFilter.value, inactiveCandidateFilter.value, recordsToShow.value]);
+        if (requestKey === lastSearchVisit.key && Date.now() - lastSearchVisit.at < 300) return;
+        lastSearchVisit = { key: requestKey, at: Date.now() };
         router.get(
             window.location.pathname,
             {
@@ -380,30 +411,28 @@ export function useBranchInventory(props) {
                 preserveState: true,
                 preserveScroll: true,
                 replace: true,
+                only: ["branchProductsDB", "filters"],
             },
         );
     };
 
-    const goToPage = handlePageChange;
+    const goToPage = (url) => {
+        pageRefresh.invalidate();
+        handlePageChange(url);
+    };
 
-    function clearProductDetailCache(productId) {
-        if (!productId || !detailCache.value[productId]) return;
+    function productRequestKeys({ productId = null, branchProductId = null } = {}) {
+        const row = rawBranchProducts.value.find((item) => (
+            (branchProductId && Number(item.id) === Number(branchProductId)) ||
+            (productId && Number(item.product_id) === Number(productId))
+        ));
+        const resolvedProductId = productId ?? row?.product_id;
+        const resolvedBranchProductId = branchProductId ?? row?.id;
 
-        const nextCache = { ...detailCache.value };
-        delete nextCache[productId];
-        detailCache.value = nextCache;
-    }
-
-    function shouldRefreshRealtimeDetails(productId) {
-        if (!productId) return false;
-
-        return Boolean(
-            detailCache.value[productId] ||
-                selectedMovementProduct.value?.id === productId ||
-                selectedMovementsProduct.value?.id === productId ||
-                selectedConfigProduct.value?.id === productId ||
-                selectedBatchesProductId.value === productId,
-        );
+        return [
+            resolvedProductId ? `product:${resolvedProductId}` : null,
+            resolvedBranchProductId ? `branch-product:${resolvedBranchProductId}` : null,
+        ];
     }
 
     function updateBranchProductsState(mutator) {
@@ -419,38 +448,6 @@ export function useBranchInventory(props) {
             ...(currentValue ?? {}),
             data: nextData,
         };
-    }
-
-    function upsertBranchProductRow(branchProduct) {
-        if (!branchProduct?.id) return;
-
-        updateBranchProductsState((items, isArrayPayload) => {
-            const nextItems = [...items];
-            const existingIndex = nextItems.findIndex(
-                (item) => Number(item.id) === Number(branchProduct.id),
-            );
-
-            if (existingIndex >= 0) {
-                nextItems[existingIndex] = {
-                    ...nextItems[existingIndex],
-                    ...branchProduct,
-                };
-            } else {
-                nextItems.push(branchProduct);
-            }
-
-            const sortedItems = sortBranchProducts(nextItems);
-
-            if (!isArrayPayload && branchProductsState.value) {
-                const currentTotal = Number(
-                    branchProductsState.value.total ?? items.length,
-                );
-                branchProductsState.value.total =
-                    existingIndex >= 0 ? currentTotal : currentTotal + 1;
-            }
-
-            return sortedItems;
-        });
     }
 
     function removeBranchProductByProductId(productId) {
@@ -475,69 +472,87 @@ export function useBranchInventory(props) {
         });
     }
 
-    function applyRealtimeSnapshot(snapshot) {
-        if (snapshot?.branchProduct) {
-            upsertBranchProductRow(snapshot.branchProduct);
-        }
+    const pageRefresh = createInventoryPageRefresh({
+        getContext: () => JSON.stringify([window.location.href, page.component, currentBranch.value?.id,
+            search.value, productDepartmentFilter.value, categoryFilter.value, stockFilter.value,
+            statusFilter.value, expirationStatusFilter.value, inactiveCandidateFilter.value, recordsToShow.value]),
+        load: async ({ signal }) => {
+            const { data } = await window.axios.get(window.location.href, {
+                signal,
+                headers: inventoryPartialHeaders(page, ["branchProductsDB", "filters"]),
+            });
+            return readInventoryPage(data, page.component, "branchProductsDB");
+        },
+        apply: (value) => { branchProductsState.value = cloneBranchProductsPayload(value); },
+        onError: (error) => console.error("No se pudo actualizar el inventario", error),
+    });
 
-        if (snapshot?.branchProductDetails?.id) {
-            detailCache.value = {
-                ...detailCache.value,
-                [snapshot.branchProductDetails.id]: snapshot.branchProductDetails,
-            };
-        }
-
-        if (snapshot?.inventoryStats) {
-            inventoryStatsState.value = { ...snapshot.inventoryStats };
-        }
-
-        if (snapshot?.inventoryAlerts) {
-            inventoryAlertsState.value = cloneInventoryAlerts(
-                snapshot.inventoryAlerts,
-            );
-        }
+    async function refreshInventorySummary() {
+        if (!currentBranch.value?.id) return;
+        const branchId = currentBranch.value.id;
+        return summaryState.request("summary", {
+            load: async () => {
+                const { data } = await window.axios.get(route("inventory.branches.inventory.summary", { branch: branchId }), {
+                    params: { include_alerts: showAlertModal.value ? 1 : 0 },
+                });
+                if (!data?.inventoryStats || !data?.inventoryAlerts) throw new Error("Resumen de inventario incompleto");
+                return data;
+            },
+            onSuccess: (data) => {
+                if (Number(currentBranch.value?.id) !== Number(branchId)) return;
+                inventoryStatsState.value = { ...data.inventoryStats };
+                inventoryAlertsState.value = cloneInventoryAlerts({ ...inventoryAlertsState.value, ...data.inventoryAlerts });
+            },
+            onError: (error) => console.error("No se pudo actualizar el resumen del inventario", error),
+        });
     }
 
-    async function fetchRealtimeSnapshot(params = {}) {
-        if (!currentBranch.value?.id) return null;
-
-        try {
-            const { data } = await window.axios.get(
-                route("inventory.branches.inventory.realtime-snapshot", {
-                    branch: currentBranch.value.id,
-                }),
-                {
-                    params,
-                },
-            );
-
-            applyRealtimeSnapshot(data);
-            return data;
-        } catch (error) {
-            console.error(
-                "No se pudo actualizar el estado en tiempo real del inventario",
-                error,
-            );
-            return null;
-        }
+    function invalidateEventDetails(event) {
+        const productId = event.productId ?? event.product_id;
+        const branchProductId = event.branch_product_id ?? event.branchProduct?.id ?? event.branch_product?.id;
+        const candidates = [...rawBranchProducts.value, ...Object.values(detailCache.value)];
+        const touched = new Set();
+        candidates.forEach((item) => {
+            if (event.reconnect || Number(item.id) === Number(branchProductId) ||
+                (productId && Number(item.product_id ?? item.product?.id) === Number(productId))) touched.add(item.id);
+        });
+        touched.forEach((id) => {
+            staleDetails.add(id);
+            detailRevisions.set(id, (detailRevisions.get(id) ?? 0) + 1);
+        });
     }
+
+    const realtimeBatch = createInventoryRealtimeBatch({
+        flush: async () => {
+            const branchId = currentBranch.value?.id;
+            const refreshPage = search.value === (props.filters?.search ?? "")
+                ? pageRefresh.refresh() : Promise.resolve();
+            await Promise.allSettled([refreshPage, refreshInventorySummary()]);
+            if (!realtimeState.isActive() || Number(currentBranch.value?.id) !== Number(branchId)) return;
+            const opened = new Map();
+            if (showEntryModal.value || showExitModal.value) opened.set(selectedMovementProduct.value?.id, selectedMovementProduct.value);
+            if (showProductBatchesModal.value) opened.set(selectedBatchesProduct.value?.id, selectedBatchesProduct.value);
+            if (showMovementsModal.value) opened.set(selectedMovementsProduct.value?.id, selectedMovementsProduct.value);
+            await Promise.allSettled([...opened.values()].filter((product) => product && staleDetails.has(product.id)).map((product) => (
+                ensureProductDetails(product, { forceRefresh: true,
+                    params: showMovementsModal.value && product.id === selectedMovementsProduct.value?.id
+                        ? { ...movementParams.value, include_movements: 1 } : {} })
+            )));
+        },
+    });
 
     async function ensureProductDetails(product, options = {}) {
         if (!product?.id) return product;
-        const { forceRefresh = false } = options;
+        const { forceRefresh = false, params = {} } = options;
 
-        if (forceRefresh) {
-            clearProductDetailCache(product.id);
-        }
-
-        if (detailCache.value[product.id]) {
+        if (!forceRefresh && !staleDetails.has(product.id) && detailCache.value[product.id]) {
             return (
                 visualProducts.value.find((item) => item.id === product.id) ??
                 product
             );
         }
 
-        if (detailRequests.value[product.id]) {
+        if (!forceRefresh && detailRequests.value[product.id]) {
             await detailRequests.value[product.id];
 
             return (
@@ -546,26 +561,38 @@ export function useBranchInventory(props) {
             );
         }
 
-        detailRequests.value[product.id] = window.axios
-            .get(
-                route("inventory.branch-inventory.details", {
-                    branchProduct: product.id,
-                }),
-            )
-            .then(({ data }) => {
-                detailCache.value = {
-                    ...detailCache.value,
-                    [product.id]: data,
-                };
-            })
-            .catch((error) => {
-                console.error("No se pudo cargar el detalle del producto", error);
+        const revision = detailRevisions.get(product.id) ?? 0;
+        const request = detailState
+            .request(productRequestKeys({ branchProductId: product.id }), {
+                load: async () => {
+                    const { data } = await window.axios.get(
+                        route("inventory.branch-inventory.details", {
+                            branchProduct: product.id,
+                        }),
+                        { params: { include_movements: 0, ...params } },
+                    );
+
+                    return data;
+                },
+                onSuccess: (data) => {
+                    if (revision === (detailRevisions.get(product.id) ?? 0)) staleDetails.delete(product.id);
+                    detailCache.value = {
+                        ...detailCache.value,
+                        [product.id]: data,
+                    };
+                },
+                onError: (error) => {
+                    console.error("No se pudo cargar el detalle del producto", error);
+                },
             })
             .finally(() => {
+                if (!realtimeState.isActive()) return;
+                if (detailRequests.value[product.id] !== request) return;
                 const requests = { ...detailRequests.value };
                 delete requests[product.id];
                 detailRequests.value = requests;
             });
+        detailRequests.value[product.id] = request;
 
         await detailRequests.value[product.id];
 
@@ -573,20 +600,6 @@ export function useBranchInventory(props) {
             visualProducts.value.find((item) => item.id === product.id) ??
             product
         );
-    }
-
-    async function refreshProductDetails(productId) {
-        if (!productId) return null;
-
-        const product =
-            visualProducts.value.find((item) => item.id === productId) ??
-            selectedMovementsProduct.value ??
-            selectedMovementProduct.value ??
-            selectedConfigProduct.value ??
-            liveSelectedBatchesProduct.value ??
-            { id: productId };
-
-        return ensureProductDetails(product, { forceRefresh: true });
     }
 
     const openCreateModal = () => {
@@ -599,6 +612,7 @@ export function useBranchInventory(props) {
 
     const openAlertModal = (type) => {
         selectedAlertType.value = type;
+        void refreshInventorySummary();
     };
 
     const closeAlertModal = () => {
@@ -606,7 +620,11 @@ export function useBranchInventory(props) {
     };
 
     const openEntryModal = async (product) => {
-        selectedMovementProduct.value = await ensureProductDetails(product);
+        const branch = { ...currentBranch.value };
+        const detailedProduct = await ensureProductDetails(product);
+        if (!realtimeState.isActive() || Number(currentBranch.value?.id) !== Number(branch.id)) return;
+        selectedMovementProduct.value = detailedProduct;
+        selectedMovementBranch.value = branch;
         showEntryModal.value = true;
     };
 
@@ -616,7 +634,10 @@ export function useBranchInventory(props) {
     };
 
     const openExitModal = async (product) => {
-        selectedMovementProduct.value = await ensureProductDetails(product);
+        const branchId = currentBranch.value?.id;
+        const detailedProduct = await ensureProductDetails(product);
+        if (!realtimeState.isActive() || Number(currentBranch.value?.id) !== Number(branchId)) return;
+        selectedMovementProduct.value = detailedProduct;
         showExitModal.value = true;
     };
 
@@ -626,7 +647,11 @@ export function useBranchInventory(props) {
     };
 
     const openMovementsModal = async (product) => {
-        selectedMovementsProduct.value = await ensureProductDetails(product);
+        const branchId = currentBranch.value?.id;
+        movementParams.value = {};
+        const detailedProduct = await ensureProductDetails(product, { forceRefresh: true, params: { include_movements: 1 } });
+        if (!realtimeState.isActive() || Number(currentBranch.value?.id) !== Number(branchId)) return;
+        selectedMovementsProduct.value = detailedProduct;
         showMovementsModal.value = true;
     };
 
@@ -634,6 +659,21 @@ export function useBranchInventory(props) {
         showMovementsModal.value = false;
         selectedMovementsProduct.value = null;
     };
+
+    async function loadMovementPage(params = {}) {
+        if (!selectedMovementsProduct.value) return;
+        const loadSequence = ++movementLoadSequence;
+        movementParams.value = params;
+        movementLoading.value = true;
+        const result = await ensureProductDetails(selectedMovementsProduct.value, { forceRefresh: true, params: { ...params, include_movements: 1 } });
+        if (realtimeState.isActive() && loadSequence === movementLoadSequence) movementLoading.value = false;
+        return result;
+    }
+
+    function handleSearchEnter(event, placeholder) {
+        if (event.key !== "Enter" || event.target?.tagName !== "INPUT" || event.target?.placeholder !== placeholder) return;
+        reloadInventory();
+    }
 
     const editProduct = (product) => {
         selectedConfigProduct.value = product;
@@ -659,10 +699,11 @@ export function useBranchInventory(props) {
 
     watch(search, () => {
         clearTimeout(searchTimeout);
+        pageRefresh.invalidate();
 
         searchTimeout = setTimeout(() => {
             reloadInventory();
-        }, 150);
+        }, /^\d{8,14}$/.test(search.value.trim()) ? 0 : 250);
     });
 
     watch(recordsToShow, reloadInventory);
@@ -673,15 +714,21 @@ export function useBranchInventory(props) {
     watch(expirationStatusFilter, reloadInventory);
     watch(inactiveCandidateFilter, reloadInventory);
 
-    onMounted(() => {
+    function subscribeForCurrentBranch() {
+        unsubscribeStockUpdated?.();
+        unsubscribeProductChanged?.();
+        unsubscribeStockUpdated = null;
+        unsubscribeProductChanged = null;
         if (!currentBranch.value?.id) return;
 
-        const channelName = REALTIME_CHANNELS.inventoryBranch(currentBranch.value.id);
+        const subscribedBranchId = currentBranch.value.id;
+        const channelName = REALTIME_CHANNELS.inventoryBranch(subscribedBranchId);
 
         unsubscribeStockUpdated = subscribeRealtime(
             channelName,
             REALTIME_EVENTS.stockUpdated,
-            async (event) => {
+            (event) => {
+                if (Number(currentBranch.value?.id) !== Number(subscribedBranchId)) return;
                 const branchProductId =
                     event.branch_product_id ??
                     event.branchProduct?.id ??
@@ -689,22 +736,15 @@ export function useBranchInventory(props) {
 
                 if (!branchProductId) return;
 
-                const shouldRefreshDetails =
-                    shouldRefreshRealtimeDetails(branchProductId);
-
-                await fetchRealtimeSnapshot({
-                    branch_product_id: branchProductId,
-                });
-
-                if (shouldRefreshDetails) {
-                    await refreshProductDetails(branchProductId);
-                }
+                invalidateEventDetails(event);
+                realtimeBatch.add(event);
             },
         );
         unsubscribeProductChanged = subscribeRealtime(
             channelName,
             REALTIME_EVENTS.productChanged,
-            async (event) => {
+            (event) => {
+                if (Number(currentBranch.value?.id) !== Number(subscribedBranchId)) return;
                 const branchIds = event.branchIds ?? event.branch_ids ?? [];
                 const currentBranchId = Number(currentBranch.value?.id);
 
@@ -717,23 +757,63 @@ export function useBranchInventory(props) {
                 }
 
                 const productId = event.productId ?? event.product_id ?? null;
+                if (!productId) return;
+                invalidateEventDetails(event);
 
-                const snapshot = await fetchRealtimeSnapshot({
-                    product_id: productId,
-                });
-
-                if (!snapshot?.branchProduct) {
+                if (event.action === "deleted") {
+                    const requestKeys = productRequestKeys({ productId });
+                    realtimeState.invalidate(requestKeys);
+                    detailState.invalidate(requestKeys);
                     removeBranchProductByProductId(productId);
                 }
+
+                realtimeBatch.add(event);
             },
         );
+    }
+
+    watch(() => currentBranch.value?.id, () => {
+        clearTimeout(searchTimeout);
+        realtimeState.invalidateAll();
+        detailState.invalidateAll();
+        summaryState.invalidateAll();
+        pageRefresh.invalidate();
+        realtimeBatch.clear();
+        detailCache.value = {};
+        detailRequests.value = {};
+        staleDetails.clear();
+        detailRevisions.clear();
+        movementParams.value = {};
+        movementLoadSequence++;
+        movementLoading.value = false;
+        inventoryStatsState.value = { ...(props.inventoryStats ?? {}) };
+        inventoryAlertsState.value = cloneInventoryAlerts(props.inventoryAlerts);
+        lastSearchVisit = { key: "", at: 0 };
+        if (realtimeMounted) subscribeForCurrentBranch();
+    }, { flush: "post" });
+
+    onMounted(() => {
+        realtimeMounted = true;
+        subscribeForCurrentBranch();
+        unsubscribeReconnect = subscribeRealtimeReconnect(() => {
+            detailState.invalidateAll();
+            invalidateEventDetails({ reconnect: true });
+            realtimeBatch.add({ reconnect: true });
+        });
     });
 
     onBeforeUnmount(() => {
         clearTimeout(searchTimeout);
+        realtimeMounted = false;
+        realtimeState.dispose();
+        detailState.dispose();
+        summaryState.dispose();
+        pageRefresh.dispose();
+        realtimeBatch.dispose();
 
         unsubscribeStockUpdated?.();
         unsubscribeProductChanged?.();
+        unsubscribeReconnect?.();
     });
 
     return {
@@ -751,6 +831,7 @@ export function useBranchInventory(props) {
         showConfigModal,
 
         selectedMovementProduct,
+        selectedMovementBranch,
         selectedMovementsProduct,
         selectedConfigProduct,
 
@@ -772,6 +853,10 @@ export function useBranchInventory(props) {
 
         visualProducts,
         filteredProducts,
+        inventoryPagination: branchProductsState,
+        movementLoading,
+        loadMovementPage,
+        handleSearchEnter,
 
         alerts,
 

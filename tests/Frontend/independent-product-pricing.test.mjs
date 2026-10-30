@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import { parse as parseVue } from '@vue/compiler-sfc';
 import { parse as parseJavaScript } from '@babel/parser';
 import { reactive, ref, computed, watch, nextTick, effectScope } from 'vue';
+import { localDateInput } from '../../resources/js/utils/localDate.js';
 
 // Run the actual form and its watchers; only replace screen/network dependencies.
 const source = parseVue(readFileSync(new URL('../../resources/js/Components/Inventory/ProductModal.vue', import.meta.url), 'utf8')).descriptor.scriptSetup.content;
@@ -17,7 +18,7 @@ function openForm(t, product = null) {
     const scope = effectScope();
     t.after(() => scope.stop());
     const context = vm.createContext({
-        ref, computed, watch, File: class File {}, URL,
+        ref, computed, watch, localDateInput, File: class File {}, URL,
         defineProps: () => props, defineEmits: () => () => {}, onBeforeUnmount() {},
         useForm: values => reactive({ ...values, errors: {}, reset() {}, clearErrors() {} }),
     });

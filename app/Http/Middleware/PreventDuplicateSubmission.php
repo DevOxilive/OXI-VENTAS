@@ -15,6 +15,12 @@ class PreventDuplicateSubmission
             return $next($request);
         }
 
+        if ($request->hasHeader('Idempotency-Key') && $request->routeIs(
+            'inventory.stock-movements.store', 'inventory.product-batches.update',
+        )) {
+            return app(PreventDuplicateInventoryOperation::class)->handle($request, $next);
+        }
+
         $fingerprint = $request->header('Idempotency-Key') ?: hash('sha256', json_encode([
             'user_id' => $request->user()?->id,
             'method' => $request->method(),
@@ -52,7 +58,7 @@ class PreventDuplicateSubmission
 
             $hasValidationErrors = $request->hasSession() && $request->session()->has('errors');
 
-            if ($response->getStatusCode() < 400 && !$hasValidationErrors) {
+            if ($response->getStatusCode() < 400 && ! $hasValidationErrors) {
                 Cache::put($completedKey, true, now()->addSeconds(10));
             }
 

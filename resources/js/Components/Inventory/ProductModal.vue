@@ -66,6 +66,7 @@ const form = useForm({
   kilos: null,
   grams: null,
   record_version: "",
+  catalog_version: null,
 });
 const activeStep = ref(1);
 const modalSections = [
@@ -224,6 +225,7 @@ function captureFormSnapshot() {
     grams: form.grams,
     liters: form.liters,
     record_version: form.record_version,
+    catalog_version: form.catalog_version,
     piece_pricing_mode: form.piece_pricing_mode,
     box_pricing_mode: form.box_pricing_mode,
     piece_margin_percentage: form.piece_margin_percentage,
@@ -259,6 +261,7 @@ function restoreFormSnapshot(snapshot) {
   form.grams = snapshot.grams;
   form.liters = snapshot.liters;
   form.record_version = snapshot.record_version;
+  form.catalog_version = snapshot.catalog_version;
 
   form.piece_pricing_mode = snapshot.piece_pricing_mode;
   form.box_pricing_mode = snapshot.box_pricing_mode;
@@ -278,7 +281,7 @@ watch(
     if (!product) return;
 
     form.barcodes = product.barcodes?.length
-      ? product.barcodes
+      ? [...product.barcodes]
       : [product.barcode ?? ""];
 
     form.inventory_unit = product.inventory_unit ?? (product.unit === "kg" ? "kg" : "pza");
@@ -306,6 +309,7 @@ watch(
     form.active = true;
     form.image = product.image ?? null;
     form.record_version = product.record_version ?? "";
+    form.catalog_version = product.catalog_version ?? null;
 
     form.quantity = product.quantity ?? null;
     form.kilos = product.kilos ?? null;
@@ -471,6 +475,8 @@ function setCreateDefaults() {
   form.quantity = null;
   form.kilos = null;
   form.liters = null;
+  form.record_version = "";
+  form.catalog_version = null;
   initializePricingFields();
 }
 
@@ -704,8 +710,10 @@ function submit() {
             }
 
             ErrorAlert({
-              title: "Error al crear producto",
+              title: "No se pudo actualizar el producto",
               message:
+                errors.catalog_version ||
+                errors.record_version ||
                 errors.name ||
                 errors.search_aliases ||
                 errors.product_department_id ||

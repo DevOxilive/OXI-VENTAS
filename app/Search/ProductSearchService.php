@@ -14,6 +14,9 @@ use Throwable;
 
 class ProductSearchService
 {
+    /** @var array<string, true> Términos que ya coincidieron por texto en la consulta actual. */
+    private array $inventoryTextMatchedTerms = [];
+
     public function __construct(
         private readonly DatabaseProductSearch $databaseSearch,
         private readonly ProductIdentifierSearch $identifierSearch,
@@ -21,6 +24,7 @@ class ProductSearchService
 
     public function ids(string $search, ?ProductSearchOptions $options = null): Collection
     {
+        $this->inventoryTextMatchedTerms = [];
         $search = trim($search);
         $options ??= new ProductSearchOptions;
 
@@ -55,10 +59,18 @@ class ProductSearchService
             }
         }
 
+        if ($options->inventorySqlPrefilter) {
+            $intersection = $this->inventoryIntersection($search, $options);
+            if ($intersection !== null) {
+                return $intersection;
+            }
+        }
+
         return $this->searchWithIdentifiers(
             $search,
             $options,
             fn (string $value) => $this->databaseSearch->ids($value, $options),
+            trackInventoryText: $options->inventorySqlPrefilter,
         );
     }
 
@@ -109,6 +121,7 @@ class ProductSearchService
         $this->assertRelation($lotRelation);
         $options ??= new ProductSearchOptions;
         $ids = $this->ids($search, $options);
+        $textMatchedTerms = $this->inventoryTextMatchedTerms;
 
         if ($ids->isEmpty()) {
             $query->whereRaw('1 = 0');
@@ -121,6 +134,10 @@ class ProductSearchService
         if ($options->includeLotNumbers) {
             foreach ($this->identifierSearch->terms($search) as $term) {
                 if (! $this->identifierSearch->supportsLotFragment($term)) {
+                    continue;
+                }
+                if ($options->inventorySqlPrefilter && isset($textMatchedTerms[$term])) {
+                    // La intersección ya exige este texto: repetir la búsqueda no restringe la fila.
                     continue;
                 }
 
@@ -218,6 +235,7 @@ class ProductSearchService
         string $search,
         ProductSearchOptions $options,
         Closure $searchEngine,
+        bool $trackInventoryText = false,
     ): Collection {
         $terms = $this->identifierSearch->terms($search);
 
@@ -232,6 +250,9 @@ class ProductSearchService
 
         foreach ($terms as $term) {
             $identifierMatches = $this->identifierSearch->idsForTerm($term, $options);
+            if ($trackInventoryText && $identifierMatches->isEmpty()) {
+                $this->inventoryTextMatchedTerms[$term] = true;
+            }
             $termMatches = ($identifierMatches->isNotEmpty()
                 ? $identifierMatches
                 : $searchEngine($term))
@@ -266,6 +287,45 @@ class ProductSearchService
             ->unique()
             ->take(min($options->limit, (int) config('product_search.max_results', 10000)))
             ->values();
+    }
+
+    private function inventoryIntersection(string $search, ProductSearchOptions $options): ?Collection
+    {
+        $terms = $this->identifierSearch->terms($search);
+        if (! $this->identifierSearch->hasRelevantTerm($terms, $options)) {
+            return null;
+        }
+
+        $candidateIds = null;
+        $preferredOrder = null;
+        $textSearches = [];
+        $textMatched = [];
+        foreach ($terms as $index => $term) {
+            $identifiers = $this->identifierSearch->idsForTerm($term, $options);
+            if ($identifiers->isEmpty()) {
+                $textSearches[] = $term;
+                $textMatched[$term] = true;
+
+                continue;
+            }
+            if ($index === 0) {
+                $preferredOrder = $identifiers;
+            }
+            $candidateIds = $candidateIds === null ? $identifiers : $candidateIds->intersect($identifiers)->values();
+            if ($candidateIds->isEmpty()) {
+                return collect();
+            }
+        }
+
+        if ($textSearches === []) {
+            return $candidateIds;
+        }
+        $result = $this->databaseSearch->intersectInventoryTerms($textSearches, $options, $candidateIds, $preferredOrder);
+        if ($result !== null) {
+            $this->inventoryTextMatchedTerms = $textMatched;
+        }
+
+        return $result;
     }
 
     private function exactBarcodeIds(string $barcode, ProductSearchOptions $options): Collection

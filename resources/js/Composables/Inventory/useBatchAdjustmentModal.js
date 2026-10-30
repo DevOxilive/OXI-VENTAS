@@ -1,11 +1,15 @@
 import { computed, reactive, ref, watch } from "vue";
 import { router } from "@inertiajs/vue3";
 import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
+import { createInventoryOperationKey } from "@/utils/inventoryOperationKey";
 
 export function useBatchAdjustmentModal(products) {
+    const operationKey = createInventoryOperationKey();
     const selectedBatchId = ref(null);
     const processing = ref(false);
     const hydratedBatchForm = ref(null);
+
+    watch(selectedBatchId, () => operationKey.reset());
 
     const form = reactive({
         id: null,
@@ -157,6 +161,8 @@ export function useBatchAdjustmentModal(products) {
             const sameBatch = Number(form.id) === Number(batch.id);
 
             if (sameBatch && hasPendingBatchChanges()) {
+                // El saldo de referencia puede actualizarse sin perder lo que se está capturando.
+                form.original_quantity = Number(batch.quantity || 0);
                 return;
             }
 
@@ -314,27 +320,36 @@ export function useBatchAdjustmentModal(products) {
     }
 
     function saveEditedBatch(closeModal = null) {
-        if (!validateForm()) return;
+        if (processing.value || !validateForm()) return;
+
+        const payload = { expected_values: {}, notes: form.notes || null };
+        const original = hydratedBatchForm.value ?? {};
+        const metadataFields = [
+            "lot_number", "expiration_date", "supplier", "received_at",
+            "season_start_date", "season_end_date", "status",
+        ];
+
+        // Solo se envían los datos editados: los demás pueden haber cambiado en otra PC.
+        metadataFields.forEach((field) => {
+            const value = form[field] || null;
+            const expected = original[field] || null;
+
+            if (value !== expected) {
+                payload[field] = value;
+                payload.expected_values[field] = expected;
+            }
+        });
+
+        if (signedAdjustmentQuantity.value !== 0) {
+            payload.quantity_delta = signedAdjustmentQuantity.value;
+            payload.expected_values.status = original.status;
+        }
 
         processing.value = true;
 
         router.put(
             route("inventory.product-batches.update", form.id),
-            {
-                lot_number: form.lot_number || null,
-                expiration_date: form.expiration_date || null,
-                supplier: form.supplier || null,
-                received_at: form.received_at || null,
-                quantity: calculatedQuantity.value,
-                season_start_date: isSeasonal.value
-                    ? form.season_start_date || null
-                    : null,
-                season_end_date: isSeasonal.value
-                    ? form.season_end_date || null
-                    : null,
-                status: form.status || "ACTIVE",
-                notes: form.notes || null,
-            },
+            payload,
             {
                 ...getModalRequestOptions({
                     mode: "update",
@@ -344,6 +359,8 @@ export function useBatchAdjustmentModal(products) {
                     errorTitle: "No se pudo actualizar",
                     errorMessage:
                         "Revisa la informacion del lote e intenta nuevamente.",
+                    headers: { "Idempotency-Key": operationKey.get() },
+                    onSuccess: () => operationKey.reset(),
                 }),
                 onFinish: () => {
                     processing.value = false;

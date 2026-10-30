@@ -260,8 +260,7 @@ class NegativeStockTest extends TestCase
         $this->assertSame(0, $sale->activeCancellations()->count());
         $this->assertStock(1);
 
-        Event::assertDispatched(SaleReturnChanged::class, fn (SaleReturnChanged $event) =>
-            $event->action === 'voided' && $event->cancellationId === (int) $cancellation->id
+        Event::assertDispatched(SaleReturnChanged::class, fn (SaleReturnChanged $event) => $event->action === 'voided' && $event->cancellationId === (int) $cancellation->id
         );
     }
 
@@ -321,7 +320,7 @@ class NegativeStockTest extends TestCase
     {
         $batch = $this->batch(0);
         $emptyBatch = $this->batch(0, 'ZERO-002');
-        $this->put(route('inventory.product-batches.update', $batch), ['quantity' => -7, 'status' => 'ACTIVE'])
+        $this->put(route('inventory.product-batches.update', $batch), ['quantity' => -7, 'expected_quantity' => 0, 'status' => 'ACTIVE', 'expected_values' => ['status' => 'ACTIVE']])
             ->assertSessionHasNoErrors();
         $this->assertStock(-7);
         $controller = app(BranchInventoryController::class);
@@ -351,10 +350,10 @@ class NegativeStockTest extends TestCase
     {
         $batch = $this->batch(-1500);
         $this->inventory->update(['stock' => -1500]);
-        $this->put(route('inventory.product-batches.update', $batch), ['quantity' => -1499, 'status' => 'ACTIVE'])
+        $this->put(route('inventory.product-batches.update', $batch), ['quantity' => -1499, 'expected_quantity' => -1500, 'status' => 'ACTIVE', 'expected_values' => ['status' => 'ACTIVE']])
             ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertStock(-1499);
-        $this->putJson(route('inventory.product-batches.update', $batch), ['quantity' => -1498.5, 'status' => 'ACTIVE'])
+        $this->putJson(route('inventory.product-batches.update', $batch), ['quantity' => -1498.5, 'expected_quantity' => -1499, 'status' => 'ACTIVE', 'expected_values' => ['status' => 'ACTIVE']])
             ->assertUnprocessable()->assertJsonValidationErrors('quantity');
         $this->assertStock(-1499);
     }
