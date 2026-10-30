@@ -645,6 +645,10 @@ Route::middleware([
             ->middleware($branchInventoryAccess)
             ->name('branches.inventory.realtime-snapshot');
 
+        Route::get('/branches/{branch}/inventory/summary', [BranchInventoryController::class, 'summary'])
+            ->middleware($branchInventoryAccess)
+            ->name('branches.inventory.summary');
+
         Route::post('/branch-inventory', [BranchInventoryController::class, 'store'])
             ->middleware('permission:inventory.branches.config.update')
             ->name('branch-inventory.store');
@@ -658,7 +662,7 @@ Route::middleware([
             ->name('branch-inventory.details');
 
         Route::put('/product-batches/{productBatch}', [ProductBatchController::class, 'update'])
-            ->middleware('permission:inventory.branches.batches.update')
+            ->middleware(['permission:inventory.branches.batches.update', 'idempotent'])
             ->name('product-batches.update');
 
         Route::get('/stock-movements', [StockMovementController::class, 'index'])

@@ -51,6 +51,10 @@ class SystemAuditService
 
             $this->announceChange($module, $action, $result, $request, $user?->id);
         } catch (Throwable $exception) {
+            if (app(InventoryBackgroundContext::class)->active()) {
+                throw $exception;
+            }
+
             report($exception);
         }
     }
@@ -71,6 +75,19 @@ class SystemAuditService
         $routeName = $request?->route()?->getName();
 
         try {
+            if (app(InventoryBackgroundContext::class)->handlesRequest($request)) {
+                app(InventoryOutbox::class)->record('system.audit.changed', [
+                    'module' => $module,
+                    'action' => $action,
+                    'actor_id' => $actorId,
+                    'route_name' => $routeName,
+                    'result' => $result,
+                    'socket' => $request?->header('X-Socket-ID'),
+                ]);
+
+                return;
+            }
+
             DB::afterCommit(fn () => broadcast(new SystemAuditChanged(
                 $module,
                 $action,
@@ -79,6 +96,10 @@ class SystemAuditService
                 $result,
             ))->toOthers());
         } catch (Throwable $exception) {
+            if (app(InventoryBackgroundContext::class)->active()) {
+                throw $exception;
+            }
+
             report($exception);
         }
     }

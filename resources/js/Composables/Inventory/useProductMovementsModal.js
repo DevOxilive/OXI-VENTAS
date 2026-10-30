@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted, reactive } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, watch } from "vue";
 import { formatInventoryQuantity } from "@/utils/quantityFormatter";
 
 function parseDateValue(value) {
@@ -15,14 +15,33 @@ export function useProductMovementsModal(props, emit) {
     const currentStock = computed(() => Number(props.product?.stock ?? 0));
 
     const filters = reactive({
-        userName: "",
+        userId: "",
         dateFrom: "",
         dateTo: "",
         movementGroup: "all",
     });
 
     const movements = computed(() => props.product?.recentMovements ?? []);
-    const totalMovements = computed(() => movements.value.length);
+    const pagination = computed(() => props.product?.movementsPagination ?? null);
+    const totalMovements = computed(() => props.product?.movementsTotal ?? movements.value.length);
+    let filterTimer = null;
+
+    function loadPage(number) {
+        clearTimeout(filterTimer);
+        emit("load-page", {
+            movements_page: number,
+            movement_user_id: filters.userId === "" ? undefined : filters.userId,
+            movement_group: filters.movementGroup,
+            movement_date_from: filters.dateFrom || undefined,
+            movement_date_to: filters.dateTo || undefined,
+        });
+    }
+
+    watch(() => [filters.userId, filters.movementGroup, filters.dateFrom, filters.dateTo], () => {
+        if (!pagination.value) return;
+        clearTimeout(filterTimer);
+        filterTimer = setTimeout(() => loadPage(1), 200);
+    });
 
     function isAdministrativeAdjustment(movement) {
         return (
@@ -92,6 +111,11 @@ export function useProductMovementsModal(props, emit) {
     ]);
 
     const userOptions = computed(() => {
+        if (pagination.value) {
+            return [{ value: "", label: "Todos" }, ...(props.product?.movementsUsers ?? []).map((user) => ({
+                value: String(user.id), label: user.name,
+            }))];
+        }
         const users = new Map([["", "Todos"]]);
 
         movements.value.forEach((movement) => {
@@ -279,7 +303,7 @@ export function useProductMovementsModal(props, emit) {
             return "Sin cambio";
         }
 
-        const quantity = formatNumber(movement.quantity ?? 0);
+        const quantity = formatNumber(Math.abs(Number(movement.quantity ?? 0)));
 
         if (movement.type === "IN") return `+${quantity}`;
         if (movement.type === "OUT") return `-${quantity}`;
@@ -321,6 +345,8 @@ export function useProductMovementsModal(props, emit) {
     }
 
     const filteredMovements = computed(() => {
+        // El servidor filtra todo el historial antes de paginarlo.
+        if (pagination.value) return movements.value;
         const fromDate = filters.dateFrom ? parseDateValue(filters.dateFrom) : null;
         const toDate = filters.dateTo ? parseDateValue(filters.dateTo) : null;
 
@@ -333,7 +359,7 @@ export function useProductMovementsModal(props, emit) {
                 return false;
             }
 
-            if (filters.userName && userLabel(movement) !== filters.userName) {
+            if (filters.userId && userLabel(movement) !== filters.userId) {
                 return false;
             }
 
@@ -356,7 +382,7 @@ export function useProductMovementsModal(props, emit) {
         });
     });
 
-    const totalFilteredMovements = computed(() => filteredMovements.value.length);
+    const totalFilteredMovements = computed(() => pagination.value?.total ?? filteredMovements.value.length);
 
     const tableRows = computed(() =>
         filteredMovements.value.map((movement) => ({
@@ -388,6 +414,12 @@ export function useProductMovementsModal(props, emit) {
     }
 
     const movementSummary = computed(() => {
+        if (pagination.value) {
+            return (props.product?.movementsSummary ?? []).map((item) => ({
+                ...item, label: groupLabel(item.key, {}),
+            })).filter((item) => Number(item.count) > 0)
+                .sort((a, b) => a.label.localeCompare(b.label, "es"));
+        }
         const summaries = new Map();
 
         filteredMovements.value.forEach((movement) => {
@@ -421,6 +453,7 @@ export function useProductMovementsModal(props, emit) {
     });
 
     onBeforeUnmount(() => {
+        clearTimeout(filterTimer);
         window.removeEventListener("keydown", handleEsc);
     });
 
@@ -439,6 +472,8 @@ export function useProductMovementsModal(props, emit) {
         movementSummary,
         quantityClass,
         formatNumber,
+        pagination,
+        loadPage,
         closeModal,
     };
 }

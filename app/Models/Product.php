@@ -3,15 +3,30 @@
 namespace App\Models;
 
 use App\Search\ProductSearchDocumentBuilder;
+use App\Observers\InventoryProductSearchObserver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Laravel\Scout\Searchable;
+use Laravel\Scout\SearchableScope;
 
 class Product extends Model
 {
     use Searchable, SoftDeletes;
+
+    public static function bootSearchable()
+    {
+        static::addGlobalScope(new SearchableScope);
+        static::whenBooted(function (): void {
+            static::observe(new InventoryProductSearchObserver);
+            (new static)->registerSearchableMacros();
+        });
+    }
+
+    protected $attributes = [
+        'catalog_version' => 1,
+    ];
 
     protected $fillable = [
         'name',
@@ -40,6 +55,7 @@ class Product extends Model
     ];
 
     protected $casts = [
+        'catalog_version' => 'integer',
         'search_aliases' => 'array',
         'cost' => 'decimal:2',
         'sale_price' => 'decimal:2',

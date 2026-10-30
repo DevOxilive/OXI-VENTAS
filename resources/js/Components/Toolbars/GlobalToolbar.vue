@@ -1,11 +1,31 @@
 <script setup>
-import { computed, useSlots } from 'vue'
+import { computed, ref, useSlots } from 'vue'
 import ToolbarMobile from './ToolbarMobile.vue'
 import ToolbarDesktop from './ToolbarDesktop.vue'
 
 const RECORDS_PER_PAGE_OPTIONS = [10, 25, 50, 100, 200]
 const slots = useSlots()
 const hasActionsSlot = computed(() => Boolean(slots.actions))
+const toolbarRoot = ref(null)
+
+function focusSearch({ select = false } = {}) {
+    if (!toolbarRoot.value || typeof document === 'undefined') return false
+
+    const openDialog = Array.from(document.querySelectorAll(
+        '[data-global-modal-panel], [role="dialog"][aria-modal="true"], .swal2-popup:not(.swal2-toast)',
+    )).some((element) => element.getClientRects().length)
+    if (openDialog) return false
+
+    const input = Array.from(toolbarRoot.value.querySelectorAll('[data-toolbar-search]'))
+        .find((element) => !element.disabled && element.getClientRects().length)
+    if (!input) return false
+
+    input.focus({ preventScroll: true })
+    if (select) input.select()
+    return document.activeElement === input
+}
+
+defineExpose({ focusSearch })
 
 defineProps({
     icon: {
@@ -98,7 +118,7 @@ defineEmits([
 </script>
 
 <template>
-    <div>
+    <div ref="toolbarRoot">
         <ToolbarDesktop :icon="icon" :title="title" :subtitle="subtitle" :back-button="backButton" :back-label="backLabel"
             :search="search" :search-placeholder="searchPlaceholder" :show-search="showSearch" :filters="filters"
             :actions="actions" :tabs="tabs" :active-tab="activeTab" :records-per-page="recordsPerPage"

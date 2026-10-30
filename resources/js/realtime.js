@@ -139,6 +139,20 @@ export function subscribePrivateRealtime(channelName, eventName, handler) {
     return subscribeToRealtimeChannel(channelName, eventName, handler, true)
 }
 
+/** Reutiliza la conexión existente y sincroniza al recuperarla, sin crear otro cliente. */
+export function subscribeRealtimeReconnect(handler) {
+    const connection = getRealtimeClient()?.connector?.pusher?.connection
+    if (!connection || typeof handler !== 'function') return () => {}
+    let hasConnected = connection.state === 'connected'
+    const onStateChange = ({ current }) => {
+        if (current !== 'connected') return
+        if (hasConnected) handler()
+        hasConnected = true
+    }
+    connection.bind('state_change', onStateChange)
+    return () => connection.unbind('state_change', onStateChange)
+}
+
 /**
  * Obtiene propiedades Inertia sin iniciar una visita ni reemplazar el componente.
  * Así los eventos colaborativos actualizan datos sin cerrar modales o perder formularios.
