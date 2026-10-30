@@ -1,11 +1,20 @@
 // resources/js/Config/Toolbars/usersToolbarConfig.js
 
-export function getUsersToolbarConfig({ roles = [], activeFilters = {} }) {
+export function getUsersToolbarConfig({ canCreate = false, roles = [], activeFilters = {} }) {
     return {
         icon: "manage_accounts",
         showSearch: true,
         showRecordsPerPage: true,
         searchPlaceholder: "Buscar nombre, correo, usuario o rol...",
+        actions: [
+            {
+                id: "create",
+                label: "Nuevo usuario",
+                icon: "person_add",
+                variant: "primary",
+                hidden: () => !canCreate,
+            },
+        ],
         filters: [
             {
                 key: "user_status",
