@@ -50,6 +50,10 @@ const canViewUsers = computed(() => {
   return Boolean(userCapabilities.value.viewUsers) && can('users.view')
 })
 
+const canCreateUsers = computed(() => {
+  return Boolean(userCapabilities.value.createUsers) && can('users.create')
+})
+
 const showModal = ref(false)
 const isEditing = ref(false)
 const selectedUserId = ref(null)
@@ -60,7 +64,7 @@ const selectedUser = ref(null)
 const errors = ref({})
 
 const form = useForm({
-  employee_id: '',
+  employee_id: null,
   name: '',
   email: '',
   password: '',
@@ -292,6 +296,12 @@ function handleToolbarFilter({ key, value }) {
   }
 }
 
+function handleToolbarAction(action) {
+  if (action === 'create' && canCreateUsers.value) {
+    openModal()
+  }
+}
+
 const userTableActionHandlers = {
   view: (row) => {
     if (!canViewUsers.value) return
@@ -373,7 +383,7 @@ function openModal(item = null) {
     isEditing.value = true
     selectedUserId.value = item.id
 
-    form.employee_id = item.employee_id || ''
+    form.employee_id = item.employee_id ?? null
     form.name = item.name || ''
     form.email = item.email || ''
     form.role_id = item.role_id || ''
@@ -558,6 +568,7 @@ onBeforeUnmount(() => {
   <PageLayout>
     <template #toolbar>
       <UserToolbar :search="search" :records-per-page="recordsPerPage" :roles="roles"
+        :can-create="canCreateUsers" @action="handleToolbarAction"
         :active-filters="{ userStatus: userStatusFilter, status: statusFilter, role: roleFilter }"
         :filtered-records="normalizedList.length" :total-records="activePaginator?.total || 0"
         @update:search="search = $event" @update:filter="handleToolbarFilter" @update:records-per-page="recordsPerPage = $event" />
