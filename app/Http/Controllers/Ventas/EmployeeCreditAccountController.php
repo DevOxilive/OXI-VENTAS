@@ -117,7 +117,8 @@ class EmployeeCreditAccountController extends Controller
                 'paymentMethod:id,name',
                 'branch:id,name',
                 'receivedBy:id,name',
-                'allocations.charge.sale:id,folio',
+                'allocations.charge.sale:id,folio,branch_id',
+                'allocations.charge.sale.branch:id,name',
             ])->latest('paid_at'),
         ]);
 
@@ -138,11 +139,13 @@ class EmployeeCreditAccountController extends Controller
             ...$this->mapAccount($account),
             'charges' => $account->charges->map(fn ($charge) => [
                 'id' => $charge->id,
+                'sale_id' => $charge->sale_id,
                 'folio' => $charge->sale?->folio,
                 'date' => LocalDateTime::format($charge->sale?->date, 'd/m/Y H:i'),
                 'date_key' => LocalDateTime::format($charge->sale?->date, 'Y-m-d'),
                 'date_label' => LocalDateTime::format($charge->sale?->date, 'd/m/Y'),
                 'branch' => $charge->sale?->branch?->name,
+                'branch_id' => $charge->sale?->branch_id,
                 'amount' => (float) $charge->amount,
                 'outstanding_amount' => (float) $charge->outstanding_amount,
                 'paid_amount' => max(0, round((float) $charge->amount - (float) $charge->outstanding_amount, 2)),
@@ -161,6 +164,7 @@ class EmployeeCreditAccountController extends Controller
                 ])->values(),
             ])->values(),
             'payments' => $account->payments->map(fn ($payment) => [
+                'id' => (int) $payment->id,
                 'folio' => $payment->folio,
                 'date' => LocalDateTime::format($payment->paid_at, 'd/m/Y H:i'),
                 'method' => $payment->paymentMethod?->name,
@@ -172,7 +176,11 @@ class EmployeeCreditAccountController extends Controller
                 'change_due' => (float) ($payment->change_due ?? 0),
                 'applied_sales' => $payment->allocations
                     ->map(fn ($allocation) => [
+                        'id' => (int) $allocation->id,
+                        'sale_id' => $allocation->charge?->sale?->id,
                         'folio' => $allocation->charge?->sale?->folio ?? 'Sin ticket vinculado',
+                        'branch_id' => $allocation->charge?->sale?->branch_id,
+                        'branch' => $allocation->charge?->sale?->branch?->name,
                         'amount' => (float) $allocation->amount,
                     ])
                     ->values(),
@@ -182,6 +190,7 @@ class EmployeeCreditAccountController extends Controller
                 'sale_id' => (int) $return->sale_id,
                 'folio' => 'DEV-'.str_pad((string) $return->id, 6, '0', STR_PAD_LEFT),
                 'sale_folio' => $return->sale?->folio,
+                'branch' => $return->sale?->branch?->name,
                 'date' => LocalDateTime::format($return->cancelled_at, 'd/m/Y H:i'),
                 'date_key' => LocalDateTime::format($return->cancelled_at, 'Y-m-d'),
                 'amount' => (float) $return->amount,
@@ -233,7 +242,7 @@ class EmployeeCreditAccountController extends Controller
                 ->where('outstanding_amount', '>', 0)
                 ->orderBy('created_at')
                 ->lockForUpdate()
-                ->with('sale:id,folio')
+                ->with(['sale:id,folio,branch_id', 'sale.branch:id,name'])
                 ->get();
             if ($charges->count() !== $selectedChargeIds->count()) {
                 throw ValidationException::withMessages(['selected_charge_ids' => 'Selecciona únicamente tickets pendientes de esta cuenta.']);
@@ -264,6 +273,7 @@ class EmployeeCreditAccountController extends Controller
 
             $holder = $account->customer?->name
                 ?: trim(($account->employee?->first_name ?? '').' '.($account->employee?->last_name ?? ''));
+            $folioCounts = $charges->countBy(fn (EmployeeCreditCharge $charge) => $charge->sale?->folio);
 
             return [
                 'payment' => $payment,
@@ -283,7 +293,9 @@ class EmployeeCreditAccountController extends Controller
                     'balance_before' => $accountBalanceBefore,
                     'balance_after' => max(0, round($accountBalanceBefore - $amount, 2)),
                     'paid_charges' => $charges->map(fn (EmployeeCreditCharge $charge) => [
-                        'folio' => $charge->sale?->folio ?: 'Sin folio',
+                        'folio' => ($charge->sale?->folio ?: 'Sin folio')
+                            .($folioCounts->get($charge->sale?->folio) > 1 && $charge->sale?->branch?->name
+                                ? ' · '.$charge->sale->branch->name : ''),
                         'amount' => (float) $charge->amount,
                     ])->values()->all(),
                     // Un abono en efectivo debe abrir el cajón, aunque el ticket de

@@ -265,6 +265,7 @@ const permissionLabels = {
     "sales.view": "Ver ventas registradas",
     "sales.create": "Crear ventas",
     "sales.update": "Editar ventas",
+    "sales.returns.void": "Anular devoluciones de ventas",
     "sales.delete": "Eliminar ventas",
     "sales.reports": "Ver reportes de ventas",
     "sales.employee-credit.view": "Ver estados de cuenta",

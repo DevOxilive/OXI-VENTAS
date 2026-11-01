@@ -333,7 +333,8 @@ class CashRegisterClosureController extends Controller
                 'receivedBy:id,name',
                 'account.employee:id,first_name,last_name',
                 'account.customer:id,name,first_name,last_name',
-                'allocations.charge.sale:id,folio',
+                'allocations.charge.sale:id,folio,branch_id',
+                'allocations.charge.sale.branch:id,name',
             ])
             ->where('branch_id', $branch->id)
             ->where('cash_box_number', (string) $cashBoxNumber)
@@ -491,6 +492,11 @@ class CashRegisterClosureController extends Controller
     {
         $holder = $payment->account?->customer?->name
             ?: trim(($payment->account?->employee?->first_name ?? '').' '.($payment->account?->employee?->last_name ?? ''));
+        $folioCounts = $payment->allocations
+            ->map(fn ($allocation) => $allocation->charge?->sale)
+            ->filter()
+            ->unique('id')
+            ->countBy('folio');
 
         return [
             'id' => $payment->id,
@@ -504,7 +510,11 @@ class CashRegisterClosureController extends Controller
             'cash_received' => (float) ($payment->cash_received ?? $payment->amount),
             'change_due' => (float) ($payment->change_due ?? 0),
             'applied_sales' => $payment->allocations->map(fn ($allocation) => [
-                'folio' => $allocation->charge?->sale?->folio ?? 'Sin ticket vinculado',
+                'id' => (int) $allocation->id,
+                'folio' => ($allocation->charge?->sale?->folio ?? 'Sin ticket vinculado')
+                    .($folioCounts->get($allocation->charge?->sale?->folio) > 1
+                        ? ' · '.($allocation->charge?->sale?->branch?->name ?: 'Sucursal #'.$allocation->charge?->sale?->branch_id)
+                        : ''),
                 'amount' => (float) $allocation->amount,
             ])->values()->all(),
         ];

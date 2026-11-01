@@ -127,7 +127,7 @@ const selectedPaymentMethod = computed(() =>
 const ticketOptions = computed(() =>
   (selected.value?.charges || []).filter((charge) => charge.status === 'open' && Number(charge.outstanding_amount || 0) > 0).map((charge) => ({
     value: String(charge.id),
-    label: `${charge.folio || 'Sin folio'} · ${charge.date || 'Sin fecha'} · ${money(charge.outstanding_amount)}`,
+    label: `${creditTicketLabel(charge)} · ${charge.date || 'Sin fecha'} · ${money(charge.outstanding_amount)}`,
   }))
 )
 
@@ -204,6 +204,14 @@ function saleDateLabel(group) {
   }).format(date)
 
   return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+function creditTicketLabel(ticket) {
+  const folio = ticket.folio || 'Sin folio'
+  const branches = new Set((selected.value?.charges || [])
+    .filter((charge) => charge.folio === ticket.folio)
+    .map((charge) => charge.branch_id || charge.branch))
+  return branches.size > 1 && ticket.branch ? `${folio} · ${ticket.branch}` : folio
 }
 
 function quantityLabel(item) {
@@ -393,7 +401,7 @@ function buildAccountPrintJob(account) {
     label: saleDateLabel(group),
     total: Number(group.total || 0),
     charges: group.charges.map((charge) => ({
-      folio: charge.folio || 'Sin folio',
+      folio: creditTicketLabel(charge),
       date: charge.date,
       total: Number(charge.outstanding_amount || 0),
       items: (charge.items || []).map((item) => ({
@@ -408,7 +416,7 @@ function buildAccountPrintJob(account) {
   }))
   const creditReturns = (account.returns || []).map((returnedSale) => ({
     folio: returnedSale.folio,
-    sale_folio: returnedSale.sale_folio,
+    sale_folio: creditTicketLabel({ folio: returnedSale.sale_folio, branch: returnedSale.branch }),
     date: returnedSale.date,
     amount: Number(returnedSale.amount || 0),
     items: (returnedSale.items || []).map((item) => ({
@@ -430,7 +438,7 @@ function buildAccountPrintJob(account) {
     group.charges.forEach((charge) => {
       ;(charge.items || []).forEach((item) => {
         items.push({
-          product_name: `${charge.folio || 'S/F'} ${item.product || ''}`.trim(),
+          product_name: `${creditTicketLabel(charge)} ${item.product || ''}`.trim(),
           quantity: Number(item.quantity || 0),
           unit_price: Number(item.unit_price || 0),
           subtotal: Number(item.subtotal || 0),
@@ -808,17 +816,17 @@ onBeforeUnmount(() => {
                     </td>
                   </tr>
 
-                  <template v-for="charge in group.charges" :key="charge.folio || charge.date">
+                  <template v-for="charge in group.charges" :key="charge.id">
                     <tr class="bg-background">
                       <td colspan="5" class="px-3 py-2 font-black text-text">
-                        Número de ticket: {{ charge.folio || 'Sin folio' }}
+                        Número de ticket: {{ creditTicketLabel(charge) }}
                       </td>
                       <td colspan="2" class="px-3 py-2 text-right font-black text-text">
                         {{ charge.status_label }} · Original {{ money(charge.amount) }} · Pendiente {{ money(charge.outstanding_amount) }}
                       </td>
                     </tr>
 
-                    <tr v-for="(item, index) in charge.items" :key="`${charge.folio}-${item.code}-${item.product}-${index}`">
+                    <tr v-for="(item, index) in charge.items" :key="`${charge.id}-${index}`">
                       <td class="px-3 py-2 font-semibold text-text opacity-75">{{ item.code || '-' }}</td>
                       <td class="px-3 py-2 font-semibold text-text">{{ item.product }}</td>
                       <td class="px-3 py-2 text-text opacity-80">{{ quantityLabel(item) }}</td>
@@ -839,7 +847,7 @@ onBeforeUnmount(() => {
           <div class="space-y-3">
             <article v-for="returnedSale in selected.returns" :key="returnedSale.id" class="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm text-text">
               <div class="flex flex-wrap justify-between gap-2 font-black">
-                <span>{{ returnedSale.folio }} · Ticket {{ returnedSale.sale_folio }}</span>
+                <span>{{ returnedSale.folio }} · Ticket {{ creditTicketLabel({ folio: returnedSale.sale_folio, branch: returnedSale.branch }) }}</span>
                 <span :class="returnedSale.is_voided ? 'opacity-60' : 'text-primary'">{{ returnedSale.is_voided ? 'Anulada' : `-${money(returnedSale.amount)}` }}</span>
               </div>
               <p class="mt-1 text-xs opacity-65">{{ returnedSale.date }}</p>
@@ -865,7 +873,7 @@ onBeforeUnmount(() => {
         <section v-if="selected.payments?.length">
           <h2 class="mb-2 text-sm font-black uppercase tracking-[0.18em] text-text opacity-60">Abonos anteriores</h2>
           <div class="divide-y divide-secondary overflow-hidden rounded-xl border border-secondary bg-background">
-            <article v-for="entry in selected.payments" :key="entry.folio" class="px-3 py-3 text-sm text-text">
+            <article v-for="entry in selected.payments" :key="entry.id" class="px-3 py-3 text-sm text-text">
               <div class="flex flex-wrap justify-between gap-3">
                 <span><strong>{{ entry.folio }}</strong> · {{ entry.date }} · {{ entry.method }}</span>
                 <strong>{{ money(entry.amount) }}</strong>
@@ -874,8 +882,8 @@ onBeforeUnmount(() => {
               <p v-if="Number(entry.change_due || 0) > 0" class="mt-1 text-xs opacity-70">Recibido {{ money(entry.cash_received) }} · Cambio {{ money(entry.change_due) }}</p>
               <div class="mt-2 flex flex-wrap gap-2 text-xs">
                 <span v-if="!entry.applied_sales?.length" class="rounded-full bg-secondary px-2 py-1 font-semibold">Sin ticket vinculado en el historial</span>
-                <span v-for="applied in entry.applied_sales || []" :key="`${entry.folio}-${applied.folio}`" class="rounded-full bg-secondary px-2 py-1 font-semibold">
-                  {{ applied.folio }} · {{ money(applied.amount) }}
+                <span v-for="applied in entry.applied_sales || []" :key="applied.id" class="rounded-full bg-secondary px-2 py-1 font-semibold">
+                  {{ creditTicketLabel(applied) }} · {{ money(applied.amount) }}
                 </span>
               </div>
             </article>

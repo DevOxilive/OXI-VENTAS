@@ -507,11 +507,11 @@ Route::middleware([
                 ->name('purchase-orders.index');
 
             Route::get('/asistencia', [AttendanceController::class, 'index'])
-                ->middleware(['permission:attendance.register', 'role:Ventas,Vendedor'])
+                ->middleware(['permission:attendance.register', 'role:Ventas'])
                 ->name('attendance.index');
 
             Route::post('/asistencia', [AttendanceController::class, 'store'])
-                ->middleware(['permission:attendance.register', 'role:Ventas,Vendedor', 'idempotent'])
+                ->middleware(['permission:attendance.register', 'role:Ventas', 'idempotent'])
                 ->name('attendance.store');
         });
 

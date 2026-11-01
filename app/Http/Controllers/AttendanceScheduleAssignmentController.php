@@ -39,7 +39,7 @@ class AttendanceScheduleAssignmentController extends Controller
                 ->through(fn ($assignment) => $this->payload($assignment)),
             'employees' => Employee::query()
                 ->where('employment_status', '!=', 'Inactivo')
-                ->whereHas('user.role', fn ($role) => $role->whereIn('name', ['Ventas', 'Vendedor']))
+                ->whereHas('user.role', fn ($role) => $role->where('name', 'Ventas'))
                 ->orderBy('first_name')
                 ->get(['id', 'first_name', 'last_name'])
                 ->map(fn ($employee) => ['value' => $employee->id, 'label' => trim($employee->first_name.' '.$employee->last_name)]),
@@ -233,12 +233,12 @@ class AttendanceScheduleAssignmentController extends Controller
     {
         $eligible = Employee::query()
             ->whereKey($employeeId)
-            ->whereHas('user.role', fn ($role) => $role->whereIn('name', ['Ventas', 'Vendedor']))
+            ->whereHas('user.role', fn ($role) => $role->where('name', 'Ventas'))
             ->exists();
 
         if (! $eligible) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'employee_id' => 'Solo puedes asignar horarios de asistencia a personal de Ventas o Vendedor.',
+                'employee_id' => 'Solo puedes asignar horarios de asistencia a personal de Ventas.',
             ]);
         }
     }
