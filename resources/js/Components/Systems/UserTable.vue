@@ -38,6 +38,7 @@ defineEmits([
         canViewUsers: props.canViewUsers,
         onViewUser: props.actionHandlers.view,
         onCreateUser: props.actionHandlers.createUser,
+        onLinkUser: props.actionHandlers.linkUser,
         onEditUser: props.actionHandlers.edit,
         onDeleteUser: props.actionHandlers.delete,
     })" :pagination="pagination" @page-change="$emit('page-change', $event)" @action="$emit('action', $event)"

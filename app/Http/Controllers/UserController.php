@@ -428,6 +428,21 @@ class UserController extends Controller
                 ->orderBy('name')
                 ->get(),
 
+            'linkableUsers' => User::query()
+                ->with('role:id,name')
+                ->whereNull('employee_id')
+                ->when(!$this->canManageSuperAdministrators(), function ($query) {
+                    $query->whereDoesntHave('role', fn ($roleQuery) => $roleQuery->where('name', 'Super Administrador'));
+                })
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'role_id', 'updated_at'])
+                ->map(fn (User $user) => [
+                    'value' => $user->id,
+                    'label' => trim("{$user->name} · {$user->email}"),
+                    'record_version' => $user->updated_at?->toJSON(),
+                ])
+                ->values(),
+
             'filters' => [
                 'search' => $search,
                 'perPage' => $perPage,
@@ -567,6 +582,63 @@ class UserController extends Controller
         return redirect()
             ->route('systems.users.index')
             ->with('success', 'Usuario actualizado correctamente');
+    }
+
+    public function linkEmployee(Request $request)
+    {
+        $this->checkPermission('users.update');
+
+        $validated = $request->validate([
+            'employee_id' => ['required', 'exists:employees,id'],
+            'user_id' => ['required', 'exists:users,id'],
+            'record_version' => ['required', 'date'],
+        ]);
+
+        $user = User::findOrFail($validated['user_id']);
+        $this->ensureCanManageUser($user);
+
+        $user = DB::transaction(function () use ($request, $user, $validated) {
+            $user = $this->lockCurrentVersion($request, $user);
+
+            if ($user->employee_id) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'user_id' => 'Este usuario ya está ligado a un empleado. Actualiza la lista antes de intentarlo de nuevo.',
+                ]);
+            }
+
+            $employee = Employee::query()->lockForUpdate()->findOrFail($validated['employee_id']);
+
+            if (User::query()->where('employee_id', $employee->id)->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'employee_id' => 'Este empleado ya tiene un usuario ligado. Actualiza la lista antes de intentarlo de nuevo.',
+                ]);
+            }
+
+            $user->forceFill([
+                'employee_id' => $employee->id,
+                'is_active' => $this->resolveUserActiveState($employee->id, $user->is_active ?? true),
+            ])->save();
+
+            if (! $user->is_active) {
+                DB::table('sessions')->where('user_id', $user->id)->delete();
+            }
+
+            return $user;
+        });
+
+        $this->refreshAuthenticatedSession($request, $user);
+        $user->load(['role', 'permissions', 'branches']);
+
+        try {
+            event(new UserChanged($user, 'updated'));
+            event(RealtimeActivityLogged::message('actualizó', 'el vínculo del usuario', $user->email, 'Sistemas', 'updated'));
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return redirect()
+            ->route('systems.users.index')
+            ->with('success', 'Usuario ligado al empleado correctamente');
     }
 
     public function destroy(Request $request, User $user)

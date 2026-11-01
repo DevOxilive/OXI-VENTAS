@@ -14,6 +14,7 @@ import {
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import UserRegisterModal from '@/Components/Systems/UserRegisterModal.vue'
 import UserDetailModal from '@/Components/Systems/UserDetailModal.vue'
+import LinkEmployeeUserModal from '@/Components/Systems/LinkEmployeeUserModal.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribeRealtime } from '@/realtime'
 defineOptions({ layout: AdminLayout })
@@ -31,6 +32,7 @@ const branches = computed(() => page.props.branches || [])
 const permissions = computed(() => page.props.permissions || [])
 const filters = computed(() => page.props.filters || {})
 const userCapabilities = computed(() => page.props.capabilities || {})
+const linkableUsers = computed(() => page.props.linkableUsers || [])
 
 const search = ref(filters.value.search || '')
 const recordsPerPage = ref(filters.value.perPage || 25)
@@ -60,6 +62,8 @@ const selectedUserId = ref(null)
 
 const showUserDetail = ref(false)
 const selectedUser = ref(null)
+const showLinkEmployeeUser = ref(false)
+const selectedEmployeeForLink = ref(null)
 
 const errors = ref({})
 
@@ -72,6 +76,12 @@ const form = useForm({
   role_id: '',
   branch_ids: [],
   permissions: [],
+  record_version: '',
+})
+
+const linkForm = useForm({
+  employee_id: '',
+  user_id: '',
   record_version: '',
 })
 
@@ -311,6 +321,10 @@ const userTableActionHandlers = {
     if (!can('users.create')) return
     openModal(row)
   },
+  linkUser: (row) => {
+    if (!can('users.update')) return
+    openLinkEmployeeUser(row)
+  },
   edit: (row) => {
     if (!can('users.update')) return
     openModal(row)
@@ -319,6 +333,43 @@ const userTableActionHandlers = {
     if (!can('users.delete')) return
     deleteUser(row.id)
   },
+}
+
+function openLinkEmployeeUser(employee) {
+  selectedEmployeeForLink.value = employee
+  linkForm.reset()
+  linkForm.clearErrors()
+  linkForm.employee_id = employee.id
+  showLinkEmployeeUser.value = true
+}
+
+function closeLinkEmployeeUser() {
+  showLinkEmployeeUser.value = false
+  selectedEmployeeForLink.value = null
+  linkForm.reset()
+  linkForm.clearErrors()
+}
+
+function saveLinkedEmployeeUser() {
+  const selectedLinkableUser = linkableUsers.value.find((user) => Number(user.value) === Number(linkForm.user_id))
+
+  if (!selectedLinkableUser) {
+    linkForm.setError('user_id', 'Selecciona el usuario que deseas vincular.')
+    return
+  }
+
+  linkForm.record_version = selectedLinkableUser.record_version || ''
+  linkForm.put(route('systems.users.link-employee'), getModalRequestOptions({
+    mode: 'update',
+    entityName: 'Usuario',
+    close: closeLinkEmployeeUser,
+    successTitle: 'Usuario ligado al empleado correctamente',
+    errorTitle: 'No fue posible ligar el usuario',
+    errorMessage: 'Actualiza la lista y verifica que el usuario y el empleado sigan disponibles.',
+    onSuccess: () => {
+      reloadUsers()
+    },
+  }))
 }
 
 function openUserDetail(user) {
@@ -519,6 +570,7 @@ function reloadSystem() {
       'permissions',
       'branches',
       'capabilities',
+      'linkableUsers',
   ])
 }
 
@@ -579,6 +631,9 @@ onBeforeUnmount(() => {
 
     <UserDetailModal v-if="showUserDetail && canViewUsers" :user="selectedUser" :permissions="permissions"
       @close="closeUserDetail" />
+
+    <LinkEmployeeUserModal v-if="showLinkEmployeeUser" :employee="selectedEmployeeForLink"
+      :users="linkableUsers" :form="linkForm" @close="closeLinkEmployeeUser" @save="saveLinkedEmployeeUser" />
 
     <UserRegisterModal v-if="showModal" :form="form" :errors="errors" :roles="roles" :branches="branches"
       :permission-sections="permissionSections" :isEditing="isEditing"

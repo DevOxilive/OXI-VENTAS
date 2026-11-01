@@ -239,6 +239,10 @@ Route::middleware([
             ->middleware('permission:users.create')
             ->name('users.store');
 
+        Route::put('/users/link-employee', [UserController::class, 'linkEmployee'])
+            ->middleware('permission:users.update')
+            ->name('users.link-employee');
+
         Route::put('/users/{user}', [UserController::class, 'update'])
             ->middleware('permission:users.update')
             ->name('users.update');
