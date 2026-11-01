@@ -33,6 +33,7 @@ use App\Http\Controllers\Ventas\EmployeeCreditAccountController;
 use App\Http\Controllers\Ventas\SalesController;
 use App\Http\Controllers\Ventas\SalesReportController;
 use App\Models\Branch;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -149,6 +150,16 @@ Route::middleware([
     Route::get('/dashboard/productos', [DashboardController::class, 'searchProducts'])
         ->name('dashboard.products.search');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+    // Las cuentas con rol Ventas mantienen su sesión mientras tengan el sistema abierto.
+    // La actividad queda registrada en la misma sesión almacenada en la base de datos.
+    Route::post('/sesion/mantener-activa', function (Request $request) {
+        $request->session()->put('sales_session_keep_alive_at', now()->timestamp);
+
+        return response()->noContent();
+    })
+        ->middleware('role:Ventas')
+        ->name('session.keep-alive');
 
     Route::prefix('system-administration')->name('system-administration.')->group(function () {
         Route::get('/', [SystemAdministrationController::class, 'index'])
