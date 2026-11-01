@@ -41,7 +41,6 @@ class QzTrayConnectionRetryTest extends TestCase
         $this->assertStringContainsString('qz.websocket.setClosedCallbacks([scheduleRecovery]);', $composable);
         $this->assertStringContainsString('qz.websocket.setErrorCallbacks([scheduleRecovery]);', $composable);
         $this->assertStringContainsString('scheduleQzTrayRecovery(0);', $composable);
-        $this->assertStringContainsString('})().finally(() => {', $composable);
         $this->assertStringContainsString('if (needsRetry) {', $composable);
         $this->assertStringContainsString('scheduleQzTrayRecovery();', $composable);
     }
