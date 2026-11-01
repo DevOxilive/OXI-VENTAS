@@ -21,6 +21,7 @@ import { t } from '@/i18n/es'
 
 const page = usePage()
 const desktopMediaQuery = '(min-width: 768px)'
+const SALES_SESSION_KEEP_ALIVE_INTERVAL_MS = 30 * 60 * 1000
 
 const { permissions, role } = usePermissions()
 
@@ -52,6 +53,42 @@ let unsubscribeRealtimeActivity = null
 let unsubscribeGlobalDataChanged = null
 let desktopMediaQueryList = null
 let handleDesktopViewportChange = null
+let salesSessionKeepAliveTimer = null
+let salesSessionKeepAliveRequest = null
+
+function keepSalesSessionAlive() {
+    if (role.value !== 'Ventas' || salesSessionKeepAliveRequest) return
+
+    salesSessionKeepAliveRequest = window.axios
+        .post(route('session.keep-alive'))
+        .catch(() => null)
+        .finally(() => {
+            salesSessionKeepAliveRequest = null
+        })
+}
+
+function startSalesSessionKeepAlive() {
+    if (role.value !== 'Ventas' || salesSessionKeepAliveTimer) return
+
+    void keepSalesSessionAlive()
+    salesSessionKeepAliveTimer = window.setInterval(
+        keepSalesSessionAlive,
+        SALES_SESSION_KEEP_ALIVE_INTERVAL_MS,
+    )
+}
+
+function stopSalesSessionKeepAlive() {
+    if (!salesSessionKeepAliveTimer) return
+
+    window.clearInterval(salesSessionKeepAliveTimer)
+    salesSessionKeepAliveTimer = null
+}
+
+function renewSalesSessionWhenAppBecomesVisible() {
+    if (!document.hidden) {
+        void keepSalesSessionAlive()
+    }
+}
 
 function distributeGlobalDataChange(event) {
     if (typeof window === 'undefined') return
@@ -186,6 +223,9 @@ onMounted(() => {
 
         isDesktopViewport.value = desktopMediaQueryList.matches
         desktopMediaQueryList.addEventListener('change', handleDesktopViewportChange)
+
+        startSalesSessionKeepAlive()
+        document.addEventListener('visibilitychange', renewSalesSessionWhenAppBecomesVisible)
     }
 
     if (!page.props.auth?.user?.id) return
@@ -229,10 +269,22 @@ onBeforeUnmount(() => {
         desktopMediaQueryList.removeEventListener('change', handleDesktopViewportChange)
     }
 
+    stopSalesSessionKeepAlive()
+    document.removeEventListener('visibilitychange', renewSalesSessionWhenAppBecomesVisible)
+
     unsubscribeUserChanged?.()
     unsubscribeRealtimeActivity?.()
     unsubscribeGlobalDataChanged?.()
 
+})
+
+watch(role, (nextRole) => {
+    if (nextRole === 'Ventas') {
+        startSalesSessionKeepAlive()
+        return
+    }
+
+    stopSalesSessionKeepAlive()
 })
 
 watch(desktopSidebarCollapsed, (value) => {
