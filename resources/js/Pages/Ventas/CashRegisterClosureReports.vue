@@ -19,6 +19,7 @@ import {
   getStoredTicketPrinterName,
   isQzTrayActive,
   printEscPosTicket,
+  subscribeToQzTrayRecovery,
 } from "@/Composables/useQzTray";
 import { getCashRegisterClosureReportsToolbarConfig } from "@/config/ToolbarConfigs/cashRegisterClosureReportsToolbarConfig";
 import { cashDenominations, totalCashDenominations } from "@/config/cashDenominations";
@@ -81,6 +82,7 @@ const modalMode = ref("view");
 const showClosureModal = ref(false);
 const selectedPrinterName = ref(getStoredTicketPrinterName());
 const printerBridgeReady = ref(false);
+let stopPrinterRecovery = null;
 const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
 let ticketLogoDataUrlPromise = null;
 const ticketHeaderDataUrlPromises = new Map();
@@ -274,7 +276,11 @@ async function initializePrinterBridge() {
 
 onMounted(() => {
   if (!props.selectorMode) {
-    void initializePrinterBridge().catch(() => {});
+    stopPrinterRecovery = subscribeToQzTrayRecovery(async () => {
+      await initializePrinterBridge();
+      return !getStoredTicketPrinterName()
+        || Boolean(printerBridgeReady.value && selectedPrinterName.value);
+    });
   }
 });
 
@@ -511,6 +517,7 @@ watch(
 
 onBeforeUnmount(() => {
   clearTimeout(filterReloadTimeout);
+  stopPrinterRecovery?.();
 });
 </script>
 

@@ -11,11 +11,16 @@ const QZ_STARTUP_TIMEOUT_MS = 60000;
 const QZ_STARTUP_RETRY_DELAY_MS = 1500;
 const QZ_PRINTER_DISCOVERY_TIMEOUT_MS = 30000;
 const QZ_PRINTER_DISCOVERY_RETRY_DELAY_MS = 1000;
+const QZ_RECOVERY_RETRY_DELAY_MS = 5000;
 
 let securityConfigured = false;
 let connectionPromise = null;
 let printQueue = Promise.resolve();
 const printerDiscoveryPromises = new Map();
+const recoverySubscribers = new Set();
+let recoveryTimer = null;
+let recoveryPromise = null;
+let lifecycleRecoveryConfigured = false;
 
 function csrfToken() {
   if (typeof document === "undefined") {
@@ -159,6 +164,29 @@ export function isQzTrayActive() {
   return qz.websocket.isActive();
 }
 
+// Las pantallas se suscriben mientras estan abiertas. Si QZ o Windows tarda en
+// publicar la cola, o si el socket se corta despues, volvemos a ejecutar su
+// comprobacion sin recargar la pagina ni alterar la captura del usuario.
+export function subscribeToQzTrayRecovery(recover) {
+  if (typeof recover !== "function") {
+    throw new Error("La recuperacion de QZ Tray requiere una funcion de comprobacion.");
+  }
+
+  configureSecurity();
+  configureLifecycleRecovery();
+  recoverySubscribers.add(recover);
+  scheduleQzTrayRecovery(0);
+
+  return () => {
+    recoverySubscribers.delete(recover);
+
+    if (!recoverySubscribers.size && recoveryTimer) {
+      window.clearTimeout(recoveryTimer);
+      recoveryTimer = null;
+    }
+  };
+}
+
 export async function disconnectQzTray() {
   if (!qz.websocket.isActive()) {
     return;
@@ -171,6 +199,59 @@ function wait(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function configureLifecycleRecovery() {
+  if (lifecycleRecoveryConfigured) {
+    return;
+  }
+
+  // QZ solo conserva un conjunto de callbacks; este modulo es el punto comun
+  // de conexion para todas las pantallas de impresion.
+  const scheduleRecovery = () => scheduleQzTrayRecovery(0);
+  qz.websocket.setClosedCallbacks([scheduleRecovery]);
+  qz.websocket.setErrorCallbacks([scheduleRecovery]);
+  lifecycleRecoveryConfigured = true;
+}
+
+function scheduleQzTrayRecovery(delay = QZ_RECOVERY_RETRY_DELAY_MS) {
+  if (!recoverySubscribers.size || recoveryTimer || recoveryPromise) {
+    return;
+  }
+
+  recoveryTimer = window.setTimeout(() => {
+    recoveryTimer = null;
+    void runQzTrayRecovery();
+  }, delay);
+}
+
+async function runQzTrayRecovery() {
+  if (recoveryPromise || !recoverySubscribers.size) {
+    return recoveryPromise;
+  }
+
+  let needsRetry = false;
+
+  recoveryPromise = (async () => {
+    // Una copia evita que una pantalla cerrada durante la espera reciba una
+    // actualizacion tardia.
+    for (const recover of [...recoverySubscribers]) {
+      if (recoverySubscribers.has(recover)) {
+        try {
+          needsRetry = (await recover()) !== true || needsRetry;
+        } catch (error) {
+          needsRetry = true;
+        }
+      }
+    }
+  }).finally(() => {
+    recoveryPromise = null;
+    if (needsRetry) {
+      scheduleQzTrayRecovery();
+    }
+  });
+
+  return recoveryPromise;
 }
 
 async function connectQzTrayDuringStartup() {

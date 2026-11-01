@@ -1,6 +1,6 @@
 <script setup>
 import { renderTicketHeaderImage } from "@/config/ticketTemplate";
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { Head, router, useForm, usePage } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
@@ -18,6 +18,7 @@ import {
   getQzPrinters,
   getStoredTicketPrinterName,
   printEscPosTicket,
+  subscribeToQzTrayRecovery,
 } from "@/Composables/useQzTray";
 import {
   buildEscPosTicketData,
@@ -50,6 +51,7 @@ const returnToVoid = ref(null);
 const selectedPrinterName = ref(getStoredTicketPrinterName());
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para reimprimir tickets.");
+let stopPrinterRecovery = null;
 const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
 let ticketLogoDataUrlPromise = null;
 const ticketHeaderDataUrlPromises = new Map();
@@ -434,8 +436,14 @@ async function initializePrinterBridge() {
 }
 
 onMounted(() => {
-  void initializePrinterBridge().catch(() => {});
+  stopPrinterRecovery = subscribeToQzTrayRecovery(async () => {
+    await initializePrinterBridge();
+    return !getStoredTicketPrinterName()
+      || Boolean(printerBridgeReady.value && selectedPrinterName.value);
+  });
 });
+
+onBeforeUnmount(() => stopPrinterRecovery?.());
 
 async function printTicket(printJob) {
   if (!selectedPrinterName.value || !printerBridgeReady.value) {

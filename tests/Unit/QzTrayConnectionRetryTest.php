@@ -31,4 +31,17 @@ class QzTrayConnectionRetryTest extends TestCase
         $this->assertStringContainsString('expectedPrinterNames.every((printerName) => lastPrinters.includes(printerName))', $composable);
         $this->assertStringContainsString('export async function getQzPrinters({ expectedPrinterNames = [] } = {})', $composable);
     }
+
+    public function test_qz_recovery_keeps_retrying_without_reloading_the_screen(): void
+    {
+        $composable = file_get_contents(resource_path('js/Composables/useQzTray.js'));
+
+        $this->assertStringContainsString('const QZ_RECOVERY_RETRY_DELAY_MS = 5000;', $composable);
+        $this->assertStringContainsString('export function subscribeToQzTrayRecovery(recover)', $composable);
+        $this->assertStringContainsString('qz.websocket.setClosedCallbacks([scheduleRecovery]);', $composable);
+        $this->assertStringContainsString('qz.websocket.setErrorCallbacks([scheduleRecovery]);', $composable);
+        $this->assertStringContainsString('scheduleQzTrayRecovery(0);', $composable);
+        $this->assertStringContainsString('if (needsRetry) {', $composable);
+        $this->assertStringContainsString('scheduleQzTrayRecovery();', $composable);
+    }
 }
