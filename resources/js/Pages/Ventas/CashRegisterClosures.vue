@@ -22,6 +22,7 @@ import {
   getStoredTicketPrinterName,
   isQzTrayActive,
   printEscPosTicket,
+  subscribeToQzTrayRecovery,
 } from "@/Composables/useQzTray";
 import {
   buildEscPosTicketData,
@@ -52,6 +53,7 @@ const showClosureModal = ref(false);
 const selectedPrinterName = ref(getStoredTicketPrinterName());
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para imprimir tickets.");
+let stopPrinterRecovery = null;
 const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
 let ticketLogoDataUrlPromise = null;
 const ticketHeaderDataUrlPromises = new Map();
@@ -331,7 +333,11 @@ function saveClosure() {
 
 onMounted(() => {
   if (!props.selectorMode) {
-    initializePrinterBridge({ silent: true });
+    stopPrinterRecovery = subscribeToQzTrayRecovery(async () => {
+      await initializePrinterBridge({ silent: true });
+      return !getStoredTicketPrinterName()
+        || Boolean(printerBridgeReady.value && selectedPrinterName.value);
+    });
     unsubscribeSaleReturnChanged = subscribeRealtime(
       REALTIME_CHANNELS.salesBranch(props.branch?.id),
       REALTIME_EVENTS.saleReturnChanged,
@@ -340,7 +346,10 @@ onMounted(() => {
   }
 });
 
-onBeforeUnmount(() => unsubscribeSaleReturnChanged?.());
+onBeforeUnmount(() => {
+  unsubscribeSaleReturnChanged?.();
+  stopPrinterRecovery?.();
+});
 </script>
 
 <template>

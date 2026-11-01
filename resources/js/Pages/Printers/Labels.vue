@@ -27,6 +27,7 @@ import {
     getQzPrinters,
     getStoredLabelPrinterName,
     printImageLabel,
+    subscribeToQzTrayRecovery,
 } from "@/Composables/useQzTray";
 import { usePermissions } from "@/Composables/usePermissions";
 
@@ -62,6 +63,7 @@ const availablePrinters = ref([]);
 const selectedPrinterName = ref(getStoredLabelPrinterName());
 const printerBridgeReady = ref(false);
 const printerBridgeMessage = ref("Conecta QZ Tray para imprimir etiquetas.");
+let stopPrinterRecovery = null;
 const printing = ref(false);
 const printCopies = ref(1);
 const { can } = usePermissions();
@@ -229,12 +231,17 @@ watch(productSearch, (value) => {
 });
 
 onMounted(() => {
-    initializePrinterBridge({ silent: true });
+    stopPrinterRecovery = subscribeToQzTrayRecovery(async () => {
+        await initializePrinterBridge({ silent: true });
+        return !getStoredLabelPrinterName()
+            || Boolean(printerBridgeReady.value && selectedPrinterName.value);
+    });
 });
 
 onBeforeUnmount(() => {
     clearTimeout(productSearchTimer);
     productSearchRequest += 1;
+    stopPrinterRecovery?.();
 });
 
 function resetTemplate() {

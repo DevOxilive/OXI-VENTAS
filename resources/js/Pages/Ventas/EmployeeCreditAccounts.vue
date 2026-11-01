@@ -19,6 +19,7 @@ import {
   getQzPrinters,
   getStoredTicketPrinterName,
   printEscPosTicket,
+  subscribeToQzTrayRecovery,
 } from '@/Composables/useQzTray'
 import {
   buildEscPosTicketData,
@@ -49,6 +50,7 @@ const { handlePageChange } = useGlobalTablePagination()
 const selectedPrinterName = ref(getStoredTicketPrinterName())
 const printerBridgeReady = ref(false)
 const printerBridgeMessage = ref('Conecta QZ Tray para imprimir tickets.')
+let stopPrinterRecovery = null
 const TICKET_LOGO_URL = '/icons/super-kay-ticket-bw.png'
 let ticketLogoDataUrlPromise = null
 const ticketHeaderDataUrlPromises = new Map()
@@ -625,13 +627,18 @@ onMounted(() => {
   )
 
   if (canPrintEmployeeCredit.value) {
-    void initializePrinterBridge({ silent: true })
+    stopPrinterRecovery = subscribeToQzTrayRecovery(async () => {
+      await initializePrinterBridge({ silent: true })
+      return !getStoredTicketPrinterName()
+        || Boolean(printerBridgeReady.value && selectedPrinterName.value)
+    })
   }
 })
 
 onBeforeUnmount(() => {
   unsubscribeCreditAccountChanged?.()
   unsubscribeCustomerChanged?.()
+  stopPrinterRecovery?.()
 })
 </script>
 

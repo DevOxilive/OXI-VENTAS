@@ -37,6 +37,7 @@ class TicketPrinterDetectionTest extends TestCase
 
             $this->assertStringContainsString('findTicketPrinter', $content, basename($ticketPage).' no usa el identificador de tickets.');
             $this->assertStringContainsString('expectedPrinterNames', $content, basename($ticketPage).' no espera la cola configurada.');
+            $this->assertStringContainsString('subscribeToQzTrayRecovery', $content, basename($ticketPage).' no recupera QZ Tray sin recargar.');
             $this->assertStringNotContainsString('getDefaultQzPrinter', $content, basename($ticketPage).' aun depende de la impresora predeterminada de Windows.');
         }
 
@@ -65,6 +66,7 @@ class TicketPrinterDetectionTest extends TestCase
         );
         $this->assertStringContainsString('getStoredLabelPrinterName', $labelsPage);
         $this->assertStringContainsString('expectedPrinterNames', $labelsPage);
+        $this->assertStringContainsString('subscribeToQzTrayRecovery', $labelsPage);
         $this->assertStringNotContainsString('getDefaultQzPrinter', $labelsPage);
     }
 }

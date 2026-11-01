@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 import SelectField from "@/Components/Forms/SelectField.vue";
 import { ErrorAlert, ToastAlert, WarningAlert } from "@/Components/Modales/UniversalActionModal";
@@ -21,6 +21,7 @@ import {
   printImageLabel,
   saveStoredLabelPrinterName,
   saveStoredTicketPrinterName,
+  subscribeToQzTrayRecovery,
 } from "@/Composables/useQzTray";
 
 defineOptions({
@@ -42,6 +43,7 @@ const bridgeMessage = ref("Comprobando QZ Tray y las impresoras de esta computad
 const refreshing = ref(false);
 const printingTicket = ref(false);
 const printingLabel = ref(false);
+let stopPrinterRecovery = null;
 
 const printerOptions = computed(() => availablePrinters.value.map((printerName) => ({
   label: printerName,
@@ -56,8 +58,16 @@ const labelAvailable = computed(() => (
 ));
 
 onMounted(() => {
-  void refreshPrinterBridge();
+  stopPrinterRecovery = subscribeToQzTrayRecovery(async () => {
+    await refreshPrinterBridge();
+    const expectedPrinters = [savedTicketPrinter.value, savedLabelPrinter.value].filter(Boolean);
+    return qzReady.value && (expectedPrinters.length
+      ? expectedPrinters.every((printerName) => availablePrinters.value.includes(printerName))
+      : availablePrinters.value.length > 0);
+  });
 });
+
+onBeforeUnmount(() => stopPrinterRecovery?.());
 
 async function refreshPrinterBridge({ showError = false } = {}) {
   refreshing.value = true;
