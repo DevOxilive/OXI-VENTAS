@@ -67,3 +67,35 @@ test('a printer query that never responds releases its caller on timeout', async
   s.timers.at(-1).fn();
   await rejected;
 });
+
+test('signature reads the current session cookie after switching users', async () => {
+  const s = setup();
+  s.context.document = { cookie: 'XSRF-TOKEN=user%2BA', querySelector: () => ({ content: 'obsolete' }) };
+  const headers = [];
+  s.context.fetch = async (_url, options) => {
+    headers.push(options.headers);
+    return { ok: true, status: 200, headers: { get: () => 'text/plain' }, text: async () => 'signature' };
+  };
+  await vm.runInContext('requestSignature("first")', s.context);
+  s.context.document.cookie = 'XSRF-TOKEN=user%2BB';
+  await vm.runInContext('requestSignature("second")', s.context);
+  assert.equal(headers[0]['X-XSRF-TOKEN'], 'user+A');
+  assert.equal(headers[1]['X-XSRF-TOKEN'], 'user+B');
+  assert.equal(headers[1]['X-CSRF-TOKEN'], undefined);
+});
+
+test('419 stops repeated signature requests until the session token changes', async () => {
+  const s = setup();
+  s.context.document = { cookie: 'XSRF-TOKEN=old' };
+  let calls = 0;
+  s.context.fetch = async () => {
+    calls++;
+    return { status: 419 };
+  };
+  await assert.rejects(vm.runInContext('requestSignature("first")', s.context), /sesion/);
+  await assert.rejects(vm.runInContext('requestSignature("second")', s.context), /sesion/);
+  assert.equal(calls, 1);
+  s.context.document.cookie = 'XSRF-TOKEN=new';
+  await assert.rejects(vm.runInContext('requestSignature("third")', s.context), /sesion/);
+  assert.equal(calls, 2);
+});
