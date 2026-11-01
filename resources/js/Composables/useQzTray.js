@@ -21,13 +21,40 @@ const recoverySubscribers = new Set();
 let recoveryTimer = null;
 let recoveryPromise = null;
 let lifecycleRecoveryConfigured = false;
+let signatureSessionFailure = null;
 
 function csrfToken() {
   if (typeof document === "undefined") {
     return "";
   }
 
-  return document.querySelector('meta[name="csrf-token"]')?.content || "";
+  const cookie = document.cookie.split(";").map((part) => part.trim())
+    .find((part) => part.startsWith("XSRF-TOKEN="));
+  return cookie ? decodeURIComponent(cookie.slice("XSRF-TOKEN=".length)) : "";
+}
+
+async function requestSignature(dataToSign) {
+  // Laravel renueva esta cookie al cambiar de sesion. El meta de la pagina
+  // puede conservar el token anterior durante la navegacion de Inertia.
+  const token = csrfToken();
+  if (signatureSessionFailure?.token === token) throw signatureSessionFailure.error;
+  signatureSessionFailure = null;
+  const response = await fetch("/qz/sign", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-XSRF-TOKEN": token,
+    },
+    body: JSON.stringify({ data: dataToSign }),
+  });
+  if ([401, 419].includes(response.status) || response.redirected) {
+    const error = new Error("La sesion de Super Kay necesita renovarse para autorizar la impresion. No reinstales el certificado.");
+    signatureSessionFailure = { token, error };
+    throw error;
+  }
+  return responseTextOrError(response);
 }
 
 function responseTextOrError(response) {
@@ -62,17 +89,7 @@ function configureSecurity() {
 
   qz.security.setSignatureAlgorithm("SHA256");
   qz.security.setSignaturePromise((dataToSign) => (resolve, reject) => {
-    fetch("/qz/sign", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        Accept: "text/plain",
-        "Content-Type": "application/json",
-        "X-CSRF-TOKEN": csrfToken(),
-      },
-      body: JSON.stringify({ data: dataToSign }),
-    })
-      .then(responseTextOrError)
+    requestSignature(dataToSign)
       .then(resolve)
       .catch(reject);
   });
@@ -251,7 +268,7 @@ async function runQzTrayRecovery() {
     }
   }).finally(() => {
     recoveryPromise = null;
-    if (needsRetry) {
+    if (needsRetry && signatureSessionFailure?.token !== csrfToken()) {
       scheduleQzTrayRecovery();
     }
   });
@@ -408,6 +425,9 @@ async function findPrintersDuringStartup(expectedPrinterNames = []) {
         return lastPrinters;
       }
     } catch (error) {
+      if (signatureSessionFailure?.token === csrfToken()) {
+        throw signatureSessionFailure.error;
+      }
       lastError = error;
 
       if (!qz.websocket.isActive()) {
