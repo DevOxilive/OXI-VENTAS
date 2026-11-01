@@ -244,7 +244,7 @@ async function runQzTrayRecovery() {
         }
       }
     }
-  })().finally(() => {
+  }).finally(() => {
     recoveryPromise = null;
     if (needsRetry) {
       scheduleQzTrayRecovery();
