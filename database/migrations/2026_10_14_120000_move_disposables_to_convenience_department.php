@@ -16,7 +16,9 @@ return new class extends Migration
                 ->value('id');
 
             if (! $cleaningDepartmentId || ! $convenienceDepartmentId) {
-                throw new RuntimeException('No se encontraron los departamentos Limpieza y Conveniencia requeridos para mover Desechables.');
+                // En una instalación limpia los catálogos se crean después, desde seeders.
+                // No hay categoría histórica que trasladar todavía.
+                return;
             }
 
             $disposablesCategory = DB::table('categories')
