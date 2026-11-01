@@ -583,7 +583,7 @@ function readablePrinterBridgeError(error) {
     isPublicPwaOriginForQz()
     && /unable to establish connection|qz tray no esta conectado|websocket|connection/i.test(message)
   ) {
-    return "Chrome esta bloqueando la conexion local con QZ Tray porque la PWA se abrio desde una URL publica. Para imprimir tickets, abre el POS desde localhost/LAN o desactiva temporalmente la revision de acceso local del navegador.";
+    return "No se pudo comunicar con QZ Tray. Comprueba que este abierto y que el navegador permita la conexion local.";
   }
 
   return message || "QZ Tray no esta conectado en esta computadora.";
@@ -1198,7 +1198,7 @@ async function openCashDrawer() {
       "\x1B\x70\x01\x19\xFA",
       "\x10\x14\x01\x00\x05",
     ]);
-    ToastAlert({ title: "Caja abierta" });
+    ToastAlert({ title: "Orden enviada al cajon" });
   } catch (error) {
     ErrorAlert({
       title: "No se pudo abrir la caja",

@@ -32,6 +32,9 @@ function csrfToken() {
 
 function responseTextOrError(response) {
   return response.text().then((text) => {
+    if (response.redirected || response.headers.get("content-type")?.includes("text/html")) {
+      throw new Error("La sesion de Super Kay necesita renovarse para autorizar la impresion.");
+    }
     if (!response.ok) {
       throw new Error(text || `QZ respondio con error ${response.status}.`);
     }
@@ -144,6 +147,8 @@ export function findLabelPrinter(printers = []) {
 export async function connectQzTray() {
   configureSecurity();
 
+  if (connectionPromise) return connectionPromise;
+
   if (qz.websocket.isActive()) {
     return qz;
   }
@@ -232,7 +237,7 @@ async function runQzTrayRecovery() {
 
   let needsRetry = false;
 
-  recoveryPromise = (async () => {
+  recoveryPromise = Promise.resolve().then(async () => {
     // Una copia evita que una pantalla cerrada durante la espera reciba una
     // actualizacion tardia.
     for (const recover of [...recoverySubscribers]) {
@@ -264,11 +269,11 @@ async function connectQzTrayDuringStartup() {
     }
 
     try {
-      await qz.websocket.connect({
+      await withTimeout(qz.websocket.connect({
         retries: QZ_CONNECTION_RETRIES,
         delay: QZ_CONNECTION_DELAY_SECONDS,
         keepAlive: 60,
-      });
+      }), Math.max(1, deadline - Date.now()), "QZ Tray no respondio al conectar.");
 
       return qz;
     } catch (error) {
@@ -304,23 +309,23 @@ function withTimeout(promise, ms, message) {
 
 async function reconnectQzTray() {
   configureSecurity();
-  connectionPromise = null;
+  if (connectionPromise) return connectionPromise;
 
-  try {
+  connectionPromise = Promise.resolve().then(async () => {
     if (qz.websocket.isActive()) {
-      await qz.websocket.disconnect();
+      await withTimeout(qz.websocket.disconnect(), 5000, "QZ Tray no respondio al desconectar.");
     }
-  } catch (error) {
-    // Si QZ ya se quedo en un estado inconsistente, forzamos una conexion nueva abajo.
-  }
-
-  return connectQzTray();
+    return connectQzTrayDuringStartup();
+  }).finally(() => { connectionPromise = null; });
+  return connectionPromise;
 }
 
 function shouldRetryQzPrint(error) {
   const message = String(error?.message || error || "");
 
-  return /sendData is not a function|connection attempt has not returned|open connection with QZ Tray already exists|websocket|closed|not connected|tiempo de espera/i.test(message);
+  // Solo repetir errores que indican que el trabajo no pudo enviarse.
+  // Una respuesta tardia o una desconexion no prueban que Windows no lo recibio.
+  return /sendData is not a function|connection attempt has not returned|open connection with QZ Tray already exists|not connected/i.test(message);
 }
 
 function normalizeRawPrintPayload(printData) {
@@ -390,7 +395,7 @@ async function findPrintersDuringStartup(expectedPrinterNames = []) {
 
   while (Date.now() < deadline) {
     try {
-      const printers = await qz.printers.find();
+      const printers = await withTimeout(qz.printers.find(), Math.max(1, deadline - Date.now()), "QZ Tray no respondio al consultar impresoras.");
       lastPrinters = Array.isArray(printers) ? printers : [];
       receivedPrinterList = true;
       lastError = null;
