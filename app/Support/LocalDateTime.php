@@ -20,6 +20,34 @@ final class LocalDateTime
         return $date?->copy()->setTimezone(self::TIMEZONE)->format($format);
     }
 
+    /**
+     * Presenta una fecha operativa para personas: conserva UTC internamente,
+     * pero elimina la necesidad de interpretar reloj de 24 horas en pantalla.
+     */
+    public static function human(?CarbonInterface $date): ?string
+    {
+        if (! $date) {
+            return null;
+        }
+
+        $local = $date->copy()->setTimezone(self::TIMEZONE);
+        $meridiem = $local->hour < 12 ? 'a. m.' : 'p. m.';
+
+        return $local->format('d/m/Y, g:i').' '.$meridiem;
+    }
+
+    /** Presenta únicamente la hora operativa, en reloj de 12 horas. */
+    public static function time(?CarbonInterface $date): ?string
+    {
+        if (! $date) {
+            return null;
+        }
+
+        $local = $date->copy()->setTimezone(self::TIMEZONE);
+
+        return $local->format('g:i').' '.($local->hour < 12 ? 'a. m.' : 'p. m.');
+    }
+
     public static function iso(?CarbonInterface $date): ?string
     {
         return $date?->copy()->setTimezone(self::TIMEZONE)->toIso8601String();

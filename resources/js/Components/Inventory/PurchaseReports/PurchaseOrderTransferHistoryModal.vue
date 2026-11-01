@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
+import { formatOperationalDateTime } from '@/utils/operationalDateTime'
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -15,10 +16,7 @@ const transfers = computed(() => props.order.transfers ?? [])
 function dateTime(value) {
     if (!value) return 'Sin fecha'
 
-    return new Intl.DateTimeFormat('es-MX', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    }).format(new Date(value))
+    return formatOperationalDateTime(value, { fallback: 'Sin fecha' })
 }
 </script>
 

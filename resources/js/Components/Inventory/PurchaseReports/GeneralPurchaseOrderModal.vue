@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import PurchaseOrderModalLayout from '@/Components/Inventory/PurchaseReports/PurchaseOrderModalLayout.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
+import { formatOperationalDateTime } from '@/utils/operationalDateTime'
 
 const props = defineProps({ order: { type: Object, required: true } })
 defineEmits(['close'])
@@ -43,9 +44,7 @@ function quantity(value, unit = 'pza') {
 }
 
 function dateTime(value) {
-    return value
-        ? new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-        : 'Sin fecha'
+    return formatOperationalDateTime(value, { fallback: 'Sin fecha' })
 }
 
 function status(item) {

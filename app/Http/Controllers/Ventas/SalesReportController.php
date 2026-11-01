@@ -665,7 +665,7 @@ class SalesReportController extends Controller
             'monthly_average' => $monthlyAverageValue,
             'monthly_average_display' => $this->quantityLabel($monthlyAverage, $unit),
             'last_sale' => $row->last_sale_at,
-            'last_sale_display' => $row->last_sale_at ? LocalDateTime::format(Carbon::parse($row->last_sale_at, 'UTC'), 'd/m/Y H:i') : '-',
+            'last_sale_display' => $row->last_sale_at ? LocalDateTime::human(Carbon::parse($row->last_sale_at, 'UTC')) : '-',
         ];
     }
 
@@ -680,8 +680,8 @@ class SalesReportController extends Controller
                 'folio' => 'DEV-'.str_pad((string) $return->id, 6, '0', STR_PAD_LEFT),
                 'amount' => (float) $return->amount,
                 'is_voided' => $return->isVoided(),
-                'cancelled_at_display' => LocalDateTime::format($return->cancelled_at, 'd/m/Y H:i') ?? '-',
-                'voided_at_display' => LocalDateTime::format($return->voided_at, 'd/m/Y H:i'),
+                'cancelled_at_display' => LocalDateTime::human($return->cancelled_at) ?? '-',
+                'voided_at_display' => LocalDateTime::human($return->voided_at),
                 'items' => $return->details->map(fn ($detail) => [
                     'sale_detail_id' => (int) $detail->sale_detail_id,
                     'product' => $detail->product?->name ?? 'Producto sin nombre',
@@ -702,9 +702,9 @@ class SalesReportController extends Controller
             'folio' => $sale->folio ?: 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
             'date' => LocalDateTime::iso($sale->date),
             'date_sort' => LocalDateTime::format($sale->date, 'Y-m-d H:i:s') ?? '',
-            'date_display' => LocalDateTime::format($sale->date, 'd/m/Y H:i') ?? '-',
+            'date_display' => LocalDateTime::human($sale->date) ?? '-',
             'date_only' => LocalDateTime::format($sale->date, 'd/m/Y') ?? '-',
-            'time_only' => LocalDateTime::format($sale->date, 'H:i') ?? '-',
+            'time_only' => LocalDateTime::time($sale->date) ?? '-',
             'branch' => $sale->branch?->name ?? '-',
             'customer' => $this->saleHolderName($sale),
             'cash_box' => $sale->cash_box_number ? 'Caja '.$sale->cash_box_number : '-',
@@ -716,14 +716,14 @@ class SalesReportController extends Controller
             'status_label' => $returnedAmount <= 0 ? ($sale->status === 'cancelled' ? 'Cancelada' : 'Completada') : ($returnedAmount + 0.009 >= (float) $sale->total ? 'Devolución total' : 'Devolución parcial'),
             'status_tone' => $returnedAmount > 0 ? 'danger' : ($sale->status === 'cancelled' ? 'danger' : 'success'),
             'cancelled_at' => LocalDateTime::iso($sale->cancelled_at),
-            'cancelled_at_display' => LocalDateTime::format($sale->cancelled_at, 'd/m/Y H:i') ?? null,
+            'cancelled_at_display' => LocalDateTime::human($sale->cancelled_at),
             'cancellation' => $sale->cancellation ? [
                 'id' => (int) $sale->cancellation->id,
                 'reason' => $sale->cancellation->reason,
                 'amount' => (float) $sale->cancellation->amount,
                 'payment_method' => $sale->cancellation->paymentMethod?->name ?? 'Sin método',
                 'cancelled_at' => LocalDateTime::iso($sale->cancellation->cancelled_at),
-                'cancelled_at_display' => LocalDateTime::format($sale->cancellation->cancelled_at, 'd/m/Y H:i') ?? '-',
+                'cancelled_at_display' => LocalDateTime::human($sale->cancellation->cancelled_at) ?? '-',
                 'cancelled_by' => $sale->cancellation->cancelledBy?->name ?? 'Sin usuario',
                 'details' => $sale->cancellation->details
                     ->map(fn ($detail) => [
@@ -812,9 +812,9 @@ class SalesReportController extends Controller
             'payment_folio' => $payment->folio,
             'related_folios' => $relatedFolios->all(),
             'date_sort' => LocalDateTime::format($payment->paid_at, 'Y-m-d H:i:s') ?? '',
-            'date_display' => LocalDateTime::format($payment->paid_at, 'd/m/Y H:i') ?? '-',
+            'date_display' => LocalDateTime::human($payment->paid_at) ?? '-',
             'date_only' => LocalDateTime::format($payment->paid_at, 'd/m/Y') ?? '-',
-            'time_only' => LocalDateTime::format($payment->paid_at, 'H:i') ?? '-',
+            'time_only' => LocalDateTime::time($payment->paid_at) ?? '-',
             'branch' => $payment->branch?->name ?? '-',
             'customer' => $this->accountHolderName($payment->account),
             'cash_box' => $payment->cash_box_number ? 'Caja '.$payment->cash_box_number : '-',

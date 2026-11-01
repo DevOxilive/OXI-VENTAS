@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, reactive, watch } from "vue";
 import { formatInventoryQuantity } from "@/utils/quantityFormatter";
+import { formatOperationalDateTime } from "@/utils/operationalDateTime";
 
 function parseDateValue(value) {
     if (!value) return null;
@@ -198,19 +199,7 @@ export function useProductMovementsModal(props, emit) {
     function formatDateTime(date) {
         if (!date) return "Sin fecha";
 
-        const parsedDate = parseDateValue(date);
-
-        if (!parsedDate) {
-            return "Fecha inválida";
-        }
-
-        return new Intl.DateTimeFormat("es-MX", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        }).format(parsedDate);
+        return formatOperationalDateTime(date, { fallback: "Fecha inválida" });
     }
 
     function groupLabel(groupKey, movement) {

@@ -8,6 +8,7 @@ import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
 import { getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
+import { formatOperationalDate } from '@/utils/operationalDateTime'
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -69,7 +70,7 @@ function quantity(value, item = null) { return formatInventoryQuantity(value, it
 
 function formatDate(value) {
     if (!value) return 'Sin fecha'
-    return new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
+    return formatOperationalDate(value)
 }
 
 function save() {
