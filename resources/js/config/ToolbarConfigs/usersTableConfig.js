@@ -5,6 +5,7 @@ export function getUsersTableConfig({
     canViewUsers = false,
     onViewUser,
     onCreateUser,
+    onLinkUser,
     onEditUser,
     onDeleteUser,
 }) {
@@ -68,6 +69,16 @@ export function getUsersTableConfig({
                 permission: "users.create",
                 handler: onCreateUser,
                 hidden: (row) => row?.has_user || row?.displayStatus === "Inactivo" || !can("users.create"),
+                mobile: "button",
+            },
+            {
+                id: "link-user",
+                label: "Vincular usuario existente",
+                icon: "link",
+                variant: "slate",
+                permission: "users.update",
+                handler: onLinkUser,
+                hidden: (row) => row?.has_user || row?.displayStatus === "Inactivo" || !can("users.update"),
                 mobile: "button",
             },
             {
