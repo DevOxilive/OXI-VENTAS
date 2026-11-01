@@ -95,7 +95,7 @@ class AttendanceController extends Controller
         $user = $request->user()->loadMissing('branches');
         if (! $this->canRegisterAttendance($user)) {
             return back()->withErrors([
-                'type' => 'Solo los usuarios con rol Ventas o Vendedor pueden registrar asistencia.',
+                'type' => 'Solo los usuarios con rol Ventas pueden registrar asistencia.',
             ]);
         }
         $branch = $this->resolveAttendanceBranch($user, $data['attendance_branch_id'] ?? null);
@@ -322,7 +322,7 @@ class AttendanceController extends Controller
             return false;
         }
 
-        return in_array($user->role?->name, ['Ventas', 'Vendedor'], true);
+        return $user->role?->name === 'Ventas';
     }
 
     private function attendanceBranchesForUser($user): array

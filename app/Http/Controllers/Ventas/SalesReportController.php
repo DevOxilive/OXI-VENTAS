@@ -756,7 +756,19 @@ class SalesReportController extends Controller
 
     private function mapEmployeeCreditPaymentRow(EmployeeCreditPayment $payment): array
     {
-        $details = $payment->allocations->flatMap(function ($allocation) {
+        $relatedSales = $payment->allocations
+            ->map(fn ($allocation) => $allocation->charge?->sale)
+            ->filter(fn ($sale) => filled($sale?->folio))
+            ->unique('id')
+            ->values();
+        $folioCounts = $relatedSales->countBy('folio');
+        $saleLabels = $relatedSales->mapWithKeys(fn (Sale $sale) => [
+            $sale->id => $folioCounts->get($sale->folio) > 1
+                ? $sale->folio.' · '.($sale->branch?->name ?: 'Sucursal #'.$sale->branch_id)
+                : $sale->folio,
+        ]);
+
+        $details = $payment->allocations->flatMap(function ($allocation) use ($saleLabels) {
             $sale = $allocation->charge?->sale;
             if (! $sale) return [];
 
@@ -766,13 +778,13 @@ class SalesReportController extends Controller
             $remainingAmount = $appliedAmount;
             $lastDetailIndex = $mappedDetails->count() - 1;
 
-            return $mappedDetails->map(function (array $detail, int $index) use ($appliedAmount, $saleTotal, $lastDetailIndex, &$remainingAmount, $sale) {
+            return $mappedDetails->map(function (array $detail, int $index) use ($appliedAmount, $saleTotal, $lastDetailIndex, &$remainingAmount, $sale, $saleLabels) {
                 $amount = $index === $lastDetailIndex
                     ? $remainingAmount
                     : round(((float) $detail['subtotal'] / max($saleTotal, 0.01)) * $appliedAmount, 2);
                 $remainingAmount = round($remainingAmount - $amount, 2);
                 $detail['id'] = 'payment-detail-'.$sale->id.'-'.$detail['id'];
-                $detail['product'] = ($sale->folio ?: 'Sin folio').' · '.$detail['product'];
+                $detail['product'] = $saleLabels->get($sale->id, $sale->folio ?: 'Sin folio').' · '.$detail['product'];
                 $detail['report_amount'] = $amount;
 
                 return $detail;
@@ -790,11 +802,7 @@ class SalesReportController extends Controller
             ]]);
         }
 
-        $relatedFolios = $payment->allocations
-            ->map(fn ($allocation) => $allocation->charge?->sale?->folio)
-            ->filter()
-            ->unique()
-            ->values();
+        $relatedFolios = $saleLabels->values();
 
         return [
             'id' => 'payment-'.$payment->id,

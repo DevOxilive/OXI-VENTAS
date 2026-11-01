@@ -11,7 +11,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         }
     };
     const canRegisterSalesAttendance =
-        ["Ventas", "Vendedor"].includes(role) && can("attendance.register");
+        role === "Ventas" && can("attendance.register");
 
     const modulePermissions = {
         employees: ["employees.view", "employees.create", "employees.update", "employees.delete"],

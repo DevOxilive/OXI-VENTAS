@@ -34,7 +34,7 @@ class CreateNewUser implements CreatesNewUsers
             'role_id' => ['prohibited'],
         ])->validate();
 
-        $roleId = Role::where('name', 'Vendedor')->value('id');
+        $roleId = Role::where('name', 'Ventas')->value('id');
 
         if (! $roleId) {
             throw ValidationException::withMessages([

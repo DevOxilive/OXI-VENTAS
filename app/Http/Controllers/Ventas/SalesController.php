@@ -24,6 +24,7 @@ use App\Models\User;
 use App\Search\ProductSearchOptions;
 use App\Search\ProductSearchService;
 use App\Services\SaleCancellationService;
+use App\Services\SaleFolioService;
 use App\Services\StockMovementService;
 use App\Support\LocalDateTime;
 use App\Support\SystemPermission;
@@ -204,7 +205,8 @@ class SalesController extends Controller
                 'receivedBy:id,name',
                 'account.employee:id,first_name,last_name',
                 'account.customer:id,name,first_name,last_name',
-                'allocations.charge.sale:id,folio',
+                'allocations.charge.sale:id,folio,branch_id',
+                'allocations.charge.sale.branch:id,name',
             ])
             ->whereIn('branch_id', $branchIds)
             ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->where('paid_at', '>=', LocalDateTime::startOfDay($date)))
@@ -317,7 +319,7 @@ class SalesController extends Controller
         return response()->json(['products' => $products]);
     }
 
-    public function store(Request $request, StockMovementService $stockService)
+    public function store(Request $request, StockMovementService $stockService, SaleFolioService $folios)
     {
         $data = $request->validate([
             'branch_id' => ['required', 'exists:branches,id'],
@@ -377,7 +379,7 @@ class SalesController extends Controller
             ->all();
 
         $accountId = null;
-        $sale = DB::transaction(function () use ($data, $user, $branch, $paymentMethod, $stockService, $isAccountCredit, &$accountId) {
+        $sale = DB::transaction(function () use ($data, $user, $branch, $paymentMethod, $stockService, $folios, $isAccountCredit, &$accountId) {
             $creditEmployeeId = null;
             $creditCustomerId = null;
 
@@ -396,6 +398,7 @@ class SalesController extends Controller
             }
 
             $sale = Sale::create([
+                'folio' => $folios->nextForBranch((int) $branch->id),
                 'date' => now(),
                 'employee_id' => $user->employee_id,
                 'customer_id' => $creditCustomerId,
@@ -523,7 +526,6 @@ class SalesController extends Controller
             }
 
             $sale->update([
-                'folio' => 'V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT),
                 'total' => $total,
                 'cash_received' => $cashReceived,
                 'change_due' => $isCashPayment ? round($cashReceived - $total, 2) : 0,
@@ -829,6 +831,12 @@ class SalesController extends Controller
 
     private function mapRecentPayment(EmployeeCreditPayment $payment): array
     {
+        $folioCounts = $payment->allocations
+            ->map(fn ($allocation) => $allocation->charge?->sale)
+            ->filter()
+            ->unique('id')
+            ->countBy('folio');
+
         return [
             'id' => 'payment-'.$payment->id,
             'operation_type' => 'payment',
@@ -849,7 +857,10 @@ class SalesController extends Controller
             'change_due' => (float) ($payment->change_due ?? 0),
             'applied_sales' => $payment->allocations->map(fn ($allocation) => [
                 'id' => (int) $allocation->id,
-                'folio' => $allocation->charge?->sale?->folio ?? 'Sin ticket vinculado',
+                'folio' => ($allocation->charge?->sale?->folio ?? 'Sin ticket vinculado')
+                    .($folioCounts->get($allocation->charge?->sale?->folio) > 1
+                        ? ' · '.($allocation->charge?->sale?->branch?->name ?: 'Sucursal #'.$allocation->charge?->sale?->branch_id)
+                        : ''),
                 'amount' => (float) $allocation->amount,
             ])->values()->all(),
             'details' => [],

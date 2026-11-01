@@ -18,7 +18,6 @@ class RoleSeeder extends Seeder
             'Sistemas',
             'Recursos Humanos',
             'Ventas',
-            'Vendedor',
             'Inventario',
         ];
 
@@ -111,6 +110,7 @@ class RoleSeeder extends Seeder
         $salesPermissions = [
             'sales.view',
             'sales.create',
+            'sales.returns.void',
             'sales.purchase-lists.view',
             'sales.purchase-lists.create',
             'sales.purchase-lists.update',
@@ -118,16 +118,11 @@ class RoleSeeder extends Seeder
             'sales.purchase-orders.view',
             'sales.purchase-orders.receive',
             'systems.qz.sign',
+            'attendance.register',
+            'attendance.corrections.request',
         ];
 
         $this->collectRolePermissions($rolePermissions, $roles['Ventas']->id, $salesPermissions, $permissionIdsByName);
-        $this->collectRolePermissions($rolePermissions, $roles['Vendedor']->id, $salesPermissions, $permissionIdsByName);
-        $this->collectRolePermissions(
-            $rolePermissions,
-            $roles['Vendedor']->id,
-            ['sales.returns.void'],
-            $permissionIdsByName
-        );
 
         $this->collectRolePermissions(
             $rolePermissions,
@@ -176,10 +171,12 @@ class RoleSeeder extends Seeder
 
         DB::table('role_permission')
             ->whereIn('role_id', $roles->pluck('id')->all())
+            ->where('role_id', '!=', $roles['Ventas']->id)
             ->delete();
 
         if ($rolePermissions) {
-            DB::table('role_permission')->insert($rolePermissions);
+            // Conserva los permisos de Ventas trasladados desde el rol anterior.
+            DB::table('role_permission')->insertOrIgnore($rolePermissions);
         }
 
         $adminUser = User::where('email', 'carlos@oxilive.com.mx')->first();
