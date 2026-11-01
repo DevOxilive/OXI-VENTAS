@@ -13,6 +13,7 @@ class LocalDateTimeTest extends TestCase
         $utcSale = Carbon::parse('2026-10-06 14:02:00', 'UTC');
 
         $this->assertSame('06/10/2026 08:02', LocalDateTime::format($utcSale, 'd/m/Y H:i'));
+        $this->assertSame('06/10/2026, 8:02 a. m.', LocalDateTime::human($utcSale));
         $this->assertSame('2026-10-06T08:02:00-06:00', LocalDateTime::iso($utcSale));
         $this->assertSame('UTC', $utcSale->getTimezone()->getName());
     }
@@ -21,5 +22,12 @@ class LocalDateTimeTest extends TestCase
     {
         $this->assertSame('2026-10-06 06:00:00', LocalDateTime::startOfDay('2026-10-06')->format('Y-m-d H:i:s'));
         $this->assertSame('2026-10-07 05:59:59', LocalDateTime::endOfDay('2026-10-06')->format('Y-m-d H:i:s'));
+    }
+
+    public function test_it_uses_a_twelve_hour_clock_for_operational_display(): void
+    {
+        $utcClosure = Carbon::parse('2026-11-01 04:22:38', 'UTC');
+
+        $this->assertSame('31/10/2026, 10:22 p. m.', LocalDateTime::human($utcClosure));
     }
 }

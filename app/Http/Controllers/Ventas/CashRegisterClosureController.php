@@ -385,8 +385,8 @@ class CashRegisterClosureController extends Controller
             'cash_box_number' => $cashBoxNumber,
             'period_start_raw' => $periodStart,
             'period_end_raw' => $periodEnd,
-            'period_start' => LocalDateTime::format($periodStart, 'd/m/Y H:i'),
-            'period_end' => LocalDateTime::format($periodEnd, 'd/m/Y H:i'),
+            'period_start' => LocalDateTime::human($periodStart),
+            'period_end' => LocalDateTime::human($periodEnd),
             'sales_count' => $sales->count(),
             'sales_total' => round((float) $sales->sum('total'), 2),
             'credit_payments_count' => $creditPayments->count(),
@@ -452,7 +452,7 @@ class CashRegisterClosureController extends Controller
                     'payments_count' => $group->where('type', 'payment')->count(),
                     'sales_total' => round((float) $group->where('type', 'sale')->sum('amount'), 2),
                     'payments_total' => round((float) $group->where('type', 'payment')->sum('amount'), 2),
-                    'last_sale_at' => LocalDateTime::format($lastOperation['date'] ?? null, 'd/m/Y H:i'),
+                    'last_sale_at' => LocalDateTime::human($lastOperation['date'] ?? null),
                 ];
             })
             ->values()
@@ -464,7 +464,7 @@ class CashRegisterClosureController extends Controller
         return [
             'id' => $sale->id,
             'folio' => $sale->folio ?? ('V-' . str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT)),
-            'date' => LocalDateTime::format($sale->date, 'd/m/Y H:i'),
+            'date' => LocalDateTime::human($sale->date),
             'user' => $this->cashierName($sale),
             'payment_method' => $sale->paymentMethod?->name ?? 'Sin metodo',
             'cash_box_number' => $sale->cash_box_number ?: '1',
@@ -479,7 +479,7 @@ class CashRegisterClosureController extends Controller
         return [
             'id' => $refund->id,
             'sale_id' => $refund->sale_id,
-            'date' => LocalDateTime::format($refund->cancelled_at, 'd/m/Y H:i'),
+            'date' => LocalDateTime::human($refund->cancelled_at),
             'user' => $refund->cancelledBy?->name ?? 'Sin usuario',
             'payment_method' => $refund->paymentMethod?->name ?? 'Sin metodo',
             'cash_box_number' => $refund->cash_box_number ?: '1',
@@ -501,7 +501,7 @@ class CashRegisterClosureController extends Controller
         return [
             'id' => $payment->id,
             'folio' => $payment->folio ?: 'ABO-'.str_pad((string) $payment->id, 6, '0', STR_PAD_LEFT),
-            'date' => LocalDateTime::format($payment->paid_at, 'd/m/Y H:i'),
+            'date' => LocalDateTime::human($payment->paid_at),
             'holder' => $holder ?: 'Titular sin nombre',
             'received_by' => $payment->receivedBy?->name ?? 'Sin usuario',
             'payment_method' => $payment->paymentMethod?->name ?? 'Sin método',
@@ -569,7 +569,7 @@ class CashRegisterClosureController extends Controller
             'card_total' => (float) ($summary->card_total ?? 0),
             'cash_difference' => (float) ($summary->cash_difference ?? 0),
             'card_difference' => (float) ($summary->card_difference ?? 0),
-            'last_closure_at' => LocalDateTime::format($lastClosure?->period_end, 'd/m/Y H:i'),
+            'last_closure_at' => LocalDateTime::human($lastClosure?->period_end),
             'last_closure_folio' => $lastClosure?->folio,
             'has_closures' => (int) ($summary->cuts_count ?? 0) > 0,
         ]);
@@ -593,7 +593,7 @@ class CashRegisterClosureController extends Controller
             'branch' => $closure->branch?->name ?? 'Sin sucursal',
             'user' => $closure->user?->name ?? 'Sin usuario',
             'cash_box_number' => $closure->cash_box_number,
-            'period' => (LocalDateTime::format($closure->period_start, 'd/m/Y H:i') ?? '-') . ' - ' . (LocalDateTime::format($closure->period_end, 'd/m/Y H:i') ?? '-'),
+            'period' => (LocalDateTime::human($closure->period_start) ?? '-') . ' - ' . (LocalDateTime::human($closure->period_end) ?? '-'),
             'sales_count' => $closure->sales_count,
             'sales_total' => (float) $closure->sales_total,
             'refunds_count' => (int) ($closure->refunds_count ?? 0),
@@ -705,13 +705,13 @@ class CashRegisterClosureController extends Controller
     {
         $base = [
             'folio' => $closure->folio,
-            'date' => LocalDateTime::format($closure->period_end, 'd/m/Y H:i'),
+            'date' => LocalDateTime::human($closure->period_end),
             'branch_name' => $closure->branch?->name ?? 'Sin sucursal',
             'user_name' => $closure->user?->name ?? 'Sin usuario',
             'cash_box_text' => 'CAJA #' . ($closure->cash_box_number ?: '1'),
             'cash_box_number' => $closure->cash_box_number ?: '1',
-            'period_start' => LocalDateTime::format($closure->period_start, 'd/m/Y H:i'),
-            'period_end' => LocalDateTime::format($closure->period_end, 'd/m/Y H:i'),
+            'period_start' => LocalDateTime::human($closure->period_start),
+            'period_end' => LocalDateTime::human($closure->period_end),
             'sales_count' => (int) $closure->sales_count,
             'sales_total' => (float) $closure->sales_total,
             'refunds_count' => (int) ($closure->refunds_count ?? 0),

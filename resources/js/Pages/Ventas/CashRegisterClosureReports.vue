@@ -588,7 +588,7 @@ onBeforeUnmount(() => {
           <div class="flex flex-wrap items-start justify-between gap-3 border-b border-secondary pb-3">
             <div>
               <p class="text-sm font-semibold text-text opacity-70">
-                {{ selectedClosure.branch }} · Caja #{{ selectedClosure.cash_box_number || '1' }} · {{ selectedClosure.period }}
+                {{ selectedClosure.branch }} · Caja #{{ selectedClosure.cash_box_number || '1' }} · Horario de Ciudad de México · {{ selectedClosure.period }}
               </p>
             </div>
             <span

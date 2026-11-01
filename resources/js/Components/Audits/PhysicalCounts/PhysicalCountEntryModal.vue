@@ -10,6 +10,7 @@ import {
     getModalRequestOptions,
 } from '@/Components/Modales/useModalConfig'
 import { getPhysicalCountEntryModalConfig } from '@/config/ModalConfigs/physicalCountEntryModalConfig'
+import { formatOperationalDate, formatOperationalTime } from '@/utils/operationalDateTime'
 
 const emit = defineEmits(['close'])
 
@@ -67,16 +68,13 @@ const userName = computed(() =>
 const entryDate = computed(() => {
     if (!props.entry?.created_at) return '-'
 
-    return new Date(props.entry.created_at).toLocaleDateString('es-MX')
+    return formatOperationalDate(props.entry.created_at)
 })
 
 const entryTime = computed(() => {
     if (!props.entry?.created_at) return '-'
 
-    return new Date(props.entry.created_at).toLocaleTimeString('es-MX', {
-        hour: '2-digit',
-        minute: '2-digit',
-    })
+    return formatOperationalTime(props.entry.created_at)
 })
 
 function loadEntryData() {

@@ -428,7 +428,7 @@ onBeforeUnmount(() => {
                 Caja #{{ current.cash_box_number }} · {{ branch.name }}
               </h2>
               <p class="mt-1 text-sm font-semibold text-text opacity-65">
-                Periodo {{ current.period_start }} a {{ current.period_end }}
+                Horario de Ciudad de México · {{ current.period_start }} a {{ current.period_end }}
               </p>
             </div>
 

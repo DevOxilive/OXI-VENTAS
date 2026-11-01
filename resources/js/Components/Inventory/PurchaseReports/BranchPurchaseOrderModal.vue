@@ -8,6 +8,7 @@ import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
+import { formatOperationalDateTime } from '@/utils/operationalDateTime'
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -53,9 +54,7 @@ function quantity(value, item = null) {
 }
 
 function dateTime(value) {
-    return value
-        ? new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-        : 'Sin fecha'
+    return formatOperationalDateTime(value, { fallback: 'Sin fecha' })
 }
 
 function status(item) {

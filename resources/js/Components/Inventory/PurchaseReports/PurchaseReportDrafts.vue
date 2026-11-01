@@ -1,6 +1,7 @@
 <script setup>
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
 import { usePermissions } from '@/Composables/usePermissions'
+import { formatOperationalDate } from '@/utils/operationalDateTime'
 
 const props = defineProps({
     reports: {
@@ -19,11 +20,7 @@ const { can } = usePermissions()
 function formatDate(date) {
     if (!date) return 'Sin fecha'
 
-    return new Intl.DateTimeFormat('es-MX', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    }).format(new Date(date))
+    return formatOperationalDate(date)
 }
 
 function reportTitle(report, index) {
