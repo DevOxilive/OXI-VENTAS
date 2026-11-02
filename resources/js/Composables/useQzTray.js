@@ -546,6 +546,17 @@ export async function printEscPosTicket(printerName, printData = [], options = {
   return queuedPrint;
 }
 
+// El cajon no espera los tickets pendientes ni reinicia la conexion compartida.
+// Windows y el firmware siguen siendo responsables de entregar el pulso.
+export async function openQzCashDrawer(printerName) {
+  if (!printerName) throw new Error("Configura la impresora de tickets para abrir el cajon.");
+  await connectQzTray();
+  return withTimeout(sendRawPrint(printerName, [{
+    type: "raw", format: "command", flavor: "plain",
+    data: "\x10\x14\x01\x00\x05\x1B\x70\x00\x19\xFA\x1B\x70\x01\x19\xFA",
+  }]), 8000, "No se confirmo el envio al cajon. Revisa la cola de Windows y el estado de la impresora antes de repetir.");
+}
+
 export async function printHtmlTicket(printerName, html, dimensions = {}) {
   if (!printerName) {
     throw new Error("No hay una impresora seleccionada.");

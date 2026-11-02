@@ -33,6 +33,21 @@ function setup() {
 }
 const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 
+test('drawer sends only pulses even while a ticket is pending', async () => {
+  const s = setup();
+  const jobs = [];
+  s.qz.print = (_config, data) => {
+    jobs.push(data);
+    return jobs.length === 1 ? new Promise(() => {}) : Promise.resolve();
+  };
+  vm.runInContext('void printEscPosTicket("Ticket", ["pending ticket"])', s.context);
+  await flush();
+  await vm.runInContext('openQzCashDrawer("Ticket")', s.context);
+  assert.equal(jobs.length, 2);
+  assert.equal(jobs[1][0].data, '\x10\x14\x01\x00\x05\x1B\x70\x00\x19\xFA\x1B\x70\x01\x19\xFA');
+  assert.equal(s.connections(), 1);
+});
+
 test('startup recovery runs and reconnects after QZ closes without page reload', async () => {
   const s = setup();
   vm.runInContext('subscribeToQzTrayRecovery(async () => { await getQzPrinters(); return true; })', s.context);
