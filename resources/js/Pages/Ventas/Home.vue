@@ -17,6 +17,7 @@ import { getSalesToolbarConfig } from "@/config/ToolbarConfigs/salesToolbarConfi
 import {
   connectQzTray,
   findTicketPrinter,
+  openQzCashDrawer,
   getStoredTicketPrinterName,
   getQzPrinters,
   printEscPosTicket,
@@ -1184,20 +1185,8 @@ function handleToolbarAction(actionId) {
 }
 
 async function openCashDrawer() {
-  if (!printerBridgeReady.value || !selectedPrinterName.value) {
-    await initializePrinterBridge({ silent: false });
-  }
-
-  if (!printerBridgeReady.value || !selectedPrinterName.value) {
-    return;
-  }
-
   try {
-    await printEscPosTicket(selectedPrinterName.value, [
-      "\x1B\x70\x00\x19\xFA",
-      "\x1B\x70\x01\x19\xFA",
-      "\x10\x14\x01\x00\x05",
-    ]);
+    await openQzCashDrawer(selectedPrinterName.value || getStoredTicketPrinterName());
     ToastAlert({ title: "Orden enviada al cajon" });
   } catch (error) {
     ErrorAlert({
