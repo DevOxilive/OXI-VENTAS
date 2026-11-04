@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\RoleSessionPolicy;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -54,6 +55,17 @@ class HandleInertiaRequests extends Middleware
                'permissions' => $user
     ? $user->all_permissions->pluck('name')->values()
     : [],
+
+                'sessionPolicy' => $user
+                    ? function () use ($request, $user) {
+                        $policy = RoleSessionPolicy::forUser($user);
+
+                        return [
+                            ...$policy,
+                            'expires_at' => RoleSessionPolicy::expiresAt($request, $policy),
+                        ];
+                    }
+                    : null,
             ],
 
             'branches' => $navigationBranches,

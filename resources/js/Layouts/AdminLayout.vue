@@ -2,6 +2,7 @@
 import SidebarItem from '@/Components/Layout/SidebarItem.vue'
 import Dropdown from '@/Components/Layout/Dropdown.vue'
 import DropdownLink from '@/Components/Layout/DropdownLink.vue'
+import SessionExpiryWarningModal from '@/Components/Modales/SessionExpiryWarningModal.vue'
 import { usePage, router } from '@inertiajs/vue3'
 import { generateMenu } from '@/config/menuConfig'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
@@ -55,6 +56,16 @@ let desktopMediaQueryList = null
 let handleDesktopViewportChange = null
 let salesSessionKeepAliveTimer = null
 let salesSessionKeepAliveRequest = null
+let sessionExpiryTimer = null
+let sessionWarningTimer = null
+let sessionCountdownTimer = null
+let sessionLogoutStarted = false
+
+const sessionPolicy = computed(() => page.props.auth?.sessionPolicy ?? null)
+const activeSessionExpiresAt = ref(null)
+const showSessionExpiryWarning = ref(false)
+const sessionWarningRemainingSeconds = ref(0)
+const continuingRoleSession = ref(false)
 
 function keepSalesSessionAlive() {
     if (role.value !== 'Ventas' || salesSessionKeepAliveRequest) return
@@ -88,6 +99,82 @@ function renewSalesSessionWhenAppBecomesVisible() {
     if (!document.hidden) {
         void keepSalesSessionAlive()
     }
+}
+
+function clearRoleSessionTimers() {
+    window.clearTimeout(sessionExpiryTimer)
+    window.clearTimeout(sessionWarningTimer)
+    window.clearInterval(sessionCountdownTimer)
+    sessionExpiryTimer = null
+    sessionWarningTimer = null
+    sessionCountdownTimer = null
+}
+
+function updateSessionWarningCountdown() {
+    const remainingMilliseconds = (Number(activeSessionExpiresAt.value || 0) * 1000) - Date.now()
+    sessionWarningRemainingSeconds.value = Math.max(0, Math.ceil(remainingMilliseconds / 1000))
+
+    if (remainingMilliseconds <= 0) {
+        closeExpiredSession()
+    }
+}
+
+function closeExpiredSession() {
+    if (sessionLogoutStarted) return
+
+    sessionLogoutStarted = true
+    showSessionExpiryWarning.value = false
+    clearRoleSessionTimers()
+    router.post(route('logout'))
+}
+
+async function continueRoleSession() {
+    continuingRoleSession.value = true
+
+    try {
+        const { data } = await window.axios.post(route('session.continue'))
+        showSessionExpiryWarning.value = false
+        scheduleRoleSessionTimeout(data?.expires_at)
+    } catch {
+        closeExpiredSession()
+    } finally {
+        continuingRoleSession.value = false
+    }
+}
+
+function showRoleSessionWarning() {
+    if (showSessionExpiryWarning.value) return
+
+    updateSessionWarningCountdown()
+    if (sessionWarningRemainingSeconds.value <= 0) return
+
+    showSessionExpiryWarning.value = true
+    sessionCountdownTimer = window.setInterval(updateSessionWarningCountdown, 1000)
+}
+
+function scheduleRoleSessionTimeout(expiresAt = sessionPolicy.value?.expires_at) {
+    clearRoleSessionTimers()
+    sessionLogoutStarted = false
+
+    if (sessionPolicy.value?.keep_alive || !expiresAt) {
+        activeSessionExpiresAt.value = null
+        showSessionExpiryWarning.value = false
+        return
+    }
+
+    activeSessionExpiresAt.value = Number(expiresAt)
+    const expiresAtMilliseconds = Number(expiresAt) * 1000
+    const warningMilliseconds = Number(sessionPolicy.value?.warning_minutes || 5) * 60 * 1000
+    const remainingMilliseconds = expiresAtMilliseconds - Date.now()
+
+    if (remainingMilliseconds <= 0) {
+        closeExpiredSession()
+        return
+    }
+
+    const warningDelay = Math.max(0, remainingMilliseconds - warningMilliseconds)
+    sessionWarningTimer = window.setTimeout(showRoleSessionWarning, warningDelay)
+    sessionExpiryTimer = window.setTimeout(closeExpiredSession, remainingMilliseconds)
 }
 
 function distributeGlobalDataChange(event) {
@@ -226,6 +313,7 @@ onMounted(() => {
 
         startSalesSessionKeepAlive()
         document.addEventListener('visibilitychange', renewSalesSessionWhenAppBecomesVisible)
+        scheduleRoleSessionTimeout()
     }
 
     if (!page.props.auth?.user?.id) return
@@ -270,6 +358,7 @@ onBeforeUnmount(() => {
     }
 
     stopSalesSessionKeepAlive()
+    clearRoleSessionTimers()
     document.removeEventListener('visibilitychange', renewSalesSessionWhenAppBecomesVisible)
 
     unsubscribeUserChanged?.()
@@ -286,6 +375,13 @@ watch(role, (nextRole) => {
 
     stopSalesSessionKeepAlive()
 })
+
+watch(
+    () => sessionPolicy.value?.expires_at,
+    (expiresAt) => {
+        if (expiresAt) scheduleRoleSessionTimeout(expiresAt)
+    },
+)
 
 watch(desktopSidebarCollapsed, (value) => {
     if (typeof window === 'undefined') return
@@ -459,5 +555,14 @@ watch(
                 <slot />
             </main>
         </section>
+
+        <SessionExpiryWarningModal
+            v-if="showSessionExpiryWarning"
+            :remaining-seconds="sessionWarningRemainingSeconds"
+            :warning-seconds="Number(sessionPolicy?.warning_minutes || 5) * 60"
+            :processing="continuingRoleSession"
+            @continue="continueRoleSession"
+            @logout="closeExpiredSession"
+        />
     </div>
 </template>

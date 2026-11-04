@@ -33,6 +33,7 @@ use App\Http\Controllers\Ventas\EmployeeCreditAccountController;
 use App\Http\Controllers\Ventas\SalesController;
 use App\Http\Controllers\Ventas\SalesReportController;
 use App\Models\Branch;
+use App\Support\RoleSessionPolicy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -160,6 +161,13 @@ Route::middleware([
     })
         ->middleware('role:Ventas')
         ->name('session.keep-alive');
+
+    Route::post('/sesion/continuar', function (Request $request) {
+        $policy = RoleSessionPolicy::forUser($request->user());
+        $expiresAt = RoleSessionPolicy::renew($request, $policy);
+
+        return response()->json(['expires_at' => $expiresAt]);
+    })->name('session.continue');
 
     Route::prefix('system-administration')->name('system-administration.')->group(function () {
         Route::get('/', [SystemAdministrationController::class, 'index'])
