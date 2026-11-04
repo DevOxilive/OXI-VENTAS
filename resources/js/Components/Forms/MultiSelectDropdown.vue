@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = defineProps({
     modelValue: {
@@ -35,6 +35,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const root = ref(null)
+const searchInput = ref(null)
 const open = ref(false)
 const search = ref('')
 
@@ -83,10 +84,25 @@ function toggleOption(option) {
         : [...selectedValues.value, value]
 
     emit('update:modelValue', next)
+    focusSearch()
 }
 
 function clearSelection() {
     emit('update:modelValue', [])
+    focusSearch()
+}
+
+function toggleDropdown() {
+    open.value = !open.value
+
+    if (open.value) focusSearch()
+}
+
+function focusSearch() {
+    nextTick(() => {
+        searchInput.value?.focus()
+        searchInput.value?.select()
+    })
 }
 
 function handleOutsideClick(event) {
@@ -109,7 +125,7 @@ onBeforeUnmount(() => {
         <button
             type="button"
             class="flex h-11 w-full items-center justify-between rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary"
-            @click="open = !open"
+            @click="toggleDropdown"
         >
             <span class="truncate">
                 {{ displayLabel }}
@@ -128,6 +144,7 @@ onBeforeUnmount(() => {
             <div class="mb-2 flex h-11 items-center gap-3 rounded-lg bg-secondary px-3">
                 <span class="material-symbols-outlined shrink-0 text-[18px] text-text opacity-60">filter_list</span>
                 <input
+                    ref="searchInput"
                     v-model="search"
                     type="text"
                     class="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-text placeholder:text-text placeholder:opacity-50 outline-none focus:border-0 focus:ring-0"

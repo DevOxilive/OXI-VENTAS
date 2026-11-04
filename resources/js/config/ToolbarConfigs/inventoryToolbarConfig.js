@@ -13,17 +13,25 @@ export function getInventoryToolbarConfig({
     categories = [],
     categoryFilter,
     stockFilter,
-    statusFilter,
-    expirationStatusFilter,
-    inactiveCandidateFilter,
+    showStock = true,
+    canCreate = false,
 }) {
     return {
         icon: "inventory_2",
-        title: branch?.name ? `Inventario - ${branch.name}` : "Inventario",
+        title: branch?.name ? `Inventario-Producto - ${branch.name}` : "Inventario-Producto",
         subtitle: "Consulta y movimientos por sucursal",
         searchPlaceholder: "Buscar producto, código, lote o barcode...",
 
         showRecordsPerPage: true,
+        actions: [
+            {
+                id: "create",
+                label: "Agregar",
+                icon: "add",
+                variant: "primary",
+                hidden: () => !canCreate,
+            },
+        ],
         filters: [
             {
                 key: "productDepartmentFilter",
@@ -56,36 +64,6 @@ export function getInventoryToolbarConfig({
                     { label: "Agotado", value: "Agotado" },
                 ],
             },
-            {
-                key: "statusFilter",
-                label: "Estado",
-                placeholder: "Estado",
-                value: statusFilter,
-                options: [
-                    { label: "Activo", value: "active" },
-                    { label: "Inactivo", value: "inactive" },
-                    { label: "Temporada", value: "seasonal" },
-                ],
-            },
-            {
-                key: "expirationStatusFilter",
-                label: "Caducidad",
-                placeholder: "Caducidad",
-                value: expirationStatusFilter,
-                options: [
-                    { label: "Vencidos", value: "expired" },
-                    { label: "Por vencer", value: "near_expiration" },
-                    { label: "Vigentes", value: "valid" },
-                    { label: "Sin caducidad", value: "without_expiration" },
-                ],
-            },
-            {
-                key: "inactiveCandidateFilter",
-                label: "Sin rotación",
-                placeholder: "Sin rotación",
-                value: inactiveCandidateFilter,
-                options: [{ label: "Productos sin rotación", value: "1" }],
-            },
-        ],
+        ].filter(filter => showStock || filter.key !== "stockFilter"),
     };
 }

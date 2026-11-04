@@ -59,6 +59,27 @@ export const inventoryTableConfig = {
 
     actions: [
         {
+            id: "view",
+            label: "Ver producto",
+            icon: "visibility",
+            variant: "blue",
+            permission: "inventory.products.view",
+        },
+        {
+            id: "delete",
+            label: "Eliminar producto",
+            icon: "delete",
+            variant: "red",
+            permission: "inventory.products.delete",
+        },
+        {
+            id: "edit",
+            label: "Editar producto",
+            icon: "edit",
+            variant: "amber",
+            permission: "inventory.products.update",
+        },
+        {
             id: "entry",
             label: "Ingresar lotes",
             icon: "add",

@@ -134,7 +134,8 @@ Route::middleware([
     $qzSetupAccess = 'permission:systems.qz.setup';
     $productsAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete';
     $productImagesAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete,sales.view,sales.create,sales.purchase-lists.view,sales.purchase-lists.create,sales.purchase-orders.view,sales.purchase-orders.receive,inventory.purchase-orders.general.view,inventory.purchase-orders.general.create,inventory.purchase-orders.general.update,inventory.purchase-orders.general.complete';
-    $branchInventoryAccess = 'permission:inventory.branches.view,inventory.branches.stock-in,inventory.branches.stock-out,inventory.branches.stock-adjust,inventory.branches.batches.update,inventory.branches.config.update';
+    $branchInventoryAccess = 'permission:'.implode(',', BranchInventoryController::INVENTORY_PERMISSIONS);
+    $inventoryPageAccess = $branchInventoryAccess.','.substr($productsAccess, strlen('permission:'));
     $purchaseReportsAccess = 'permission:sales.purchase-lists.view,sales.purchase-lists.create,sales.purchase-lists.update,sales.purchase-lists.delete,sales.purchase-orders.view,sales.purchase-orders.receive';
     $generalPurchaseOrdersAccess = 'permission:inventory.purchase-orders.general.view,inventory.purchase-orders.general.create,inventory.purchase-orders.general.update,inventory.purchase-orders.general.complete';
     $auditsAccess = 'permission:audits.physical-counts.count,audits.physical-counts.view-stock,audits.physical-counts.create,audits.physical-counts.close,audits.physical-counts.reopen,audits.physical-counts.finalize,audits.physical-counts.participants,audits.physical-counts.apply,audits.physical-counts.delete';
@@ -616,6 +617,7 @@ Route::middleware([
         $productsAccess,
         $productImagesAccess,
         $branchInventoryAccess,
+        $inventoryPageAccess,
         $inventoryReportsAccess,
         $movementReportsAccess,
         $purchaseReportsAccess,
@@ -625,10 +627,6 @@ Route::middleware([
         Route::get('/dashboard', fn () => redirect()->route('dashboard'))
             ->middleware($reportsAccess)
             ->name('dashboard');
-
-        Route::get('/branches/{branch:slug}/products', [ProductController::class, 'index'])
-            ->middleware($productsAccess)
-            ->name('branches.products.index');
 
         Route::get('/branches/{branch:slug}/products/snapshots/{productId}', [ProductController::class, 'snapshot'])
             ->middleware($productsAccess)
@@ -661,7 +659,7 @@ Route::middleware([
         */
 
         Route::get('/branches/{branch}/inventory', [BranchInventoryController::class, 'show'])
-            ->middleware($branchInventoryAccess)
+            ->middleware($inventoryPageAccess)
             ->name('branches.inventory');
 
         Route::get('/branches/{branch}/inventory/realtime-snapshot', [BranchInventoryController::class, 'realtimeSnapshot'])
@@ -680,6 +678,10 @@ Route::middleware([
             ->middleware('permission:inventory.branches.config.update')
             ->name('branch-inventory.update-config');
 
+        Route::get('/branch-inventory/{branchProduct}/history', [BranchInventoryController::class, 'history'])
+            ->middleware('permission:inventory.branches.view')
+            ->name('branch-inventory.history');
+
         Route::get('/branch-inventory/{branchProduct}/details', [BranchInventoryController::class, 'details'])
             ->middleware($branchInventoryAccess)
             ->name('branch-inventory.details');
@@ -689,7 +691,7 @@ Route::middleware([
             ->name('product-batches.update');
 
         Route::get('/stock-movements', [StockMovementController::class, 'index'])
-            ->middleware($branchInventoryAccess)
+            ->middleware('permission:inventory.branches.view')
             ->name('stock-movements.index');
 
         Route::get('/stock-movements/products/search', [StockMovementController::class, 'searchProducts'])
@@ -701,7 +703,7 @@ Route::middleware([
             ->name('stock-movements.store');
 
         Route::get('/movements', [StockMovementController::class, 'index'])
-            ->middleware($branchInventoryAccess)
+            ->middleware('permission:inventory.branches.view')
             ->name('movements');
 
         Route::get('/expirations', fn () => redirect()->route('inventory.reports.select', [

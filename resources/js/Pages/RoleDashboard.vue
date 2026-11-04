@@ -378,11 +378,11 @@ const permissionAction = (permission) => {
         'reports.cash-closures.create': { icon: 'add_card', href: route('inventory.reports.select', { report: 'cash-closures' }) },
         'reports.cash-closures.update': { icon: 'edit', href: route('inventory.reports.select', { report: 'cash-closures' }) },
         'reports.cash-closures.delete': { icon: 'delete', href: route('inventory.reports.select', { report: 'cash-closures' }) },
-        'inventory.products.view': { icon: 'visibility', href: branchHref((branch) => route('inventory.branches.products.index', { branch: branch.slug })) },
-        'inventory.products.create': { icon: 'add_box', href: branchHref((branch) => route('inventory.branches.products.index', { branch: branch.slug })) },
-        'inventory.products.update': { icon: 'edit_square', href: branchHref((branch) => route('inventory.branches.products.index', { branch: branch.slug })) },
-        'inventory.products.delete': { icon: 'delete', href: branchHref((branch) => route('inventory.branches.products.index', { branch: branch.slug })) },
-        'inventory.products.manage-pricing': { icon: 'sell', href: branchHref((branch) => route('inventory.branches.products.index', { branch: branch.slug })) },
+        'inventory.products.view': { icon: 'visibility', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
+        'inventory.products.create': { icon: 'add_box', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
+        'inventory.products.update': { icon: 'edit_square', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
+        'inventory.products.delete': { icon: 'delete', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
+        'inventory.products.manage-pricing': { icon: 'sell', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
         'inventory.branches.view': { icon: 'visibility', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
         'inventory.branches.stock-in': { icon: 'input', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
         'inventory.branches.stock-out': { icon: 'output', href: branchHref((branch) => route('inventory.branches.inventory', { branch: branch.id })) },
@@ -496,7 +496,7 @@ const allQuickActions = computed(() => [
         description: 'Administrar catalogo y stock base.',
         icon: 'inventory',
         href: firstBranch.value
-            ? route('inventory.branches.products.index', { branch: firstBranch.value.slug })
+            ? route('inventory.branches.inventory', { branch: firstBranch.value.id })
             : null,
         visible: Boolean(firstBranch.value) && canAny([
             'inventory.products.view',
