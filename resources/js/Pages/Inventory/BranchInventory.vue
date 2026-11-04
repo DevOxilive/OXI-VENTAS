@@ -100,7 +100,9 @@ const { can } = usePermissions()
 const inventoryToolbar = ref(null)
 
 function focusInventorySearch() {
-    nextTick(() => inventoryToolbar.value?.focusSearch({ select: true }))
+    // Conserva el cursor listo para el lector sin seleccionar el código actual.
+    // Así, una recarga o el cierre de una ventana no sustituye lo escaneado.
+    nextTick(() => inventoryToolbar.value?.focusSearch())
 }
 
 const {
@@ -183,7 +185,7 @@ const inventoryModals = [showEntryModal, showExitModal, showConfigModal, showPro
 watch(inventoryModals, async (open, previous) => {
     if (!previous.some(Boolean) || open.some(Boolean)) return
     await nextTick()
-    if (!inventoryModals.some((modal) => modal.value)) inventoryToolbar.value?.focusSearch({ select: true })
+    if (!inventoryModals.some((modal) => modal.value)) inventoryToolbar.value?.focusSearch()
 }, { flush: 'post' })
 
 onMounted(focusInventorySearch)
@@ -377,7 +379,6 @@ function closeProductEditModal() {
 
                 <GlobalToolbar ref="inventoryToolbar" v-bind="inventoryToolbarConfig" :search="search" :records-per-page="recordsToShow"
                     @keydown="handleSearchEnter($event, inventoryToolbarConfig.searchPlaceholder)"
-                    select-search-on-enter
                     :filtered-records="filteredProducts.length" :total-records="visualProducts.length"
                     @update:search="search = $event" @update:filter="handleInventoryToolbarFilter"
                     @update:records-per-page="recordsToShow = $event" @action="handleInventoryToolbarAction" />
