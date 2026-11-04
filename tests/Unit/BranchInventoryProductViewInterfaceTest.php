@@ -39,7 +39,8 @@ class BranchInventoryProductViewInterfaceTest extends TestCase
         $this->assertStringNotContainsString('skipNextSearchReload', $inventory);
         $this->assertStringContainsString('nextTick(focusInventorySearch)', $page);
         $this->assertStringContainsString('onMounted(focusInventorySearch)', $page);
-        $this->assertStringContainsString('focusSearch({ select: true })', $page);
+        $this->assertStringContainsString('focusSearch()', $page);
+        $this->assertStringNotContainsString('select-search-on-enter', $page);
         $this->assertStringContainsString('onReloaded: focusInventorySearch', $page);
         $this->assertStringContainsString('onFinish: () => onReloaded?.()', $inventory);
         $this->assertStringContainsString('product_id: item.product_id', $inventory);
