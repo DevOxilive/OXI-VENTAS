@@ -13,7 +13,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Inertia\Testing\AssertableInertia;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -44,17 +43,9 @@ class InventoryProductConcurrencyTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    public function test_initial_listing_and_snapshot_include_both_versions_and_snapshot_can_be_saved(): void
+    public function test_snapshot_includes_both_versions_and_can_be_saved(): void
     {
         $product = $this->createProduct();
-
-        $this->get(route('inventory.branches.products.index', $this->branch->slug))
-            ->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page
-                ->component('Inventory/Home')
-                ->where('productsDB.data.0.record_version', $product->updated_at->toJSON())
-                ->where('productsDB.data.0.catalog_version', 1)
-            );
 
         $snapshot = $this->getJson(route('inventory.branches.products.snapshot', [$this->branch->slug, $product->id]))
             ->assertOk()

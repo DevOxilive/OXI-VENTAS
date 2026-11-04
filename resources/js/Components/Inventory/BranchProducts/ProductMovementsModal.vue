@@ -10,9 +10,10 @@ const props = defineProps({
         required: true,
     },
     loading: Boolean,
+    error: String,
 })
 
-const emit = defineEmits(['close', 'load-page'])
+const emit = defineEmits(['close', 'load-page', 'retry'])
 
 const {
     productName,
@@ -130,7 +131,10 @@ function summaryTextClass(item) {
             </section>
 
             <section class="min-h-0 flex-1 overflow-hidden">
-                <GlobalTable
+                <div v-if="error" role="alert" class="p-4">
+                    {{ error }} <button type="button" class="underline" @click="emit('retry')">Reintentar</button>
+                </div>
+                <GlobalTable v-else
                     :items="tableRows"
                     :columns="movementTableColumns"
                     row-key="id"

@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
-use App\Models\Product;
 use App\Models\ProductBatch;
 use App\Models\ProductDepartment;
 use App\Search\ProductSearchOptions;
@@ -24,6 +23,11 @@ use Inertia\Inertia;
 class BranchInventoryController extends Controller
 {
     use AuthorizesBranchAccess;
+
+    public const INVENTORY_PERMISSIONS = [
+        'inventory.branches.view', 'inventory.branches.stock-in', 'inventory.branches.stock-out',
+        'inventory.branches.stock-adjust', 'inventory.branches.batches.update', 'inventory.branches.config.update',
+    ];
 
     public function __construct(
         private readonly ProductSearchService $productSearch,
@@ -61,42 +65,19 @@ class BranchInventoryController extends Controller
     private function renderInventory(Request $request, ?Branch $branch)
     {
         $perPage = TablePagination::resolvePerPage($request);
+        $canUseInventory = $request->user()->all_permissions->pluck('name')->intersect(self::INVENTORY_PERMISSIONS)->isNotEmpty();
         $summaryPayload = null;
         $summary = function () use ($branch, &$summaryPayload) {
             return $summaryPayload ??= $this->inventorySummaryPayload($branch);
         };
 
         return Inertia::render('Inventory/BranchInventory', [
+            'canUseInventory' => $canUseInventory,
             'currentBranch' => $branch,
-            'branchProductsDB' => fn () => $this->inventoryRowsQuery($request, $branch)
+            'branchProductsDB' => fn () => $this->inventoryRowsQuery($request, $branch, $canUseInventory)
                 ->paginate($perPage)->withQueryString(),
-            'inventoryStats' => fn () => $summary()['inventoryStats'],
-            'inventoryAlerts' => fn () => $summary()['inventoryAlerts'],
-
-            'productsDB' => fn () => Product::query()
-                ->select(['products.id', 'products.name', 'products.sale_price', 'products.cost', 'products.unit', 'products.inventory_unit', 'products.pieces_per_box', 'products.has_box_presentation', 'products.inventory_quantity_mode', 'products.category_id'])
-                ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
-                ->when($branch, fn ($query) => $query->where('branch_products.branch_id', $branch->id))
-                ->where('products.active', true)
-                ->with(['category:id,product_department_id,name', 'category.productDepartment:id,name', 'barcodes:id,product_id,code'])
-                ->distinct()
-                ->orderBy('products.name')
-                ->limit(300)
-                ->get()
-                ->map(fn (Product $product) => [
-                    'id' => $product->id,
-                    'name' => $product->name,
-                    'sale_price' => $product->sale_price,
-                    'cost' => $product->cost,
-                    'unit' => $product->unit,
-                    'product_department_id' => $product->category?->product_department_id,
-                    'product_department_name' => $product->category?->productDepartment?->name ?? 'Sin departamento',
-                    'category_id' => $product->category_id,
-                    'category_name' => $product->category?->name,
-                    'main_barcode' => $product->barcodes?->first()?->code,
-                    'label' => trim($product->name.' - '.($product->barcodes?->first()?->code ?? 'Sin codigo')),
-                ])
-                ->values(),
+            'inventoryStats' => fn () => $canUseInventory ? $summary()['inventoryStats'] : [],
+            'inventoryAlerts' => fn () => $canUseInventory ? $summary()['inventoryAlerts'] : [],
 
             'branchesDB' => fn () => Branch::query()
                 ->select(['id', 'name', 'slug'])
@@ -106,25 +87,24 @@ class BranchInventoryController extends Controller
 
             'categoriesDB' => fn () => $this->categoryOptions($branch),
             'productDepartmentsDB' => fn () => $this->productDepartmentOptions($branch),
+            // Los filtros permanecen acotados a la sucursal. El formulario, en cambio,
+            // debe poder elegir cualquier categoría activa del catálogo.
+            'catalogCategoriesDB' => fn () => $this->catalogCategoryOptions(),
+            'catalogProductDepartmentsDB' => fn () => $this->catalogProductDepartmentOptions(),
+            'canManagePricing' => fn () => $request->user()?->hasPermission('inventory.products.manage-pricing') ?? false,
 
             'filters' => [
                 'search' => $request->search,
                 'product_department' => $this->selectedIntegerIds($request->input('product_department')),
                 'category' => $this->selectedIntegerIds($request->input('category')),
-                'status' => $request->status,
                 'stock' => $request->stock,
-                'expiration_status' => $request->expiration_status,
-                'inactive_candidate' => $request->inactive_candidate,
                 'per_page' => $perPage,
             ],
         ]);
     }
 
-    private function inventoryRowsQuery(Request $request, ?Branch $branch)
+    private function inventoryRowsQuery(Request $request, ?Branch $branch, bool $canUseInventory)
     {
-        $today = now()->toDateString();
-        $nearExpirationLimit = now()->addDays(30)->toDateString();
-
         return BranchProduct::query()
             ->select([
                 'branch_products.id',
@@ -156,6 +136,8 @@ class BranchInventoryController extends Controller
                         onlyLotsWithStock: false,
                         inventorySqlPrefilter: true,
                     ),
+                    orderByRelevance: true,
+                    resetExistingOrder: true,
                 );
             })
             ->when($this->selectedIntegerIds($request->input('category')) !== [], function ($query) use ($request) {
@@ -172,10 +154,7 @@ class BranchInventoryController extends Controller
                     $query->whereIn('product_department_id', $productDepartmentIds);
                 });
             })
-            ->when($request->filled('status'), function ($query) use ($request) {
-                $query->where('status', $request->status);
-            })
-            ->when($request->filled('stock'), function ($query) use ($request) {
+            ->when($canUseInventory && $request->filled('stock'), function ($query) use ($request) {
                 match ($request->stock) {
                     'Disponible' => $query->whereColumn('stock', '>', 'min_stock'),
                     'Stock bajo' => $query->whereColumn('stock', '<=', 'min_stock')->where('stock', '>', 0),
@@ -183,42 +162,22 @@ class BranchInventoryController extends Controller
                     default => null,
                 };
             })
-            ->when($request->filled('expiration_status'), function ($query) use ($request, $today, $nearExpirationLimit) {
-                match ($request->expiration_status) {
-                    'expired' => $query->whereHas('activeBatches', fn ($query) => $query
-                        ->whereDate('expiration_date', '<', $today)),
-
-                    'near_expiration' => $query->whereHas('activeBatches', fn ($query) => $query
-                        ->whereDate('expiration_date', '>=', $today)
-                        ->whereDate('expiration_date', '<=', $nearExpirationLimit)),
-
-                    'valid' => $query->whereHas('activeBatches', fn ($query) => $query
-                        ->whereDate('expiration_date', '>', $nearExpirationLimit)),
-
-                    'without_expiration' => $query->whereDoesntHave('activeBatches', fn ($query) => $query
-                        ->whereNotNull('expiration_date')),
-
-                    default => null,
-                };
-            })
-            ->when($request->filled('inactive_candidate'), function ($query) {
-                $query->whereNotNull('last_restocked_at')
-                    ->whereRaw('DATE_ADD(last_restocked_at, INTERVAL inactive_candidate_after_days DAY) <= NOW()');
-            })
             ->with([
                 'branch:id,name',
-                'product:id,name,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
+                'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
                 'product.category:id,product_department_id,name',
                 'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
             ])
             ->join('products', 'products.id', '=', 'branch_products.product_id')
-            ->withCount([
-                'activeBatches as active_batches_count',
-            ])
-            ->withMin([
-                'activeBatches as next_expiration_date',
-            ], 'expiration_date')
+            // Quien sólo administra catálogo no debe recibir indicadores de lotes o
+            // caducidad en la respuesta Inertia, aunque la tabla no los muestre.
+            ->when($canUseInventory, fn ($query) => $query
+                ->withCount(['activeBatches as active_batches_count'])
+                ->withMin(['activeBatches as next_expiration_date'], 'expiration_date'))
+            ->when(! $canUseInventory, fn ($query) => $query->select([
+                'branch_products.id', 'branch_products.product_id', 'branch_products.branch_id', 'branch_products.barcode',
+            ]))
             ->orderBy('products.name')->orderBy('branch_products.id');
 
     }
@@ -226,27 +185,44 @@ class BranchInventoryController extends Controller
     private function categoryOptions(?Branch $branch)
     {
         return Category::query()
-            ->select(['categories.id', 'categories.product_department_id', 'categories.name'])
-            ->join('products', 'products.category_id', '=', 'categories.id')
-            ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
-            ->when($branch, fn ($query) => $query->where('branch_products.branch_id', $branch->id))
-            ->distinct()
+            ->where('active', true)
             ->orderBy('categories.name')
-            ->get();
+            ->get(['id', 'product_department_id', 'name']);
     }
 
     private function productDepartmentOptions(?Branch $branch)
     {
         return ProductDepartment::query()
-            ->select(['product_departments.id', 'product_departments.name', 'product_departments.icon'])
-            ->join('categories', 'categories.product_department_id', '=', 'product_departments.id')
-            ->join('products', 'products.category_id', '=', 'categories.id')
-            ->join('branch_products', 'branch_products.product_id', '=', 'products.id')
             ->where('product_departments.active', true)
-            ->when($branch, fn ($query) => $query->where('branch_products.branch_id', $branch->id))
-            ->distinct()
             ->orderBy('product_departments.name')
-            ->get();
+            ->get(['id', 'name', 'icon']);
+    }
+
+    private function catalogProductDepartmentOptions()
+    {
+        return ProductDepartment::query()
+            ->where('active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'icon']);
+    }
+
+    private function catalogCategoryOptions()
+    {
+        return Category::query()
+            ->with('productDepartment:id,name')
+            ->where('active', true)
+            ->orderBy('product_department_id')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'product_department_id', 'name', 'sort_order'])
+            ->map(fn (Category $category) => [
+                'id' => $category->id,
+                'product_department_id' => $category->product_department_id,
+                'name' => $category->name,
+                'department_name' => $category->productDepartment?->name,
+            ])
+            ->values();
     }
 
     private function selectedIntegerIds($value): array
@@ -258,6 +234,13 @@ class BranchInventoryController extends Controller
             ->unique()
             ->values()
             ->all();
+    }
+
+    public function history(Request $request, BranchProduct $branchProduct): JsonResponse
+    {
+        $this->abortIfUserCannotAccessBranch($request, $branchProduct->branch);
+
+        return response()->json(app(InventoryReadService::class)->movements($branchProduct, $request));
     }
 
     public function details(Request $request, BranchProduct $branchProduct): JsonResponse
@@ -298,7 +281,7 @@ class BranchInventoryController extends Controller
                 })
                 ->with([
                     'branch:id,name,slug',
-                    'product:id,name,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
+                    'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
                     'product.category:id,product_department_id,name',
                     'product.category.productDepartment:id,name',
                     'product.barcodes:id,product_id,code',
@@ -418,7 +401,7 @@ class BranchInventoryController extends Controller
     {
         $branchProduct->loadMissing([
             'branch:id,name,slug',
-            'product:id,name,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
+            'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
             'product.category:id,product_department_id,name',
             'product.category.productDepartment:id,name',
             'product.barcodes:id,product_id,code',
@@ -453,10 +436,12 @@ class BranchInventoryController extends Controller
 
     private function serializeBranchProductDetails(BranchProduct $branchProduct, Request $request): array
     {
+        $mayReadHistory = $request->user()->hasPermission('inventory.branches.view');
+        abort_if($request->boolean('include_movements') && ! $mayReadHistory, 403);
         $request->validate(['include_movements' => ['sometimes', 'boolean']]);
         $branchProduct->load([
             'branch:id,name,slug',
-            'product:id,name,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
+            'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
             'product.category:id,product_department_id,name',
             'product.category.productDepartment:id,name',
             'product.barcodes:id,product_id,code',
@@ -488,7 +473,7 @@ class BranchInventoryController extends Controller
             ->values()
             ->all();
 
-        return $request->boolean('include_movements', true)
+        return $mayReadHistory && $request->boolean('include_movements', true)
             ? array_merge($payload, app(InventoryReadService::class)->movements($branchProduct, $request))
             : $payload;
     }
@@ -511,11 +496,20 @@ class BranchInventoryController extends Controller
             });
     }
 
+    private function rotationExpiredSql(): string
+    {
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return "datetime(branch_products.last_restocked_at, branch_products.inactive_candidate_after_days || ' days') <= CURRENT_TIMESTAMP";
+        }
+
+        return 'DATE_ADD(branch_products.last_restocked_at, INTERVAL branch_products.inactive_candidate_after_days DAY) <= NOW()';
+    }
+
     private function inventoryInactiveCandidatesQuery(?Branch $branch)
     {
         return $this->inventoryBaseStatsQuery($branch)
             ->whereNotNull('last_restocked_at')
-            ->whereRaw('DATE_ADD(last_restocked_at, INTERVAL inactive_candidate_after_days DAY) <= NOW()');
+            ->whereRaw($this->rotationExpiredSql());
     }
 
     private function inventorySummaryPayload(?Branch $branch, bool $includeAlerts = true): array
@@ -528,7 +522,7 @@ class BranchInventoryController extends Controller
             ->selectRaw('COALESCE(SUM(branch_products.stock), 0) as total_stock')
             ->selectRaw('SUM(CASE WHEN branch_products.stock <= branch_products.min_stock AND branch_products.stock > 0 THEN 1 ELSE 0 END) as low_stock')
             ->selectRaw('SUM(CASE WHEN branch_products.stock <= 0 THEN 1 ELSE 0 END) as out_of_stock')
-            ->selectRaw('SUM(CASE WHEN branch_products.last_restocked_at IS NOT NULL AND DATE_ADD(branch_products.last_restocked_at, INTERVAL branch_products.inactive_candidate_after_days DAY) <= NOW() THEN 1 ELSE 0 END) as inactive_candidates')
+            ->selectRaw('SUM(CASE WHEN '.$this->rotationExpiredSql().' THEN 1 ELSE 0 END) as inactive_candidates')
             ->selectRaw('COALESCE(SUM(branch_products.stock * COALESCE(products.sale_price_per_piece, products.sale_price)), 0) as inventory_value')
             ->first();
         $batches = $this->inventoryBatchAlertsQuery($branch)

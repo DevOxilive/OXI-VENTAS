@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Inventory\BranchInventoryController;
-use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
@@ -55,7 +54,6 @@ class InventoryReadPerformanceTest extends TestCase
         DB::flushQueryLog();
         $response = $this->get($this->inventoryUrl().'?stock=Agotado', [
             'X-Inertia' => 'true',
-            'X-Inertia-Version' => app(HandleInertiaRequests::class)->version(Request::create($this->inventoryUrl())),
             'X-Inertia-Partial-Component' => 'Inventory/BranchInventory',
             'X-Inertia-Partial-Data' => 'branchProductsDB,filters',
         ]);
@@ -258,6 +256,43 @@ class InventoryReadPerformanceTest extends TestCase
         ]);
         $this->getJson(route('inventory.branches.inventory.summary', ['branch' => $foreignBranch->id]))->assertForbidden();
         $this->getJson(route('inventory.branch-inventory.details', ['branchProduct' => $foreign->id]))->assertForbidden();
+    }
+
+    public function test_catalog_only_can_open_page_without_access_to_stock_or_history(): void
+    {
+        $this->user->role->permissions()->sync([Permission::firstOrCreate(['name' => 'inventory.products.create'])->id]);
+        $this->get($this->inventoryUrl(), [
+            'X-Inertia' => 'true',
+        ])->assertOk()->assertJsonPath('props.canUseInventory', false)
+            ->assertJsonPath('props.branchProductsDB.data.0.product_id', $this->inventory->product_id)
+            ->assertJsonMissingPath('props.branchProductsDB.data.0.stock')
+            ->assertJsonMissingPath('props.branchProductsDB.data.0.active_batches_count')
+            ->assertJsonMissingPath('props.branchProductsDB.data.0.next_expiration_date')
+            ->assertJsonMissingPath('props.productsDB')->assertJsonPath('props.inventoryAlerts', []);
+        $this->getJson(route('inventory.branch-inventory.history', $this->inventory))->assertForbidden();
+        $this->getJson(route('inventory.branch-inventory.details', $this->inventory))->assertForbidden();
+        $this->getJson(route('inventory.branches.inventory.summary', $this->branch))->assertForbidden();
+        $this->getJson(route('inventory.branches.products.snapshot', [$this->branch->slug, $this->inventory->product_id]))
+            ->assertOk()
+            ->assertJsonMissingPath('product.min_stock')
+            ->assertJsonMissingPath('product.active_batches_count')
+            ->assertJsonMissingPath('product.tracks_batches');
+    }
+
+    public function test_stock_operator_cannot_request_history_through_detail_or_snapshot(): void
+    {
+        $this->user->role->permissions()->sync([Permission::firstOrCreate(['name' => 'inventory.branches.stock-in'])->id]);
+        $this->getJson(route('inventory.branch-inventory.details', $this->inventory))->assertOk()->assertJsonMissingPath('movements');
+        $this->getJson(route('inventory.branch-inventory.details', [$this->inventory, 'include_movements' => 1]))->assertForbidden();
+        $this->getJson(route('inventory.branches.inventory.realtime-snapshot', [$this->branch, 'branch_product_id' => $this->inventory->id, 'include_details' => 1, 'include_movements' => 1]))->assertForbidden();
+    }
+
+    public function test_history_route_paginates_without_reading_product_lots(): void
+    {
+        $movement = $this->movement('PURCHASE');
+        $this->getJson(route('inventory.branch-inventory.history', $this->inventory))->assertOk()
+            ->assertJsonPath('movements.0.id', $movement->id)->assertJsonPath('movements_total', 1)
+            ->assertJsonMissingPath('batches');
     }
 
     private function createInventory(string $name, float $stock, float $minimum = 0): BranchProduct

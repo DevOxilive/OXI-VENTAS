@@ -191,23 +191,10 @@ export function generateMenu(role, permissions = [], branches = []) {
     |--------------------------------------------------------------------------
     */
     const inventoryOptions = (branch) => [
-        ...(canUse("products")
+        ...(canUse("branchInventory") || canUse("products")
             ? [
                   {
-                      text: "Productos",
-                      key: `inventory.${branch.slug}.products`,
-                      icon: "inventory",
-                      url: route("inventory.branches.products.index", {
-                          branch: branch.slug,
-                      }),
-                  },
-              ]
-            : []),
-
-        ...(canUse("branchInventory")
-            ? [
-                  {
-                      text: "Inventario",
+                      text: "Inventario-Producto",
                       key: `inventory.${branch.slug}.inventory`,
                       icon: "inventory_2",
                       url: route("inventory.branches.inventory", {

@@ -184,14 +184,14 @@ test("a response from a previous branch, URL, or search cannot change the curren
 
 test("valid partial payloads replace only the requested dataset", () => {
     const products = { current_page: 2, data: [{ id: 7 }] };
-    const payload = { component: "Inventory/Home", props: { productsDB: products } };
-    assert.equal(readInventoryPage(payload, "Inventory/Home", "productsDB"), products);
+    const payload = { component: "Inventory/BranchInventory", props: { branchProductsDB: products } };
+    assert.equal(readInventoryPage(payload, "Inventory/BranchInventory", "branchProductsDB"), products);
     for (const invalid of [{}, { component: "Auth/Login", props: { productsDB: products } },
-        { component: "Inventory/Home", props: {} }, { component: "Inventory/Home", props: { productsDB: null } }]) {
-        assert.throws(() => readInventoryPage(invalid, "Inventory/Home", "productsDB"));
+        { component: "Inventory/BranchInventory", props: {} }, { component: "Inventory/BranchInventory", props: { branchProductsDB: null } }]) {
+        assert.throws(() => readInventoryPage(invalid, "Inventory/BranchInventory", "branchProductsDB"));
     }
-    assert.deepEqual(inventoryPartialHeaders({ component: "Inventory/Home", version: "asset123" }, ["productsDB", "filters"]), {
+    assert.deepEqual(inventoryPartialHeaders({ component: "Inventory/BranchInventory", version: "asset123" }, ["branchProductsDB", "filters"]), {
         Accept: "text/html, application/xhtml+xml", "X-Inertia": "true",
-        "X-Inertia-Partial-Component": "Inventory/Home", "X-Inertia-Partial-Data": "productsDB,filters", "X-Inertia-Version": "asset123",
+        "X-Inertia-Partial-Component": "Inventory/BranchInventory", "X-Inertia-Partial-Data": "branchProductsDB,filters", "X-Inertia-Version": "asset123",
     });
 });

@@ -33,7 +33,7 @@ test("the inventory composable groups events, refreshes the current page and pre
     const scope = effectScope();
     t.after(() => scope.stop());
     const original = { id: 12, product_id: 7, branch_id: 1, stock: 100, product: { id: 7, name: "Coca 600" } };
-    const props = reactive({ currentBranch: { id: 1 }, branchProductsDB: { current_page: 3, total: 60,
+    const props = reactive({ canUseInventory: true, currentBranch: { id: 1 }, branchProductsDB: { current_page: 3, total: 60,
         data: [original], links: [] }, filters: { search: "coc", per_page: 25 }, inventoryAlerts: {}, inventoryStats: {} });
     const context = vm.createContext({
         computed, ref, reactive, watch, console, AbortController,
@@ -180,74 +180,6 @@ test("movement filters request the whole server-side history and retain paginati
     assert.equal(modal.tableRows.value.length, 1);
     assert.equal(modal.movementSummary.value[0].count, 40);
     cleanup.forEach((callback) => callback());
-});
-
-test("the product page replaces its branch subscriptions without losing an open form", async (t) => {
-    const file = readFileSync(new URL("../../resources/js/Pages/Inventory/Home.vue", import.meta.url), "utf8");
-    const source = parseVue(file).descriptor.scriptSetup.content;
-    const script = parse(source, { sourceType: "module" }).program.body.filter((node) => node.type !== "ImportDeclaration")
-        .map((node) => source.slice(node.start, node.end)).join("\n");
-    const mounts = [];
-    const unmounts = [];
-    const subscriptions = [];
-    const timers = new Map();
-    const requests = [];
-    let timerId = 0;
-    const scope = effectScope();
-    t.after(() => scope.stop());
-    const props = reactive({ branch: { id: 1, slug: "san-cristobal" }, productsDB: { current_page: 2, data: [] },
-        filters: { search: "coc" }, categoriesDB: [], productDepartmentsDB: [], branchesDB: [] });
-    const showModal = ref(false);
-    const context = vm.createContext({ computed, ref, watch, console,
-        onMounted: (callback) => mounts.push(callback), onBeforeUnmount: (callback) => unmounts.push(callback),
-        AdminLayout: {}, defineOptions() {}, defineProps: () => props, usePermissions: () => ({ can: () => true }),
-        useProductActions: () => ({ showModal, modalMode: ref("create"), selectedProduct: ref(null) }),
-        useBatchAdjustmentModal: () => ({}), useGlobalTablePagination: () => ({ handlePageChange() {} }),
-        getProductToolbarConfig: () => ({ searchPlaceholder: "Buscar" }),
-        router: { get: () => assert.fail("no navigation") }, usePage: () => ({ component: "Inventory/Home" }),
-        createInventoryRealtimeState, createInventoryPageRefresh, readInventoryPage, inventoryPartialHeaders,
-        createInventoryRealtimeBatch: (options) => createInventoryRealtimeBatch({ ...options,
-            setTimer: (callback) => { timers.set(++timerId, callback); return timerId; }, clearTimer: (id) => timers.delete(id) }),
-        REALTIME_CHANNELS: { inventoryProducts: "inventory.products", inventoryBranch: (id) => `inventory.branch.${id}` },
-        REALTIME_EVENTS: { stockUpdated: "stock", productChanged: "product" },
-        subscribeRealtime: (channel, event, callback) => {
-            const item = { channel, event, callback, active: true };
-            subscriptions.push(item);
-            return () => { item.active = false; };
-        },
-        subscribeRealtimeReconnect: () => () => {}, route: (name) => name, setTimeout, clearTimeout,
-        window: { location: { href: "http://local/inventory/branches/san-cristobal/products?search=coc&page=2" },
-            axios: { get: async (url) => {
-                requests.push(url);
-                return { data: { component: "Inventory/Home", props: { productsDB: { current_page: 2, data: [] } } } };
-            } } },
-    });
-    const home = scope.run(() => vm.runInContext(`${script}\n;({ selectedProductBranch, productsState })`, context));
-    mounts.forEach((callback) => callback());
-    showModal.value = true;
-    await nextTick();
-    assert.equal(home.selectedProductBranch.value.id, 1);
-    const oldStock = subscriptions.find((item) => item.channel === "inventory.branch.1");
-    oldStock.callback({ product_id: 7 });
-    assert.equal(timers.size, 1);
-    props.branch = { id: 2, slug: "otra-sucursal" };
-    context.window.location.href = "http://local/inventory/branches/otra-sucursal/products?search=coc&page=2";
-    await nextTick();
-    assert.equal(oldStock.active, false);
-    assert.equal(timers.size, 0);
-    oldStock.callback({ product_id: 7 });
-    assert.equal(timers.size, 0);
-    const currentStock = subscriptions.find((item) => item.active && item.channel === "inventory.branch.2");
-    for (let i = 0; i < 100; i++) currentStock.callback({ product_id: 8 });
-    await Promise.all([...timers.values()].map((callback) => callback()));
-    timers.clear();
-    assert.equal(requests.length, 1);
-    assert.match(requests[0], /otra-sucursal/);
-    assert.equal(showModal.value, true);
-    assert.equal(home.selectedProductBranch.value.id, 1);
-    assert.equal(home.productsState.value.current_page, 2);
-    unmounts.forEach((callback) => callback());
-    assert.equal(subscriptions.every((item) => !item.active), true);
 });
 
 test("reconnect subscriptions reuse the existing connection and unbind on cleanup", () => {
