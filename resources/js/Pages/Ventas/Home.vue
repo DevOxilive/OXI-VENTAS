@@ -750,6 +750,30 @@ function cartItemAvailableQuantity(item) {
   return Number(item.stock || 0);
 }
 
+function bulkQuantityFromInput(value) {
+  const raw = String(value ?? "").trim().replace(",", ".");
+
+  if (!raw) return 0;
+
+  // En el POS se captura el peso corto como gramos: .90 significa 90 g y
+  // 900 significa 900 g. Con tres decimales (por ejemplo .125) se conserva
+  // la captura en kg para admitir 125 g y fracciones más precisas.
+  if (/^\d+$/.test(raw)) {
+    return Number(raw) / 1000;
+  }
+
+  const shortGramMatch = raw.match(/^0?\.(\d{1,2})$/);
+  if (shortGramMatch) {
+    return Number(shortGramMatch[1]) / 1000;
+  }
+
+  return Number(raw);
+}
+
+function bulkQuantityInput(value) {
+  return Number(value || 0).toFixed(3);
+}
+
 function setCartPresentation(index, presentation) {
   const item = cart.value[index];
   if (!item || (presentation === "box" && !item.has_box_presentation)) return;
@@ -760,10 +784,12 @@ function setCartPresentation(index, presentation) {
     : Number(item.sale_price_per_piece || item.price || 0);
   item.available_quantity = cartItemAvailableQuantity(item);
   item.quantity = Math.max(1, Number(item.quantity || 1));
+  item.quantity_input = item.quantity;
 }
 
 function saleQuantityStep(item) {
-  return item.presentation === "piece" && item.inventory_unit === "kg" ? 0.001 : 1;
+  // El inventario a granel se registra en kilogramos y se ajusta de 50 g en 50 g.
+  return item.presentation === "piece" && item.inventory_unit === "kg" ? 0.05 : 1;
 }
 
 function updateCartQuantity(index, value) {
@@ -771,13 +797,18 @@ function updateCartQuantity(index, value) {
   if (!item) return;
 
   const step = saleQuantityStep(item);
-  const raw = Number(String(value ?? "").replace(",", "."));
+  const input = String(value ?? "");
+  const raw = item.inventory_unit === "kg" && item.presentation === "piece"
+    ? bulkQuantityFromInput(input)
+    : Number(input.replace(",", "."));
   if (!Number.isFinite(raw)) return;
 
   const normalized = step === 1
     ? Math.floor(raw)
     : Math.round(raw * 1000) / 1000;
-  item.quantity = Math.max(step, normalized);
+  const minimum = item.inventory_unit === "kg" && item.presentation === "piece" ? 0.001 : step;
+  item.quantity = Math.max(minimum, normalized);
+  item.quantity_input = input;
 }
 
 function addProduct(product) {
@@ -796,7 +827,10 @@ function addProduct(product) {
   );
 
   if (existing) {
-    existing.quantity += 1;
+    existing.quantity = Number((existing.quantity + saleQuantityStep(existing)).toFixed(3));
+    existing.quantity_input = existing.inventory_unit === "kg"
+      ? bulkQuantityInput(existing.quantity)
+      : existing.quantity;
     search.value = "";
     focusSearch();
     return;
@@ -818,7 +852,8 @@ function addProduct(product) {
     presentation: "piece",
     stock: Number(product.stock || 0),
     available_quantity: Number(product.stock || 0),
-    quantity: 1,
+    quantity: product.inventory_unit === "kg" ? 0.05 : 1,
+    quantity_input: product.inventory_unit === "kg" ? "0.050" : "1",
     discount_enabled: false,
     discount_percentage: 0,
   });
@@ -1034,6 +1069,9 @@ function increaseQuantity(index) {
   if (!item) return;
 
   item.quantity = Number((Number(item.quantity) + saleQuantityStep(item)).toFixed(3));
+  item.quantity_input = item.inventory_unit === "kg"
+    ? bulkQuantityInput(item.quantity)
+    : item.quantity;
 }
 
 function decreaseQuantity(index) {
@@ -1047,6 +1085,9 @@ function decreaseQuantity(index) {
   }
 
   item.quantity = Number((Number(item.quantity) - step).toFixed(3));
+  item.quantity_input = item.inventory_unit === "kg"
+    ? bulkQuantityInput(item.quantity)
+    : item.quantity;
 }
 
 function removeItem(index) {

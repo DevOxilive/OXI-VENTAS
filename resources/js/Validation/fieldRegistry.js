@@ -382,7 +382,9 @@ export const fieldRegistry = {
         max: 7,
         maxIntegerDigits: 3,
         maxDecimalDigits: 3,
-        autoDecimalAfterIntegerDigits: true,
+        // La cantidad se interpreta exactamente como se captura; nunca se
+        // inserta un punto automáticamente en ventas ni en inventario.
+        autoDecimalAfterIntegerDigits: false,
         message: "La cantidad permite hasta 999.999 kilogramos.",
     },
 

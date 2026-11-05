@@ -7,7 +7,7 @@ import { parse as parseJavaScript } from '@babel/parser';
 
 // Ejecuta las funciones reales del carrito, aislando únicamente sus dependencias de pantalla.
 const source = parseVue(readFileSync(new URL('../../resources/js/Pages/Ventas/Home.vue', import.meta.url), 'utf8')).descriptor.scriptSetup.content;
-const names = ['addProduct', 'increaseQuantity', 'decreaseQuantity', 'updateCartQuantity', 'setCartPresentation', 'cartItemAvailableQuantity', 'saleQuantityStep'];
+const names = ['addProduct', 'increaseQuantity', 'decreaseQuantity', 'updateCartQuantity', 'setCartPresentation', 'cartItemAvailableQuantity', 'saleQuantityStep', 'bulkQuantityFromInput', 'bulkQuantityInput'];
 const functions = parseJavaScript(source, { sourceType: 'module' }).program.body
     .filter((node) => node.type === 'FunctionDeclaration' && names.includes(node.id.name))
     .map((node) => source.slice(node.start, node.end)).join('\n');
@@ -46,14 +46,37 @@ test('cambiar a cajas no limita la venta por existencias', () => {
     assert.equal(context.cart.value[0].quantity, 5);
 });
 
-test('kilogramos admiten decimales sobre stock negativo y conservan cantidades de venta positivas', () => {
+test('kilogramos admiten fracciones de gramo y el contador aumenta de 50 gramos', () => {
     const context = cartContext();
     context.addProduct({ branch_product_id: 1, stock: -1, inventory_unit: 'kg' });
+    assert.equal(context.cart.value[0].quantity, 0.05);
     context.updateCartQuantity(0, 0.125);
     context.increaseQuantity(0);
-    assert.equal(context.cart.value[0].quantity, 0.126);
+    assert.equal(context.cart.value[0].quantity, 0.175);
     context.updateCartQuantity(0, -3);
     assert.equal(context.cart.value[0].quantity, 0.001);
     context.decreaseQuantity(0);
     assert.equal(context.cart.value.length, 0);
+});
+
+test('la captura de granel interpreta cualquier peso en gramos, sin casos fijos', () => {
+    const context = cartContext();
+    context.addProduct({ branch_product_id: 1, stock: 5, inventory_unit: 'kg' });
+
+    context.updateCartQuantity(0, '.90');
+    assert.equal(context.cart.value[0].quantity, 0.09);
+    assert.equal(context.cart.value[0].quantity_input, '.90');
+    context.updateCartQuantity(0, '.30');
+    assert.equal(context.cart.value[0].quantity, 0.03);
+    context.updateCartQuantity(0, '900');
+    assert.equal(context.cart.value[0].quantity, 0.9);
+    assert.equal(context.cart.value[0].quantity_input, '900');
+    context.updateCartQuantity(0, '.125');
+    assert.equal(context.cart.value[0].quantity, 0.125);
+    context.updateCartQuantity(0, '233');
+    assert.equal(context.cart.value[0].quantity, 0.233);
+    context.updateCartQuantity(0, '699');
+    assert.equal(context.cart.value[0].quantity, 0.699);
+    context.updateCartQuantity(0, '999999');
+    assert.equal(context.cart.value[0].quantity, 999.999);
 });

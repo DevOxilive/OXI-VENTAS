@@ -97,10 +97,11 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
           Cantidad
         </p>
         <QuantityStepper
-          :value="item.quantity"
+          :value="item.quantity_input ?? item.quantity"
           :allow-decimal="item.presentation === 'piece' && item.inventory_unit === 'kg'"
-          :max-integer-digits="3"
+          :max-integer-digits="item.presentation === 'piece' && item.inventory_unit === 'kg' ? 6 : 3"
           :max-decimal-digits="3"
+          :auto-decimal-after-integer-digits="false"
           :decrease-disabled="Number(item.quantity) <= 0"
           class="pos-quantity-stepper"
           @decrease="$emit('decrease')"
