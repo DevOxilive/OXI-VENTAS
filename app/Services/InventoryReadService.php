@@ -43,7 +43,7 @@ class InventoryReadService
         }
 
         $summary = (clone $filtered)->selectRaw("{$group} as movement_group, COUNT(*) as movement_count")
-            ->groupByRaw($group)->get()
+            ->groupBy('movement_group')->get()
             ->map(fn ($row) => ['key' => $row->movement_group, 'count' => (int) $row->movement_count])->values();
         $filteredTotal = $summary->sum('count');
         $perPage = (int) ($filters['movements_per_page'] ?? 25);
