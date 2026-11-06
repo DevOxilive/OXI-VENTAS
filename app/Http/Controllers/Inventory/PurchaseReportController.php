@@ -563,6 +563,7 @@ class PurchaseReportController extends Controller
         $purchaseReport->load([
             'branch:id,name',
             'user:id,name',
+            'generalOrder.creator:id,name',
             'items.branchProduct.product.barcodes',
             'items.branchProduct.product.category.productDepartment',
         ]);
@@ -577,6 +578,14 @@ class PurchaseReportController extends Controller
             'items_count' => $purchaseReport->items->count(),
             'branch' => $purchaseReport->branch ? ['id' => $purchaseReport->branch->id, 'name' => $purchaseReport->branch->name] : null,
             'user' => $purchaseReport->user ? ['id' => $purchaseReport->user->id, 'name' => $purchaseReport->user->name] : null,
+            'general_order' => $purchaseReport->generalOrder ? [
+                'id' => $purchaseReport->generalOrder->id,
+                'folio' => $purchaseReport->generalOrder->folio,
+                'created_by' => $purchaseReport->generalOrder->creator ? [
+                    'id' => $purchaseReport->generalOrder->creator->id,
+                    'name' => $purchaseReport->generalOrder->creator->name,
+                ] : null,
+            ] : null,
             'items' => $purchaseReport->items->map(function (PurchaseOrderItem $item) {
                 $branchProduct = $item->branchProduct;
                 $product = $branchProduct?->product;
@@ -1054,25 +1063,25 @@ class PurchaseReportController extends Controller
     {
         $branchName = Str::of($branch->name ?: 'Sucursal')
             ->ascii()
-            ->replaceMatches('/[^A-Za-z0-9]+/', '-')
-            ->trim('-')
+            ->replaceMatches('/[^A-Za-z0-9]+/', '_')
+            ->trim('_')
             ->value() ?: 'Sucursal';
-        $prefix = "OC-{$branchName}";
+        $prefix = "OC_{$branchName}";
         $nextSequence = PurchaseOrder::query()
             ->where('status', '!=', PurchaseOrder::STATUS_DRAFT)
-            ->where('folio', 'like', "{$prefix}-%")
+            ->where('folio', 'like', "{$prefix}_%")
             ->lockForUpdate()
             ->pluck('folio')
             ->map(function (?string $folio): int {
-                if (! $folio || ! preg_match('/-(\d{6})$/', $folio, $matches)) {
+                if (! $folio || ! preg_match('/_(\d+)$/', $folio, $matches)) {
                     return 0;
                 }
 
                 return (int) $matches[1];
             })
-            ->max() + 1;
+            ->max();
 
-        return sprintf('%s-%06d', $prefix, $nextSequence);
+        return sprintf('%s_%d', $prefix, max(1, $nextSequence + 1));
     }
 
     private function statusLabel(string $status, ?string $reviewStatus = null): string
