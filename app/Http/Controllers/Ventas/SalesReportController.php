@@ -202,11 +202,9 @@ class SalesReportController extends Controller
 
         $filters = $this->resolveFilters($request, $branch, $branches);
         $rows = $this->salesReportRows($filters);
-        $fileScope = $branch ? $this->safeSegment($branch->slug ?: $branch->name) : 'global';
-
         return Excel::download(
             new SalesReportExport($rows, 'Ventas registradas', 'sales', $this->salesReportSummary($rows)),
-            'reporte-ventas-registradas-'.$fileScope.'-'.LocalDateTime::now('Y-m-d-H-i').'.xlsx'
+            $this->salesReportDownloadName($filters, $branch, $branches).'.xlsx'
         );
     }
 
@@ -220,7 +218,6 @@ class SalesReportController extends Controller
 
         $filters = $this->resolveFilters($request, $branch, $branches);
         $rows = $this->salesReportRows($filters);
-        $fileScope = $branch ? $this->safeSegment($branch->slug ?: $branch->name) : 'global';
         $summary = $this->salesReportSummary($rows);
 
         $pdf = Pdf::loadView('pdf.sales-registered-report', [
@@ -231,7 +228,7 @@ class SalesReportController extends Controller
             'title' => 'Ventas registradas',
         ])->setPaper('letter', 'landscape');
 
-        return $pdf->download('reporte-ventas-registradas-'.$fileScope.'-'.LocalDateTime::now('Y-m-d-H-i').'.pdf');
+        return $pdf->download($this->salesReportDownloadName($filters, $branch, $branches).'.pdf');
     }
 
     public function exportSaleExcel(Request $request, Sale $sale)
@@ -1178,6 +1175,20 @@ class SalesReportController extends Controller
     private function safeFolio(Sale $sale): string
     {
         return $this->safeSegment($sale->folio ?: (string) $sale->id);
+    }
+
+    private function salesReportDownloadName(array $filters, ?Branch $branch, $branches): string
+    {
+        $selectedBranches = $this->selectedReportBranches($branch, $branches, $filters);
+        $branchName = $selectedBranches->count() === 1
+            ? $selectedBranches->first()->name
+            : ($selectedBranches->count() === $branches->count()
+                ? 'Todas las sucursales'
+                : 'Sucursales seleccionadas');
+        $from = Carbon::parse($filters['date_from'], LocalDateTime::TIMEZONE)->format('d-m-Y');
+        $to = Carbon::parse($filters['date_to'], LocalDateTime::TIMEZONE)->format('d-m-Y');
+
+        return 'RepGeneralVent-'.$from.'_a_'.$to.'_'.$this->safeSegment($branchName);
     }
 
     private function safeSegment(string $value): string
