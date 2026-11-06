@@ -925,7 +925,7 @@ class SalesController extends Controller
 
         $formatted = rtrim(rtrim(number_format($quantity, 3, '.', ''), '0'), '.') ?: '0';
 
-        return $formatted.' kg';
+        return \App\Support\QuantityFormatter::withUnit($quantity, 'kg');
     }
 
     private function shouldShowBranchSelector(Request $request, $user, $allowedBranches): bool
@@ -1224,6 +1224,6 @@ class SalesController extends Controller
             : (strtolower((string) ($detail->product?->inventory_unit ?? $detail->product?->unit)) === 'kg' ? 'kg' : 'pzas');
         $quantity = rtrim(rtrim(number_format((float) $detail->quantity, 3, '.', ''), '0'), '.') ?: '0';
 
-        return $quantity.' '.$unit;
+        return \App\Support\QuantityFormatter::withUnit($detail->quantity, $unit);
     }
 }

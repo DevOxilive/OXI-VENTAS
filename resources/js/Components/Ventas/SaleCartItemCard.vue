@@ -1,4 +1,5 @@
 <script setup>
+import { formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter'
 import InputField from "@/Components/Forms/InputField.vue"
 import QuantityStepper from "@/Components/Forms/QuantityStepper.vue"
 import ActionIconButton from "@/Components/Forms/ActionIconButton.vue"
@@ -53,7 +54,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
               {{ item.name }}
             </p>
             <p class="mt-0.5 truncate text-sm text-text opacity-70">
-              {{ item.barcode || "Sin codigo" }} · Stock: {{ Number(item.available_quantity ?? item.stock).toFixed(3) }} {{ item.presentation === 'box' ? 'cajas' : item.inventory_unit }}
+              {{ item.barcode || "Sin codigo" }} · Stock: {{ item.presentation === 'box' ? `${Number(item.available_quantity ?? item.stock)} cajas` : formatInventoryQuantityWithUnit(item.available_quantity ?? item.stock, item.inventory_unit) }}
             </p>
             <div
               v-if="item.has_box_presentation"

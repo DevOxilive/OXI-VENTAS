@@ -8,7 +8,7 @@ import InputField from '@/Components/Forms/InputField.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 import { getProductBatchesModalConfig } from '@/config/ModalConfigs/productBatchesModalConfig'
-import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
+import { formatInventoryQuantityWithUnit, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 
 const emit = defineEmits(['close', 'select-batch', 'save', 'adjust-batch'])
 
@@ -170,7 +170,7 @@ function selectBatch(batch) {
 }
 
 function quantity(value) {
-    return formatInventoryQuantity(value, unit.value)
+    return formatInventoryQuantityWithUnit(value, unit.value)
 }
 </script>
 
@@ -222,7 +222,7 @@ function quantity(value) {
                                     </div>
 
                                     <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text opacity-70">
-                                        <span>Stock: <span class="font-semibold text-text">{{ quantity(batch.quantity) }} {{ unitLabel }}</span></span>
+                                        <span>Stock: <span class="font-semibold text-text">{{ quantity(batch.quantity) }}</span></span>
                                         <span>Proveedor: <span class="font-semibold text-text">{{ batch.supplier || 'Sin proveedor' }}</span></span>
                                     </div>
                                 </button>
@@ -250,7 +250,7 @@ function quantity(value) {
 
                                 <template #aside>
                                     <span class="rounded-full border border-secondary bg-secondary px-3 py-1 text-xs font-semibold text-text opacity-80">
-                                        Disponible: {{ quantity(availableQuantity) }} {{ unitLabel }}
+                                        Disponible: {{ quantity(availableQuantity) }}
                                     </span>
                                 </template>
                             </SectionHeading>

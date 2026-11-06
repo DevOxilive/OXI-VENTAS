@@ -1,4 +1,5 @@
 <script setup>
+import { formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter'
 import { renderTicketHeaderImage } from "@/config/ticketTemplate";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, router, useForm, usePage } from '@inertiajs/vue3'
@@ -222,7 +223,7 @@ function quantityLabel(item) {
       ? 'kg'
       : 'Pza'
 
-  return `${compactNumber(item?.quantity)} ${label}`
+  return label === 'kg' ? formatInventoryQuantityWithUnit(item?.quantity, 'kg') : `${compactNumber(item?.quantity)} ${label}`
 }
 
 function reloadAccounts() {

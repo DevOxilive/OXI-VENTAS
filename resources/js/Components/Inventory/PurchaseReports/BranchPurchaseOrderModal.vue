@@ -7,7 +7,7 @@ import AppButton from '@/Components/Buttons/AppButton.vue'
 import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
-import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
+import { formatInventoryQuantityWithUnit, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 import { formatOperationalDateTime } from '@/utils/operationalDateTime'
 
 const props = defineProps({
@@ -50,7 +50,7 @@ function unitLabel(item) {
 }
 
 function quantity(value, item = null) {
-    return formatInventoryQuantity(value, item ? itemUnit(item) : 'pza')
+    return formatInventoryQuantityWithUnit(value, item ? itemUnit(item) : 'pza')
 }
 
 function dateTime(value) {
@@ -138,7 +138,7 @@ async function completeReceipt() {
 
                     <div class="flex flex-wrap items-center gap-2 xl:block">
                         <span class="text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-50 xl:hidden">Solicitadas</span>
-                        <strong class="text-sm">{{ quantity(isEditing ? sourceItem(item).requested_quantity : item.requested_quantity, item) }} {{ unitLabel(item) }}</strong>
+                        <strong class="text-sm">{{ quantity(isEditing ? sourceItem(item).requested_quantity : item.requested_quantity, item) }}</strong>
                     </div>
 
                     <QuantityStepper

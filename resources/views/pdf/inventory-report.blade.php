@@ -18,7 +18,7 @@
 </head>
 <body>
     @php
-        $formatQuantity = fn ($value, $unit = 'pza') => \App\Support\QuantityFormatter::format($value, $unit);
+        $formatQuantity = fn ($value, $unit = 'pza') => \App\Support\QuantityFormatter::withUnit($value, $unit);
     @endphp
 
     <h1>{{ $isMovements ? 'Reporte de movimientos' : 'Reporte de inventario' }}</h1>

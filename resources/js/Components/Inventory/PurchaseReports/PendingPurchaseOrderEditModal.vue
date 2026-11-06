@@ -7,7 +7,7 @@ import AppButton from '@/Components/Buttons/AppButton.vue'
 import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
 import { getModalRequestOptions } from '@/Components/Modales/useModalConfig'
-import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
+import { formatInventoryQuantityWithUnit, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 import { formatOperationalDate } from '@/utils/operationalDateTime'
 
 const props = defineProps({
@@ -66,7 +66,7 @@ function updateQuantity(item, value) {
 
 function itemUnit(item) { return normalizeInventoryUnit(item.base_unit ?? item.inventory_unit ?? item.unit ?? 'pza') }
 function unitLabel(item) { return itemUnit(item) === 'kg' ? 'kg' : 'pzas.' }
-function quantity(value, item = null) { return formatInventoryQuantity(value, item ? itemUnit(item) : 'pza') }
+function quantity(value, item = null) { return formatInventoryQuantityWithUnit(value, item ? itemUnit(item) : 'pza') }
 
 function formatDate(value) {
     if (!value) return 'Sin fecha'
@@ -114,7 +114,7 @@ function save() {
                     <p class="mt-1 truncate text-xs text-text opacity-60">{{ item.product_code || 'Sin código' }}</p>
                 </div>
 
-                <div class="text-sm text-text"><span class="lg:hidden text-xs opacity-55">Solicitadas: </span><strong>{{ quantity(item.requested_quantity, item) }} {{ unitLabel(item) }}</strong></div>
+                <div class="text-sm text-text"><span class="lg:hidden text-xs opacity-55">Solicitadas: </span><strong>{{ quantity(item.requested_quantity, item) }}</strong></div>
 
                 <div><span class="mb-1 block text-xs opacity-55 lg:hidden">Ajustar cantidad</span><QuantityStepper :data-modal-autofocus="index === 0 ? '' : null" :value="item.requested_quantity" :allow-decimal="itemUnit(item) === 'kg'" :validation-field="itemUnit(item) === 'kg' ? 'kilogram_quantity' : 'product_piece_quantity'" :aria-label="`Cantidad solicitada de ${item.product_name}`" :decrease-disabled="Number(item.requested_quantity) <= 1" @decrease="decrease(item)" @increase="increase(item)" @update="updateQuantity(item, $event)" /></div>
 

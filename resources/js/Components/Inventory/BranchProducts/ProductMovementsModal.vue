@@ -69,7 +69,7 @@ function summaryTextClass(item) {
 
                             <p>
                                 <span class="font-semibold text-violet-700">Stock:</span>
-                                {{ formatNumber(currentStock) }} {{ unit }}
+                                {{ formatNumber(currentStock) }}
                             </p>
 
                             <p>
@@ -145,7 +145,7 @@ function summaryTextClass(item) {
                 >
                     <template #cell-displayQuantity="{ row }">
                         <span class="font-semibold" :class="quantityClass(row)">
-                            {{ row.displayQuantity }} {{ unit }}
+                            {{ row.displayQuantity }}
                         </span>
                     </template>
 

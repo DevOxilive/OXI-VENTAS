@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import FormPanel from '@/Components/Cards/FormPanel.vue'
-import { formatInventoryQuantity } from '@/utils/quantityFormatter'
+import { formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter'
 
 const props = defineProps({
     product: {
@@ -34,7 +34,7 @@ const relatedCodes = computed(() =>
 const unitLabel = computed(() => props.product?.inventory_unit === 'kg' ? 'kg' : 'piezas')
 
 function formatQuantity(value) {
-    return formatInventoryQuantity(value, props.product?.inventory_unit ?? 'pza')
+    return formatInventoryQuantityWithUnit(value, props.product?.inventory_unit ?? 'pza')
 }
 </script>
 
@@ -79,7 +79,7 @@ function formatQuantity(value) {
                     {{ canViewStock ? 'Stock actual' : 'Lotes disponibles' }}
                 </p>
                 <p class="mt-1 text-lg font-bold text-text">
-                    {{ canViewStock ? `${formatQuantity(product.stock)} ${unitLabel}` : availableBatchesCount }}
+                    {{ canViewStock ? `${formatQuantity(product.stock)}` : availableBatchesCount }}
                 </p>
             </div>
 

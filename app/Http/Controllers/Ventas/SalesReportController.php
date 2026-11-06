@@ -1138,7 +1138,7 @@ class SalesReportController extends Controller
 
     private function quantityLabel(float $quantity, string $unit): string
     {
-        return $this->formatQuantity($quantity, $unit).' '.($unit === 'kg' ? 'kg' : 'pzas');
+        return \App\Support\QuantityFormatter::withUnit($quantity, $unit);
     }
 
     private function saleTotalQuantityDisplay(Sale $sale, float $total): string

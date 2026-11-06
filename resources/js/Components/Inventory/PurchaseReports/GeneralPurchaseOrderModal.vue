@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 import PurchaseOrderModalLayout from '@/Components/Inventory/PurchaseReports/PurchaseOrderModalLayout.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
-import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
+import { formatInventoryQuantityWithUnit, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 import { formatOperationalDateTime } from '@/utils/operationalDateTime'
 
 const props = defineProps({ order: { type: Object, required: true } })
@@ -27,7 +27,7 @@ const summary = computed(() => [
     { label: 'Estado', value: props.order.status_label },
     { label: 'Responsable', value: props.order.created_by?.name },
     { label: 'Productos solicitados', value: `${props.order.items?.length || 0} productos` },
-    { label: 'Cantidad solicitada', value: `${quantity(totalRequested.value, totalRequestedUnit.value)} ${totalRequestedUnit.value === 'kg' ? 'kg' : 'piezas'}` },
+    { label: 'Cantidad solicitada', value: `${quantity(totalRequested.value, totalRequestedUnit.value)}` },
     { label: 'Sucursales participantes', value: branchNames.value.join(', ') },
 ])
 
@@ -40,7 +40,7 @@ function unitLabel(item) {
 }
 
 function quantity(value, unit = 'pza') {
-    return formatInventoryQuantity(value, unit)
+    return formatInventoryQuantityWithUnit(value, unit)
 }
 
 function dateTime(value) {
@@ -95,7 +95,7 @@ function status(item) {
                                     :key="`${item.id}-${branch.branch_id}`"
                                     class="max-w-full rounded-full bg-secondary px-2 py-1 text-[10px] font-semibold leading-tight text-text"
                                 >
-                                    {{ branch.branch_name }}: {{ quantity(branch.requested_quantity, itemUnit(item)) }} {{ unitLabel(item) }}
+                                    {{ branch.branch_name }}: {{ quantity(branch.requested_quantity, itemUnit(item)) }}
                                 </span>
                             </div>
                         </div>
@@ -103,7 +103,7 @@ function status(item) {
 
                     <div class="flex flex-wrap items-center gap-2 xl:block">
                         <span class="text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-50 xl:hidden">Solicitadas</span>
-                        <strong class="text-sm text-text">{{ quantity(item.requested_quantity, itemUnit(item)) }} {{ unitLabel(item) }}</strong>
+                        <strong class="text-sm text-text">{{ quantity(item.requested_quantity, itemUnit(item)) }}</strong>
                     </div>
 
                     <span class="w-fit rounded-full bg-secondary px-2 py-1 text-[11px] font-bold text-text">

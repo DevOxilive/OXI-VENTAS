@@ -26,6 +26,10 @@ class QuantityFormatter
     {
         $normalizedUnit = self::normalizeUnit($unit);
 
+        if ($normalizedUnit === 'kg' && abs(round((float) $quantity, 3)) < 1) {
+            return self::format(round((float) $quantity * 1000), 'pza').' g';
+        }
+
         return self::format($quantity, $normalizedUnit).' '.($normalizedUnit === 'kg' ? 'kg' : 'pzas');
     }
 
