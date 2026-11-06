@@ -1,4 +1,5 @@
 import { formatOperationalDate, formatOperationalDateTime, formatOperationalTime } from '@/utils/operationalDateTime'
+import { formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter'
 
 export const formatters = {
   text: (value, options = {}) => {
@@ -107,10 +108,7 @@ export const formatters = {
       }).format(Math.round(num))
     }
 
-    return new Intl.NumberFormat(options.locale || 'es-MX', {
-      minimumFractionDigits: options.minimumFractionDigits ?? 0,
-      maximumFractionDigits: decimals,
-    }).format(num)
+    return formatInventoryQuantityWithUnit(num, unit, options)
   },
 }
 

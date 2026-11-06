@@ -36,6 +36,11 @@ export function formatInventoryQuantity(value, unit = 'pza', options = {}) {
 
 export function formatInventoryQuantityWithUnit(value, unit = 'pza', options = {}) {
   const normalizedUnit = normalizeInventoryUnit(unit)
+  const numeric = Number(String(value ?? 0).replace(',', '.'))
+  const rounded = Math.round(numeric * 1000) / 1000
+  if (normalizedUnit === 'kg' && Number.isFinite(rounded) && Math.abs(rounded) < 1) {
+    return `${formatInventoryQuantity(Math.round(rounded * 1000), 'pza', options)} g`
+  }
   const suffix = normalizedUnit === 'kg'
     ? (options.kgLabel ?? 'kg')
     : (options.pieceLabel ?? 'pzas')

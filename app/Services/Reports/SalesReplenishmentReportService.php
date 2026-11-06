@@ -470,7 +470,7 @@ class SalesReplenishmentReportService
             ? rtrim(rtrim(number_format($normalized, 3, '.', ''), '0'), '.')
             : (string) (int) round($normalized);
 
-        return $formatted.' '.$unit;
+        return \App\Support\QuantityFormatter::withUnit($quantity, $unit);
     }
 
     private function baseUnit(string $unit): string

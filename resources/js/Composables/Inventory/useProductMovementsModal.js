@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, reactive, watch } from "vue";
-import { formatInventoryQuantity } from "@/utils/quantityFormatter";
+import { formatInventoryQuantityWithUnit } from "@/utils/quantityFormatter";
 import { formatOperationalDateTime } from "@/utils/operationalDateTime";
 
 function parseDateValue(value) {
@@ -193,7 +193,7 @@ export function useProductMovementsModal(props, emit) {
     ]);
 
     function formatNumber(value) {
-        return formatInventoryQuantity(value, unit.value);
+        return formatInventoryQuantityWithUnit(value, unit.value);
     }
 
     function formatDateTime(date) {

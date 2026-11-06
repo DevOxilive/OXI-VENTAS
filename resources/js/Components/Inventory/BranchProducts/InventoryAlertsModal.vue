@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 import { getInventoryAlertsModalConfig } from '@/config/ModalConfigs/inventoryAlertsModalConfig'
-import { formatInventoryQuantity } from '@/utils/quantityFormatter'
+import { formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter'
 
 const props = defineProps({
     title: {
@@ -224,7 +224,7 @@ function formatLongDate(value, fallback = 'Sin fecha') {
 }
 
 function formatQuantity(value, unit = 'pza') {
-    return formatInventoryQuantity(value, unit)
+    return formatInventoryQuantityWithUnit(value, unit)
 }
 
 function productName(item) {

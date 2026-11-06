@@ -11,7 +11,7 @@ import AuditBatchSelect from '@/Components/Audits/PhysicalCounts/AuditBatchSelec
 import PresentationSwitch from '@/Components/Inventory/PresentationSwitch.vue'
 import { ErrorAlert, ToastAlert } from '@/Components/Modales/UniversalActionModal'
 import { confirmModalAction } from '@/Components/Modales/useModalConfig'
-import { formatInventoryQuantity } from '@/utils/quantityFormatter'
+import { formatInventoryQuantity, formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter'
 
 const props = defineProps({
     physicalCountId: {
@@ -225,7 +225,7 @@ function submit() {
                 </div>
                 <div>
                     <p class="text-xs font-medium opacity-60">Stock actual</p>
-                    <p class="mt-1 font-semibold">{{ formatQuantity(product?.stock ?? 0) }} {{ baseUnitLabel }}</p>
+                    <p class="mt-1 font-semibold">{{ formatInventoryQuantityWithUnit(product?.stock ?? 0, product?.inventory_unit) }}</p>
                 </div>
                 <div v-if="countPresentation === 'box'">
                     <p class="text-xs font-medium opacity-60">Equivalencia</p>

@@ -1,4 +1,5 @@
 <script setup>
+import { formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter'
 import { computed, reactive, ref } from 'vue'
 import { TableSurface } from '@/Components/Tables'
 
@@ -160,7 +161,7 @@ function transferUnit(row) {
 }
 
 function quantityWithUnit(value, unit) {
-    return `${quantity(value)} ${unit}`
+    return formatInventoryQuantityWithUnit(value, unit)
 }
 
 function branchDemand(row, branchId) {
@@ -399,12 +400,12 @@ function branchTransferClasses(row, branchId) {
                             </td>
                             <td class="w-16 min-w-16 px-1 py-1 text-center">
                                 <span class="inline-flex h-9 w-full items-center justify-center px-2 text-sm font-semibold text-text">
-                                    {{ quantity(row.total_sold) }}
+                                    {{ quantityWithUnit(row.total_sold, row.unit) }}
                                 </span>
                             </td>
                             <td class="w-16 min-w-16 px-1 py-1 text-center">
                                 <span class="inline-flex h-9 w-full items-center justify-center px-2 text-sm font-semibold text-text">
-                                    {{ quantity(row.total_stock) }}
+                                    {{ quantityWithUnit(row.total_stock, row.unit) }}
                                 </span>
                             </td>
                             <td :class="[tableClasses.bodyCell, 'w-72 min-w-72 max-w-72 px-3']">
@@ -413,10 +414,10 @@ function branchTransferClasses(row, branchId) {
                             </td>
                             <template v-for="branch in branches" :key="`row-${row.id}-${branch.id}`">
                                 <td class="w-20 min-w-20 px-2 py-2 text-center font-semibold" :class="branchStockClasses(row, branch.id)">
-                                    {{ quantity(metricFor(row, branch.id, 'stock')) }}
+                                    {{ quantityWithUnit(metricFor(row, branch.id, 'stock'), row.unit) }}
                                 </td>
                                 <td class="w-16 min-w-16 bg-warning/15 px-2 py-2 text-center font-semibold">
-                                    {{ quantity(metricFor(row, branch.id, 'monthly_sales')) }}
+                                    {{ quantityWithUnit(metricFor(row, branch.id, 'monthly_sales'), row.unit) }}
                                 </td>
                                 <td v-if="showBranchActionColumn" class="w-20 min-w-20 px-1 py-1 text-center" :class="branchTransferClasses(row, branch.id)">
                                     <span

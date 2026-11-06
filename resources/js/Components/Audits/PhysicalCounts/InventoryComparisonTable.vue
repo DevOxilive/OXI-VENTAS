@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { formatInventoryQuantity } from '@/utils/quantityFormatter'
+import { formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter'
 
 const props = defineProps({
   comparison: {
@@ -41,7 +41,7 @@ function unit(item) {
 }
 
 function quantity(item, key) {
-  return formatInventoryQuantity(item[key] ?? 0, unit(item))
+  return formatInventoryQuantityWithUnit(item[key] ?? 0, unit(item))
 }
 
 function difference(item) {

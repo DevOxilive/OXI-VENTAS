@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import { formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter'
 import { Head } from '@inertiajs/vue3'
 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -68,9 +69,7 @@ function formatCurrency(value) {
 }
 
 function formatQuantity(value) {
-    return new Intl.NumberFormat('es-MX', {
-        maximumFractionDigits: 3,
-    }).format(Number(value || 0))
+    return formatInventoryQuantityWithUnit(value, selectedMovement.value?.inventory_unit ?? selectedMovement.value?.unit ?? 'pza')
 }
 </script>
 

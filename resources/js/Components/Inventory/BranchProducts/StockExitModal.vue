@@ -1,4 +1,5 @@
 <script setup>
+import { formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter'
 import { computed } from 'vue'
 import { useStockExitModal } from '@/Composables/Inventory/useStockExitModal'
 
@@ -136,7 +137,7 @@ const isKilogramUnit = computed(() => String(unit.value).toLowerCase() === 'kg')
                                 class="mt-1 text-xs"
                                 :class="selectedSourceKey === source.key ? 'text-white/80' : 'text-text opacity-70'"
                             >
-                                Disponible: {{ source.quantity }} {{ unit }}
+                                Disponible: {{ formatInventoryQuantityWithUnit(source.quantity, unit) }}
                             </p>
 
                             <p

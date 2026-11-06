@@ -1,7 +1,7 @@
 <script setup>
 import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
-import { formatInventoryQuantity, normalizeInventoryUnit } from '@/utils/quantityFormatter'
+import { formatInventoryQuantityWithUnit, normalizeInventoryUnit } from '@/utils/quantityFormatter'
 
 defineProps({
     notes: {
@@ -51,7 +51,7 @@ function itemUnit(item) {
 }
 
 function quantity(value, item = null) {
-    return formatInventoryQuantity(value, item ? itemUnit(item) : 'pza')
+    return formatInventoryQuantityWithUnit(value, item ? itemUnit(item) : 'pza')
 }
 
 function allowsDecimalQuantity(item) {
