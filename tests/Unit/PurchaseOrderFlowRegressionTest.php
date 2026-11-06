@@ -67,14 +67,38 @@ class PurchaseOrderFlowRegressionTest extends TestCase
         $this->assertStringContainsString("->where('status', PurchaseOrder::STATUS_DRAFT)", $controller);
     }
 
-    public function test_purchase_order_folio_uses_branch_name_and_six_digit_sequence(): void
+    public function test_purchase_order_folio_uses_branch_name_and_numeric_sequence(): void
     {
         $controller = file_get_contents(app_path('Http/Controllers/Inventory/PurchaseReportController.php'));
 
         $this->assertStringContainsString('private function makeGeneratedFolio(Branch $branch): string', $controller);
-        $this->assertStringContainsString("OC-{\$branchName}", $controller);
+        $this->assertStringContainsString('OC_{$branchName}', $controller);
         $this->assertStringContainsString("where('status', '!=', PurchaseOrder::STATUS_DRAFT)", $controller);
-        $this->assertStringContainsString("return sprintf('%s-%06d', \$prefix, \$nextSequence);", $controller);
+        $this->assertStringContainsString("return sprintf('%s_%d', \$prefix, max(1, \$nextSequence + 1));", $controller);
+    }
+
+    public function test_general_purchase_orders_use_the_requested_folio_and_show_its_creator_to_sales(): void
+    {
+        $service = file_get_contents(app_path('Services/PurchaseCycleService.php'));
+        $controller = file_get_contents(app_path('Http/Controllers/Inventory/PurchaseReportController.php'));
+        $modal = file_get_contents(resource_path('js/Components/Inventory/PurchaseReports/BranchPurchaseOrderModal.vue'));
+
+        $this->assertStringContainsString("\$prefix = 'OC-General';", $service);
+        $this->assertStringContainsString("return sprintf('%s-%d', \$prefix, max(1, \$lastSequence + 1));", $service);
+        $this->assertStringContainsString("'generalOrder.creator:id,name'", $controller);
+        $this->assertStringContainsString("'general_order' => \$purchaseReport->generalOrder", $controller);
+        $this->assertStringContainsString('props.order.general_order.created_by?.name', $modal);
+    }
+
+    public function test_source_order_table_omits_product_and_piece_totals_and_notes_are_multiline(): void
+    {
+        $table = file_get_contents(resource_path('js/config/TableConfigs/generalPurchaseSourceOrdersTableConfig.js'));
+        $modal = file_get_contents(resource_path('js/Components/Inventory/PurchaseReports/BranchPurchaseOrderModal.vue'));
+
+        $this->assertStringNotContainsString("key: 'items_count'", $table);
+        $this->assertStringNotContainsString("key: 'requested_quantity'", $table);
+        $this->assertStringContainsString(':rows="3"', $modal);
+        $this->assertStringContainsString('220px', $modal);
     }
 
     public function test_purchase_order_notifications_cover_inventory_and_sales_follow_up(): void
@@ -89,7 +113,7 @@ class PurchaseOrderFlowRegressionTest extends TestCase
         $this->assertStringContainsString('Recibiste la Orden de compra', $purchaseReportController);
         $this->assertStringContainsString("'purchase_order_assigned'", $purchaseReportController);
         $this->assertStringContainsString("'purchase_order_assigned'", $inventoryOrdersPage);
-        $this->assertStringContainsString("purchaseOrderNotificationSummary", $generalController);
+        $this->assertStringContainsString('purchaseOrderNotificationSummary', $generalController);
         $this->assertStringContainsString("refreshRealtimeProps(page, ['generation', 'notificationSummary'])", $inventoryOrdersPage);
         $this->assertStringContainsString('markNotificationsSeen()', $inventoryOrdersPage);
         $this->assertStringContainsString('FloatingNotificationModal', $inventoryOrdersPage);

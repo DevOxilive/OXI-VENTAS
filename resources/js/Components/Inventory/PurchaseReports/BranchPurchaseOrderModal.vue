@@ -33,7 +33,14 @@ const summary = computed(() => [
     { label: 'Estado de revision', value: props.order.review_status_label || props.order.status_label },
     { label: 'Productos solicitados', value: `${props.order.items_count || props.order.items?.length || 0} productos` },
     { label: 'Solicitado por', value: props.order.user?.name || props.order.requested_by_name },
-    { label: 'Responsable actual', value: props.order.assigned_to?.name },
+    {
+        label: props.order.status === 'COMPLETED' && props.order.general_order
+            ? 'Responsable de la OC general'
+            : 'Responsable actual',
+        value: props.order.status === 'COMPLETED' && props.order.general_order
+            ? props.order.general_order.created_by?.name
+            : props.order.assigned_to?.name,
+    },
     { label: 'Sucursal', value: props.order.branch?.name || props.order.branch_name },
 ])
 
@@ -108,7 +115,7 @@ async function completeReceipt() {
     >
         <template #products>
             <div class="space-y-3">
-                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_110px_150px_100px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 xl:grid">
+                <div class="sticky top-0 z-10 hidden grid-cols-[minmax(0,1fr)_110px_150px_220px] gap-3 border-b border-secondary bg-background px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-text opacity-55 xl:grid">
                     <span>Producto</span>
                     <span>Solicitadas</span>
                     <span>{{ isEditing ? 'Recibidas' : 'Estado' }}</span>
@@ -118,7 +125,7 @@ async function completeReceipt() {
                 <article
                     v-for="item in (isEditing ? form.items : order.items)"
                     :key="item.id"
-                    class="grid min-w-0 gap-3 rounded-xl border border-secondary bg-background px-3 py-3 xl:grid-cols-[minmax(0,1fr)_110px_150px_100px] xl:items-center"
+                    class="grid min-w-0 gap-3 rounded-xl border border-secondary bg-background px-3 py-3 xl:grid-cols-[minmax(0,1fr)_110px_150px_220px] xl:items-center"
                 >
                     <div class="flex min-w-0 items-start gap-3">
                         <div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-secondary">
@@ -160,7 +167,8 @@ async function completeReceipt() {
                         v-model="item.receipt_notes"
                         :field="`receipt_notes_${item.id}`"
                         placeholder="Notas"
-                        :rows="1"
+                        :rows="3"
+                        class="min-h-24 resize-y"
                     />
                 </article>
 

@@ -419,7 +419,7 @@ class PurchaseCycleService
             ]);
 
             $draft->update([
-                'folio' => $draft->folio ?: sprintf('OCG-%s-%04d', now()->format('Ymd'), $draft->id),
+                'folio' => $draft->folio ?: $this->makeGeneralPurchaseOrderFolio(),
                 'status' => GeneralPurchaseOrder::STATUS_PURCHASING,
             ]);
 
@@ -438,6 +438,26 @@ class PurchaseCycleService
 
             return $draft->fresh(['items', 'branchOrders.branch']);
         });
+    }
+
+    /** Genera el consecutivo de las órdenes de compra generales. */
+    private function makeGeneralPurchaseOrderFolio(): string
+    {
+        $prefix = 'OC-General';
+        $lastSequence = GeneralPurchaseOrder::query()
+            ->where('folio', 'like', "{$prefix}-%")
+            ->lockForUpdate()
+            ->pluck('folio')
+            ->map(function (?string $folio): int {
+                if (! $folio || ! preg_match('/-(\d+)$/', $folio, $matches)) {
+                    return 0;
+                }
+
+                return (int) $matches[1];
+            })
+            ->max();
+
+        return sprintf('%s-%d', $prefix, max(1, $lastSequence + 1));
     }
 
     private function assertRecordVersion($record, ?string $recordVersion): void

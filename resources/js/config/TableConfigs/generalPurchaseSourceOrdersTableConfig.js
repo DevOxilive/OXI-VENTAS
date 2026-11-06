@@ -28,20 +28,6 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
                 mobileDisplay: true,
             },
             {
-                key: 'items_count',
-                label: 'Productos',
-                format: 'number',
-                mobileLabel: 'Productos',
-                mobileDisplay: true,
-            },
-            {
-                key: 'requested_quantity',
-                label: 'Piezas',
-                format: 'number',
-                mobileLabel: 'Piezas',
-                mobileDisplay: true,
-            },
-            {
                 key: 'generated_at',
                 label: 'Fecha',
                 format: 'date',
