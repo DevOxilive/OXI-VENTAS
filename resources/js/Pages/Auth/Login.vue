@@ -14,9 +14,11 @@ const form = useForm({
 });
 
 const submit = () => {
+    form.email = form.email.trim();
+
     form.transform(data => ({
         ...data,
-        email: data.email + '@oxilive.com.mx',
+        email: data.email.trim() + '@oxilive.com.mx',
         remember: form.remember ? 'on' : '',
     })).post(route('login'), {
         onFinish: () => form.reset('password'),
@@ -69,6 +71,7 @@ const submit = () => {
                             <div class="login-input-wrap flex overflow-hidden rounded-2xl border border-slate-200 bg-white transition focus-within:border-amber-300 focus-within:ring-2 focus-within:ring-amber-200">
                                 <input
                                     v-model="form.email"
+                                    @blur="form.email = form.email.trim()"
                                     type="text"
                                     placeholder="usuario"
                                     class="login-input w-full border-0 bg-transparent px-4 py-3 text-base text-slate-800 outline-none sm:text-lg"
