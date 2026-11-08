@@ -40,6 +40,10 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         Fortify::authenticateUsing(function (Request $request) {
+            $request->merge([
+                'email' => trim((string) $request->input('email')),
+            ]);
+
             $request->validate([
                 'email' => ['required', 'string'],
                 'password' => ['required', 'string'],
@@ -82,7 +86,7 @@ class FortifyServiceProvider extends ServiceProvider
 
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(
-                Str::lower($request->input(Fortify::username())) . '|' . $request->ip()
+                Str::lower(trim((string) $request->input(Fortify::username()))) . '|' . $request->ip()
             );
 
             return Limit::perMinute(5)->by($throttleKey);

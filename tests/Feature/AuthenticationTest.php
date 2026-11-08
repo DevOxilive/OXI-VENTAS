@@ -30,6 +30,19 @@ class AuthenticationTest extends TestCase
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 
+    public function test_users_can_authenticate_when_the_username_has_surrounding_spaces(): void
+    {
+        $user = User::factory()->create(['email' => 'sistemas@oxilive.com.mx']);
+
+        $response = $this->post('/login', [
+            'email' => '  sistemas@oxilive.com.mx  ',
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticatedAs($user);
+        $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
     public function test_users_can_not_authenticate_with_invalid_password(): void
     {
         $user = User::factory()->create();
