@@ -143,37 +143,35 @@ export function createVisualLayout(kind = "sales") {
     if (label)
         return {
             version: 2,
-            dpi: label ? 300 : 203,
+            // Perfil base para Brother QL-1110NWB con cinta blanca continua
+            // de 62 mm. El largo de corte se determina por el diseño.
+            // Dejamos 2 mm de margen lateral para que el contenido no quede
+            // pegado a un borde cuando el rollo avance ligeramente desalineado.
+            paper_format: "continuous-62",
+            dpi: 300,
             width,
-            height: 40,
+            height: 29,
             auto_height: false,
             elements: [
                 e("field", {
                     binding: "name",
-                    x: 3,
+                    x: 2,
                     y: 3,
-                    width: 56,
-                    height: 12,
+                    width: 58,
+                    height: 9,
                     font_size: 11,
                     bold: true,
                     align: "center",
                 }),
                 e("field", {
                     binding: "price",
-                    x: 3,
-                    y: 16,
-                    width: 56,
+                    x: 2,
+                    y: 14,
+                    width: 58,
                     height: 10,
                     font_size: 19,
                     bold: true,
                     align: "center",
-                }),
-                e("barcode", {
-                    x: 6,
-                    y: 28,
-                    width: 50,
-                    height: 9,
-                    binding: "barcode",
                 }),
             ],
         };

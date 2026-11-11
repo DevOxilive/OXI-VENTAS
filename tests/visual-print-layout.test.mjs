@@ -14,6 +14,18 @@ test('each document has an independent editable layout within the paper', () => 
     }
   }
 });
+test('label base uses the centered Brother 62 mm continuous profile', () => {
+  const layout=createVisualLayout('label');
+  assert.equal(layout.paper_format,'continuous-62');
+  assert.equal(layout.dpi,300);
+  assert.equal(layout.width,62);
+  assert.equal(layout.height,29);
+  assert.equal(layout.auto_height,false);
+  assert.deepEqual(layout.elements.map(({binding,x,y,width,height,align})=>({binding,x,y,width,height,align})),[
+    {binding:'name',x:2,y:3,width:58,height:9,align:'center'},
+    {binding:'price',x:2,y:14,width:58,height:10,align:'center'},
+  ]);
+});
 test('long details shift totals and footer preserving their spacing', () => {
   const layout=createVisualLayout('sales');
   const detail=layout.elements.find(e=>e.type==='items');

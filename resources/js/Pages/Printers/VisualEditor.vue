@@ -58,13 +58,18 @@ const canPrint = computed(() =>
         : can("systems.qz.sign"),
 );
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const defaultLayout = () => {
+    const base = createVisualLayout(props.kind);
+
+    // La etiqueta ya define su medida de corte y no debe heredar el alto
+    // automático de una cinta continua al abrirse por primera vez.
+    return props.kind === "label"
+        ? base
+        : applyPaperFormat(base, "receipt-80");
+};
 const layout = ref(
     clone(
-        props.saved.layout ||
-            applyPaperFormat(
-                createVisualLayout(props.kind),
-                props.kind === "label" ? "continuous-62" : "receipt-80",
-            ),
+        props.saved.layout || defaultLayout(),
     ),
 );
 const name = ref(
