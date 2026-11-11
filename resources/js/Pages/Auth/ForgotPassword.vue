@@ -24,7 +24,7 @@ const submit = () => {
         <!-- Card centrada -->
         <div class="w-full max-w-md bg-white rounded-lg shadow-md p-6">
             <div class="flex flex-col items-center mb-6">
-                <img src="@/img/OXILIVE.ico" alt="Logo" class="w-20 mb-4" />
+                <img src="/icons/super-kay-navidad.png" alt="Logotipo navideño de Super Kay" class="w-20 mb-4 rounded-3xl" />
                 <h2 class="text-xl font-bold text-center">Recuperar Contraseña</h2>
                 <p class="text-center text-gray-600 mt-2">
                     Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.

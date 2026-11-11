@@ -1,9 +1,7 @@
 <script setup>
 import SidebarItem from '@/Components/Layout/SidebarItem.vue'
-import Dropdown from '@/Components/Layout/Dropdown.vue'
-import DropdownLink from '@/Components/Layout/DropdownLink.vue'
 import SessionExpiryWarningModal from '@/Components/Modales/SessionExpiryWarningModal.vue'
-import { usePage, router } from '@inertiajs/vue3'
+import { Link, usePage, router } from '@inertiajs/vue3'
 import { generateMenu } from '@/config/menuConfig'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import {
@@ -49,6 +47,7 @@ const themeMetaColors = {
 const collapseEventName = 'sidebar:collapse-all'
 const isDesktopViewport = ref(false)
 const currentTheme = ref('light')
+const profileMenu = ref(null)
 let unsubscribeUserChanged = null
 let unsubscribeRealtimeActivity = null
 let unsubscribeGlobalDataChanged = null
@@ -291,6 +290,18 @@ function toggleTheme() {
     syncTheme(currentTheme.value === 'dark' ? 'light' : 'dark')
 }
 
+function closeProfileMenu() {
+    profileMenu.value?.removeAttribute('open')
+}
+
+function handleMainClick(event) {
+    closeSidebarFromOutside()
+
+    if (!event.target.closest('.profile-menu')) {
+        closeProfileMenu()
+    }
+}
+
 onMounted(() => {
     if (typeof window !== 'undefined') {
         desktopSidebarCollapsed.value =
@@ -416,7 +427,7 @@ watch(
                 desktopSidebarCollapsed ? 'w-72 md:w-20' : 'w-72',
             ]"
         >
-            <div class="shrink-0 border-b border-secondary px-4 py-3">
+            <div class="shrink-0 border-b border-secondary py-3" :class="desktopSidebarCollapsed ? 'px-2' : 'px-4'">
                 <div
                     class="flex min-h-16 items-center gap-3"
                     :class="desktopSidebarCollapsed ? 'justify-center' : 'justify-between'"
@@ -424,14 +435,14 @@ watch(
                     <div class="flex min-w-0 items-center gap-3">
                         <button
                             type="button"
-                            class="group relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-secondary bg-secondary shadow-sm transition hover:scale-[1.02] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary"
-                            :class="desktopSidebarCollapsed ? 'h-12 w-12' : 'h-14 w-14'"
+                            class="group relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#d6a92e] bg-[#fff8df] shadow-md shadow-amber-900/20 transition hover:scale-[1.04] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                            :class="desktopSidebarCollapsed ? 'h-16 w-16' : 'h-[4.5rem] w-[4.5rem]'"
                             @click="toggleDesktopSidebar"
                         >
                             <img
-                                src="/icons/icon-192.png"
-                                alt="Super Kay Logo"
-                                class="h-full w-full object-contain p-1"
+                                src="/icons/super-kay-navidad.png"
+                                alt="Logotipo navideño de Super Kay"
+                                class="h-full w-full scale-110 rounded-full object-cover"
                             />
                         </button>
 
@@ -457,7 +468,7 @@ watch(
             />
         </aside>
 
-        <section class="flex min-w-0 flex-1 flex-col overflow-visible" @click="closeSidebarFromOutside">
+        <section class="flex min-w-0 flex-1 flex-col overflow-visible" @click="handleMainClick">
             <header class="shrink-0 border-b border-secondary bg-background px-4 py-3 shadow-sm md:px-8">
                 <div class="flex min-h-16 items-center justify-between gap-4 md:justify-end">
                     <div class="flex min-w-0 items-center gap-3">
@@ -473,23 +484,9 @@ watch(
 
                     <div class="shrink-0">
                         <div class="flex items-center gap-3">
-                            <Dropdown
-                                align="right"
-                                width="60"
-                                :content-classes="['bg-transparent']"
-                                :panel-classes="['mt-0']"
-                            >
-                                <template #trigger="{ open }">
-                                    <button
-                                        type="button"
-                                        class="flex h-16 min-w-[15rem] items-center gap-3 border border-secondary bg-background px-4 text-left shadow-sm transition hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary"
-                                        :class="open ? 'rounded-t-2xl rounded-b-none border-b-0' : 'rounded-2xl'"
-                                    >
-                                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary text-text">
-                                            <span class="material-symbols-outlined text-[24px]">
-                                                account_circle
-                                            </span>
-                                        </span>
+                            <details ref="profileMenu" class="profile-menu shrink-0">
+                                <summary class="profile-menu-trigger flex h-16 min-w-[15rem] cursor-pointer list-none items-center gap-3 rounded-2xl border border-secondary bg-background px-4 text-left shadow-sm transition hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <img src="/icons/profile-santa-flaticon.png" alt="Perfil navideño" class="h-12 w-12 shrink-0 object-contain">
 
                                         <span class="min-w-0 flex-1">
                                             <span class="block truncate text-sm font-semibold text-text">
@@ -500,16 +497,15 @@ watch(
                                                 {{ role }}
                                             </span>
                                         </span>
-                                    </button>
-                                </template>
+                                    <span class="material-symbols-outlined profile-menu-chevron text-[20px] text-text/60">expand_more</span>
+                                </summary>
 
-                                <template #content>
-                                    <div class="overflow-hidden rounded-b-2xl border border-t-0 border-secondary bg-background shadow-sm">
+                                <div class="profile-menu-panel absolute right-0 top-full z-50 mt-2 min-w-[15rem] overflow-hidden rounded-2xl border border-secondary bg-background shadow-xl">
                                         <button
                                             type="button"
                                             class="flex w-full items-center gap-3 border-b border-secondary px-4 py-3 text-left text-sm font-medium text-text transition hover:bg-secondary focus:bg-secondary focus:outline-none"
                                             :title="currentTheme === 'dark' ? t('theme.switchToLight') : t('theme.switchToDark')"
-                                            @click="toggleTheme"
+                                            @click="toggleTheme(); closeProfileMenu()"
                                         >
                                             <span class="material-symbols-outlined text-[20px]">
                                                 {{ currentTheme === 'dark' ? 'light_mode' : 'dark_mode' }}
@@ -520,32 +516,29 @@ watch(
                                             </span>
                                         </button>
 
-                                        <DropdownLink
+                                        <Link
                                             :href="route('profile.show')"
-                                            class="flex items-center gap-3 border-b border-secondary px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
+                                            class="flex items-center gap-3 border-b border-secondary px-4 py-3 text-sm font-medium text-text transition hover:bg-secondary focus:bg-secondary"
+                                            @click="closeProfileMenu"
                                         >
                                             <span class="material-symbols-outlined text-[20px]">
                                                 manage_accounts
                                             </span>
 
                                             <span>Editar perfil</span>
-                                        </DropdownLink>
+                                        </Link>
 
                                         <form @submit.prevent="logout">
-                                            <DropdownLink
-                                                as="button"
-                                                class="flex items-center gap-3 px-4 py-3 text-sm font-medium text-text hover:bg-secondary focus:bg-secondary"
-                                            >
+                                            <button type="submit" class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-text transition hover:bg-secondary focus:bg-secondary focus:outline-none">
                                                 <span class="material-symbols-outlined text-[20px]">
                                                     logout
                                                 </span>
 
                                                 <span>Cerrar sesión</span>
-                                            </DropdownLink>
+                                            </button>
                                         </form>
-                                    </div>
-                                </template>
-                            </Dropdown>
+                                </div>
+                            </details>
                         </div>
                     </div>
                 </div>
@@ -566,3 +559,37 @@ watch(
         />
     </div>
 </template>
+
+<style scoped>
+.profile-menu {
+    position: relative;
+}
+
+.profile-menu-trigger::-webkit-details-marker {
+    display: none;
+}
+
+.profile-menu[open] .profile-menu-trigger {
+    border-color: color-mix(in srgb, var(--primary) 54%, var(--secondary));
+    border-bottom-left-radius: 1rem;
+    border-bottom-right-radius: 1rem;
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.profile-menu-chevron {
+    transition: transform 0.18s ease;
+}
+
+.profile-menu[open] .profile-menu-chevron {
+    transform: rotate(180deg);
+}
+
+.profile-menu-panel {
+    animation: profile-menu-in 0.16s ease-out;
+}
+
+@keyframes profile-menu-in {
+    from { opacity: 0; transform: translateY(-5px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+</style>

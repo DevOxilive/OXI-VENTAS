@@ -62,25 +62,25 @@ Route::get('/pwa/manifest.webmanifest', function () {
         'description' => 'Sistema Super-Kay instalado como app.',
         'icons' => [
             [
-                'src' => '/icons/icon-192.png',
+                'src' => '/icons/super-kay-navidad-192.png',
                 'sizes' => '192x192',
                 'type' => 'image/png',
                 'purpose' => 'any',
             ],
             [
-                'src' => '/icons/icon-512.png',
+                'src' => '/icons/super-kay-navidad-512.png',
                 'sizes' => '512x512',
                 'type' => 'image/png',
                 'purpose' => 'any',
             ],
             [
-                'src' => '/icons/maskable-512.png',
+                'src' => '/icons/super-kay-navidad-maskable-512.png',
                 'sizes' => '512x512',
                 'type' => 'image/png',
                 'purpose' => 'maskable',
             ],
             [
-                'src' => '/icons/maskable-192.png',
+                'src' => '/icons/super-kay-navidad-maskable-192.png',
                 'sizes' => '192x192',
                 'type' => 'image/png',
                 'purpose' => 'maskable',

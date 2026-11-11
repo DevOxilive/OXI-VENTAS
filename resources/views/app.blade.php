@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="/icons/icon-192.png" as="image" type="image/png" fetchpriority="high">
+    <link rel="preload" href="/icons/super-kay-navidad.png" as="image" type="image/png" fetchpriority="high">
     <link rel="preload" href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript>
@@ -26,9 +26,8 @@
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&display=swap" rel="stylesheet">
     </noscript>
     <link rel="manifest" href="/pwa/manifest.webmanifest">
-    <link rel="icon" href="/favicon.ico">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/icons/super-kay-navidad.png">
+    <link rel="apple-touch-icon" href="/icons/super-kay-navidad-apple-touch.png">
     <script>
         (() => {
             const storedTheme = window.localStorage.getItem('color-theme');

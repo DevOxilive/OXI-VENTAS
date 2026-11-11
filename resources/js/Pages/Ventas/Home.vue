@@ -28,6 +28,7 @@ import {
   ErrorAlert,
   WarningAlert,
   BlockingWarningAlert,
+  UniversalActionModal,
 } from "@/Components/Modales/UniversalActionModal";
 import {
   buildEscPosTicketData,
@@ -35,6 +36,7 @@ import {
   normalizeTicketTemplate,
 } from "@/config/ticketTemplate";
 import { usePermissions } from "@/Composables/usePermissions";
+import { createPendingSalesStorage } from "@/utils/pendingSalesStorage";
 import {
   REALTIME_CHANNELS,
   REALTIME_EVENTS,
@@ -85,6 +87,8 @@ const props = defineProps({
 const page = usePage();
 const { can } = usePermissions();
 const CASH_BOX_STORAGE_KEY = "ventas_cash_box_by_branch";
+const DEFAULT_PENDING_DRAFTS = 5;
+const MAX_PENDING_SALES = 8;
 const PRODUCT_SEARCH_DEBOUNCE_MS = 120;
 const PRODUCT_SEARCH_CACHE_TTL_MS = 5000;
 const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
@@ -96,6 +100,8 @@ const searchLoading = ref(false);
 const selectedBranchId = ref(props.currentBranch?.id ?? "");
 const selectedCashBoxNumber = ref("1");
 const cart = ref([]);
+const pendingSales = ref([]);
+const activePendingSaleId = ref(null);
 const lastPrintJob = ref(null);
 const cardPaymentConfirmed = ref(false);
 const initialAlertBranchId = ref(null);
@@ -119,6 +125,12 @@ let unsubscribeCustomerChanged = null;
 let realtimeMounted = false;
 let ticketLogoDataUrlPromise = null;
 const ticketHeaderDataUrlPromises = new Map();
+const pendingSalesStorage = typeof window === "undefined"
+  ? null
+  : createPendingSalesStorage({
+    localStorage: window.localStorage,
+    sessionStorage: window.sessionStorage,
+  });
 
 const saleForm = useForm({
   branch_id: props.currentBranch?.id ?? "",
@@ -221,6 +233,7 @@ watch(
     }
 
     if (realtimeMounted) {
+      ensurePendingSalesForCurrentBranch();
       subscribeSalesBranchRealtime(branchId);
     }
   },
@@ -229,6 +242,10 @@ watch(
 
 onMounted(() => {
   realtimeMounted = true;
+  // No se restaura nada después de recargar: las esperas son deliberadamente
+  // efímeras y nunca se convierten en borradores de base de datos.
+  pendingSalesStorage?.clearForPageLoad();
+  ensurePendingSalesForCurrentBranch();
 
   if (!props.selectorMode) {
     focusSearch();
@@ -351,6 +368,16 @@ const totalItems = computed(() =>
 );
 
 const totalLines = computed(() => cart.value.length);
+
+const pendingSalesForCurrentBranch = computed(() =>
+  pendingSales.value.filter(
+    (sale) => String(sale.branch_id) === String(selectedBranchId.value || props.currentBranch?.id || "")
+  )
+);
+
+const activePendingSale = computed(() =>
+  pendingSales.value.find((sale) => sale.id === activePendingSaleId.value) || null
+);
 
 const cartTotal = computed(() =>
   cart.value.reduce(
@@ -741,6 +768,191 @@ function cartItemDiscountAmount(item) {
 function cartItemSubtotal(item) {
   return Number((cartItemUnitPrice(item) * Number(item.quantity || 0)).toFixed(2));
 }
+
+function clonePendingSaleItems(items = []) {
+  try {
+    return JSON.parse(JSON.stringify(items));
+  } catch (error) {
+    return [];
+  }
+}
+
+function persistPendingSales() {
+  pendingSalesStorage?.save(pendingSales.value);
+}
+
+function currentPendingBranchId() {
+  return selectedBranchId.value || props.currentBranch?.id || "";
+}
+
+function createPendingDraft(branchId) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    branch_id: branchId,
+    items: [],
+    payment_method_id: props.defaultPaymentMethodId ?? "",
+    cash_received: "",
+    credit_holder_type: null,
+    credit_holder_id: null,
+    estimated_payment_date: null,
+  };
+}
+
+function ensurePendingSalesForCurrentBranch() {
+  const branchId = currentPendingBranchId();
+  if (!branchId) return;
+
+  const missingDrafts = Math.max(0, DEFAULT_PENDING_DRAFTS - pendingSalesForCurrentBranch.value.length);
+  for (let index = 0; index < missingDrafts; index += 1) {
+    pendingSales.value.push(createPendingDraft(branchId));
+  }
+
+  if (!activePendingSale.value || String(activePendingSale.value.branch_id) !== String(branchId)) {
+    activePendingSaleId.value = pendingSalesForCurrentBranch.value[0]?.id || null;
+  }
+
+  persistPendingSales();
+}
+
+function syncActivePendingSale() {
+  const draft = activePendingSale.value;
+  if (!draft) return;
+
+  Object.assign(draft, {
+    items: clonePendingSaleItems(cart.value),
+    payment_method_id: saleForm.payment_method_id || "",
+    cash_received: saleForm.cash_received || "",
+    credit_holder_type: saleForm.credit_holder_type || null,
+    credit_holder_id: saleForm.credit_holder_id || null,
+    estimated_payment_date: saleForm.estimated_payment_date || null,
+  });
+  persistPendingSales();
+}
+
+function resetSaleCapture() {
+  cart.value = [];
+  search.value = "";
+  saleForm.cash_received = "";
+  saleForm.payment_method_id = props.defaultPaymentMethodId ?? "";
+  saleForm.credit_holder_type = null;
+  saleForm.credit_holder_id = null;
+  saleForm.estimated_payment_date = null;
+  creditHolder.value = "";
+  creditDueDate.value = "";
+  showCreditModal.value = false;
+  showPaymentModal.value = false;
+  cardPaymentConfirmed.value = false;
+  highlightedSuggestionIndex.value = 0;
+}
+
+function loadPendingSale(draft) {
+  cart.value = clonePendingSaleItems(draft.items);
+  saleForm.payment_method_id = draft.payment_method_id || props.defaultPaymentMethodId || "";
+  saleForm.cash_received = draft.cash_received || "";
+  saleForm.credit_holder_type = draft.credit_holder_type || null;
+  saleForm.credit_holder_id = draft.credit_holder_id || null;
+  saleForm.estimated_payment_date = draft.estimated_payment_date || null;
+  search.value = "";
+  showCreditModal.value = false;
+  showPaymentModal.value = false;
+  cardPaymentConfirmed.value = false;
+  highlightedSuggestionIndex.value = 0;
+}
+
+function startAdditionalSale() {
+  if (saleSubmitting.value) return;
+
+  syncActivePendingSale();
+  const emptyDraft = pendingSalesForCurrentBranch.value.find(
+    (draft) => draft.id !== activePendingSaleId.value && !draft.items.length
+  );
+
+  if (emptyDraft) {
+    resumePendingSale(emptyDraft.id);
+    return;
+  }
+
+  if (pendingSalesForCurrentBranch.value.length >= MAX_PENDING_SALES) {
+    WarningAlert({
+      title: "Límite de borradores",
+      message: `Puedes tener hasta ${MAX_PENDING_SALES} borradores por sucursal en esta pestaña.`,
+    });
+    return;
+  }
+
+  const draft = createPendingDraft(currentPendingBranchId());
+  pendingSales.value.push(draft);
+  resumePendingSale(draft.id);
+}
+
+function resumePendingSale(id) {
+  if (saleSubmitting.value) return;
+
+  const selectedSale = pendingSales.value.find((sale) => sale.id === id);
+  if (!selectedSale || String(selectedSale.branch_id) !== String(currentPendingBranchId())) return;
+
+  if (selectedSale.id === activePendingSaleId.value) return;
+
+  syncActivePendingSale();
+  activePendingSaleId.value = selectedSale.id;
+  loadPendingSale(selectedSale);
+  persistPendingSales();
+  focusSearch();
+}
+
+async function removePendingSale(id) {
+  if (saleSubmitting.value) return;
+
+  const result = await UniversalActionModal({
+    title: "¿Vaciar borrador?",
+    message: "Se eliminarán los artículos de este borrador temporal.",
+    confirmText: "Vaciar borrador",
+  });
+
+  if (!result.isConfirmed) return;
+
+  const draft = pendingSales.value.find((sale) => sale.id === id);
+  if (!draft) return;
+
+  Object.assign(draft, createPendingDraft(draft.branch_id), { id: draft.id });
+  if (draft.id === activePendingSaleId.value) {
+    loadPendingSale(draft);
+  }
+  ensurePendingSalesForCurrentBranch();
+  persistPendingSales();
+}
+
+async function clearPendingSales() {
+  if (saleSubmitting.value) return;
+
+  const currentBranchId = selectedBranchId.value || props.currentBranch?.id || "";
+  if (!pendingSalesForCurrentBranch.value.length) return;
+
+  const result = await UniversalActionModal({
+    title: "¿Limpiar ventas en espera?",
+    message: "Se eliminarán solo de esta pestaña y no se pueden recuperar.",
+    confirmText: "Limpiar esperas",
+  });
+
+  if (!result.isConfirmed) return;
+
+  pendingSales.value = pendingSales.value.filter((sale) => String(sale.branch_id) !== String(currentBranchId));
+  for (let index = 0; index < DEFAULT_PENDING_DRAFTS; index += 1) {
+    pendingSales.value.push(createPendingDraft(currentBranchId));
+  }
+  activePendingSaleId.value = pendingSalesForCurrentBranch.value[0]?.id || null;
+  resetSaleCapture();
+  persistPendingSales();
+  ToastAlert({ title: "Borradores vaciados" });
+}
+
+watch(
+  cart,
+  () => {
+    syncActivePendingSale();
+  },
+  { deep: true }
+);
 
 function cartItemAvailableQuantity(item) {
   if (item.presentation === "box") {
@@ -1754,6 +1966,63 @@ function closeChangeModal() {
           </div>
 
           <div class="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden">
+            <section class="mb-3 shrink-0 rounded-xl border border-secondary bg-secondary/60 p-2.5" aria-label="Borradores de venta">
+              <div class="flex items-center gap-2 overflow-x-auto pb-0.5">
+                <div class="flex shrink-0 items-center gap-2 pr-1">
+                  <span class="material-symbols-outlined text-[19px] text-primary">pause_circle</span>
+                  <p class="whitespace-nowrap text-xs font-black text-text">Borradores</p>
+                </div>
+
+                <article
+                  v-for="(pendingSale, index) in pendingSalesForCurrentBranch"
+                  :key="pendingSale.id"
+                  class="flex min-w-[190px] shrink-0 items-center gap-2 rounded-lg border bg-background px-2.5 py-2 shadow-sm transition"
+                  :class="pendingSale.id === activePendingSaleId ? 'border-primary ring-1 ring-primary/25' : 'border-secondary hover:border-primary/45'"
+                >
+                  <button
+                    type="button"
+                    class="min-w-0 flex-1 text-left"
+                    :disabled="saleSubmitting"
+                    @click="resumePendingSale(pendingSale.id)"
+                  >
+                    <p class="truncate text-xs font-black text-text">Venta {{ index + 1 }}</p>
+                    <p class="mt-0.5 text-[11px] font-semibold text-text opacity-65">
+                      {{ pendingSale.items.length }} artículo(s) · {{ formatMoney(pendingSale.items.reduce((total, item) => total + cartItemSubtotal(item), 0)) }}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text opacity-55 transition hover:bg-secondary hover:text-primary hover:opacity-100 disabled:cursor-not-allowed"
+                    :aria-label="`Vaciar borrador ${index + 1}`"
+                    :disabled="saleSubmitting"
+                    @click="removePendingSale(pendingSale.id)"
+                  >
+                    <span class="material-symbols-outlined text-[17px]">close</span>
+                  </button>
+                </article>
+
+                <div class="ml-auto flex shrink-0 items-center gap-2 pl-1">
+                  <button
+                    type="button"
+                    class="rounded-lg px-2.5 py-1.5 text-xs font-bold text-text opacity-70 transition hover:bg-background hover:opacity-100"
+                    :disabled="saleSubmitting"
+                    @click="clearPendingSales"
+                  >
+                    Limpiar esperas
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-black text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="saleSubmitting"
+                    @click="startAdditionalSale"
+                  >
+                    <span class="material-symbols-outlined text-[16px]">add</span>
+                    Añadir venta
+                  </button>
+                </div>
+              </div>
+            </section>
+
             <div class="hidden grid-cols-[minmax(0,1.4fr)_120px_120px_140px_88px] gap-3 border-b border-secondary px-1 py-3 text-xs font-bold uppercase tracking-[0.14em] text-text opacity-70 md:grid">
               <span>Producto</span>
               <span>Precio</span>

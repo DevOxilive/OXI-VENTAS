@@ -1,19 +1,20 @@
-const VERSION = 'oxi-ventas-pwa-v11';
+const VERSION = 'oxi-ventas-pwa-v13';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
 const PRECACHE_URLS = [
     '/offline.html',
     '/favicon.ico',
-    '/icons/icon-192.png',
-    '/icons/maskable-192.png',
+    '/icons/super-kay-navidad-192.png',
+    '/icons/super-kay-navidad-maskable-192.png',
+    '/icons/super-kay-navidad.png',
     '/pwa/manifest.webmanifest',
 ];
 
 const CACHEABLE_DESTINATIONS = new Set(['font', 'image', 'manifest', 'script', 'style']);
 const CACHEABLE_PATHS = [
     /^\/build\/assets\/.+\.(?:css|js|mjs|woff2?)$/,
-    /^\/icons\/(?:icon-192|icon-512|maskable-192|maskable-512|apple-touch-icon)\.png$/,
+    /^\/icons\/(?:icon-192|icon-512|maskable-192|maskable-512|apple-touch-icon|super-kay-navidad(?:-[a-z0-9-]+)?)\.png$/,
     /^\/pwa\/manifest\.webmanifest$/,
 ];
 
