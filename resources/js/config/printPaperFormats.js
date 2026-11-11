@@ -22,11 +22,11 @@ export const PRINT_PAPER_FORMATS = [
     {
         id: "continuous-62",
         kind: "label",
-        label: "Cinta continua · 62 mm (Brother DK-2205)",
+        label: "Cinta blanca continua · 62 mm (Brother)",
         paperWidth: 62,
         width: 62,
         continuous: true,
-        note: "Ancho físico de la cinta: 62 mm. No tiene un largo fijo: se corta según el diseño. Los márgenes imprimibles dependen del controlador; selecciona el mismo rollo en sus preferencias.",
+        note: "Cinta blanca continua de 62 mm. No tiene un largo fijo: se corta según el diseño. Los márgenes imprimibles dependen del controlador; selecciona 62 mm en sus preferencias.",
     },
 ];
 export function paperFormatsFor(kind) {
