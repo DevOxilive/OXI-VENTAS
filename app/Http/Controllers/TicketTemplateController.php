@@ -43,13 +43,27 @@ class TicketTemplateController extends Controller
 
     public function labels()
     {
+        return Inertia::render('Printers/Labels', $this->labelPageProps());
+    }
+
+    public function printPrices()
+    {
+        return Inertia::render('Sales/PrintPrices', [
+            ...$this->labelPageProps(),
+            'printOnly' => true,
+        ]);
+    }
+
+    private function labelPageProps(): array
+    {
         $template = TicketTemplate::productLabelTemplate();
         $branchId = auth()->user()?->branch_id;
         $branchName = Branch::query()->whereKey($branchId)->value('name') ?? '';
 
         $products = Product::query()
             ->with([
-                'category:id,name',
+                'category:id,name,product_department_id',
+                'category.productDepartment:id,name',
                 'barcodes' => fn ($query) => $query
                     ->where('active', true)
                     ->orderBy('id'),
@@ -66,6 +80,7 @@ class TicketTemplateController extends Controller
                     'id' => $product->id,
                     'name' => $product->name,
                     'category' => $product->category?->name ?? 'Sin categoria',
+                    'department' => $product->category?->productDepartment?->name ?? 'Sin departamento',
                     'barcode' => $barcode,
                     'barcodes' => $product->barcodes->pluck('code')->values(),
                     'sku' => $barcode,
@@ -77,7 +92,7 @@ class TicketTemplateController extends Controller
             })
             ->values();
 
-        return Inertia::render('Printers/Labels', [
+        return [
             'visualLayout' => \App\Support\VisualPrintLayout::active('label'),
             'template' => [
                 'id' => $template->id,
@@ -89,7 +104,7 @@ class TicketTemplateController extends Controller
             ],
             'products' => $products,
             'sampleProduct' => $products->first() ?? $this->sampleProduct(),
-        ]);
+        ];
     }
 
     public function searchLabelProducts(Request $request, ProductSearchService $productSearch)

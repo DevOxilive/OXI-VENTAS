@@ -75,6 +75,12 @@ const hasRightAddon = computed(() => props.suffix
 const isDisabled = computed(() => Boolean(attrs.disabled))
 const isTextarea = computed(() => props.type === 'textarea')
 const isCurrencyField = computed(() => normalizedFieldConfig.value.format === 'currency')
+const showPassword = ref(false)
+const isPasswordField = computed(() => props.type === 'password')
+const inputType = computed(() =>
+    isPasswordField.value && showPassword.value ? 'text' : props.type
+)
+const hasRightControl = computed(() => hasRightAddon.value || isPasswordField.value)
 
 watch(
     [() => props.modelValue, normalizedFieldConfig],
@@ -209,14 +215,14 @@ defineExpose({
                     readonly || isDisabled ? 'cursor-not-allowed border-secondary bg-secondary text-text opacity-60' : 'bg-background text-text',
                     error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'
                 ]" />
-            <input v-else ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="type" :placeholder="placeholder"
+            <input v-else ref="inputEl" v-bind="attrs" :id="inputId" :name="field" :type="inputType" :placeholder="placeholder"
                 :value="isCurrencyField ? displayValue : modelValue"
                 :maxlength="isDateField || isCurrencyField ? undefined : (normalizedFieldConfig?.max || undefined)"
                 :readonly="readonly" @keydown="handleKeydown"
                 @wheel="preventNumberWheel" @input="handleInput" @blur="handleBlur" :class="[
                     'w-full rounded-xl border py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
                     hasLeftAddon ? 'pl-11 pr-4' : 'px-4',
-                    hasRightAddon ? 'pr-12' : '',
+                    hasRightControl ? 'pr-12' : '',
                     readonly || isDisabled ? 'cursor-not-allowed border-secondary bg-secondary text-text opacity-60' : 'bg-background text-text',
                     error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'
                 ]" />
@@ -224,6 +230,18 @@ defineExpose({
                 class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-text opacity-60">
                 {{ suffix }}
             </span>
+            <button
+                v-if="isPasswordField"
+                type="button"
+                class="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-text opacity-60 transition hover:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                :title="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                @click="showPassword = !showPassword"
+            >
+                <span class="material-symbols-outlined text-[20px]" aria-hidden="true">
+                    {{ showPassword ? 'visibility_off' : 'visibility' }}
+                </span>
+            </button>
         </div>
         <div class="flex justify-between items-center mt-1">
             <p v-if="error" class="text-xs text-primary">

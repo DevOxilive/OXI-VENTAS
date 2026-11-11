@@ -80,7 +80,8 @@ export function generateMenu(role, permissions = [], branches = []) {
             "systems.cash-closure-tickets.view",
             "systems.cash-closure-tickets.update",
         ],
-        labels: ["systems.labels.view", "systems.labels.update", "systems.labels.print"],
+        labels: ["systems.labels.view", "systems.labels.update"],
+        printPrices: ["systems.labels.print"],
         qzSetup: ["systems.qz.setup"],
         attendance: [
             "attendance.view",
@@ -315,6 +316,7 @@ export function generateMenu(role, permissions = [], branches = []) {
 
     if (
         canUse("sales") ||
+        canUse("printPrices") ||
         canUseCustomers ||
         canViewEmployeeCredit ||
         canUse("cashClosures") ||
@@ -354,6 +356,7 @@ export function generateMenu(role, permissions = [], branches = []) {
                           },
                       ]
                     : []),
+                ...(canUse("printPrices") ? [{ text: "Imprimir precios", key: "sales.print-prices", icon: "barcode", url: route("ventas.print-prices.index") }] : []),
                 ...(canUsePurchaseLists
                     ? [purchaseListsMenuItem]
                     : []),

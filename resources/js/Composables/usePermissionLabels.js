@@ -343,7 +343,7 @@ const permissionLabels = {
     "systems.cash-closure-tickets.update": "Editar configuracion de tickets de corte",
     "systems.labels.view": "Ver configuración actual de etiquetas",
     "systems.labels.update": "Editar configuracion de etiquetas",
-    "systems.labels.print": "Imprimir etiquetas de productos",
+    "systems.labels.print": "Imprimir precios",
     "systems.qz.sign": "Firmar trabajos de impresion local",
     "systems.qz.setup": "Descargar y configurar QZ Tray en una caja",
 

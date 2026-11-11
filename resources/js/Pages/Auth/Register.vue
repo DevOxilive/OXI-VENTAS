@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
 import InputField from '@/Components/Forms/InputField.vue';
 
 const form = useForm({
@@ -11,6 +11,8 @@ const form = useForm({
     branch_id: '',
     terms: false,
 });
+const showPassword = ref(false);
+const showPasswordConfirmation = ref(false);
 
 // Generar correo automático
 watch(() => form.name, (newName) => {
@@ -128,13 +130,24 @@ const branches = usePage().props.branches;
 
                     <!-- PASSWORD -->
                     <div>
-                        <input
-                            type="password"
-                            placeholder="Contraseña"
-                            v-model="form.password"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-                            required
-                        />
+                        <div class="relative">
+                            <input
+                                :type="showPassword ? 'text' : 'password'"
+                                placeholder="Contraseña"
+                                v-model="form.password"
+                                class="w-full p-3 pr-12 border rounded-lg focus:ring-2 focus:ring-green-500"
+                                required
+                            />
+                            <button
+                                type="button"
+                                class="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-gray-500 hover:bg-green-50 hover:text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                                :title="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                                @click="showPassword = !showPassword"
+                            >
+                                <span class="material-symbols-outlined text-[20px]" aria-hidden="true">{{ showPassword ? 'visibility_off' : 'visibility' }}</span>
+                            </button>
+                        </div>
 
                         <p v-if="form.errors.password" class="text-red-500 text-sm">
                             {{ form.errors.password }}
@@ -143,13 +156,24 @@ const branches = usePage().props.branches;
 
                     <!-- CONFIRMAR -->
                     <div>
-                        <input
-                            type="password"
-                            placeholder="Confirmar contraseña"
-                            v-model="form.password_confirmation"
-                            class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
-                            required
-                        />
+                        <div class="relative">
+                            <input
+                                :type="showPasswordConfirmation ? 'text' : 'password'"
+                                placeholder="Confirmar contraseña"
+                                v-model="form.password_confirmation"
+                                class="w-full p-3 pr-12 border rounded-lg focus:ring-2 focus:ring-green-500"
+                                required
+                            />
+                            <button
+                                type="button"
+                                class="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-gray-500 hover:bg-green-50 hover:text-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                :aria-label="showPasswordConfirmation ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                                :title="showPasswordConfirmation ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                                @click="showPasswordConfirmation = !showPasswordConfirmation"
+                            >
+                                <span class="material-symbols-outlined text-[20px]" aria-hidden="true">{{ showPasswordConfirmation ? 'visibility_off' : 'visibility' }}</span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- BOTONES -->

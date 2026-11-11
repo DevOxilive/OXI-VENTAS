@@ -130,7 +130,10 @@ Route::middleware([
     $cashClosureReportsAccess = 'permission:reports.cash-closures.view';
     $ticketsAccess = 'permission:systems.tickets.view,systems.tickets.update';
     $cashClosureTicketsAccess = 'permission:systems.cash-closure-tickets.view,systems.cash-closure-tickets.update';
-    $labelsAccess = 'permission:systems.labels.view,systems.labels.update,systems.labels.print';
+    $labelsConfigurationAccess = 'permission:systems.labels.view,systems.labels.update';
+    $labelsPrintAccess = 'permission:systems.labels.print';
+    Route::get('/ventas/imprimir-precios', [TicketTemplateController::class, 'printPrices'])
+        ->middleware($labelsPrintAccess)->name('ventas.print-prices.index');
     $qzSetupAccess = 'permission:systems.qz.setup';
     $productsAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete';
     $productImagesAccess = 'permission:inventory.products.view,inventory.products.create,inventory.products.update,inventory.products.delete,sales.view,sales.create,sales.purchase-lists.view,sales.purchase-lists.create,sales.purchase-orders.view,sales.purchase-orders.receive,inventory.purchase-orders.general.view,inventory.purchase-orders.general.create,inventory.purchase-orders.general.update,inventory.purchase-orders.general.complete';
@@ -230,7 +233,8 @@ Route::middleware([
         $usersAccess,
         $ticketsAccess,
         $cashClosureTicketsAccess,
-        $labelsAccess
+        $labelsConfigurationAccess,
+        $labelsPrintAccess
     ) {
         Route::get('/users', [UserController::class, 'index'])
             ->middleware($usersAccess)
@@ -300,9 +304,11 @@ Route::middleware([
             ->name('employee-credit-statement-tickets.update');
 
         Route::get('/labels', function () {
-            return redirect()->route('printers.labels.index');
+            return redirect()->route(auth()->user()?->hasPermission('systems.labels.print')
+                ? 'printers.print-prices.index'
+                : 'printers.labels.index');
         })
-            ->middleware($labelsAccess)
+            ->middleware($labelsConfigurationAccess.','.substr($labelsPrintAccess, strlen('permission:')))
             ->name('labels.index');
     });
 
@@ -544,7 +550,8 @@ Route::middleware([
     Route::prefix('printers')->name('printers.')->group(function () use (
         $ticketsAccess,
         $cashClosureTicketsAccess,
-        $labelsAccess,
+        $labelsConfigurationAccess,
+        $labelsPrintAccess,
         $qzSetupAccess
     ) {
         Route::get('/visual-editor/{kind}', [\App\Http\Controllers\VisualPrintTemplateController::class, 'show'])->name('visual-editor.show');
@@ -586,11 +593,15 @@ Route::middleware([
             ->name('employee-credit-statement-tickets.update');
 
         Route::get('/labels', [TicketTemplateController::class, 'labels'])
-            ->middleware($labelsAccess)
+            ->middleware($labelsConfigurationAccess)
             ->name('labels.index');
 
+        Route::get('/imprimir-precios', fn () => redirect()->route('ventas.print-prices.index'))
+            ->middleware($labelsPrintAccess)
+            ->name('print-prices.index');
+
         Route::get('/labels/products/search', [TicketTemplateController::class, 'searchLabelProducts'])
-            ->middleware($labelsAccess)
+            ->middleware($labelsPrintAccess)
             ->name('labels.products.search');
 
         Route::put('/labels/{ticketTemplate}', [TicketTemplateController::class, 'updateLabel'])

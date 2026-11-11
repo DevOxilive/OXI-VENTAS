@@ -219,7 +219,7 @@ const permissionLabelMap = {
     'systems.cash-closure-tickets.update': 'Editar tickets de corte',
     'systems.labels.view': 'Ver etiquetas',
     'systems.labels.update': 'Editar etiquetas',
-    'systems.labels.print': 'Imprimir etiquetas',
+    'systems.labels.print': 'Imprimir precios',
     'files.export': 'Exportar archivos',
 }
 
@@ -431,7 +431,7 @@ const permissionAction = (permission) => {
         'systems.cash-closure-tickets.update': { icon: 'edit', href: route('printers.cash-closure-tickets.index') },
         'systems.labels.view': { icon: 'visibility', href: route('printers.labels.index') },
         'systems.labels.update': { icon: 'edit', href: route('printers.labels.index') },
-        'systems.labels.print': { icon: 'print', href: route('printers.labels.index') },
+        'systems.labels.print': { icon: 'barcode', href: route('ventas.print-prices.index') },
         'files.export': { icon: 'download', href: branchHref((branch) => route('inventory.branches.reports', { branch: branch.id })) },
     }
 

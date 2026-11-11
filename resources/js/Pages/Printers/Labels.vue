@@ -1,6 +1,6 @@
 <script setup>
 import AnimatedCheckbox from "@/Components/Forms/AnimatedCheckbox.vue";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { router, useForm } from "@inertiajs/vue3";
 
 import TemplateWorkspace from "@/Components/Printers/TemplateWorkspace.vue";
@@ -49,6 +49,7 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    printOnly: { type: Boolean, default: false },
 });
 
 const blockCatalog = getLabelBlockCatalog();
@@ -56,6 +57,8 @@ const selectedProductId = ref(
     props.products[0]?.id || props.sampleProduct?.id || "",
 );
 const productSearch = ref("");
+const searchInput = ref(null);
+const highlightedSuggestionIndex = ref(0);
 const remoteProductIds = ref(null);
 let productSearchTimer = null;
 let productSearchRequest = 0;
@@ -66,6 +69,41 @@ const printerBridgeMessage = ref("Conecta QZ Tray para imprimir etiquetas.");
 let stopPrinterRecovery = null;
 const printing = ref(false);
 const printCopies = ref(1);
+const printQueue = ref([]);
+function addToQueue(product) {
+    if (printing.value || !product) return;
+
+    selectedProductId.value = product.id;
+    const row = printQueue.value.find((item) => String(item.product.id) === String(product.id));
+
+    if (row) {
+        row.copies += 1;
+        row.sent = false;
+        return;
+    }
+
+    printQueue.value.push({ product: { ...product }, copies: 1, sent: false });
+}
+
+function focusSearch() {
+    nextTick(() => searchInput.value?.focus?.());
+}
+
+function selectSuggestion(product) {
+    addToQueue(product);
+    productSearch.value = '';
+    remoteProductIds.value = null;
+    highlightedSuggestionIndex.value = 0;
+    focusSearch();
+}
+
+function clearPrintQueue() {
+    printQueue.value = [];
+    productSearch.value = '';
+    remoteProductIds.value = null;
+    highlightedSuggestionIndex.value = 0;
+    focusSearch();
+}
 const { can } = usePermissions();
 const canUpdateTemplate = computed(() => can("systems.labels.update"));
 const canPrintLabels = computed(() => can("systems.labels.print"));
@@ -148,8 +186,14 @@ const toolbarConfig = computed(() =>
     getPrinterLabelsToolbarConfig({
         processing: form.processing,
         printing: printing.value,
-        canSave: canUpdateTemplate.value,
-        canPrint: canPrintLabels.value,
+        canSave: !props.printOnly && canUpdateTemplate.value,
+        canPrint: !props.printOnly && canPrintLabels.value,
+        showVisualEditor: !props.printOnly,
+        title: props.printOnly ? "Imprimir precios" : "Etiquetas",
+        subtitle: props.printOnly
+            ? ""
+            : "Productos, papel y diseño en un solo lugar.",
+        printLabel: props.printOnly ? "Imprimir precios" : "Imprimir etiquetas",
     }),
 );
 const productOptions = computed(() =>
@@ -162,6 +206,7 @@ const productOptions = computed(() =>
             .toLowerCase(),
     })),
 );
+
 const filteredProductOptions = computed(() => {
     const query = productSearch.value.trim().toLowerCase();
 
@@ -199,6 +244,60 @@ const filteredProductOptions = computed(() => {
             String(option.value) === String(selectedProductId.value),
     );
 });
+
+const searchSuggestions = computed(() => {
+    const query = productSearch.value.trim().toLowerCase();
+    if (!query) return [];
+
+    return filteredProductOptions.value
+        .map((option) => props.products.find((product) => String(product.id) === String(option.value)))
+        .filter(Boolean)
+        .sort((a, b) => {
+            const aName = String(a.name || '').toLowerCase();
+            const bName = String(b.name || '').toLowerCase();
+            const aBarcode = String(a.barcode || '').toLowerCase();
+            const bBarcode = String(b.barcode || '').toLowerCase();
+            const aStarts = aName.startsWith(query) || aBarcode.startsWith(query);
+            const bStarts = bName.startsWith(query) || bBarcode.startsWith(query);
+            if (aStarts !== bStarts) return aStarts ? -1 : 1;
+            return aName.localeCompare(bName, 'es');
+        })
+        .slice(0, 6);
+});
+
+watch(searchSuggestions, (suggestions) => {
+    if (!suggestions.length || highlightedSuggestionIndex.value >= suggestions.length) {
+        highlightedSuggestionIndex.value = 0;
+    }
+});
+
+function moveSuggestion(delta) {
+    if (!searchSuggestions.value.length) return;
+    const maxIndex = searchSuggestions.value.length - 1;
+    const nextIndex = highlightedSuggestionIndex.value + delta;
+    highlightedSuggestionIndex.value = nextIndex < 0 ? maxIndex : nextIndex > maxIndex ? 0 : nextIndex;
+}
+
+function handleSearchKeydown(event) {
+    if (!props.printOnly) return;
+
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        moveSuggestion(1);
+        return;
+    }
+
+    if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        moveSuggestion(-1);
+        return;
+    }
+
+    if (event.key === 'Enter' && searchSuggestions.value.length) {
+        event.preventDefault();
+        selectSuggestion(searchSuggestions.value[Math.min(highlightedSuggestionIndex.value, searchSuggestions.value.length - 1)]);
+    }
+}
 
 watch(productSearch, (value) => {
     clearTimeout(productSearchTimer);
@@ -371,7 +470,7 @@ async function initializePrinterBridge({ silent = true } = {}) {
 }
 
 async function printTestLabel() {
-    if (!canPrintLabels.value) return;
+    if (!canPrintLabels.value || printing.value) return;
     printing.value = true;
 
     try {
@@ -383,6 +482,21 @@ async function printTestLabel() {
             throw new Error("No hay una impresora seleccionada.");
         }
 
+        if (props.printOnly) {
+            const jobs = printQueue.value.filter(row => !row.sent);
+            if (!jobs.length) throw new Error('Agrega productos pendientes a la lista.');
+            for (const row of jobs) {
+                if (!Number.isInteger(Number(row.copies)) || row.copies < 1 || row.copies > 100) throw new Error('La cantidad por producto debe ser un entero entre 1 y 100.');
+            }
+            for (const row of jobs) {
+                const output = props.visualLayout
+                    ? await (await import('@/Components/Printers/visualPrintRenderer')).renderVisualPrint(props.visualLayout, row.product, { dpi: props.visualLayout.dpi || 300 })
+                    : null;
+                await printImageLabel(selectedPrinterName.value, output?.base64 || buildLabelPngBase64(previewTemplate.value, row.product), output || resolveLabelPrintDimensions(previewTemplate.value), Number(row.copies));
+                row.sent = true;
+            }
+            printQueue.value = [];
+        } else {
         const visualOutput = props.visualLayout
             ? await (await import("@/Components/Printers/visualPrintRenderer")).renderVisualPrint(props.visualLayout, selectedProduct.value, {dpi: props.visualLayout.dpi || 300})
             : null;
@@ -391,8 +505,9 @@ async function printTestLabel() {
             selectedPrinterName.value,
             image,
             visualOutput || resolveLabelPrintDimensions(previewTemplate.value),
-            printCopies.value,
+            1,
         );
+        }
 
         ToastAlert({
             title: "Etiqueta enviada a la impresora",
@@ -418,14 +533,17 @@ async function printTestLabel() {
                 @action="handleToolbarAction"
         /></template>
         <p v-if="visualPreviewError" role="alert" class="text-red-600">{{ visualPreviewError }}</p>
-        <div v-if="visualLayout" class="rounded-xl border border-secondary bg-background p-4 text-sm text-text">
+        <div v-if="visualLayout && !printOnly" class="rounded-xl border border-secondary bg-background p-4 text-sm text-text">
             Se imprime el diseño del editor visual. Estos ajustes conservan tu plantilla anterior como respaldo.
             <button type="button" class="font-semibold text-primary underline" @click="handleToolbarAction('visual-editor')">Abrir diseño activo</button>
         </div>
         <TemplateWorkspace
+            :compact="printOnly"
+            :single-column="printOnly"
             v-model="editorTab"
-            title="Una etiqueta lista para el anaquel"
-            description="Elige un producto, revisa su etiqueta y envíala. El papel y el diseño se ajustan por separado."
+            :tabs="printOnly ? [{ value: 'content', label: 'Producto', icon: 'sell' }] : undefined"
+            :title="printOnly ? 'Imprime el precio del producto' : 'Una etiqueta lista para el anaquel'"
+            :description="printOnly ? 'La impresora, el tamaño y el diseño ya están configurados.' : 'Elige un producto, revisa su etiqueta y envíala. El papel y el diseño se ajustan por separado.'"
         >
             <template #status
                 ><span
@@ -444,14 +562,50 @@ async function printTestLabel() {
                 </p>
             </div>
             <div v-show="editorTab === 'content'" class="space-y-5">
-                <div>
+                <div v-if="!printOnly">
                     <h3 class="font-bold">¿Qué producto vas a etiquetar?</h3>
                     <p class="mt-1 text-sm opacity-60">
                         El precio y el código se toman del producto
                         seleccionado.
                     </p>
                 </div>
+                <div v-if="printOnly" class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end">
+                    <div class="min-w-0 flex-1">
+                        <div class="pos-search relative">
+                            <InputField
+                                ref="searchInput"
+                                v-model="productSearch"
+                                label="Buscar o escanear"
+                                field="sales_search"
+                                validation-field="toolbar_search"
+                                icon="barcode_scanner"
+                                placeholder="Codigo de barras o nombre del producto"
+                                autocomplete="off"
+                                :show-counter="false"
+                                @keydown="handleSearchKeydown"
+                            />
+                            <div v-if="searchSuggestions.length" class="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 overflow-hidden rounded-2xl border border-secondary bg-background shadow-xl">
+                                <button
+                                    v-for="(product, index) in searchSuggestions"
+                                    :key="product.id"
+                                    type="button"
+                                    class="flex w-full items-center justify-between gap-3 border-b border-secondary px-4 py-3 text-left last:border-b-0"
+                                    :class="index === highlightedSuggestionIndex ? 'bg-primary text-white' : 'bg-background text-text hover:bg-secondary'"
+                                    @click="selectSuggestion(product)"
+                                >
+                                    <div class="min-w-0">
+                                        <p class="truncate text-base font-semibold">{{ product.name }}</p>
+                                        <p class="truncate text-sm" :class="index === highlightedSuggestionIndex ? 'text-white opacity-80' : 'text-text opacity-70'">{{ product.barcode || 'Sin codigo' }}</p>
+                                    </div>
+                                    <span class="shrink-0 text-base font-bold">${{ Number(product.price || 0).toFixed(2) }}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="h-14 shrink-0 rounded-lg border border-secondary bg-background px-5 text-base font-semibold text-text transition hover:border-primary hover:bg-secondary sm:mb-5" @click="clearPrintQueue">Limpiar</button>
+                </div>
                 <InputField
+                    v-else
                     v-model="productSearch"
                     label="Buscar producto"
                     field="label-product-search"
@@ -459,29 +613,45 @@ async function printTestLabel() {
                     type="search"
                     placeholder="Nombre o código de barras"
                     :show-counter="false"
+                    @keydown="handleSearchKeydown"
                 />
-                <label class="print-field"
-                    >Producto<select v-model="selectedProductId">
-                        <option
-                            v-for="option in filteredProductOptions"
-                            :key="option.value"
-                            :value="option.value"
+                <template v-if="printOnly">
+                    <div class="space-y-2">
+                        <p class="text-sm font-semibold">Etiquetas por imprimir</p>
+                        <p v-if="!printQueue.length" class="text-sm opacity-60">Escanea un código o busca y agrega un producto.</p>
+                        <div v-for="(row, index) in printQueue" :key="row.product.id" class="flex items-center gap-3 rounded-xl border border-secondary p-3">
+                            <button type="button" class="min-w-0 flex-1 truncate text-left text-sm font-medium" @click="selectedProductId = row.product.id">{{ row.product.name }}</button>
+                            <input v-model.number="row.copies" :aria-label="`Cantidad para ${row.product.name}`" type="number" min="1" max="100" class="w-16 rounded-lg border border-secondary bg-background px-2 py-1 text-center" :disabled="printing || row.sent" />
+                            <button type="button" :disabled="printing" aria-label="Quitar producto" class="text-text opacity-60 hover:opacity-100" @click="printQueue.splice(index, 1)"><span class="material-symbols-outlined">close</span></button>
+                        </div>
+                        <button
+                            v-if="canPrintLabels"
+                            type="button"
+                            :disabled="printing || !printQueue.length"
+                            class="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-white disabled:opacity-50"
+                            @click="printTestLabel"
                         >
-                            {{ option.label }}
-                        </option>
-                    </select></label
+                            {{ printing ? 'Imprimiendo…' : 'Imprimir etiquetas' }}
+                        </button>
+                    </div>
+                </template>
+                <label v-else class="print-field"
+                    >Producto<select v-model="selectedProductId">
+                        <option v-for="option in filteredProductOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select></label>
                 >
                 <InputField
+                    v-if="!printOnly"
                     v-model="editableProductName"
                     label="Nombre en la etiqueta"
                     field="label_product_name"
                     :show-counter="false"
                 />
-                <p class="text-xs opacity-60">
+                <p v-if="!printOnly" class="text-xs opacity-60">
                     Este nombre solo cambia la impresión; no modifica el
                     catálogo.
                 </p>
-                <label class="print-field"
+                <label v-if="!printOnly" class="print-field"
                     >Cantidad de etiquetas<input
                         v-model.number="printCopies"
                         type="number"
@@ -490,6 +660,7 @@ async function printTestLabel() {
                 /></label>
             </div>
             <fieldset
+                v-if="!printOnly"
                 v-show="editorTab === 'paper'"
                 :disabled="!canUpdateTemplate"
                 class="space-y-5 disabled:opacity-60"
@@ -546,6 +717,7 @@ async function printTestLabel() {
                 >
             </fieldset>
             <fieldset
+                v-if="!printOnly"
                 v-show="editorTab === 'design'"
                 :disabled="!canUpdateTemplate"
                 class="space-y-5 disabled:opacity-60"
@@ -607,7 +779,7 @@ async function printTestLabel() {
                     </div>
                 </details>
             </fieldset>
-            <template #preview>
+            <template v-if="!printOnly" #preview>
                 <section
                     class="overflow-hidden rounded-2xl border border-secondary bg-background shadow-sm"
                 >
@@ -629,7 +801,7 @@ async function printTestLabel() {
                         >
                     </div>
                     <div
-                        class="flex min-h-64 items-center justify-center bg-secondary/40 p-6 sm:p-10"
+                        class="flex min-h-36 items-center justify-center bg-secondary/40 p-4"
                     >
                         <img
                             v-if="previewImage"
@@ -637,16 +809,16 @@ async function printTestLabel() {
                             alt="Etiqueta que se enviará a la impresora"
                             class="h-auto max-w-full bg-white shadow-lg"
                             :style="{
-                                width: `${previewDimensions.width * 5}px`,
+                                width: printOnly ? `${previewDimensions.width * 3}px` : `${previewDimensions.width * 5}px`,
                             }"
                         />
                     </div>
                     <div class="space-y-4 p-5">
-                        <p class="text-xs opacity-60">
+                        <p v-if="!printOnly" class="text-xs opacity-60">
                             La imagen del diseño es la misma que se envía. El
                             tamaño físico depende del papel y del driver.
                         </p>
-                        <div class="rounded-xl border border-secondary p-3">
+                        <div v-if="!printOnly" class="rounded-xl border border-secondary p-3">
                             <p class="text-xs opacity-60">Impresora asignada</p>
                             <p class="mt-1 break-words text-sm font-semibold">
                                 {{ selectedPrinterName || "Sin asignar" }}
@@ -657,6 +829,7 @@ async function printTestLabel() {
                         </div>
                         <div class="flex gap-3">
                             <button
+                                v-if="!printOnly"
                                 type="button"
                                 class="rounded-xl border border-secondary px-4 py-3 text-sm font-semibold"
                                 @click="
@@ -667,14 +840,14 @@ async function printTestLabel() {
                             ><button
                                 v-if="canPrintLabels"
                                 type="button"
-                                :disabled="printing"
+                                :disabled="printing || (printOnly && !printQueue.length)"
                                 class="flex-1 rounded-xl bg-primary px-4 py-3 font-semibold text-white disabled:opacity-50"
                                 @click="printTestLabel"
                             >
                                 {{
                                     printing
                                         ? "Enviando…"
-                                        : `Imprimir ${printCopies || 1} etiqueta(s)`
+                                        : printOnly ? 'Imprimir etiquetas' : 'Imprimir etiqueta'
                                 }}
                             </button>
                         </div>
@@ -684,3 +857,9 @@ async function printTestLabel() {
         </TemplateWorkspace>
     </PageLayout>
 </template>
+
+<style scoped>
+.pos-search :deep(label) { font-size: 1rem; }
+.pos-search :deep(input) { min-height: 3.5rem; font-size: 1rem; }
+.pos-search :deep(.material-symbols-outlined) { font-size: 1.5rem; }
+</style>
