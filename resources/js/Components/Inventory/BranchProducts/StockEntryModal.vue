@@ -45,17 +45,22 @@ const unit = computed(() => props.product?.inventory_unit ?? props.product?.unit
 const isKilogramUnit = computed(() => ['kg', 'kilo', 'kilogramo'].includes(
     String(unit.value).trim().toLowerCase(),
 ))
-const isBoxUnit = computed(() => Boolean(props.product?.has_box_presentation)
+const hasBoxPresentation = computed(() => Boolean(props.product?.has_box_presentation)
     && inventoryQuantityMode.value === 'base')
+const hasPackagePresentation = computed(() => Boolean(props.product?.has_package_presentation)
+    && inventoryQuantityMode.value === 'base')
+const isBoxUnit = computed(() => hasBoxPresentation.value)
 const isLegacyPresentation = computed(() => inventoryQuantityMode.value === 'legacy_presentation')
 const piecesPerBox = computed(() => {
     const pieces = Number(props.product?.pieces_per_box ?? 1)
 
     return Number.isInteger(pieces) && pieces > 0 ? pieces : 1
 })
-const distributionUnit = ref(isBoxUnit.value ? 'boxes' : 'pieces')
+const entryPresentation = ref(hasBoxPresentation.value ? 'box' : (hasPackagePresentation.value ? 'package' : 'piece'))
+const distributionUnit = ref(hasBoxPresentation.value ? 'boxes' : 'pieces')
 const entryQuantityLabel = computed(() => {
-    if (isBoxUnit.value) return 'cajas'
+    if (entryPresentation.value === 'box') return 'cajas'
+    if (entryPresentation.value === 'package') return 'paquetes'
     if (isKilogramUnit.value) return 'kilogramos'
 
     return 'piezas'
@@ -65,7 +70,18 @@ const distributionQuantityLabel = computed(() => {
 
     return distributionUnit.value === 'boxes' ? 'cajas' : 'piezas'
 })
-const quantityLimit = computed(() => isKilogramUnit.value ? 999.999 : 999)
+const piecesPerPackage = computed(() => {
+    const pieces = Number(props.product?.pieces_per_package ?? 1)
+    return Number.isInteger(pieces) && pieces > 0 ? pieces : 1
+})
+const entryFactor = computed(() => entryPresentation.value === 'box'
+    ? piecesPerBox.value
+    : entryPresentation.value === 'package' ? piecesPerPackage.value : 1)
+const quantityLimit = computed(() => {
+    if (isKilogramUnit.value) return 999.999
+    if (entryPresentation.value === 'piece') return 9999
+    return Math.floor(100000 / entryFactor.value)
+})
 const quantityStep = computed(() => isKilogramUnit.value ? 0.001 : 1)
 
 const entry = computed(() => form.batches?.[0] ?? null)
@@ -133,7 +149,7 @@ function quantityText(value) {
     const rawValue = String(value ?? '').replace(',', '.')
 
     if (!isKilogramUnit.value) {
-        return rawValue.replace(/[^\d]/g, '').slice(0, 3)
+        return rawValue.replace(/[^\d]/g, '').slice(0, entryPresentation.value === 'piece' ? 4 : 6)
     }
 
     const cleanValue = rawValue.replace(/[^\d.]/g, '')
@@ -153,7 +169,7 @@ function formattedQuantity(value) {
 function entryQuantityInPieces(value = entry.value?.quantity) {
     const quantity = quantityNumber(value)
 
-    return isBoxUnit.value ? quantity * piecesPerBox.value : quantity
+    return quantity * entryFactor.value
 }
 
 function allocationQuantityInPieces(value) {
@@ -415,6 +431,7 @@ function saveEntry() {
 
     saveAdjustment((data) => ({
         ...data,
+        entry_presentation: entryPresentation.value,
         quantity: entryQuantityInPieces(data.quantity),
         batches: (data.batches ?? []).map((batch) => ({
             ...batch,
@@ -486,6 +503,11 @@ onMounted(() => {
                 >
                     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
                         <div class="lg:col-span-2">
+                            <div v-if="hasBoxPresentation || hasPackagePresentation" class="mb-3 flex flex-wrap gap-2">
+                                <button type="button" class="rounded-lg border px-3 py-1.5 text-xs font-semibold" :class="entryPresentation === 'piece' ? 'border-primary bg-primary text-white' : 'border-secondary'" @click="entryPresentation = 'piece'">Pieza</button>
+                                <button v-if="hasPackagePresentation" type="button" class="rounded-lg border px-3 py-1.5 text-xs font-semibold" :class="entryPresentation === 'package' ? 'border-primary bg-primary text-white' : 'border-secondary'" @click="entryPresentation = 'package'">Paquete</button>
+                                <button v-if="hasBoxPresentation" type="button" class="rounded-lg border px-3 py-1.5 text-xs font-semibold" :class="entryPresentation === 'box' ? 'border-primary bg-primary text-white' : 'border-secondary'" @click="entryPresentation = 'box'">Caja</button>
+                            </div>
                             <label class="mb-1 block text-sm font-semibold text-text">
                                 Cantidad total ({{ entryQuantityLabel }})
                             </label>
@@ -496,7 +518,7 @@ onMounted(() => {
                                 :disabled="form.processing"
                                 :allow-decimal="isKilogramUnit"
                                 :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'product_piece_quantity'"
-                                :max-integer-digits="3"
+                                :max-integer-digits="entryPresentation === 'piece' ? 4 : 6"
                                 :max-decimal-digits="3"
                                 :decrease-disabled="quantityNumber(entry.quantity) <= quantityStep"
                                 @decrease="decreaseEntryQuantity"
@@ -505,10 +527,13 @@ onMounted(() => {
                             />
 
                             <p
-                                v-if="isBoxUnit"
+                                v-if="entryPresentation === 'box'"
                                 class="mt-2 text-xs text-text opacity-70"
                             >
                                 Cada caja contiene {{ piecesPerBox }} piezas. Esta entrada registrará {{ totalPieces }} piezas.
+                            </p>
+                            <p v-else-if="entryPresentation === 'package'" class="mt-2 text-xs text-text opacity-70">
+                                Cada paquete contiene {{ piecesPerPackage }} piezas. Esta entrada registrará {{ totalPieces }} piezas.
                             </p>
                         </div>
 

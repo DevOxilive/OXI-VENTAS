@@ -56,6 +56,7 @@ class StockMovementController extends Controller
             ],
 
             'quantity' => ['required', 'numeric', $request->input('type') === StockMovement::TYPE_ADJUSTMENT ? 'not_in:0' : 'min:0.001'],
+            'entry_presentation' => ['nullable', Rule::in(['piece', 'package', 'box'])],
             'notes' => ['nullable', 'string', 'max:500'],
 
             /*
@@ -123,7 +124,7 @@ class StockMovementController extends Controller
 
         $this->authorizeMovement($request, $validated['type']);
 
-        $branchProduct = BranchProduct::with('product:id,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode')->findOrFail($validated['branch_product_id']);
+        $branchProduct = BranchProduct::with('product:id,unit,inventory_unit,pieces_per_box,pieces_per_package,has_box_presentation,has_package_presentation,inventory_quantity_mode')->findOrFail($validated['branch_product_id']);
         if (! $request->user()->hasBranchAccess((int) $branchProduct->branch_id)) {
             throw new AuthorizationException('No tienes acceso al inventario de esta sucursal.');
         }
@@ -137,6 +138,7 @@ class StockMovementController extends Controller
         $this->validateQuantitiesForUnit(
             $validated,
             (string) ($branchProduct->product?->inventory_unit ?? $branchProduct->product?->unit ?? 'pza'),
+            (string) ($validated['entry_presentation'] ?? 'piece'),
         );
 
         $destinationBranchIds = collect($validated['branch_allocations'] ?? [])
@@ -444,7 +446,7 @@ class StockMovementController extends Controller
         }
     }
 
-    private function validateQuantitiesForUnit(array $data, string $unit): void
+    private function validateQuantitiesForUnit(array $data, string $unit, string $entryPresentation = 'piece'): void
     {
         $quantities = [
             'quantity' => $data['quantity'] ?? null,
@@ -474,8 +476,11 @@ class StockMovementController extends Controller
                 continue;
             }
 
-            if (abs($value) > 999 || abs($value - round($value)) > 0.0000001) {
-                $errors[$field] = 'La cantidad debe ser un número entero entre 1 y 999.';
+            $maximum = $entryPresentation === 'piece' ? 9999 : 100000;
+            if (abs($value) > $maximum || abs($value - round($value)) > 0.0000001) {
+                $errors[$field] = $entryPresentation === 'piece'
+                    ? 'La captura por pieza permite un número entero entre 1 y 9,999.'
+                    : 'La entrada convertida a piezas permite hasta 100,000 piezas.';
             }
         }
 

@@ -164,7 +164,7 @@ class BranchInventoryController extends Controller
             })
             ->with([
                 'branch:id,name',
-                'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
+                'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,pieces_per_package,packages_per_box,has_box_presentation,has_package_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,cost_per_package,sale_price_per_package,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
                 'product.category:id,product_department_id,name',
                 'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
@@ -245,7 +245,7 @@ class BranchInventoryController extends Controller
 
     public function details(Request $request, BranchProduct $branchProduct): JsonResponse
     {
-        $branchProduct->loadMissing('branch', 'product:id,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box');
+        $branchProduct->loadMissing('branch', 'product:id,unit,inventory_unit,pieces_per_box,pieces_per_package,packages_per_box,has_box_presentation,has_package_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,cost_per_package,sale_price_per_package');
         $this->abortIfUserCannotAccessBranch($request, $branchProduct->branch);
 
         return response()->json($this->serializeBranchProductDetails($branchProduct, $request));
@@ -281,7 +281,7 @@ class BranchInventoryController extends Controller
                 })
                 ->with([
                     'branch:id,name,slug',
-                    'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
+                    'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,pieces_per_package,packages_per_box,has_box_presentation,has_package_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,cost_per_package,sale_price_per_package,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
                     'product.category:id,product_department_id,name',
                     'product.category.productDepartment:id,name',
                     'product.barcodes:id,product_id,code',
@@ -357,7 +357,7 @@ class BranchInventoryController extends Controller
 
     public function updateConfig(Request $request, BranchProduct $branchProduct)
     {
-        $branchProduct->loadMissing('branch', 'product:id,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box');
+        $branchProduct->loadMissing('branch', 'product:id,unit,inventory_unit,pieces_per_box,pieces_per_package,packages_per_box,has_box_presentation,has_package_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,cost_per_package,sale_price_per_package');
         $this->abortIfUserCannotAccessBranch($request, $branchProduct->branch);
 
         $validated = $request->validate([
@@ -401,7 +401,7 @@ class BranchInventoryController extends Controller
     {
         $branchProduct->loadMissing([
             'branch:id,name,slug',
-            'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
+            'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,pieces_per_package,packages_per_box,has_box_presentation,has_package_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,cost_per_package,sale_price_per_package,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
             'product.category:id,product_department_id,name',
             'product.category.productDepartment:id,name',
             'product.barcodes:id,product_id,code',
@@ -441,7 +441,7 @@ class BranchInventoryController extends Controller
         $request->validate(['include_movements' => ['sometimes', 'boolean']]);
         $branchProduct->load([
             'branch:id,name,slug',
-            'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
+            'product:id,name,search_aliases,image,category_id,sale_price,cost,unit,inventory_unit,pieces_per_box,pieces_per_package,packages_per_box,has_box_presentation,has_package_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,cost_per_package,sale_price_per_package,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,active,updated_at,catalog_version',
             'product.category:id,product_department_id,name',
             'product.category.productDepartment:id,name',
             'product.barcodes:id,product_id,code',

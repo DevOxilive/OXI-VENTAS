@@ -206,8 +206,14 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
                 has_box_presentation: Boolean(
                     detail.product?.has_box_presentation ?? item.product?.has_box_presentation,
                 ),
+                has_package_presentation: Boolean(
+                    detail.product?.has_package_presentation ?? item.product?.has_package_presentation,
+                ),
                 pieces_per_box: Number(
                     detail.product?.pieces_per_box ?? item.product?.pieces_per_box ?? 0,
+                ) || null,
+                pieces_per_package: Number(
+                    detail.product?.pieces_per_package ?? item.product?.pieces_per_package ?? 0,
                 ) || null,
                 assigned_branch_ids: Array.isArray(detail.assigned_branch_ids)
                     ? detail.assigned_branch_ids.map(Number)

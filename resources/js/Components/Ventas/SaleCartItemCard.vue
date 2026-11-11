@@ -54,10 +54,10 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
               {{ item.name }}
             </p>
             <p class="mt-0.5 truncate text-sm text-text opacity-70">
-              {{ item.barcode || "Sin codigo" }} · Stock: {{ item.presentation === 'box' ? `${Number(item.available_quantity ?? item.stock)} cajas` : formatInventoryQuantityWithUnit(item.available_quantity ?? item.stock, item.inventory_unit) }}
+              {{ item.barcode || "Sin codigo" }} · Stock: {{ item.presentation === 'box' ? `${Number(item.available_quantity ?? item.stock)} cajas` : item.presentation === 'package' ? `${Number(item.available_quantity ?? item.stock)} paquetes` : formatInventoryQuantityWithUnit(item.available_quantity ?? item.stock, item.inventory_unit) }}
             </p>
             <div
-              v-if="item.has_box_presentation"
+              v-if="item.has_box_presentation || item.has_package_presentation"
               class="mt-2 inline-flex rounded-lg border border-secondary bg-background p-0.5"
             >
               <button
@@ -67,6 +67,15 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
                 @click="$emit('set-presentation', 'piece')"
               >
                 Piezas
+              </button>
+              <button
+                v-if="item.has_package_presentation"
+                type="button"
+                class="rounded-md px-3 py-1.5 text-sm font-semibold"
+                :class="item.presentation === 'package' ? 'bg-primary text-white' : 'text-text'"
+                @click="$emit('set-presentation', 'package')"
+              >
+                Paquetes
               </button>
               <button
                 type="button"

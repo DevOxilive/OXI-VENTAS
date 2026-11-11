@@ -209,12 +209,12 @@ export function useAdjustStockForm(props, emit) {
             : String(form.quantity ?? "");
         const quantityPattern = isKilogramUnit.value
             ? /^\d{1,3}(\.\d{1,3})?$/
-            : /^\d{1,3}$/;
+            : /^\d{1,6}$/;
 
         if (!quantityPattern.test(rawQuantity)) {
             frontendErrors.quantity = isKilogramUnit.value
                 ? "Los kilogramos permiten hasta 999.999 con un máximo de tres decimales."
-                : "La cantidad debe ser un número entero entre 1 y 999.";
+                : "La cantidad debe ser un número entero válido.";
             return;
         }
 
