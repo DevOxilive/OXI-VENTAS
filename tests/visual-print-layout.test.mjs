@@ -22,8 +22,12 @@ test('label base uses the centered Brother 62 mm continuous profile', () => {
   assert.equal(layout.height,29);
   assert.equal(layout.auto_height,false);
   assert.deepEqual(layout.elements.map(({binding,x,y,width,height,align})=>({binding,x,y,width,height,align})),[
-    {binding:'name',x:2,y:3,width:58,height:9,align:'center'},
-    {binding:'price',x:2,y:14,width:58,height:10,align:'center'},
+    {binding:'name',x:2,y:2,width:58,height:8,align:'center'},
+    {binding:'price',x:2,y:12,width:58,height:14,align:'center'},
+  ]);
+  assert.deepEqual(layout.elements.map(({font_size,bold})=>({font_size,bold})),[
+    {font_size:16,bold:true},
+    {font_size:32,bold:true},
   ]);
 });
 test('long details shift totals and footer preserving their spacing', () => {
