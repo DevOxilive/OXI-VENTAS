@@ -73,6 +73,63 @@ class VisualPrintLayout
         return $record?->is_active ? ($record->settings['published'] ?? null) : null;
     }
 
+    /**
+     * La impresión de precios siempre usa el motor visual. Si Sistemas no ha
+     * publicado una variante, se entrega esta base única a cada interfaz.
+     */
+    public static function labelPrintLayout(): array
+    {
+        return self::active('label') ?? self::defaultLabelLayout();
+    }
+
+    private static function defaultLabelLayout(): array
+    {
+        return [
+            'version' => 2,
+            'paper_format' => 'continuous-62',
+            'dpi' => 300,
+            'width' => 62,
+            'height' => 29,
+            'auto_height' => false,
+            'elements' => [
+                [
+                    'id' => 'default-label-name',
+                    'type' => 'field',
+                    'binding' => 'name',
+                    'text' => '',
+                    'x' => 2,
+                    'y' => 2,
+                    'width' => 58,
+                    'height' => 8,
+                    'font_size' => 16,
+                    'bold' => true,
+                    'align' => 'center',
+                    'fill' => '#000000',
+                    'stroke' => 0,
+                    'visible' => true,
+                    'locked' => false,
+                ],
+                [
+                    'id' => 'default-label-price',
+                    'type' => 'field',
+                    'binding' => 'price',
+                    'text' => '',
+                    'x' => 2,
+                    'y' => 12,
+                    'width' => 58,
+                    'height' => 14,
+                    'font_size' => 32,
+                    'bold' => true,
+                    'align' => 'center',
+                    'fill' => '#000000',
+                    'stroke' => 0,
+                    'visible' => true,
+                    'locked' => false,
+                ],
+            ],
+        ];
+    }
+
     public static function withActive(string $kind, array $settings): array
     {
         $layout = self::active($kind);

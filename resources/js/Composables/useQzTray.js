@@ -621,3 +621,20 @@ export async function printImageLabel(printerName, base64Image, dimensions = {},
     data: base64Image,
   }]);
 }
+
+// Único camino para todas las etiquetas: mismo lienzo visual, misma medida
+// física y mismo envío a QZ Tray, sin que cada pantalla arme su propio PNG.
+export async function printVisualLabel(printerName, layout, product, copies = 1) {
+  if (!layout) {
+    throw new Error("No hay un diseño visual de etiquetas disponible.");
+  }
+
+  const { renderVisualPrint } = await import(
+    "@/Components/Printers/visualPrintRenderer"
+  );
+  const output = await renderVisualPrint(layout, product, {
+    dpi: layout.dpi || 300,
+  });
+
+  return printImageLabel(printerName, output.base64, output, copies);
+}

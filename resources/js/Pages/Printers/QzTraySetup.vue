@@ -6,11 +6,6 @@ import { ErrorAlert, ToastAlert, WarningAlert } from "@/Components/Modales/Unive
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
 import {
-  buildLabelPngBase64,
-  createDefaultLabelTemplate,
-  resolveLabelPrintDimensions,
-} from "@/config/labelTemplate";
-import {
   findLabelPrinter,
   findTicketPrinter,
   getQzPrinters,
@@ -18,7 +13,7 @@ import {
   getStoredLabelPrinterName,
   getStoredTicketPrinterName,
   printEscPosTicket,
-  printImageLabel,
+  printVisualLabel,
   saveStoredLabelPrinterName,
   saveStoredTicketPrinterName,
   subscribeToQzTrayRecovery,
@@ -26,6 +21,10 @@ import {
 
 defineOptions({
   layout: AdminLayout,
+});
+
+const props = defineProps({
+  visualLayout: { type: Object, required: true },
 });
 
 const installerUrl = route("printers.qz-setup.download");
@@ -202,7 +201,6 @@ async function printLabelTest() {
   printingLabel.value = true;
 
   try {
-    const template = createDefaultLabelTemplate();
     const product = {
       name: "PRUEBA SUPER KAY",
       price: 10,
@@ -213,12 +211,10 @@ async function printLabelTest() {
       category: "PRUEBA",
       date: new Date().toLocaleDateString("es-MX"),
     };
-    const image = buildLabelPngBase64(template, product);
-
-    await printImageLabel(
+    await printVisualLabel(
       printerName,
-      image,
-      resolveLabelPrintDimensions(template),
+      props.visualLayout,
+      product,
       1
     );
 
