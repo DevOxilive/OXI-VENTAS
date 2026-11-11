@@ -35,7 +35,7 @@ import {
     getQzPrinters,
     findLabelPrinter,
     findTicketPrinter,
-    printImageLabel,
+    printVisualLabel,
     printEscPosTicket,
 } from "@/Composables/useQzTray";
 
@@ -488,12 +488,7 @@ async function action(id) {
                     "Asigna una impresora en Configurar impresoras.",
                 );
             if (props.kind === "label") {
-                const output = await renderVisualPrint(
-                    layout.value,
-                    sample.value,
-                    { dpi: layout.value.dpi || 300 },
-                );
-                await printImageLabel(printer, output.base64, output, 1);
+                await printVisualLabel(printer, layout.value, sample.value, 1);
             } else
                 await printEscPosTicket(printer, [
                     {

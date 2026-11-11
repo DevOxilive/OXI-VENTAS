@@ -43,7 +43,7 @@ class TicketTemplateController extends Controller
 
     public function labels()
     {
-        return Inertia::render('Printers/Labels', $this->labelPageProps());
+        return redirect()->route('printers.visual-editor.show', ['kind' => 'label']);
     }
 
     public function printPrices()
@@ -93,7 +93,7 @@ class TicketTemplateController extends Controller
             ->values();
 
         return [
-            'visualLayout' => \App\Support\VisualPrintLayout::active('label'),
+            'visualLayout' => \App\Support\VisualPrintLayout::labelPrintLayout(),
             'template' => [
                 'id' => $template->id,
                 'name' => $template->name,

@@ -62,6 +62,20 @@ class VisualPrintTemplateTest extends TestCase
         $this->assertNull(VisualPrintLayout::active('sales'));
     }
 
+    public function test_label_printing_always_has_the_visual_base_when_no_design_is_published(): void
+    {
+        $layout = VisualPrintLayout::labelPrintLayout();
+
+        $this->assertSame('continuous-62', $layout['paper_format']);
+        $this->assertSame(62, $layout['width']);
+        $this->assertSame(29, $layout['height']);
+        $this->assertSame(16, $layout['elements'][0]['font_size']);
+        $this->assertSame(32, $layout['elements'][1]['font_size']);
+        $this->assertSame('center', $layout['elements'][0]['align']);
+        $this->assertSame('center', $layout['elements'][1]['align']);
+        $this->assertSame($layout, VisualPrintLayout::validate($layout));
+    }
+
     public function test_stale_revision_cannot_overwrite_a_design(): void
     {
         $controller = app(VisualPrintTemplateController::class);

@@ -15,18 +15,17 @@ import {
 } from "@/Components/Modales/UniversalActionModal";
 import { getPrinterLabelsToolbarConfig } from "@/config/ToolbarConfigs/printerLabelsToolbarConfig";
 import {
-    buildLabelPngBase64,
     createDefaultLabelTemplate,
     getLabelBlockCatalog,
     normalizeLabelTemplate,
-    resolveLabelPrintDimensions,
     saveStoredLabelTemplateSettings,
 } from "@/config/labelTemplate";
+import { createVisualLayout } from "@/config/visualPrintLayout";
 import {
     findLabelPrinter,
     getQzPrinters,
     getStoredLabelPrinterName,
-    printImageLabel,
+    printVisualLabel,
     subscribeToQzTrayRecovery,
 } from "@/Composables/useQzTray";
 import { usePermissions } from "@/Composables/usePermissions";
@@ -121,11 +120,12 @@ const editorTab = ref("content");
 const visualPreview = ref(null);
 const visualPreviewError = ref("");
 let visualPreviewGeneration = 0;
-const previewImage = computed(() => {
-    if (props.visualLayout) return visualPreview.value ? `data:image/png;base64,${visualPreview.value.base64}` : "";
-    if (typeof document === "undefined") return "";
-    return `data:image/png;base64,${buildLabelPngBase64(previewTemplate.value, selectedProduct.value)}`;
-});
+const labelLayout = computed(() =>
+    props.visualLayout || createVisualLayout("label"),
+);
+const previewImage = computed(() =>
+    visualPreview.value ? `data:image/png;base64,${visualPreview.value.base64}` : "",
+);
 watch(
     () => props.template.updated_at,
     (value) => {
@@ -141,9 +141,6 @@ function applyLabelSize(event) {
             label_height_mm: height,
         });
 }
-const previewTemplate = computed(() =>
-    normalizeLabelTemplate({ ...form.settings }),
-);
 const editableProductName = ref("");
 
 const baseSelectedProduct = computed(
@@ -168,11 +165,10 @@ const selectedProduct = computed(() => ({
         baseSelectedProduct.value?.name ||
         "",
 }));
-watch([() => props.visualLayout, selectedProduct], async ([layout, product]) => {
+watch([labelLayout, selectedProduct], async ([layout, product]) => {
     const generation = ++visualPreviewGeneration;
     visualPreview.value = null;
     visualPreviewError.value = "";
-    if (!layout) return;
     try {
         const {renderVisualPrint} = await import("@/Components/Printers/visualPrintRenderer");
         const output = await renderVisualPrint(layout, product, {dpi: layout.dpi || 300});
@@ -181,7 +177,7 @@ watch([() => props.visualLayout, selectedProduct], async ([layout, product]) => 
         if (generation === visualPreviewGeneration) visualPreviewError.value = error.message;
     }
 }, {deep: true, immediate: true});
-const previewDimensions = computed(() => visualPreview.value || props.visualLayout || resolveLabelPrintDimensions(previewTemplate.value));
+const previewDimensions = computed(() => visualPreview.value || labelLayout.value);
 const toolbarConfig = computed(() =>
     getPrinterLabelsToolbarConfig({
         processing: form.processing,
@@ -489,22 +485,20 @@ async function printTestLabel() {
                 if (!Number.isInteger(Number(row.copies)) || row.copies < 1 || row.copies > 100) throw new Error('La cantidad por producto debe ser un entero entre 1 y 100.');
             }
             for (const row of jobs) {
-                const output = props.visualLayout
-                    ? await (await import('@/Components/Printers/visualPrintRenderer')).renderVisualPrint(props.visualLayout, row.product, { dpi: props.visualLayout.dpi || 300 })
-                    : null;
-                await printImageLabel(selectedPrinterName.value, output?.base64 || buildLabelPngBase64(previewTemplate.value, row.product), output || resolveLabelPrintDimensions(previewTemplate.value), Number(row.copies));
+                await printVisualLabel(
+                    selectedPrinterName.value,
+                    labelLayout.value,
+                    row.product,
+                    Number(row.copies),
+                );
                 row.sent = true;
             }
             printQueue.value = [];
         } else {
-        const visualOutput = props.visualLayout
-            ? await (await import("@/Components/Printers/visualPrintRenderer")).renderVisualPrint(props.visualLayout, selectedProduct.value, {dpi: props.visualLayout.dpi || 300})
-            : null;
-        const image = visualOutput?.base64 || previewImage.value.split(",")[1];
-        await printImageLabel(
+        await printVisualLabel(
             selectedPrinterName.value,
-            image,
-            visualOutput || resolveLabelPrintDimensions(previewTemplate.value),
+            labelLayout.value,
+            selectedProduct.value,
             1,
         );
         }
@@ -533,8 +527,8 @@ async function printTestLabel() {
                 @action="handleToolbarAction"
         /></template>
         <p v-if="visualPreviewError" role="alert" class="text-red-600">{{ visualPreviewError }}</p>
-        <div v-if="visualLayout && !printOnly" class="rounded-xl border border-secondary bg-background p-4 text-sm text-text">
-            Se imprime el diseño del editor visual. Estos ajustes conservan tu plantilla anterior como respaldo.
+        <div v-if="!printOnly" class="rounded-xl border border-secondary bg-background p-4 text-sm text-text">
+            Todas las etiquetas se imprimen con el mismo diseño visual. La plantilla anterior ya no se usa al imprimir.
             <button type="button" class="font-semibold text-primary underline" @click="handleToolbarAction('visual-editor')">Abrir diseño activo</button>
         </div>
         <TemplateWorkspace

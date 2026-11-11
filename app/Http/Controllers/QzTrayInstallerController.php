@@ -11,7 +11,9 @@ class QzTrayInstallerController extends Controller
 {
     public function index(): InertiaResponse
     {
-        return Inertia::render('Printers/QzTraySetup');
+        return Inertia::render('Printers/QzTraySetup', [
+            'visualLayout' => \App\Support\VisualPrintLayout::labelPrintLayout(),
+        ]);
     }
 
     public function download(): BinaryFileResponse
