@@ -230,7 +230,7 @@ test("document print jobs use their own design instead of the page template", ()
     assert.ok(!output.includes("\x1B\x70"));
 });
 
-test("printer menu has setup, tickets and labels with permission-aware entry", async () => {
+test("printer menu separates label setup from price printing by permission", async () => {
     const { generateMenu } =
         await import("../resources/js/config/menuConfig.js");
     globalThis.route = (name, params) => `/route/${name}/${params?.kind || ""}`;
@@ -240,12 +240,26 @@ test("printer menu has setup, tickets and labels with permission-aware entry", a
             "systems.tickets.view",
             "systems.cash-closure-tickets.view",
             "systems.labels.view",
+            "systems.labels.print",
         ]);
         assert.deepEqual(
             menu
                 .find((item) => item.key === "printers")
                 .children.map((item) => item.text),
             ["Configurar impresoras", "Tickets", "Etiquetas"],
+        );
+        const printOnly = generateMenu("", ["systems.labels.print"])
+            .find((item) => item.text === "Ventas");
+        assert.deepEqual(printOnly.children.map((item) => item.text), ["Imprimir precios"]);
+        assert.ok(printOnly.children[0].url.includes("ventas.print-prices.index"));
+        const salesMenu = generateMenu("", [
+            "sales.view",
+            "sales.cash-closures.view",
+            "systems.labels.print",
+        ]).find((item) => item.key === "sales");
+        assert.deepEqual(
+            salesMenu.children.map((item) => item.text),
+            ["Punto de venta", "Historial de ventas", "Corte de caja", "Imprimir precios"],
         );
         const limited = generateMenu("", [
             "systems.cash-closure-tickets.view",

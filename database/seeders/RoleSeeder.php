@@ -118,6 +118,7 @@ class RoleSeeder extends Seeder
             'sales.purchase-orders.view',
             'sales.purchase-orders.receive',
             'systems.qz.sign',
+            'systems.labels.print',
             'attendance.register',
             'attendance.corrections.request',
         ];

@@ -3,18 +3,22 @@ export function getPrinterLabelsToolbarConfig({
   printing = false,
   canSave = true,
   canPrint = true,
+  showVisualEditor = true,
+  title = "Etiquetas",
+  subtitle = "Productos, papel y diseño en un solo lugar.",
+  printLabel = "Imprimir etiquetas",
 } = {}) {
   return {
     icon: "barcode",
-    title: "Etiquetas",
-    subtitle: "Productos, papel y diseño en un solo lugar.",
+    title,
+    subtitle,
     showSearch: false,
     showRecordsPerPage: false,
     showCounter: false,
     filters: [],
     tabs: [],
     actions: [
-      {id: "visual-editor", label: "Editor visual", icon: "draw", variant: "slate"},
+      ...(showVisualEditor ? [{id: "visual-editor", label: "Editor visual", icon: "draw", variant: "slate"}] : []),
       ...(canSave ? [
         {
           id: "reset",
@@ -32,7 +36,7 @@ export function getPrinterLabelsToolbarConfig({
       ...(canPrint ? [
         {
           id: "print",
-          label: printing ? "Imprimiendo..." : "Imprimir etiquetas",
+          label: printing ? "Imprimiendo..." : printLabel,
           icon: "print",
           variant: "green",
         },

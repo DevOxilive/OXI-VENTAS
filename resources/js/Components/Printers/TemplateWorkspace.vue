@@ -3,6 +3,8 @@ defineProps({
     title: String,
     description: String,
     modelValue: String,
+    compact: Boolean,
+    singleColumn: Boolean,
     tabs: {
         type: Array,
         default: () => [
@@ -17,6 +19,7 @@ defineEmits(["update:modelValue"]);
 <template>
     <div class="template-workspace space-y-5 text-text">
         <header
+            v-if="!compact"
             class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-secondary bg-background p-5"
         >
             <div>
@@ -28,12 +31,14 @@ defineEmits(["update:modelValue"]);
             <slot name="status" />
         </header>
         <div
-            class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]"
+            class="grid items-start gap-6"
+            :class="singleColumn ? '' : 'lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]'"
         >
             <section
                 class="min-w-0 rounded-2xl border border-secondary bg-background shadow-sm"
             >
                 <nav
+                    v-if="!compact"
                     aria-label="Configuración de plantilla"
                     class="flex gap-1 overflow-x-auto border-b border-secondary p-2"
                 >
@@ -58,7 +63,7 @@ defineEmits(["update:modelValue"]);
                 </nav>
                 <div class="space-y-5 p-5 sm:p-6"><slot /></div>
             </section>
-            <div class="min-w-0 lg:sticky lg:top-4">
+            <div v-if="!singleColumn" class="min-w-0 lg:sticky lg:top-4">
                 <slot name="preview" />
             </div>
         </div>

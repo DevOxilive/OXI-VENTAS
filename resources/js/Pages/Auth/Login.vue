@@ -1,5 +1,6 @@
 <script setup>
 import { Head, useForm } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import { t } from '@/i18n/es';
 
 defineProps({
@@ -12,6 +13,7 @@ const form = useForm({
     password: '',
     remember: false,
 });
+const showPassword = ref(false);
 
 const submit = () => {
     form.email = form.email.trim();
@@ -97,13 +99,24 @@ const submit = () => {
                             <label class="login-label mb-2 block text-sm font-semibold text-slate-700">
                                 Contrasena
                             </label>
-                            <input
-                                v-model="form.password"
-                                type="password"
-                                placeholder="Contrasena"
-                                class="login-password w-full rounded-2xl border border-slate-200 px-4 py-3 text-base text-slate-800 outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200 sm:text-lg"
-                                required
-                            />
+                            <div class="relative">
+                                <input
+                                    v-model="form.password"
+                                    :type="showPassword ? 'text' : 'password'"
+                                    placeholder="Contrasena"
+                                    class="login-password w-full rounded-2xl border border-slate-200 px-4 py-3 pr-12 text-base text-slate-800 outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200 sm:text-lg"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    class="absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-slate-500 transition hover:bg-amber-50 hover:text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                                    :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                                    :title="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                                    @click="showPassword = !showPassword"
+                                >
+                                    <span class="material-symbols-outlined text-[20px]" aria-hidden="true">{{ showPassword ? 'visibility_off' : 'visibility' }}</span>
+                                </button>
+                            </div>
 
                             <p v-if="form.errors.password" class="mt-2 text-sm text-red-500">
                                 {{ form.errors.password }}
