@@ -958,6 +958,9 @@ function cartItemAvailableQuantity(item) {
   if (item.presentation === "box") {
     return Math.floor(Number(item.stock || 0) / Number(item.pieces_per_box || 1));
   }
+  if (item.presentation === "package") {
+    return Math.floor(Number(item.stock || 0) / Number(item.pieces_per_package || 1));
+  }
 
   return Number(item.stock || 0);
 }
@@ -988,12 +991,14 @@ function bulkQuantityInput(value) {
 
 function setCartPresentation(index, presentation) {
   const item = cart.value[index];
-  if (!item || (presentation === "box" && !item.has_box_presentation)) return;
+  if (!item || (presentation === "box" && !item.has_box_presentation) || (presentation === "package" && !item.has_package_presentation)) return;
 
   item.presentation = presentation;
   item.original_price = presentation === "box"
     ? Number(item.sale_price_per_box || 0)
-    : Number(item.sale_price_per_piece || item.price || 0);
+    : presentation === "package"
+      ? Number(item.sale_price_per_package || 0)
+      : Number(item.sale_price_per_piece || item.price || 0);
   item.available_quantity = cartItemAvailableQuantity(item);
   item.quantity = Math.max(1, Number(item.quantity || 1));
   item.quantity_input = item.quantity;
@@ -1058,8 +1063,11 @@ function addProduct(product) {
     original_price: Number(product.price || 0),
     sale_price_per_piece: Number(product.sale_price_per_piece ?? product.price ?? 0),
     sale_price_per_box: Number(product.sale_price_per_box ?? 0),
+    sale_price_per_package: Number(product.sale_price_per_package ?? 0),
     has_box_presentation: Boolean(product.has_box_presentation),
+    has_package_presentation: Boolean(product.has_package_presentation),
     pieces_per_box: Number(product.pieces_per_box || 0),
+    pieces_per_package: Number(product.pieces_per_package || 0),
     inventory_unit: product.inventory_unit ?? "pza",
     presentation: "piece",
     stock: Number(product.stock || 0),

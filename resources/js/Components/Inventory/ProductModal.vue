@@ -43,7 +43,10 @@ const form = useForm({
   branch_ids: [],
   inventory_unit: "pza",
   has_box_presentation: false,
+  has_package_presentation: false,
   pieces_per_box: "",
+  pieces_per_package: "",
+  packages_per_box: "",
   name: "",
   search_aliases: [""],
   min_stock: 0,
@@ -54,6 +57,8 @@ const form = useForm({
   sale_price_per_piece: "",
   cost_per_box: "",
   sale_price_per_box: "",
+  cost_per_package: "",
+  sale_price_per_package: "",
   piece_pricing_mode: "manual",
   box_pricing_mode: "manual",
   piece_margin_percentage: "",
@@ -205,7 +210,10 @@ function captureFormSnapshot() {
     branch_ids: [...form.branch_ids],
     inventory_unit: form.inventory_unit,
     has_box_presentation: form.has_box_presentation,
+    has_package_presentation: form.has_package_presentation,
     pieces_per_box: form.pieces_per_box,
+    pieces_per_package: form.pieces_per_package,
+    packages_per_box: form.packages_per_box,
     name: form.name,
     search_aliases: [...form.search_aliases],
     min_stock: form.min_stock,
@@ -216,6 +224,8 @@ function captureFormSnapshot() {
     sale_price_per_piece: form.sale_price_per_piece,
     cost_per_box: form.cost_per_box,
     sale_price_per_box: form.sale_price_per_box,
+    cost_per_package: form.cost_per_package,
+    sale_price_per_package: form.sale_price_per_package,
     allow_low_margin: form.allow_low_margin,
     entry_date: form.entry_date,
     active: form.active,
@@ -241,7 +251,10 @@ function restoreFormSnapshot(snapshot) {
   form.branch_ids = [...snapshot.branch_ids];
   form.inventory_unit = snapshot.inventory_unit;
   form.has_box_presentation = snapshot.has_box_presentation;
+  form.has_package_presentation = snapshot.has_package_presentation;
   form.pieces_per_box = snapshot.pieces_per_box;
+  form.pieces_per_package = snapshot.pieces_per_package;
+  form.packages_per_box = snapshot.packages_per_box;
   form.name = snapshot.name;
   form.search_aliases = [...snapshot.search_aliases];
   form.min_stock = snapshot.min_stock;
@@ -252,6 +265,8 @@ function restoreFormSnapshot(snapshot) {
   form.sale_price_per_piece = snapshot.sale_price_per_piece;
   form.cost_per_box = snapshot.cost_per_box;
   form.sale_price_per_box = snapshot.sale_price_per_box;
+  form.cost_per_package = snapshot.cost_per_package;
+  form.sale_price_per_package = snapshot.sale_price_per_package;
   form.allow_low_margin = snapshot.allow_low_margin;
   form.entry_date = snapshot.entry_date;
   form.active = snapshot.active;
@@ -286,7 +301,10 @@ watch(
 
     form.inventory_unit = product.inventory_unit ?? (product.unit === "kg" ? "kg" : "pza");
     form.has_box_presentation = Boolean(product.has_box_presentation ?? product.unit === "cj");
+    form.has_package_presentation = Boolean(product.has_package_presentation);
     form.pieces_per_box = product.pieces_per_box ?? "";
+    form.pieces_per_package = product.pieces_per_package ?? "";
+    form.packages_per_box = product.packages_per_box ?? "";
     form.name = product.name ?? "";
     form.search_aliases = product.search_aliases?.length
       ? [...product.search_aliases]
@@ -304,6 +322,8 @@ watch(
     form.sale_price_per_piece = product.sale_price_per_piece ?? product.price ?? "";
     form.cost_per_box = product.cost_per_box ?? "";
     form.sale_price_per_box = product.sale_price_per_box ?? "";
+    form.cost_per_package = product.cost_per_package ?? "";
+    form.sale_price_per_package = product.sale_price_per_package ?? "";
     form.entry_date =
       product.entry_date ?? localDateInput();
     form.active = true;
@@ -326,6 +346,12 @@ const units = [
 
 const isKilogramUnit = computed(() => form.inventory_unit === "kg");
 const hasBoxPresentation = computed(() => Boolean(form.has_box_presentation));
+const enabledPresentations = computed(() => [
+  "piece",
+  ...(form.has_package_presentation ? ["package"] : []),
+  ...(hasBoxPresentation.value ? ["box"] : []),
+]);
+const presentationLabel = (value) => value === "box" ? "Caja" : value === "package" ? "Paquete" : isKilogramUnit.value ? "Kilogramo" : "Pieza";
 const selectedBranchIds = computed(() =>
   new Set(form.branch_ids.map((branchId) => Number(branchId)))
 );
@@ -337,7 +363,7 @@ const categoriesForDepartment = computed(() => {
   });
 });
 const marginBelowMinimum = computed(() => {
-  const presentations = hasBoxPresentation.value ? ["piece", "box"] : ["piece"];
+  const presentations = enabledPresentations.value;
   return presentations.some((presentation) => {
     const margin = actualMargin(presentation);
     return margin !== null && Math.round(margin * 100) / 100 < 10;
@@ -457,7 +483,10 @@ function setCreateDefaults() {
   ensureCurrentBranchSelected();
   form.inventory_unit = "pza";
   form.has_box_presentation = false;
+  form.has_package_presentation = false;
   form.pieces_per_box = "";
+  form.pieces_per_package = "";
+  form.packages_per_box = "";
   form.name = "";
   form.search_aliases = [""];
   form.min_stock = 0;
@@ -468,6 +497,8 @@ function setCreateDefaults() {
   form.sale_price_per_piece = "";
   form.cost_per_box = "";
   form.sale_price_per_box = "";
+  form.cost_per_package = "";
+  form.sale_price_per_package = "";
   form.allow_low_margin = false;
   form.entry_date = localDateInput();
   form.active = true;
@@ -556,7 +587,10 @@ watch(
   (unit) => {
     if (unit === "kg") {
       form.has_box_presentation = false;
+      form.has_package_presentation = false;
       form.pieces_per_box = "";
+      form.pieces_per_package = "";
+      form.packages_per_box = "";
       form.cost_per_box = "";
       form.sale_price_per_box = "";
     }
@@ -988,19 +1022,22 @@ function submit() {
               class="relative"
             >
               <label class="mb-1 block text-sm font-semibold text-text">
-                Captura y vende por caja
+                Captura y vende por
               </label>
-              <div class="flex h-[46px] items-center justify-between rounded-xl border border-secondary bg-background px-4">
-                <span class="text-xs text-text opacity-70">Inventario en piezas.</span>
-                <ToggleSwitch
-                  v-model="form.has_box_presentation"
-                  :disabled="mode === 'view'"
-                />
+              <div class="grid h-[46px] grid-cols-2 items-center divide-x divide-secondary rounded-xl border border-secondary bg-background">
+                <div class="flex items-center justify-between gap-2 px-3 text-sm">
+                  <span>Paquete</span>
+                  <ToggleSwitch v-model="form.has_package_presentation" :disabled="mode === 'view'" role="switch" :aria-checked="form.has_package_presentation" aria-label="Captura y venta por paquete" class="shrink-0" />
+                </div>
+                <div class="flex items-center justify-between gap-2 px-3 text-sm">
+                  <span>Caja</span>
+                  <ToggleSwitch v-model="form.has_box_presentation" :disabled="mode === 'view'" role="switch" :aria-checked="form.has_box_presentation" aria-label="Captura y venta por caja" class="shrink-0" />
+                </div>
               </div>
             </div>
 
             <InputField
-              v-if="hasBoxPresentation"
+              v-if="hasBoxPresentation && !form.has_package_presentation"
               label="Piezas por caja"
               field="pieces_per_box"
               validation-field="quantity"
@@ -1011,6 +1048,33 @@ function submit() {
               placeholder="Ej. 12"
               :readonly="mode === 'view'"
               @validate="clearFieldErrors('pieces_per_box')"
+            />
+
+
+            <InputField
+              v-if="form.has_package_presentation"
+              label="Piezas por paquete"
+              field="pieces_per_package"
+              v-model="form.pieces_per_package"
+              :error="form.errors.pieces_per_package"
+              type="text"
+              inputmode="numeric"
+              placeholder="Ej. 50"
+              :readonly="mode === 'view'"
+              @validate="clearFieldErrors('pieces_per_package')"
+            />
+
+            <InputField
+              v-if="form.has_box_presentation && form.has_package_presentation"
+              label="Paquetes por caja"
+              field="packages_per_box"
+              v-model="form.packages_per_box"
+              :error="form.errors.packages_per_box"
+              type="text"
+              inputmode="numeric"
+              placeholder="Ej. 12"
+              :readonly="mode === 'view'"
+              @validate="clearFieldErrors('packages_per_box')"
             />
 
             <InputField
@@ -1054,13 +1118,12 @@ function submit() {
 
             <template v-if="canManagePricing">
               <section
-                v-for="presentation in (hasBoxPresentation ? ['piece', 'box'] : ['piece'])"
+                v-for="presentation in enabledPresentations"
                 :key="presentation"
-                class="grid gap-3 rounded-xl border border-secondary p-3 md:col-span-2 2xl:col-span-3 md:grid-cols-3"
+                :aria-label="`Precios por ${presentationLabel(presentation).toLowerCase()}`"
+                class="grid gap-x-3 gap-y-2 border-t border-secondary pt-3 md:col-span-2 2xl:col-span-3 md:grid-cols-3"
               >
-                <h3 class="text-sm font-semibold md:col-span-3">
-                  {{ presentation === 'box' ? 'Precios por caja' : isKilogramUnit ? 'Precios por kilogramo' : 'Precios por pieza' }}
-                </h3>
+                <h3 class="text-sm font-semibold text-text md:col-span-3">{{ presentationLabel(presentation) }}</h3>
                 <InputField
                   label="Precio de compra"
                   :field="`cost_per_${presentation}`"
@@ -1084,7 +1147,7 @@ function submit() {
                     type="text"
                     inputmode="decimal"
                     :error="form.errors[`${presentation}_margin_percentage`]"
-                    :readonly="mode === 'view' || !(Number(form[`cost_per_${presentation}`]) > 0)"
+                    :readonly="presentation === 'package' || mode === 'view' || !(Number(form[`cost_per_${presentation}`]) > 0)"
                     @validate="clearFieldErrors(`${presentation}_margin_percentage`)"
                   />
                   <p v-if="Number(form[`cost_per_${presentation}`]) <= 0" class="mt-1 text-xs text-text opacity-70">
@@ -1128,6 +1191,17 @@ function submit() {
                 </button>
               </div>
             </template>
+            <InputField
+              v-if="form.has_package_presentation && !canManagePricing"
+              label="Precio compra por paquete"
+              field="cost_per_package"
+              v-model="form.cost_per_package"
+              :error="form.errors.cost_per_package"
+              type="text"
+              inputmode="decimal"
+              :readonly="mode === 'view'"
+              @validate="clearFieldErrors('cost_per_package')"
+            />
           </div>
         </section>
         </div>

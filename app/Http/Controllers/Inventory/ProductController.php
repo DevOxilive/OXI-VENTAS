@@ -62,6 +62,7 @@ class ProductController extends Controller
     private function resolvePresentationPricing(array &$data, bool $canManagePricing, ?Product $currentProduct = null): void
     {
         $hasBoxPresentation = (bool) ($data['has_box_presentation'] ?? false);
+        $hasPackagePresentation = (bool) ($data['has_package_presentation'] ?? false);
         $costPerPiece = (float) $data['cost_per_piece'];
         $costPerBox = $hasBoxPresentation ? (float) $data['cost_per_box'] : null;
 
@@ -107,16 +108,25 @@ class ProductController extends Controller
             }
         }
 
+        if ($hasPackagePresentation && ! $canManagePricing) {
+            $data['sale_price_per_package'] = $currentProduct
+                ? (float) ($currentProduct->sale_price_per_package ?? 0)
+                : round(((float) $data['cost_per_package']) * 1.10, 2);
+        }
+
         $pieceMargin = $this->calculateMarginPercentage($costPerPiece, $data['sale_price_per_piece']);
         $boxMargin = $hasBoxPresentation
             ? $this->calculateMarginPercentage($costPerBox, $data['sale_price_per_box'])
             : null;
+        $packageMargin = $hasPackagePresentation
+            ? $this->calculateMarginPercentage((float) $data['cost_per_package'], $data['sale_price_per_package'])
+            : null;
 
-        $margins = array_filter([$pieceMargin, $boxMargin], fn ($margin) => $margin !== null);
+        $margins = array_filter([$pieceMargin, $packageMargin, $boxMargin], fn ($margin) => $margin !== null);
 
         if ($margins !== [] && min($margins) < 10 && ! ($canManagePricing && ($data['allow_low_margin'] ?? false))) {
             throw ValidationException::withMessages([
-                ($pieceMargin !== null && $pieceMargin < 10 ? 'sale_price_per_piece' : 'sale_price_per_box') => 'El porcentaje de ganancia no puede ser menor al 10%. Un administrador debe autorizar esta excepción.',
+                ($pieceMargin !== null && $pieceMargin < 10 ? 'sale_price_per_piece' : ($packageMargin !== null && $packageMargin < 10 ? 'sale_price_per_package' : 'sale_price_per_box')) => 'El porcentaje de ganancia no puede ser menor al 10%. Un administrador debe autorizar esta excepción.',
             ]);
         }
 
@@ -160,7 +170,7 @@ class ProductController extends Controller
         $branchProduct = BranchProduct::query()
             ->with([
                 'branch:id,name,slug',
-                'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,active,created_at,updated_at,catalog_version',
+                'product:id,name,search_aliases,image,description,category_id,cost,sale_price,margin_percentage,piece_pricing_mode,box_pricing_mode,piece_margin_percentage,box_margin_percentage,unit,inventory_unit,pieces_per_box,pieces_per_package,packages_per_box,has_box_presentation,has_package_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,cost_per_package,sale_price_per_package,active,created_at,updated_at,catalog_version',
                 'product.category:id,product_department_id,name',
                 'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
@@ -217,7 +227,10 @@ class ProductController extends Controller
             'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct'],
             'inventory_unit' => ['required', Rule::in(['pza', 'kg'])],
             'has_box_presentation' => ['nullable', 'boolean'],
-            'pieces_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
+            'has_package_presentation' => ['nullable', 'boolean'],
+            'pieces_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation') && ! (bool) $request->boolean('has_package_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
+            'pieces_per_package' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_package_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
+            'packages_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation') && (bool) $request->boolean('has_package_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
             'name' => ['required', 'string', 'max:255', 'regex:/^[^\p{C}]+$/u'],
             'search_aliases' => ['nullable', 'array', 'max:30'],
             'search_aliases.*' => ['nullable', 'string', 'max:60', 'regex:/^[^\p{C}]+$/u', 'distinct:ignore_case'],
@@ -235,6 +248,10 @@ class ProductController extends Controller
             'sale_price_per_box' => $canManagePricing
                 ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0']
                 : ['nullable', 'numeric', 'min:0'],
+            'cost_per_package' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_package_presentation')), 'nullable', 'numeric', 'min:0'],
+            'sale_price_per_package' => $canManagePricing
+                ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_package_presentation')), 'nullable', 'numeric', 'min:0']
+                : ['nullable', 'numeric', 'min:0'],
             'piece_pricing_mode' => ['sometimes', Rule::in(['manual', 'percentage'])],
             'box_pricing_mode' => ['sometimes', Rule::in(['manual', 'percentage'])],
             'piece_margin_percentage' => ['nullable', 'numeric', 'min:0', 'max:999999'],
@@ -247,11 +264,18 @@ class ProductController extends Controller
         ]);
 
         $data['has_box_presentation'] = $request->boolean('has_box_presentation');
+        $data['has_package_presentation'] = $request->boolean('has_package_presentation');
+        if ($data['has_package_presentation'] && $data['has_box_presentation']) {
+            $data['pieces_per_box'] = $data['pieces_per_package'] * $data['packages_per_box'];
+            if ($data['pieces_per_box'] > 100000) {
+                throw ValidationException::withMessages(['packages_per_box' => 'Una caja no puede representar más de 100,000 piezas.']);
+            }
+        }
         $data['search_aliases'] = $this->normalizeSearchAliases($data['search_aliases'] ?? []);
 
         $this->resolvePresentationPricing($data, $canManagePricing);
 
-        if ($data['inventory_unit'] === 'kg' && $data['has_box_presentation']) {
+        if ($data['inventory_unit'] === 'kg' && ($data['has_box_presentation'] || $data['has_package_presentation'])) {
             throw ValidationException::withMessages([
                 'has_box_presentation' => 'La presentación por caja solo aplica a productos inventariados por pieza.',
             ]);
@@ -314,10 +338,15 @@ class ProductController extends Controller
                     'has_box_presentation' => (bool) $data['has_box_presentation'],
                     'inventory_quantity_mode' => 'base',
                     'pieces_per_box' => $data['has_box_presentation'] ? $data['pieces_per_box'] : null,
+                    'has_package_presentation' => (bool) $data['has_package_presentation'],
+                    'pieces_per_package' => $data['has_package_presentation'] ? $data['pieces_per_package'] : null,
+                    'packages_per_box' => $data['has_box_presentation'] && $data['has_package_presentation'] ? $data['packages_per_box'] : null,
                     'cost_per_piece' => $data['cost_per_piece'],
                     'sale_price_per_piece' => $data['sale_price_per_piece'],
                     'cost_per_box' => $data['has_box_presentation'] ? $data['cost_per_box'] : null,
                     'sale_price_per_box' => $data['has_box_presentation'] ? $data['sale_price_per_box'] : null,
+                    'cost_per_package' => $data['has_package_presentation'] ? $data['cost_per_package'] : null,
+                    'sale_price_per_package' => $data['has_package_presentation'] ? $data['sale_price_per_package'] : null,
                     'category_id' => $data['category_id'],
                     'active' => $data['active'] ?? true,
                 ]);
@@ -366,7 +395,10 @@ class ProductController extends Controller
             'barcodes.*' => ['nullable', 'string', 'max:100', 'distinct'],
             'inventory_unit' => ['required', Rule::in(['pza', 'kg'])],
             'has_box_presentation' => ['nullable', 'boolean'],
-            'pieces_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
+            'has_package_presentation' => ['nullable', 'boolean'],
+            'pieces_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation') && ! (bool) $request->boolean('has_package_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
+            'pieces_per_package' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_package_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
+            'packages_per_box' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation') && (bool) $request->boolean('has_package_presentation')), 'nullable', 'integer', 'min:2', 'max:999'],
             'name' => ['required', 'string', 'max:255', 'regex:/^[^\p{C}]+$/u'],
             'search_aliases' => ['nullable', 'array', 'max:30'],
             'search_aliases.*' => ['nullable', 'string', 'max:60', 'regex:/^[^\p{C}]+$/u', 'distinct:ignore_case'],
@@ -383,6 +415,10 @@ class ProductController extends Controller
             'sale_price_per_box' => $canManagePricing
                 ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_box_presentation')), 'nullable', 'numeric', 'min:0']
                 : ['nullable', 'numeric', 'min:0'],
+            'cost_per_package' => [Rule::requiredIf(fn () => (bool) $request->boolean('has_package_presentation')), 'nullable', 'numeric', 'min:0'],
+            'sale_price_per_package' => $canManagePricing
+                ? [Rule::requiredIf(fn () => (bool) $request->boolean('has_package_presentation')), 'nullable', 'numeric', 'min:0']
+                : ['nullable', 'numeric', 'min:0'],
             'piece_pricing_mode' => ['sometimes', Rule::in(['manual', 'percentage'])],
             'box_pricing_mode' => ['sometimes', Rule::in(['manual', 'percentage'])],
             'piece_margin_percentage' => ['nullable', 'numeric', 'min:0', 'max:999999'],
@@ -395,11 +431,18 @@ class ProductController extends Controller
         ]);
 
         $data['has_box_presentation'] = $request->boolean('has_box_presentation');
+        $data['has_package_presentation'] = $request->boolean('has_package_presentation');
+        if ($data['has_package_presentation'] && $data['has_box_presentation']) {
+            $data['pieces_per_box'] = $data['pieces_per_package'] * $data['packages_per_box'];
+            if ($data['pieces_per_box'] > 100000) {
+                throw ValidationException::withMessages(['packages_per_box' => 'Una caja no puede representar más de 100,000 piezas.']);
+            }
+        }
         $data['search_aliases'] = $this->normalizeSearchAliases($data['search_aliases'] ?? []);
 
         $this->resolvePresentationPricing($data, $canManagePricing, $product);
 
-        if ($data['inventory_unit'] === 'kg' && $data['has_box_presentation']) {
+        if ($data['inventory_unit'] === 'kg' && ($data['has_box_presentation'] || $data['has_package_presentation'])) {
             throw ValidationException::withMessages([
                 'has_box_presentation' => 'La presentación por caja solo aplica a productos inventariados por pieza.',
             ]);
@@ -455,7 +498,12 @@ class ProductController extends Controller
             || (float) $product->sale_price_per_box !== (float) ($data['has_box_presentation'] ? $data['sale_price_per_box'] : 0)
             || (string) $product->inventory_unit !== (string) $data['inventory_unit']
             || (bool) $product->has_box_presentation !== (bool) $data['has_box_presentation']
+            || (bool) $product->has_package_presentation !== (bool) $data['has_package_presentation']
             || (int) $product->pieces_per_box !== (int) ($data['has_box_presentation'] ? $data['pieces_per_box'] : 0)
+            || (int) $product->pieces_per_package !== (int) ($data['has_package_presentation'] ? $data['pieces_per_package'] : 0)
+            || (int) $product->packages_per_box !== (int) ($data['has_box_presentation'] && $data['has_package_presentation'] ? $data['packages_per_box'] : 0)
+            || (float) $product->cost_per_package !== (float) ($data['has_package_presentation'] ? $data['cost_per_package'] : 0)
+            || (float) $product->sale_price_per_package !== (float) ($data['has_package_presentation'] ? $data['sale_price_per_package'] : 0)
             || (bool) $product->active !== (bool) ($data['active'] ?? true)
             || $currentBarcodes->all() !== $barcodes->all();
 
@@ -506,10 +554,15 @@ class ProductController extends Controller
                     'has_box_presentation' => (bool) $data['has_box_presentation'],
                     'inventory_quantity_mode' => $isLegacyPresentationProduct ? 'legacy_presentation' : 'base',
                     'pieces_per_box' => $data['has_box_presentation'] ? $data['pieces_per_box'] : null,
+                    'has_package_presentation' => (bool) $data['has_package_presentation'],
+                    'pieces_per_package' => $data['has_package_presentation'] ? $data['pieces_per_package'] : null,
+                    'packages_per_box' => $data['has_box_presentation'] && $data['has_package_presentation'] ? $data['packages_per_box'] : null,
                     'cost_per_piece' => $data['cost_per_piece'],
                     'sale_price_per_piece' => $data['sale_price_per_piece'],
                     'cost_per_box' => $data['has_box_presentation'] ? $data['cost_per_box'] : null,
                     'sale_price_per_box' => $data['has_box_presentation'] ? $data['sale_price_per_box'] : null,
+                    'cost_per_package' => $data['has_package_presentation'] ? $data['cost_per_package'] : null,
+                    'sale_price_per_package' => $data['has_package_presentation'] ? $data['sale_price_per_package'] : null,
                     'active' => $data['active'] ?? true,
                 ]);
 
@@ -1030,7 +1083,12 @@ class ProductController extends Controller
             'unit' => $product?->unit ?? '',
             'inventory_unit' => $product?->inventory_unit ?? ($product?->unit === 'kg' ? 'kg' : 'pza'),
             'pieces_per_box' => $product?->pieces_per_box,
+            'pieces_per_package' => $product?->pieces_per_package,
+            'packages_per_box' => $product?->packages_per_box,
             'has_box_presentation' => (bool) ($product?->has_box_presentation ?? $product?->unit === 'cj'),
+            'has_package_presentation' => (bool) $product?->has_package_presentation,
+            'cost_per_package' => $product?->cost_per_package,
+            'sale_price_per_package' => $product?->sale_price_per_package,
             'inventory_quantity_mode' => $product?->inventory_quantity_mode ?? 'base',
             'name' => $product?->name ?? 'Producto sin nombre',
             'search_aliases' => $product?->search_aliases ?? [],

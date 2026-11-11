@@ -282,7 +282,7 @@ class SalesController extends Controller
 
         $products = BranchProduct::query()
             ->with([
-                'product:id,name,image,category_id,cost,sale_price,margin_percentage,active,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box',
+                'product:id,name,image,category_id,cost,sale_price,margin_percentage,active,unit,inventory_unit,pieces_per_box,pieces_per_package,has_box_presentation,has_package_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,cost_per_package,sale_price_per_package',
                 'product.category:id,name',
                 'product.barcodes:id,product_id,code',
             ])
@@ -334,7 +334,7 @@ class SalesController extends Controller
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.barcode_id' => ['nullable', 'exists:barcodes,id'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.001'],
-            'items.*.presentation' => ['nullable', 'in:piece,box'],
+            'items.*.presentation' => ['nullable', 'in:piece,package,box'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.original_unit_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -439,10 +439,14 @@ class SalesController extends Controller
                 $presentation = $item['presentation'] ?? 'piece';
                 $isKilogram = ($product?->inventory_unit ?? $product?->unit) === 'kg';
                 $piecesPerBox = (int) ($product?->pieces_per_box ?? 0);
+                $piecesPerPackage = (int) ($product?->pieces_per_package ?? 0);
                 if ($presentation === 'box' && (! $product?->has_box_presentation || $piecesPerBox < 2)) {
                     throw ValidationException::withMessages([
                         'items' => 'El producto '.($product?->name ?? 'seleccionado').' no tiene una presentación por caja configurada.',
                     ]);
+                }
+                if ($presentation === 'package' && (! $product?->has_package_presentation || $piecesPerPackage < 2)) {
+                    throw ValidationException::withMessages(['items' => 'El producto '.($product?->name ?? 'seleccionado').' no tiene una presentación por paquete configurada.']);
                 }
 
                 if (($presentation === 'box' || ! $isKilogram) && abs($quantity - round($quantity)) > 0.0000001) {
@@ -459,10 +463,10 @@ class SalesController extends Controller
 
                 $baseQuantity = $presentation === 'box'
                     ? $quantity * $piecesPerBox
-                    : $quantity;
+                    : ($presentation === 'package' ? $quantity * $piecesPerPackage : $quantity);
                 $originalUnitPrice = $presentation === 'box'
                     ? (float) ($product?->sale_price_per_box ?? 0)
-                    : (float) ($product?->sale_price_per_piece ?? $product?->sale_price ?? 0);
+                    : ($presentation === 'package' ? (float) ($product?->sale_price_per_package ?? 0) : (float) ($product?->sale_price_per_piece ?? $product?->sale_price ?? 0));
                 $discountPercentage = round((float) ($item['discount_percentage'] ?? 0), 2);
                 $unitPrice = round($originalUnitPrice * (1 - ($discountPercentage / 100)), 2);
                 $discountAmount = round(($originalUnitPrice - $unitPrice) * $quantity, 2);
@@ -490,14 +494,14 @@ class SalesController extends Controller
                     'quantity' => $quantity,
                     'sale_unit' => $presentation,
                     'base_quantity' => $baseQuantity,
-                    'pieces_per_box' => $presentation === 'box' ? $piecesPerBox : null,
+                    'pieces_per_box' => $presentation === 'box' ? $piecesPerBox : ($presentation === 'package' ? $piecesPerPackage : null),
                     'original_unit_price' => $originalUnitPrice,
                     'discount_percentage' => $discountPercentage,
                     'discount_amount' => $discountAmount,
                     'unit_price' => $unitPrice,
                     'unit_cost' => $presentation === 'box'
                         ? ($product?->cost_per_box ?? 0)
-                        : ($product?->cost_per_piece ?? $product?->cost ?? 0),
+                        : ($presentation === 'package' ? ($product?->cost_per_package ?? 0) : ($product?->cost_per_piece ?? $product?->cost ?? 0)),
                     'subtotal' => $subtotal,
                 ]);
 
@@ -731,8 +735,11 @@ class SalesController extends Controller
             'price' => (float) ($product?->sale_price_per_piece ?? $product?->sale_price ?? 0),
             'sale_price_per_piece' => (float) ($product?->sale_price_per_piece ?? $product?->sale_price ?? 0),
             'sale_price_per_box' => (float) ($product?->sale_price_per_box ?? 0),
+            'sale_price_per_package' => (float) ($product?->sale_price_per_package ?? 0),
             'has_box_presentation' => (bool) $product?->has_box_presentation,
+            'has_package_presentation' => (bool) $product?->has_package_presentation,
             'pieces_per_box' => (int) ($product?->pieces_per_box ?? 0),
+            'pieces_per_package' => (int) ($product?->pieces_per_package ?? 0),
             'inventory_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
             'inventory_quantity_mode' => $product?->inventory_quantity_mode ?? 'base',
             'cost' => (float) ($product?->cost ?? 0),
