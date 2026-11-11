@@ -88,8 +88,8 @@ const roleProfiles = {
         accent: 'Inicio',
         icon: 'dashboard',
         scene: 'general',
-        statLabel: 'Rol',
-        statValue: () => roleName.value,
+        statLabel: 'Panel principal',
+        statValue: () => 'Todo listo',
     },
 }
 
@@ -113,10 +113,6 @@ const heroMetaCards = computed(() => [
     {
         label: profile.value.statLabel,
         value: profile.value.statValue(),
-    },
-    {
-        label: 'Rol',
-        value: roleName.value,
     },
     ...(assignedBranchesSummary.value
         ? [
@@ -624,14 +620,19 @@ onBeforeUnmount(() => {
         <section class="role-dashboard-shell">
             <div class="hero-panel">
                 <div class="hero-copy">
-                    <div class="role-pill">
-                        <span class="material-symbols-outlined">{{ profile.icon }}</span>
-                        {{ profile.accent }}
+                    <div class="role-pill christmas-pill">
+                        <span class="material-symbols-outlined">ac_unit</span>
+                        Especial navideño
                     </div>
 
                     <h1>Bienvenid@, {{ userName }}</h1>
-                    <p class="hero-subtitle">{{ profile.title }}</p>
-                    <p class="hero-description">{{ profile.subtitle }}</p>
+                    <p class="hero-subtitle">{{ profile.title }} esta Navidad</p>
+                    <p class="hero-description">{{ profile.subtitle }} Que esta temporada esté llena de grandes ventas, orden y buenos momentos.</p>
+
+                    <div class="season-note">
+                        <span class="material-symbols-outlined">card_giftcard</span>
+                        <span>La magia está en cada detalle.</span>
+                    </div>
 
                     <div class="hero-meta">
                         <div
@@ -645,6 +646,10 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="mascot-stage" :class="`scene-${profile.scene}`">
+                    <div class="garland" aria-hidden="true">
+                        <span v-for="light in 8" :key="light" class="garland-light"></span>
+                    </div>
+                    <span v-for="flake in 12" :key="`flake-${flake}`" class="snowflake material-symbols-outlined" :class="`snowflake-${flake}`">ac_unit</span>
                     <span class="confetti confetti-one"></span>
                     <span class="confetti confetti-two"></span>
                     <span class="confetti confetti-three"></span>
@@ -652,9 +657,12 @@ onBeforeUnmount(() => {
 
                     <div class="mascot-orbit">
                         <div class="mascot-card">
-                            <img src="/icons/icon-192.png" alt="Super Kay" class="mascot-logo">
+                            <img src="/icons/super-kay-navidad.png" alt="Super Kay celebra la Navidad" class="mascot-logo">
                         </div>
                     </div>
+
+                    <div class="christmas-star star-one" aria-hidden="true">✦</div>
+                    <div class="christmas-star star-two" aria-hidden="true">✦</div>
 
                     <div class="scene-prop prop-primary">
                         <span class="material-symbols-outlined scene-sale">point_of_sale</span>
@@ -688,6 +696,8 @@ onBeforeUnmount(() => {
                         <span class="material-symbols-outlined scene-general">star</span>
                     </div>
 
+                    <div class="gift gift-one" aria-hidden="true"><span></span></div>
+                    <div class="gift gift-two" aria-hidden="true"><span></span></div>
                     <div class="stage-floor"></div>
                 </div>
             </div>
@@ -781,10 +791,10 @@ onBeforeUnmount(() => {
 .hero-panel {
     align-items: stretch;
     background:
-        radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 24rem),
-        radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--primary) 9%, transparent), transparent 18rem),
-        linear-gradient(135deg, var(--background) 0%, color-mix(in srgb, var(--secondary) 74%, var(--background)) 58%, var(--background) 100%);
-    border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--secondary));
+        radial-gradient(circle at 76% 20%, rgba(255, 207, 69, 0.3), transparent 24rem),
+        radial-gradient(circle at 7% 12%, rgba(191, 30, 45, 0.2), transparent 19rem),
+        linear-gradient(135deg, #fffaf0 0%, #fff2dc 48%, #f9e7d1 100%);
+    border: 1px solid rgba(172, 24, 39, 0.28);
     border-radius: 1.5rem;
     box-shadow: 0 22px 58px color-mix(in srgb, var(--text) 10%, transparent);
     display: grid;
@@ -798,10 +808,10 @@ onBeforeUnmount(() => {
 
 :global(.dark) .hero-panel {
     background:
-        radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--primary) 26%, transparent), transparent 24rem),
-        radial-gradient(circle at 12% 0%, rgba(255, 60, 74, 0.16), transparent 18rem),
-        linear-gradient(135deg, #120001 0%, #050101 58%, #100003 100%);
-    border-color: rgba(230, 0, 18, 0.28);
+        radial-gradient(circle at 76% 20%, rgba(255, 201, 55, 0.17), transparent 24rem),
+        radial-gradient(circle at 7% 12%, rgba(207, 42, 55, 0.22), transparent 19rem),
+        linear-gradient(135deg, #260c12 0%, #15080a 48%, #1d1108 100%);
+    border-color: rgba(255, 211, 92, 0.24);
     box-shadow: 0 28px 70px rgba(0, 0, 0, 0.3);
 }
 
@@ -825,6 +835,13 @@ onBeforeUnmount(() => {
     letter-spacing: 0.08em;
     padding: 0.55rem 0.9rem;
     text-transform: uppercase;
+}
+
+.christmas-pill {
+    background: linear-gradient(135deg, #8f1424, #bd2635);
+    border-color: rgba(255, 224, 141, 0.72);
+    box-shadow: 0 8px 20px rgba(116, 16, 28, 0.2);
+    color: #fff7df;
 }
 
 .role-pill .material-symbols-outlined {
@@ -853,6 +870,21 @@ h1 {
     line-height: 1.7;
     margin-top: 0.7rem;
     max-width: 35rem;
+}
+
+.season-note {
+    align-items: center;
+    color: #8c1b2a;
+    display: inline-flex;
+    font-size: 0.83rem;
+    font-weight: 800;
+    gap: 0.42rem;
+    margin-top: 0.95rem;
+}
+
+.season-note .material-symbols-outlined {
+    color: #b68a16;
+    font-size: 1.2rem;
 }
 
 .hero-meta {
@@ -902,6 +934,8 @@ h1 {
     color: rgba(255, 255, 255, 0.72);
 }
 
+:global(.dark) .season-note { color: #ffe5a0; }
+
 :global(.dark) .hero-meta div {
     background: rgba(255, 255, 255, 0.045);
     border-color: rgba(255, 45, 62, 0.24);
@@ -919,6 +953,65 @@ h1 {
     position: relative;
 }
 
+.garland {
+    align-items: flex-start;
+    display: flex;
+    justify-content: space-around;
+    left: 4%;
+    position: absolute;
+    right: 4%;
+    top: 0;
+    z-index: 6;
+}
+
+.garland::before {
+    border-top: 3px solid #1c653c;
+    border-radius: 50%;
+    content: '';
+    height: 2.25rem;
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+}
+
+.garland-light {
+    animation: twinkle 1.7s ease-in-out infinite alternate;
+    background: #ffcb47;
+    border: 2px solid #fff4b5;
+    border-radius: 999px;
+    box-shadow: 0 0 10px 3px rgba(255, 196, 42, 0.82);
+    height: 0.72rem;
+    margin-top: 1.75rem;
+    position: relative;
+    width: 0.72rem;
+}
+
+.garland-light:nth-child(2n) { animation-delay: 0.55s; background: #c72b38; box-shadow: 0 0 10px 3px rgba(199, 43, 56, 0.68); }
+.garland-light:nth-child(3n) { animation-delay: 0.9s; background: #f9f4dc; }
+
+.snowflake {
+    animation: snow-drift 6s linear infinite;
+    color: rgba(255, 255, 255, 0.86);
+    filter: drop-shadow(0 2px 3px rgba(91, 36, 21, 0.18));
+    font-size: 1.1rem;
+    position: absolute;
+    z-index: 2;
+}
+
+.snowflake-1 { left: 4%; top: 17%; }
+.snowflake-2 { left: 23%; top: 8%; animation-delay: 1s; font-size: .8rem; }
+.snowflake-3 { left: 42%; top: 13%; animation-delay: 2.4s; }
+.snowflake-4 { right: 9%; top: 26%; animation-delay: .4s; font-size: .78rem; }
+.snowflake-5 { right: 28%; top: 5%; animation-delay: 1.7s; }
+.snowflake-6 { left: 8%; bottom: 14%; animation-delay: 2.8s; font-size: .8rem; }
+.snowflake-7 { right: 5%; bottom: 13%; animation-delay: 3.2s; }
+.snowflake-8 { right: 42%; bottom: 7%; animation-delay: 1.2s; font-size: .8rem; }
+.snowflake-9 { left: 31%; bottom: 18%; animation-delay: .8s; }
+.snowflake-10 { right: 33%; top: 34%; animation-delay: 2.1s; font-size: .72rem; }
+.snowflake-11 { left: 15%; top: 38%; animation-delay: 3.5s; font-size: .72rem; }
+.snowflake-12 { right: 18%; bottom: 28%; animation-delay: 4s; font-size: .9rem; }
+
 .mascot-stage::before {
     background: radial-gradient(circle, color-mix(in srgb, var(--primary) 14%, transparent), transparent 68%);
     border-radius: 999px;
@@ -933,6 +1026,19 @@ h1 {
     position: relative;
     z-index: 3;
 }
+
+.christmas-star {
+    animation: twinkle 1.4s ease-in-out infinite alternate;
+    color: #ffd75a;
+    filter: drop-shadow(0 0 8px rgba(255, 207, 61, 0.8));
+    font-size: 2.2rem;
+    line-height: 1;
+    position: absolute;
+    z-index: 5;
+}
+
+.star-one { right: 21%; top: 18%; }
+.star-two { animation-delay: .7s; bottom: 22%; left: 25%; font-size: 1.45rem; }
 
 .mascot-card {
     align-items: center;
@@ -1068,7 +1174,7 @@ h1 {
 }
 
 .stage-floor {
-    background: rgba(230, 0, 18, 0.34);
+    background: linear-gradient(90deg, rgba(26, 102, 60, 0.14), rgba(175, 29, 43, 0.55), rgba(250, 192, 48, 0.35));
     border-radius: 999px;
     bottom: 7%;
     filter: blur(3px);
@@ -1077,6 +1183,29 @@ h1 {
     position: absolute;
     width: min(70%, 24rem);
 }
+
+.gift {
+    border: 3px solid rgba(255, 227, 140, 0.8);
+    border-radius: 0.45rem;
+    bottom: 8%;
+    box-shadow: 0 10px 19px rgba(65, 21, 15, 0.22);
+    height: 3.2rem;
+    position: absolute;
+    width: 3.2rem;
+    z-index: 5;
+}
+
+.gift::before,
+.gift::after,
+.gift span::before,
+.gift span::after { content: ''; position: absolute; }
+.gift::before { background: #fbe7a0; height: 100%; left: 50%; transform: translateX(-50%); width: .38rem; }
+.gift::after { background: #fbe7a0; height: .38rem; left: 0; top: 50%; transform: translateY(-50%); width: 100%; }
+.gift span::before, .gift span::after { border: .28rem solid #fbe7a0; border-radius: 999px 999px 0 999px; height: .78rem; top: -.58rem; width: .78rem; }
+.gift span::before { left: .74rem; transform: rotate(-28deg); }
+.gift span::after { right: .74rem; transform: scaleX(-1) rotate(-28deg); }
+.gift-one { background: #bf2735; left: 11%; transform: rotate(-8deg); }
+.gift-two { background: #1f7046; bottom: 15%; right: 10%; transform: rotate(8deg) scale(.82); }
 
 .content-grid {
     display: grid;
@@ -1090,6 +1219,28 @@ h1 {
     border: 1px solid var(--secondary);
     border-radius: 1.25rem;
     padding: 1.1rem;
+}
+
+.quick-actions-panel {
+    background:
+        radial-gradient(circle at 97% 2%, rgba(255, 204, 80, 0.18), transparent 12rem),
+        linear-gradient(135deg, rgba(178, 24, 42, 0.05), transparent 38%),
+        var(--background);
+    border-color: rgba(177, 30, 43, 0.18);
+    box-shadow: 0 14px 34px rgba(86, 30, 20, 0.06);
+    position: relative;
+}
+
+.quick-actions-panel::after {
+    background: repeating-linear-gradient(90deg, #c12635 0 1.7rem, #f7d36e 1.7rem 2.25rem, #247447 2.25rem 3.95rem);
+    border-radius: 999px;
+    content: '';
+    height: .32rem;
+    left: 1.1rem;
+    opacity: .8;
+    position: absolute;
+    right: 1.1rem;
+    top: 0;
 }
 
 .compact-heading {
@@ -1145,9 +1296,15 @@ h1 {
 }
 
 .quick-action-card:hover {
-    background: var(--background);
-    border-color: var(--primary);
+    background: linear-gradient(135deg, #fffaf0, var(--background));
+    border-color: #bd2938;
+    box-shadow: 0 10px 22px rgba(139, 31, 38, 0.12);
     transform: translateY(-2px);
+}
+
+:global(.dark) .quick-action-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 213, 99, 0.64);
 }
 
 .quick-action-card > .material-symbols-outlined:first-child {
@@ -1202,6 +1359,11 @@ h1 {
     min-height: 0;
     overflow: hidden;
     padding: 0;
+}
+
+.permission-card:hover {
+    border-color: rgba(185, 38, 52, 0.48);
+    box-shadow: 0 9px 20px rgba(110, 28, 30, 0.08);
 }
 
 .permission-card-header {
@@ -1378,6 +1540,18 @@ h1 {
     }
 }
 
+@keyframes twinkle {
+    from { opacity: 0.45; transform: scale(0.82); }
+    to { opacity: 1; transform: scale(1.14); }
+}
+
+@keyframes snow-drift {
+    0% { opacity: 0; transform: translate3d(0, -8px, 0) rotate(0deg); }
+    14% { opacity: 0.9; }
+    88% { opacity: 0.72; }
+    100% { opacity: 0; transform: translate3d(13px, 48px, 0) rotate(150deg); }
+}
+
 @media (max-width: 1180px) {
     .hero-panel {
         grid-template-columns: 1fr;
@@ -1407,6 +1581,29 @@ h1 {
     .scene-prop {
         height: 4rem;
         width: 4rem;
+    }
+
+    .garland {
+        left: 2%;
+        right: 2%;
+    }
+
+    .gift-two,
+    .snowflake-10,
+    .snowflake-11,
+    .snowflake-12 {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mascot-orbit,
+    .mascot-logo,
+    .scene-prop,
+    .confetti,
+    .garland-light,
+    .snowflake {
+        animation: none;
     }
 }
 </style>
