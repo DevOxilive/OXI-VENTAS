@@ -510,7 +510,7 @@ onBeforeUnmount(() => {
                         </p>
                     </div>
                     <label class="print-field"
-                        >Formato de referencia<select
+                        >Formato de referencia<GlobalSelect
                             v-model.number="form.settings.paper_width"
                         >
                             <option
@@ -531,7 +531,7 @@ onBeforeUnmount(() => {
                                 Personalizado ·
                                 {{ form.settings.paper_width }} columnas
                             </option>
-                        </select></label
+                        </GlobalSelect></label
                     >
                     <div class="grid grid-cols-2 gap-4">
                         <label class="print-field"

@@ -84,7 +84,15 @@ class TicketTemplateController extends Controller
                     'barcode' => $barcode,
                     'barcodes' => $product->barcodes->pluck('code')->values(),
                     'sku' => $barcode,
-                    'price' => (float) $product->sale_price,
+                    // La etiqueta decide cuál de estos precios imprimir. No se
+                    // recalculan: pieza, paquete y caja son precios comerciales
+                    // independientes.
+                    'price' => (float) ($product->sale_price_per_piece ?? $product->sale_price),
+                    'sale_price_per_piece' => (float) ($product->sale_price_per_piece ?? $product->sale_price),
+                    'sale_price_per_package' => (float) ($product->sale_price_per_package ?? 0),
+                    'sale_price_per_box' => (float) ($product->sale_price_per_box ?? 0),
+                    'has_package_presentation' => (bool) $product->has_package_presentation,
+                    'has_box_presentation' => (bool) $product->has_box_presentation,
                     'stock' => (float) ($inventory?->current_stock ?? 0),
                     'branch' => $branchName,
                     'date' => now()->format('d/m/Y'),

@@ -9,6 +9,7 @@ import AdminLayout from "@/Layouts/AdminLayout.vue";
 import PageLayout from "@/Layouts/PageLayout.vue";
 import GlobalToolbar from "@/Components/Toolbars/GlobalToolbar.vue";
 import InputField from "@/Components/Forms/InputField.vue";
+import SelectField from "@/Components/Forms/SelectField.vue";
 import {
     ToastAlert,
     WarningAlert,
@@ -69,6 +70,37 @@ let stopPrinterRecovery = null;
 const printing = ref(false);
 const printCopies = ref(1);
 const printQueue = ref([]);
+
+function pricePresentationOptions(product) {
+    const options = [{ value: "piece", label: "Pieza", price: Number(product?.sale_price_per_piece ?? product?.price ?? 0) }];
+
+    if (product?.has_package_presentation) {
+        options.push({ value: "package", label: "Paquete", price: Number(product.sale_price_per_package ?? 0) });
+    }
+
+    if (product?.has_box_presentation) {
+        options.push({ value: "box", label: "Caja", price: Number(product.sale_price_per_box ?? 0) });
+    }
+
+    return options;
+}
+
+function productForPriceLabel(product, presentation = "piece") {
+    const option = pricePresentationOptions(product).find((item) => item.value === presentation)
+        ?? pricePresentationOptions(product)[0];
+
+    return {
+        ...product,
+        price: option.price,
+        price_presentation: option.value,
+    };
+}
+
+function updateQueuePresentation(row, presentation) {
+    row.presentation = presentation;
+    row.sent = false;
+}
+
 function addToQueue(product) {
     if (printing.value || !product) return;
 
@@ -81,7 +113,12 @@ function addToQueue(product) {
         return;
     }
 
-    printQueue.value.push({ product: { ...product }, copies: 1, sent: false });
+    printQueue.value.push({
+        product: { ...product },
+        presentation: pricePresentationOptions(product)[0].value,
+        copies: 1,
+        sent: false,
+    });
 }
 
 function focusSearch() {
@@ -194,7 +231,7 @@ const toolbarConfig = computed(() =>
 );
 const productOptions = computed(() =>
     props.products.map((product) => ({
-        label: `${product.name} - $${Number(product.price || 0).toFixed(2)}`,
+        label: `${product.name} - $${Number(product.sale_price_per_piece ?? product.price ?? 0).toFixed(2)}`,
         value: product.id,
         searchText: [product.name, product.barcode, ...(product.barcodes || [])]
             .filter(Boolean)
@@ -488,7 +525,7 @@ async function printTestLabel() {
                 await printVisualLabel(
                     selectedPrinterName.value,
                     labelLayout.value,
-                    row.product,
+                    productForPriceLabel(row.product, row.presentation),
                     Number(row.copies),
                 );
                 row.sent = true;
@@ -563,7 +600,12 @@ async function printTestLabel() {
                         seleccionado.
                     </p>
                 </div>
-                <div v-if="printOnly" class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end">
+                <div v-if="printOnly" class="rounded-2xl border border-secondary bg-[var(--surface)] p-4 sm:p-5">
+                    <div class="mb-4 flex items-center gap-3">
+                        <span class="material-symbols-outlined flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">barcode_scanner</span>
+                        <div><h3 class="text-base font-bold">Prepara tus etiquetas</h3><p class="mt-0.5 text-xs text-text/60">Busca un producto o escanea su código para agregarlo a la lista.</p></div>
+                    </div>
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
                     <div class="min-w-0 flex-1">
                         <div class="pos-search relative">
                             <InputField
@@ -573,7 +615,7 @@ async function printTestLabel() {
                                 field="sales_search"
                                 validation-field="toolbar_search"
                                 icon="barcode_scanner"
-                                placeholder="Codigo de barras o nombre del producto"
+                                placeholder="Código de barras o nombre del producto"
                                 autocomplete="off"
                                 :show-counter="false"
                                 @keydown="handleSearchKeydown"
@@ -596,7 +638,8 @@ async function printTestLabel() {
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="h-14 shrink-0 rounded-lg border border-secondary bg-background px-5 text-base font-semibold text-text transition hover:border-primary hover:bg-secondary sm:mb-5" @click="clearPrintQueue">Limpiar</button>
+                    <button type="button" :disabled="printing || (!printQueue.length && !productSearch)" class="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-secondary px-4 text-sm font-semibold text-text transition hover:border-primary hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40 sm:mt-6" @click="clearPrintQueue"><span class="material-symbols-outlined text-lg" aria-hidden="true">restart_alt</span>Limpiar</button>
+                    </div>
                 </div>
                 <InputField
                     v-else
@@ -610,30 +653,49 @@ async function printTestLabel() {
                     @keydown="handleSearchKeydown"
                 />
                 <template v-if="printOnly">
-                    <div class="space-y-2">
-                        <p class="text-sm font-semibold">Etiquetas por imprimir</p>
-                        <p v-if="!printQueue.length" class="text-sm opacity-60">Escanea un código o busca y agrega un producto.</p>
-                        <div v-for="(row, index) in printQueue" :key="row.product.id" class="flex items-center gap-3 rounded-xl border border-secondary p-3">
-                            <button type="button" class="min-w-0 flex-1 truncate text-left text-sm font-medium" @click="selectedProductId = row.product.id">{{ row.product.name }}</button>
-                            <input v-model.number="row.copies" :aria-label="`Cantidad para ${row.product.name}`" type="number" min="1" max="100" class="w-16 rounded-lg border border-secondary bg-background px-2 py-1 text-center" :disabled="printing || row.sent" />
-                            <button type="button" :disabled="printing" aria-label="Quitar producto" class="text-text opacity-60 hover:opacity-100" @click="printQueue.splice(index, 1)"><span class="material-symbols-outlined">close</span></button>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between gap-3 px-1"><h3 class="text-sm font-bold">Etiquetas por imprimir</h3><span class="rounded-full bg-secondary/60 px-3 py-1 text-xs font-semibold text-text/70">{{ printQueue.length }} {{ printQueue.length === 1 ? 'producto' : 'productos' }}</span></div>
+                        <div v-if="!printQueue.length" class="flex flex-col items-center rounded-2xl border border-dashed border-secondary bg-secondary/20 px-5 py-6 text-center">
+                            <span class="material-symbols-outlined mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-background text-2xl text-primary shadow-sm" aria-hidden="true">sell</span>
+                            <p class="text-base font-bold text-text">Tu lista está lista para comenzar</p>
+                            <p class="mt-1 max-w-xl text-sm leading-relaxed text-text/70">Agrega el primer producto desde el buscador. Aquí podrás elegir su precio y cuántas etiquetas necesitas.</p>
                         </div>
+                        <div v-for="(row, index) in printQueue" :key="row.product.id" class="flex flex-wrap items-center gap-4 rounded-2xl border border-secondary bg-[var(--surface)] p-4">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary/50 text-xs font-bold text-text/60">{{ index + 1 }}</span>
+                            <button type="button" class="min-w-0 flex-1 basis-40 text-left" @click="selectedProductId = row.product.id"><span class="block truncate text-sm font-semibold">{{ row.product.name }}</span><span class="mt-1 block text-xs text-text/50">{{ row.product.barcode || 'Sin código de barras' }}</span><span v-if="row.sent" class="mt-1 inline-block text-xs font-semibold text-primary">Impreso</span></button>
+                            <div class="flex items-center gap-2 text-xs font-semibold text-text opacity-80">
+                                <span>Precio</span>
+                                <SelectField
+                                    :model-value="row.presentation"
+                                    hide-label
+                                    :options="pricePresentationOptions(row.product).map(option => ({ ...option, label: `${option.label} · $${option.price.toFixed(2)}` }))"
+                                    :show-placeholder="false"
+                                    :disabled="printing"
+                                    class="!w-auto !rounded-lg !px-2 !py-1 !text-sm"
+                                    @update:model-value="updateQueuePresentation(row, $event)"
+                                />
+                            </div>
+                            <label class="flex items-center gap-2 text-xs font-semibold text-text/80">Copias<input v-model.number="row.copies" :aria-label="`Cantidad para ${row.product.name}`" type="number" min="1" max="100" class="h-10 w-16 rounded-xl border border-secondary bg-background px-2 text-center text-sm focus:border-primary focus:ring-primary" :disabled="printing || row.sent" /></label>
+                            <button type="button" :disabled="printing" aria-label="Quitar producto" class="flex h-9 w-9 items-center justify-center rounded-xl text-text/50 transition hover:bg-primary/10 hover:text-primary disabled:opacity-40" @click="printQueue.splice(index, 1)"><span class="material-symbols-outlined text-xl">close</span></button>
+                        </div>
+                        <div v-if="printQueue.length" class="flex flex-col gap-4 border-t border-secondary pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-sm text-text/60">Revisa los precios y las copias antes de imprimir.</p>
                         <button
                             v-if="canPrintLabels"
                             type="button"
                             :disabled="printing || !printQueue.length"
-                            class="w-full rounded-xl bg-primary px-4 py-3 font-semibold text-white disabled:opacity-50"
+                            class="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-secondary disabled:text-text/40 disabled:shadow-none sm:shrink-0"
                             @click="printTestLabel"
                         >
-                            {{ printing ? 'Imprimiendo…' : 'Imprimir etiquetas' }}
+                            <span class="material-symbols-outlined text-xl" aria-hidden="true">print</span>{{ printing ? 'Imprimiendo…' : 'Imprimir etiquetas' }}
                         </button>
+                        </div>
                     </div>
                 </template>
                 <label v-else class="print-field"
-                    >Producto<select v-model="selectedProductId">
+                    >Producto<GlobalSelect v-model="selectedProductId">
                         <option v-for="option in filteredProductOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-                    </select></label>
-                >
+                    </GlobalSelect></label>
                 <InputField
                     v-if="!printOnly"
                     v-model="editableProductName"
@@ -668,7 +730,7 @@ async function printTestLabel() {
                     </p>
                 </div>
                 <label class="print-field"
-                    >Formato de referencia<select
+                    >Formato de referencia<GlobalSelect
                         value=""
                         @change="applyLabelSize"
                     >
@@ -681,7 +743,7 @@ async function printTestLabel() {
                         <option value="62x100">62 × 100 mm</option>
                         <option value="50x30">50 × 30 mm</option>
                         <option value="100x150">100 × 150 mm</option>
-                    </select></label
+                    </GlobalSelect></label
                 >
                 <div class="grid grid-cols-2 gap-4">
                     <label class="print-field"

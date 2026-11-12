@@ -91,7 +91,7 @@ const branches = usePage().props.branches;
 
                     <!-- BRANCH -->
                     <div>
-                        <select
+                        <GlobalSelect
                             v-model="form.branch_id"
                             class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500"
                             required
@@ -107,7 +107,7 @@ const branches = usePage().props.branches;
                             >
                                 {{ branch.name }}
                             </option>
-                        </select>
+                        </GlobalSelect>
 
                         <p v-if="form.errors.branch_id" class="text-red-500 text-sm">
                             {{ form.errors.branch_id }}

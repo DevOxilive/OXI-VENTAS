@@ -97,7 +97,7 @@ function move(direction) {
                 ></label
             >
             <label class="block text-sm font-semibold"
-                >Alineación<select
+                >Alineación<GlobalSelect
                     :disabled="fixedAlignmentKeys.includes(selected.key)"
                     class="mt-2 w-full rounded-xl border-secondary bg-background text-text"
                     :value="
@@ -114,7 +114,7 @@ function move(direction) {
                     <option :value="0">Izquierda</option>
                     <option :value="50">Centro</option>
                     <option :value="100">Derecha</option>
-                </select></label
+                </GlobalSelect></label
             >
             <div class="flex gap-2">
                 <button

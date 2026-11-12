@@ -109,20 +109,20 @@ function removeLot(item) {
                     @update:model-value="handleSearchInput"
                 />
 
-                <select v-model="urgencyFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
+                <GlobalSelect v-model="urgencyFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
                     <option value="">Urgencia</option>
                     <option value="Estable">Estable</option>
                     <option value="Próximo">Próximo</option>
                     <option value="Crítico">Crítico</option>
                     <option value="Vencido">Vencido</option>
-                </select>
+                </GlobalSelect>
 
-                <select v-model="branchFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
+                <GlobalSelect v-model="branchFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
                     <option value="">Sucursal</option>
                     <option value="Sucursal Centro">Sucursal Centro</option>
                     <option value="Sucursal Norte">Sucursal Norte</option>
                     <option value="Sucursal Sur">Sucursal Sur</option>
-                </select>
+                </GlobalSelect>
             </div>
 
             <div class="hidden min-w-0 overflow-hidden md:block">

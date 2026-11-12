@@ -643,7 +643,7 @@ async function action(id) {
                     >
                         ↷ Rehacer</button
                     ><label class="flex items-center gap-2 text-xs"
-                        >Zoom<select
+                        >Zoom<GlobalSelect
                             v-model.number="zoom"
                             class="editor-select"
                         >
@@ -651,7 +651,7 @@ async function action(id) {
                             <option :value="1">100%</option>
                             <option :value="1.5">150%</option>
                             <option :value="2">200%</option>
-                        </select></label
+                        </GlobalSelect></label
                     ><label class="flex items-center gap-2 text-xs"
                         ><AnimatedCheckbox v-model="grid" />Guías</label
                     ><button
@@ -685,7 +685,7 @@ async function action(id) {
                 >
                     <span>Datos de ejemplo</span
                     ><label class="flex items-center gap-2"
-                        >Cantidad de filas<select
+                        >Cantidad de filas<GlobalSelect
                             v-model.number="sampleCount"
                             class="editor-select"
                         >
@@ -693,7 +693,7 @@ async function action(id) {
                             <option :value="3">3</option>
                             <option :value="15">15</option>
                             <option :value="40">40</option>
-                        </select></label
+                        </GlobalSelect></label
                     >
                 </div>
             </main>
@@ -704,7 +704,7 @@ async function action(id) {
                     <legend class="mb-3 text-sm font-bold">Papel</legend>
                     <label class="editor-field"
                         >Tipo de papel
-                        <select
+                        <GlobalSelect
                             :value="currentPaperFormat?.id || 'custom'"
                             @change="selectPaperFormat($event.target.value)"
                         >
@@ -718,7 +718,7 @@ async function action(id) {
                             <option value="custom">
                                 Otro formato / configuración existente
                             </option>
-                        </select>
+                        </GlobalSelect>
                     </label>
                     <p class="text-xs opacity-70">
                         {{
@@ -790,7 +790,7 @@ async function action(id) {
                         </summary>
                         <label class="editor-field mt-3"
                             >Resolución de la impresora
-                            <select
+                            <GlobalSelect
                                 :value="
                                     layout.dpi || (kind === 'label' ? 300 : 203)
                                 "
@@ -800,7 +800,7 @@ async function action(id) {
                             >
                                 <option :value="203">203 dpi</option>
                                 <option :value="300">300 dpi</option>
-                            </select>
+                            </GlobalSelect>
                         </label>
                         <p class="mt-2 text-xs opacity-60">
                             Usa la resolución indicada por el fabricante. Para
@@ -833,7 +833,7 @@ async function action(id) {
                     <label
                         v-if="['field', 'barcode'].includes(selected.type)"
                         class="editor-field"
-                        >Dato del documento<select
+                        >Dato del documento<GlobalSelect
                             :value="selected.binding"
                             @change="edit('binding', $event.target.value)"
                         >
@@ -844,7 +844,7 @@ async function action(id) {
                             >
                                 {{ label }}
                             </option>
-                        </select></label
+                        </GlobalSelect></label
                     >
                     <div class="grid grid-cols-2 gap-3">
                         <label
@@ -893,14 +893,14 @@ async function action(id) {
                                 @change="edit('bold', $event.target.checked)"
                             />Negrita</label
                         ><label class="editor-field"
-                            >Alineación del texto<select
+                            >Alineación del texto<GlobalSelect
                                 :value="selected.align"
                                 @change="edit('align', $event.target.value)"
                             >
                                 <option value="left">Izquierda</option>
                                 <option value="center">Centro</option>
                                 <option value="right">Derecha</option>
-                            </select></label
+                            </GlobalSelect></label
                         >
                     </div>
                     <label

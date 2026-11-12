@@ -203,12 +203,12 @@ function updateMultiFilter(filter, value) {
                     Mostrar filas
                 </span>
 
-                <select :value="recordsPerPage" class="bg-transparent text-sm font-semibold text-text outline-none"
+                <GlobalSelect :value="recordsPerPage" class="bg-transparent text-sm font-semibold text-text outline-none"
                     @change="$emit('update:records-per-page', Number($event.target.value))">
                     <option v-for="option in recordsPerPageOptions" :key="option" :value="option">
                         {{ option }}
                     </option>
-                </select>
+                </GlobalSelect>
             </div>
         </div>
 
@@ -288,7 +288,7 @@ function updateMultiFilter(filter, value) {
                         @update:model-value="updateMultiFilter(filter, $event)"
                     />
 
-                    <select v-else :value="filter.value ?? ''"
+                    <GlobalSelect v-else :value="filter.value ?? ''"
                         class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
                         :disabled="filter.disabled"
                         @change="$emit('update:filter', {
@@ -307,7 +307,7 @@ function updateMultiFilter(filter, value) {
                             :value="getOptionValue(option, filter)">
                             {{ getOptionLabel(option, filter) }}
                         </option>
-                    </select>
+                    </GlobalSelect>
                 </label>
             </template>
         </div>

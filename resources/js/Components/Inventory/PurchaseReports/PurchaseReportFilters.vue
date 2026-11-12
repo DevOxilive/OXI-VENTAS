@@ -54,7 +54,7 @@ onBeforeUnmount(() => clearTimeout(applyTimer))
                 @update:model-value="handleSearchInput"
             />
 
-            <select
+            <GlobalSelect
                 v-model="filters.category_id"
                 class="lg:col-span-3 rounded-xl border border-secondary bg-background px-4 py-3 text-sm text-text focus:border-primary focus:ring-primary"
             >
@@ -66,25 +66,25 @@ onBeforeUnmount(() => clearTimeout(applyTimer))
                 >
                     {{ category.name ?? category }}
                 </option>
-            </select>
+            </GlobalSelect>
 
-            <select
+            <GlobalSelect
                 v-model="filters.stock"
                 class="lg:col-span-3 rounded-xl border border-secondary bg-background px-4 py-3 text-sm text-text focus:border-primary focus:ring-primary"
             >
                 <option value="">Todo el stock</option>
                 <option value="LOW">Stock bajo</option>
                 <option value="OUT">Agotados</option>
-            </select>
+            </GlobalSelect>
 
-            <select
+            <GlobalSelect
                 v-model="filters.per_page"
                 class="lg:col-span-2 rounded-xl border border-secondary bg-background px-4 py-3 text-sm text-text focus:border-primary focus:ring-primary"
             >
                 <option :value="25">25</option>
                 <option :value="50">50</option>
                 <option :value="100">100</option>
-            </select>
+            </GlobalSelect>
 
         </div>
     </section>

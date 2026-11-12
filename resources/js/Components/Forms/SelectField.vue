@@ -24,6 +24,10 @@ const props = defineProps({
         type: String,
         default: 'Seleccione una opción'
     },
+    showPlaceholder: {
+        type: Boolean,
+        default: true
+    },
     disabled: Boolean
 })
 
@@ -69,13 +73,13 @@ function handleBlur() {
             {{ label }}
         </label>
 
-        <select v-bind="attrs" :id="selectId" :name="field" :value="modelValue" :disabled="disabled" @change="handleChange"
+        <GlobalSelect v-bind="attrs" :id="selectId" :name="field" :value="modelValue" :disabled="disabled" @change="handleChange"
             @blur="handleBlur" :class="[
                 'w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary',
                 disabled ? 'cursor-not-allowed border-secondary bg-secondary text-text opacity-60' : 'bg-background text-text',
                 error ? 'border-primary bg-secondary' : 'border-secondary focus:border-primary'
             ]">
-            <option disabled value="">
+            <option v-if="showPlaceholder" disabled value="">
                 {{ placeholder }}
             </option>
 
@@ -84,7 +88,7 @@ function handleBlur() {
                 :disabled="isOptionDisabled(item)">
                 {{ getOptionLabel(item) }}
             </option>
-        </select>
+        </GlobalSelect>
 
         <div class="flex justify-between items-center mt-1">
             <p v-if="error" class="text-xs text-primary">

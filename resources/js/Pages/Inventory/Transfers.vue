@@ -97,13 +97,13 @@ function statusClass(status) {
                     @update:model-value="handleSearchInput"
                 />
 
-                <select v-model="statusFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
+                <GlobalSelect v-model="statusFilter" class="rounded-lg border border-secondary bg-secondary px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary">
                     <option value="">Estado</option>
                     <option value="Pendiente">Pendiente</option>
                     <option value="En tránsito">En tránsito</option>
                     <option value="Completada">Completada</option>
                     <option value="Cancelada">Cancelada</option>
-                </select>
+                </GlobalSelect>
             </div>
 
             <div class="hidden min-w-0 overflow-hidden md:block">
