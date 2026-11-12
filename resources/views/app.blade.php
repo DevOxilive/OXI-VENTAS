@@ -27,7 +27,7 @@
     </noscript>
     <link rel="manifest" href="/pwa/manifest.webmanifest">
     <link rel="icon" type="image/png" href="/icons/super-kay-navidad.png">
-    <link rel="apple-touch-icon" href="/icons/super-kay-navidad-apple-touch.png">
+    <link rel="apple-touch-icon" href="/icons/super-kay-navidad-2026-apple-touch.png">
     <script>
         (() => {
             const storedTheme = window.localStorage.getItem('color-theme');

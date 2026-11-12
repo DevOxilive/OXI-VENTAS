@@ -62,25 +62,25 @@ Route::get('/pwa/manifest.webmanifest', function () {
         'description' => 'Sistema Super-Kay instalado como app.',
         'icons' => [
             [
-                'src' => '/icons/super-kay-navidad-192.png',
+                'src' => '/icons/super-kay-navidad-2026-192.png',
                 'sizes' => '192x192',
                 'type' => 'image/png',
                 'purpose' => 'any',
             ],
             [
-                'src' => '/icons/super-kay-navidad-512.png',
+                'src' => '/icons/super-kay-navidad-2026-512.png',
                 'sizes' => '512x512',
                 'type' => 'image/png',
                 'purpose' => 'any',
             ],
             [
-                'src' => '/icons/super-kay-navidad-maskable-512.png',
+                'src' => '/icons/super-kay-navidad-2026-maskable-512.png',
                 'sizes' => '512x512',
                 'type' => 'image/png',
                 'purpose' => 'maskable',
             ],
             [
-                'src' => '/icons/super-kay-navidad-maskable-192.png',
+                'src' => '/icons/super-kay-navidad-2026-maskable-192.png',
                 'sizes' => '192x192',
                 'type' => 'image/png',
                 'purpose' => 'maskable',
@@ -90,7 +90,9 @@ Route::get('/pwa/manifest.webmanifest', function () {
 
     return response()->json($manifest, 200, [
         'Content-Type' => 'application/manifest+json',
-        'Cache-Control' => 'public, max-age=604800, stale-while-revalidate=2592000',
+        // El manifest debe refrescarse en cada visita para que una PWA ya instalada
+        // detecte la nueva versión de sus iconos.
+        'Cache-Control' => 'no-cache, must-revalidate',
     ]);
 })->name('pwa.manifest');
 
