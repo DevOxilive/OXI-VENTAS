@@ -58,17 +58,17 @@ const reportFilters = reactive({
   per_page: Number(props.filters.per_page || 25),
 });
 
-const toolbarActions = computed(() => can("reports.cash-closures.create")
-  ? [
-      {
-        id: "new-cut",
-        label: "Nuevo corte",
-        icon: "payments",
-        variant: "primary",
-        permission: "reports.cash-closures.create",
-      },
-    ]
-  : []);
+const toolbarActions = computed(() => [
+  ...(can("reports.cash-closures.export.excel")
+    ? [{ id: "excel", label: "Excel", icon: "table_view", variant: "amber", permission: "reports.cash-closures.export.excel" }]
+    : []),
+  ...(can("reports.cash-closures.export.pdf")
+    ? [{ id: "pdf", label: "PDF", icon: "picture_as_pdf", variant: "red", permission: "reports.cash-closures.export.pdf" }]
+    : []),
+  ...(can("reports.cash-closures.create")
+    ? [{ id: "new-cut", label: "Nuevo corte", icon: "payments", variant: "primary", permission: "reports.cash-closures.create" }]
+    : []),
+]);
 
 const toolbarConfig = computed(() => getCashRegisterClosureReportsToolbarConfig({
   form: reportFilters,
@@ -374,6 +374,20 @@ function goToCut() {
   router.visit(route("ventas.cash-closures.index"));
 }
 
+function downloadReport(format) {
+  if (props.selectorMode || !props.currentBranch?.id) return;
+
+  window.location.href = route(
+    format === "pdf"
+      ? "inventory.branches.reports.cash-closures.pdf"
+      : "inventory.branches.reports.cash-closures.excel",
+    {
+      branch: props.currentBranch.id,
+      ...reportQuery(),
+    },
+  );
+}
+
 function openBranchReport(branch) {
   router.visit(route("inventory.branches.reports.cash-closures", { branch: branch.id }));
 }
@@ -413,6 +427,24 @@ function handleTableAction({ action, row }) {
 
   if (action === "delete" && can("reports.cash-closures.delete")) {
     deleteClosure(row);
+  }
+}
+
+function handleToolbarAction(action) {
+  const actionId = typeof action === "string" ? action : action?.id;
+
+  if (actionId === "excel") {
+    downloadReport("excel");
+    return;
+  }
+
+  if (actionId === "pdf") {
+    downloadReport("pdf");
+    return;
+  }
+
+  if (actionId === "new-cut") {
+    goToCut();
   }
 }
 
@@ -534,7 +566,7 @@ onBeforeUnmount(() => {
         @update:search="reportFilters.folio = $event"
         @update:filter="updateReportFilter"
         @update:records-per-page="reportFilters.per_page = $event"
-        @action="goToCut"
+        @action="handleToolbarAction"
       />
 
       <section

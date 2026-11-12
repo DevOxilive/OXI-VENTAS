@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Ventas;
 
+use App\Exports\CashClosureReportExport;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Http\Controllers\Controller;
@@ -11,17 +12,19 @@ use App\Models\EmployeeCreditPayment;
 use App\Models\Sale;
 use App\Models\SaleCancellation;
 use App\Models\TicketTemplate;
-use App\Support\VisualPrintLayout;
 use App\Models\User;
+use App\Support\LocalDateTime;
 use App\Support\SystemPermission;
 use App\Support\TablePagination;
-use App\Support\LocalDateTime;
+use App\Support\VisualPrintLayout;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class CashRegisterClosureController extends Controller
 {
@@ -31,7 +34,7 @@ class CashRegisterClosureController extends Controller
     {
         $user = $request->user()->loadMissing(['role', 'branches']);
         $branches = $this->accessibleBranches($request);
-        $isAdminSelector = $user->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL) && !$request->filled('branch');
+        $isAdminSelector = $user->hasPermission(SystemPermission::BRANCHES_ACCESS_ALL) && ! $request->filled('branch');
 
         if ($branches->isEmpty()) {
             return $this->redirectToBranchSetup($request, 'cortes de caja');
@@ -85,7 +88,7 @@ class CashRegisterClosureController extends Controller
             $this->abortIfUserCannotAccessBranch($request, $branch);
         }
 
-        if (!$branch && $branches->count() > 1) {
+        if (! $branch && $branches->count() > 1) {
             return Inertia::render('Ventas/CashRegisterClosureReports', [
                 'selectorMode' => true,
                 'currentBranch' => null,
@@ -164,6 +167,36 @@ class CashRegisterClosureController extends Controller
         return response()->json([
             'print_jobs' => $this->buildClosurePrintJobs($closure),
         ]);
+    }
+
+    public function exportExcel(Request $request, Branch $branch)
+    {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
+        [$filters, $rows, $totals] = $this->cashClosureExportData($request, $branch);
+
+        return Excel::download(
+            new CashClosureReportExport($rows, $branch->name, $filters, $totals),
+            $this->cashClosureReportDownloadName($branch).'.xlsx'
+        );
+    }
+
+    public function exportPdf(Request $request, Branch $branch)
+    {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
+        [$filters, $rows, $totals] = $this->cashClosureExportData($request, $branch);
+        $filters['user_name'] = $this->closureReportUserName($filters['user_id'] ?? null);
+        $filters['status_label'] = match ($filters['status'] ?? null) {
+            'balanced' => 'Cuadrado',
+            'difference' => 'Con diferencia',
+            default => 'Todos',
+        };
+
+        $pdf = Pdf::loadView('pdf.cash-closures-report', compact('branch', 'filters', 'rows', 'totals'))
+            ->setPaper('legal', 'landscape');
+
+        return $pdf->download($this->cashClosureReportDownloadName($branch).'.pdf');
     }
 
     public function store(Request $request)
@@ -467,7 +500,7 @@ class CashRegisterClosureController extends Controller
     {
         return [
             'id' => $sale->id,
-            'folio' => $sale->folio ?? ('V-' . str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT)),
+            'folio' => $sale->folio ?? ('V-'.str_pad((string) $sale->id, 6, '0', STR_PAD_LEFT)),
             'date' => LocalDateTime::human($sale->date),
             'user' => $this->cashierName($sale),
             'payment_method' => $sale->paymentMethod?->name ?? 'Sin metodo',
@@ -597,7 +630,7 @@ class CashRegisterClosureController extends Controller
             'branch' => $closure->branch?->name ?? 'Sin sucursal',
             'user' => $closure->user?->name ?? 'Sin usuario',
             'cash_box_number' => $closure->cash_box_number,
-            'period' => (LocalDateTime::human($closure->period_start) ?? '-') . ' - ' . (LocalDateTime::human($closure->period_end) ?? '-'),
+            'period' => (LocalDateTime::human($closure->period_start) ?? '-').' - '.(LocalDateTime::human($closure->period_end) ?? '-'),
             'period_start_date' => LocalDateTime::format($closure->period_start, 'd/m/Y') ?? '-',
             'period_start_time' => LocalDateTime::time($closure->period_start) ?? '-',
             'period_end_date' => LocalDateTime::format($closure->period_end, 'd/m/Y') ?? '-',
@@ -629,11 +662,11 @@ class CashRegisterClosureController extends Controller
 
     private function applyClosureReportFilters($query, array $filters): void
     {
-        if (!empty($filters['folio'])) {
-            $query->where('folio', 'like', '%' . $filters['folio'] . '%');
+        if (! empty($filters['folio'])) {
+            $query->where('folio', 'like', '%'.$filters['folio'].'%');
         }
 
-        if (!empty($filters['user_id'])) {
+        if (! empty($filters['user_id'])) {
             $query->where('user_id', $filters['user_id']);
         }
 
@@ -651,13 +684,117 @@ class CashRegisterClosureController extends Controller
             });
         }
 
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->where('period_end', '>=', LocalDateTime::startOfDay($filters['date_from']));
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $query->where('period_end', '<=', LocalDateTime::endOfDay($filters['date_to']));
         }
+    }
+
+    /**
+     * Construye el archivo desde los importes guardados en cada corte. Así, una
+     * venta editada posteriormente no altera la evidencia financiera del corte.
+     */
+    private function cashClosureExportData(Request $request, Branch $branch): array
+    {
+        $filters = $request->validate([
+            'folio' => ['nullable', 'string', 'max:80'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'status' => ['nullable', 'in:balanced,difference'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
+        ]);
+
+        $query = CashRegisterClosure::query()
+            ->where('branch_id', $branch->id)
+            ->with('user:id,name')
+            ->latest('period_end');
+
+        $this->applyClosureReportFilters($query, $filters);
+
+        $rows = $query->get()
+            ->map(fn (CashRegisterClosure $closure) => $this->mapClosureExportRow($closure))
+            ->values();
+
+        $totalFields = [
+            'cash_payments', 'card_payments', 'cash_credit_payments', 'card_credit_payments',
+            'other_payments', 'refund_cash', 'refund_card', 'expected_cash', 'expected_card',
+            'counted_cash', 'counted_card', 'cash_left', 'cash_withdrawal', 'cash_difference',
+            'card_difference', 'collected_total',
+        ];
+        $totals = collect($totalFields)->mapWithKeys(fn (string $field) => [
+            $field => round((float) $rows->sum($field), 2),
+        ])->all();
+
+        return [$this->mapClosureReportFilters($filters), $rows, $totals];
+    }
+
+    private function mapClosureExportRow(CashRegisterClosure $closure): array
+    {
+        $amounts = [
+            'cash_payments' => 0.0,
+            'card_payments' => 0.0,
+            'cash_credit_payments' => 0.0,
+            'card_credit_payments' => 0.0,
+            'other_payments' => 0.0,
+        ];
+
+        foreach ($closure->payment_breakdown ?? [] as $payment) {
+            $method = (string) ($payment['method'] ?? '');
+            $isCreditPayment = str_contains(Str::ascii(mb_strtolower($method)), 'abono');
+            $type = $payment['type'] ?? $this->paymentType($method);
+            $amount = (float) ($payment['total'] ?? 0);
+
+            if ($isCreditPayment && $type === 'cash') {
+                $amounts['cash_credit_payments'] += $amount;
+            } elseif ($isCreditPayment && $type === 'card') {
+                $amounts['card_credit_payments'] += $amount;
+            } elseif ($type === 'cash') {
+                $amounts['cash_payments'] += $amount;
+            } elseif ($type === 'card') {
+                $amounts['card_payments'] += $amount;
+            } else {
+                $amounts['other_payments'] += $amount;
+            }
+        }
+
+        $countedCash = (float) $closure->counted_cash;
+        $cashLeft = (float) $closure->cash_left;
+
+        return [
+            'date' => LocalDateTime::format($closure->period_end, 'd/m/Y') ?? '-',
+            'folio' => $closure->folio,
+            'cash_box' => $closure->cash_box_number ?: '1',
+            'user' => $closure->user?->name ?? 'Sin usuario',
+            ...collect($amounts)->map(fn (float $amount) => round($amount, 2))->all(),
+            'refund_cash' => round((float) $closure->refund_cash_total, 2),
+            'refund_card' => round((float) $closure->refund_card_total, 2),
+            'expected_cash' => round((float) $closure->expected_cash, 2),
+            'expected_card' => round((float) $closure->card_total, 2),
+            'counted_cash' => round($countedCash, 2),
+            'counted_card' => round((float) $closure->counted_card, 2),
+            'cash_left' => round($cashLeft, 2),
+            'cash_withdrawal' => round(max(0, $countedCash - $cashLeft), 2),
+            'cash_difference' => round((float) $closure->cash_difference, 2),
+            'card_difference' => round((float) $closure->card_difference, 2),
+            'collected_total' => round((float) $closure->expected_cash + (float) $closure->card_total + (float) $closure->other_total, 2),
+        ];
+    }
+
+    private function cashClosureReportDownloadName(Branch $branch): string
+    {
+        $branchSegment = Str::slug($branch->slug ?: $branch->name) ?: 'sucursal';
+
+        return 'reporte-cortes-'.$branchSegment.'-'.LocalDateTime::now('Y-m-d-H-i');
+    }
+
+    private function closureReportUserName(?string $userId): string
+    {
+        return filled($userId)
+            ? User::query()->whereKey($userId)->value('name') ?: 'Todos'
+            : 'Todos';
     }
 
     private function mapClosureReportFilters(array $filters): array
@@ -716,7 +853,7 @@ class CashRegisterClosureController extends Controller
             'date' => LocalDateTime::human($closure->period_end),
             'branch_name' => $closure->branch?->name ?? 'Sin sucursal',
             'user_name' => $closure->user?->name ?? 'Sin usuario',
-            'cash_box_text' => 'CAJA #' . ($closure->cash_box_number ?: '1'),
+            'cash_box_text' => 'CAJA #'.($closure->cash_box_number ?: '1'),
             'cash_box_number' => $closure->cash_box_number ?: '1',
             'period_start' => LocalDateTime::human($closure->period_start),
             'period_end' => LocalDateTime::human($closure->period_end),
@@ -828,7 +965,7 @@ class CashRegisterClosureController extends Controller
         $employee = $sale->employee;
 
         return $employee?->user?->name
-            ?: trim(($employee?->first_name ?? '') . ' ' . ($employee?->last_name ?? ''))
+            ?: trim(($employee?->first_name ?? '').' '.($employee?->last_name ?? ''))
             ?: 'Sin usuario';
     }
 

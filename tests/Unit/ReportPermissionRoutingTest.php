@@ -78,6 +78,14 @@ class ReportPermissionRoutingTest extends TestCase
                 'inventory.branches.reports.cash-closures',
                 'permission:reports.cash-closures.view',
             ],
+            'exportar cortes excel' => [
+                'inventory.branches.reports.cash-closures.excel',
+                'permission:reports.cash-closures.export.excel',
+            ],
+            'exportar cortes pdf' => [
+                'inventory.branches.reports.cash-closures.pdf',
+                'permission:reports.cash-closures.export.pdf',
+            ],
             'crear corte desde reportes' => [
                 'ventas.cash-closures.store',
                 'permission:sales.cash-closures.create,reports.cash-closures.create',
