@@ -1,12 +1,12 @@
-const VERSION = 'oxi-ventas-pwa-v13';
+const VERSION = 'oxi-ventas-pwa-v14';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
 const PRECACHE_URLS = [
     '/offline.html',
     '/favicon.ico',
-    '/icons/super-kay-navidad-192.png',
-    '/icons/super-kay-navidad-maskable-192.png',
+    '/icons/super-kay-navidad-2026-192.png',
+    '/icons/super-kay-navidad-2026-maskable-192.png',
     '/icons/super-kay-navidad.png',
     '/pwa/manifest.webmanifest',
 ];
