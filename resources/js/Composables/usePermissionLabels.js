@@ -291,6 +291,8 @@ const permissionLabels = {
     "reports.cash-closures.create": "Crear cortes desde reportes",
     "reports.cash-closures.update": "Editar cortes desde reportes",
     "reports.cash-closures.delete": "Eliminar cortes desde reportes",
+    "reports.cash-closures.export.excel": "Exportar reportes de cortes en Excel",
+    "reports.cash-closures.export.pdf": "Exportar reportes de cortes en PDF",
     "reports.inventory.view": "Ver reportes de inventario",
     "reports.inventory.export.excel": "Exportar reportes de inventario en Excel",
     "reports.inventory.export.pdf": "Exportar reportes de inventario en PDF",

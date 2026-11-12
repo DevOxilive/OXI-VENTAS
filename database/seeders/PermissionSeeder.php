@@ -174,6 +174,8 @@ class PermissionSeeder extends Seeder
             'reports.cash-closures.create',
             'reports.cash-closures.update',
             'reports.cash-closures.delete',
+            'reports.cash-closures.export.excel',
+            'reports.cash-closures.export.pdf',
             'reports.inventory.view',
             'reports.inventory.export.excel',
             'reports.inventory.export.pdf',

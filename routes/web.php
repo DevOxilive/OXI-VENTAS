@@ -874,6 +874,14 @@ Route::middleware([
             ->middleware($cashClosureReportsAccess)
             ->name('branches.reports.cash-closures');
 
+        Route::get('/branches/{branch}/reports/cash-closures/excel', [CashRegisterClosureController::class, 'exportExcel'])
+            ->middleware('permission:reports.cash-closures.export.excel')
+            ->name('branches.reports.cash-closures.excel');
+
+        Route::get('/branches/{branch}/reports/cash-closures/pdf', [CashRegisterClosureController::class, 'exportPdf'])
+            ->middleware('permission:reports.cash-closures.export.pdf')
+            ->name('branches.reports.cash-closures.pdf');
+
         Route::get('/branches/{branch}/reports/sales', [SalesReportController::class, 'index'])
             ->middleware('permission:reports.sales.view')
             ->name('branches.reports.sales');
