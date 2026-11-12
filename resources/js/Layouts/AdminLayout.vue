@@ -20,7 +20,15 @@ import { t } from '@/i18n/es'
 
 const page = usePage()
 const desktopMediaQuery = '(min-width: 768px)'
-const SALES_SESSION_KEEP_ALIVE_INTERVAL_MS = 30 * 60 * 1000
+const ROLE_SESSION_ACTIVITY_INTERVAL_MS = 30 * 1000
+const ROLE_SESSION_ACTIVITY_EVENTS = [
+    'click',
+    'keydown',
+    'input',
+    'change',
+    'scroll',
+    'touchstart',
+]
 
 const { permissions, role } = usePermissions()
 
@@ -53,52 +61,18 @@ let unsubscribeRealtimeActivity = null
 let unsubscribeGlobalDataChanged = null
 let desktopMediaQueryList = null
 let handleDesktopViewportChange = null
-let salesSessionKeepAliveTimer = null
-let salesSessionKeepAliveRequest = null
 let sessionExpiryTimer = null
 let sessionWarningTimer = null
 let sessionCountdownTimer = null
 let sessionLogoutStarted = false
+let roleSessionActivityRequest = null
+let lastRoleSessionActivityAt = 0
 
 const sessionPolicy = computed(() => page.props.auth?.sessionPolicy ?? null)
 const activeSessionExpiresAt = ref(null)
 const showSessionExpiryWarning = ref(false)
 const sessionWarningRemainingSeconds = ref(0)
 const continuingRoleSession = ref(false)
-
-function keepSalesSessionAlive() {
-    if (role.value !== 'Ventas' || salesSessionKeepAliveRequest) return
-
-    salesSessionKeepAliveRequest = window.axios
-        .post(route('session.keep-alive'))
-        .catch(() => null)
-        .finally(() => {
-            salesSessionKeepAliveRequest = null
-        })
-}
-
-function startSalesSessionKeepAlive() {
-    if (role.value !== 'Ventas' || salesSessionKeepAliveTimer) return
-
-    void keepSalesSessionAlive()
-    salesSessionKeepAliveTimer = window.setInterval(
-        keepSalesSessionAlive,
-        SALES_SESSION_KEEP_ALIVE_INTERVAL_MS,
-    )
-}
-
-function stopSalesSessionKeepAlive() {
-    if (!salesSessionKeepAliveTimer) return
-
-    window.clearInterval(salesSessionKeepAliveTimer)
-    salesSessionKeepAliveTimer = null
-}
-
-function renewSalesSessionWhenAppBecomesVisible() {
-    if (!document.hidden) {
-        void keepSalesSessionAlive()
-    }
-}
 
 function clearRoleSessionTimers() {
     window.clearTimeout(sessionExpiryTimer)
@@ -139,6 +113,36 @@ async function continueRoleSession() {
     } finally {
         continuingRoleSession.value = false
     }
+}
+
+function renewRoleSessionFromActivity() {
+    if (
+        sessionPolicy.value?.keep_alive
+        || !page.props.auth?.user?.id
+        || sessionLogoutStarted
+        || roleSessionActivityRequest
+    ) return
+
+    const now = Date.now()
+    if (now - lastRoleSessionActivityAt < ROLE_SESSION_ACTIVITY_INTERVAL_MS) return
+
+    // Se actualiza antes de enviar la petición para no duplicarla cuando el
+    // usuario escribe, se desplaza o navega varias veces seguidas.
+    lastRoleSessionActivityAt = now
+    roleSessionActivityRequest = window.axios
+        .post(route('session.continue'))
+        .then(({ data }) => {
+            showSessionExpiryWarning.value = false
+            scheduleRoleSessionTimeout(data?.expires_at)
+        })
+        .catch(() => {
+            // La siguiente interacción podrá reintentar la renovación. No se
+            // amplía el contador local si el servidor no confirmó la sesión.
+            lastRoleSessionActivityAt = 0
+        })
+        .finally(() => {
+            roleSessionActivityRequest = null
+        })
 }
 
 function showRoleSessionWarning() {
@@ -322,8 +326,9 @@ onMounted(() => {
         isDesktopViewport.value = desktopMediaQueryList.matches
         desktopMediaQueryList.addEventListener('change', handleDesktopViewportChange)
 
-        startSalesSessionKeepAlive()
-        document.addEventListener('visibilitychange', renewSalesSessionWhenAppBecomesVisible)
+        ROLE_SESSION_ACTIVITY_EVENTS.forEach((eventName) => {
+            document.addEventListener(eventName, renewRoleSessionFromActivity, { passive: true })
+        })
         scheduleRoleSessionTimeout()
     }
 
@@ -368,23 +373,15 @@ onBeforeUnmount(() => {
         desktopMediaQueryList.removeEventListener('change', handleDesktopViewportChange)
     }
 
-    stopSalesSessionKeepAlive()
     clearRoleSessionTimers()
-    document.removeEventListener('visibilitychange', renewSalesSessionWhenAppBecomesVisible)
+    ROLE_SESSION_ACTIVITY_EVENTS.forEach((eventName) => {
+        document.removeEventListener(eventName, renewRoleSessionFromActivity)
+    })
 
     unsubscribeUserChanged?.()
     unsubscribeRealtimeActivity?.()
     unsubscribeGlobalDataChanged?.()
 
-})
-
-watch(role, (nextRole) => {
-    if (nextRole === 'Ventas') {
-        startSalesSessionKeepAlive()
-        return
-    }
-
-    stopSalesSessionKeepAlive()
 })
 
 watch(

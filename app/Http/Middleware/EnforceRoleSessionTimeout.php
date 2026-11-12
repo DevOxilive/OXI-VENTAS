@@ -37,6 +37,11 @@ class EnforceRoleSessionTimeout
             throw new AuthenticationException('Tu sesión venció por seguridad.');
         }
 
+        // Cada solicitud autenticada representa actividad dentro del sistema.
+        // Se renueva antes de generar la respuesta para que Inertia entregue a
+        // la interfaz la nueva fecha de vencimiento en la misma navegación.
+        RoleSessionPolicy::renew($request, $policy);
+
         return $next($request);
     }
 }

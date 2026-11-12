@@ -18,6 +18,7 @@ class RoleSessionTimeoutTest extends TestCase
         Event::fake();
 
         foreach ([
+            'Ventas' => 120,
             'Sistemas' => 10,
             'Super Administrador' => 10,
             'Administrador' => 10,
@@ -46,6 +47,22 @@ class RoleSessionTimeoutTest extends TestCase
             ->assertOk()
             ->assertJsonPath('expires_at', now()->addMinutes(30)->timestamp)
             ->assertSessionHas('role_session_expires_at');
+    }
+
+    public function test_each_authenticated_request_renews_the_role_session_window(): void
+    {
+        Event::fake();
+        $role = Role::firstOrCreate(['name' => 'Administrador']);
+        $user = User::factory()->create(['role_id' => $role->id]);
+
+        $this->actingAs($user)
+            ->withSession([
+                'role_session_policy_role' => 'Administrador',
+                'role_session_expires_at' => now()->addMinute()->timestamp,
+            ])
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSessionHas('role_session_expires_at', now()->addMinutes(10)->timestamp);
     }
 
     public function test_an_expired_role_session_is_rejected_by_the_server(): void
