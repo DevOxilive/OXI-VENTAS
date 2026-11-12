@@ -17,4 +17,13 @@ class RoleSessionWarningInterfaceTest extends TestCase
         $this->assertStringContainsString('variant="secondary"', $modal);
         $this->assertStringContainsString('rounded-3xl', $modal);
     }
+
+    public function test_the_global_layout_renews_the_session_when_the_user_interacts(): void
+    {
+        $layout = file_get_contents(resource_path('js/Layouts/AdminLayout.vue'));
+
+        $this->assertStringContainsString('ROLE_SESSION_ACTIVITY_EVENTS', $layout);
+        $this->assertStringContainsString("document.addEventListener(eventName, renewRoleSessionFromActivity", $layout);
+        $this->assertStringContainsString("route('session.continue')", $layout);
+    }
 }

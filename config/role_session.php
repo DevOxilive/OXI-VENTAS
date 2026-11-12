@@ -5,8 +5,9 @@ return [
     'warning_minutes' => 5,
 
     'roles' => [
-        // Ventas conserva su sesión mediante la renovación automática ya aprobada.
-        'Ventas' => ['timeout_minutes' => null, 'keep_alive' => true],
+        // Ventas se mantiene activa mientras exista interacción; sin actividad,
+        // conserva la duración general de sesión antes de mostrar la alerta.
+        'Ventas' => ['timeout_minutes' => 120],
         'Sistemas' => ['timeout_minutes' => 10],
         'Super Administrador' => ['timeout_minutes' => 10],
         'Administrador' => ['timeout_minutes' => 10],
