@@ -67,14 +67,14 @@ function handleSearchInput(value) {
           Mostrando {{ recordsToShow }} registros
         </span>
 
-        <select :value="recordsToShow" @change="$emit('update:recordsToShow', Number($event.target.value))"
+        <GlobalSelect :value="recordsToShow" @change="$emit('update:recordsToShow', Number($event.target.value))"
           class="rounded-2xl border border-secondary bg-background px-3 py-2 text-sm text-text outline-none focus:border-primary focus:ring-primary">
           <option :value="10">10</option>
           <option :value="20">20</option>
           <option :value="50">50</option>
           <option :value="100">100</option>
           <option :value="200">200</option>
-        </select>
+        </GlobalSelect>
 <button v-if="canCreate" @click="$emit('create')"
           class="rounded-2xl border border-primary bg-primary px-5 py-2.5 font-medium text-white shadow-sm transition hover:brightness-110">
           + Agregar
@@ -100,14 +100,14 @@ function handleSearchInput(value) {
         @keydown.enter.prevent="handleSearchInput($event.target.value)"
       />
 
-      <select :value="categoryFilter" @change="$emit('update:categoryFilter', $event.target.value)"
+      <GlobalSelect :value="categoryFilter" @change="$emit('update:categoryFilter', $event.target.value)"
         class="w-full rounded-2xl border border-secondary bg-background px-4 py-3 text-sm text-text outline-none focus:border-primary focus:ring-primary">
         <option value="Todas">Categoría</option>
 
         <option v-for="category in categoriesDB" :key="category.id" :value="category.id">
           {{ category.name }}
         </option>
-      </select>
+      </GlobalSelect>
 
     </div>
 

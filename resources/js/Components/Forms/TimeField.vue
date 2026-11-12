@@ -33,7 +33,7 @@ const minute = computed({ get: () => parts().minute, set: (value) => update('min
   <div>
     <label :for="`${field}-hour`" class="mb-1 block text-sm font-semibold text-text">{{ label }}</label>
     <div class="flex items-center gap-2">
-      <select
+      <GlobalSelect
         :id="`${field}-hour`"
         v-model="hour"
         :disabled="readonly"
@@ -41,9 +41,9 @@ const minute = computed({ get: () => parts().minute, set: (value) => update('min
         class="min-w-0 flex-1 rounded-xl border border-secondary bg-background px-3 py-3 text-center text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-secondary disabled:opacity-60"
       >
         <option v-for="value in hours" :key="value" :value="value">{{ value }}</option>
-      </select>
+      </GlobalSelect>
       <span class="text-lg font-bold text-text opacity-65">:</span>
-      <select
+      <GlobalSelect
         :id="`${field}-minute`"
         v-model="minute"
         :disabled="readonly"
@@ -51,7 +51,7 @@ const minute = computed({ get: () => parts().minute, set: (value) => update('min
         class="min-w-0 flex-1 rounded-xl border border-secondary bg-background px-3 py-3 text-center text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-secondary disabled:opacity-60"
       >
         <option v-for="value in minutes" :key="value" :value="value">{{ value }}</option>
-      </select>
+      </GlobalSelect>
     </div>
     <p v-if="error" class="mt-1 text-xs text-primary">{{ error }}</p>
     <p v-else-if="!compact" class="mt-1 text-xs text-text opacity-55">Selecciona hora y minutos en formato de 24 horas.</p>

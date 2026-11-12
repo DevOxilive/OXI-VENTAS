@@ -89,12 +89,12 @@ function summaryTextClass(item) {
                             Grupo
                         </span>
 
-                        <select v-model="filters.movementGroup"
+                        <GlobalSelect v-model="filters.movementGroup"
                             class="h-10 w-full rounded-lg border border-secondary bg-background px-3 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-secondary">
                             <option v-for="option in movementGroupOptions" :key="option.value" :value="option.value">
                                 {{ option.label }}
                             </option>
-                        </select>
+                        </GlobalSelect>
                     </label>
 
                     <label class="block">
@@ -102,12 +102,12 @@ function summaryTextClass(item) {
                             Usuario
                         </span>
 
-                        <select v-model="filters.userId"
+                        <GlobalSelect v-model="filters.userId"
                             class="h-10 w-full rounded-lg border border-secondary bg-background px-3 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-secondary">
                             <option v-for="option in userOptions" :key="option.value" :value="option.value">
                                 {{ option.label }}
                             </option>
-                        </select>
+                        </GlobalSelect>
                     </label>
 
                     <label class="block">

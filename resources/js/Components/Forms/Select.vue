@@ -52,7 +52,7 @@ watch(() => props.modelValue, (newValue) => {
         <label :for="id" class="mb-1 block text-sm font-semibold text-text">
             {{ label }}: <span v-if="required" class="text-primary">*</span>
         </label>
-        <select
+        <GlobalSelect
             :id="id"
             v-model="selectValue"
             :required="required"
@@ -64,7 +64,7 @@ watch(() => props.modelValue, (newValue) => {
                 <option v-for="d in data" :key="d" :value="d">{{ d }}</option>
             </template>
             <slot />
-        </select>
+        </GlobalSelect>
         <p v-if="isTesting" class="mt-3 ml-3">{{ modelValue }}</p>
     </div>
 </template>

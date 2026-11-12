@@ -5,6 +5,7 @@ import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
+import GlobalSelect from './Components/Forms/GlobalSelect.vue';
 
 const appName = 'Super-Kay';
 const themeStorageKey = 'color-theme';
@@ -73,6 +74,7 @@ createInertiaApp({
     resolve: (name) => resolvePageComponent(`./Pages/${name}.vue`, pages),
     setup({ el, App, props, plugin }) {
         return createApp({ render: () => h(App, props) })
+            .component('GlobalSelect', GlobalSelect)
             .use(plugin)
             .use(ZiggyVue)
             .mount(el);
