@@ -1,6 +1,7 @@
 <script setup>
 import { nextTick } from 'vue'
 import MultiSelectDropdown from '@/Components/Forms/MultiSelectDropdown.vue'
+import PlanningProductSearch from '@/Components/Inventory/Reports/PlanningProductSearch.vue'
 import { useToolbarConfig } from './useToolbarConfig'
 import { getToolbarActionClasses } from './toolbarClasses'
 import { sanitizeToolbarFilterWithCursor, sanitizeToolbarSearchWithCursor } from './toolbarInputSanitizer'
@@ -211,7 +212,7 @@ function updateMultiFilter(filter, value) {
                 @keydown="handleSearchKeydown"
                 @input="$emit('update:search', handleSearchInput($event))" />
 
-            <div v-for="filter in visibleFilters" :key="filter.key" :class="filterWrapperClasses(filter)">
+            <div v-for="filter in visibleFilters" :key="filter.id || filter.key" :class="filterWrapperClasses(filter)">
                 <div v-if="filter.type === 'button-group'">
                     <p v-if="filter.label" class="mb-2 text-xs font-black uppercase tracking-[0.18em] text-text opacity-50">
                         {{ filter.label }}
@@ -265,6 +266,13 @@ function updateMultiFilter(filter, value) {
                             key: filter.key,
                             value: handleTextFilterInput($event, filter)
                         })" />
+
+                    <PlanningProductSearch
+                        v-else-if="filter.type === 'product-search'"
+                        :model-value="filter.value ?? []"
+                        :options="filter.options || []"
+                        @update:model-value="updateMultiFilter(filter, $event)"
+                    />
 
                     <MultiSelectDropdown
                         v-else-if="filter.type === 'multiselect'"
