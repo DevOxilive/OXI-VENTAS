@@ -79,6 +79,7 @@ const submit = () => {
                                     class="login-input w-full border-0 bg-transparent px-4 py-3 text-base text-slate-800 outline-none sm:text-lg"
                                     required
                                     autofocus
+                                    autocomplete="username"
                                 />
 
                                 <span class="login-domain hidden items-center border-l border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 sm:flex">
@@ -106,6 +107,7 @@ const submit = () => {
                                     placeholder="Contrasena"
                                     class="login-password w-full rounded-2xl border border-slate-200 px-4 py-3 pr-12 text-base text-slate-800 outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-200 sm:text-lg"
                                     required
+                                    autocomplete="current-password"
                                 />
                                 <button
                                     type="button"
