@@ -62,6 +62,15 @@ export function getSalesReportToolbarConfig({
         activeTab,
         filters: [
             {
+                id: 'planningProductSearch',
+                key: 'productIds',
+                label: 'Buscar producto',
+                type: 'product-search',
+                value: filters?.productIds ?? [],
+                options: products,
+                visible: !isSalesReport,
+            },
+            {
                 key: 'dateFrom',
                 label: 'Desde',
                 type: 'date',
