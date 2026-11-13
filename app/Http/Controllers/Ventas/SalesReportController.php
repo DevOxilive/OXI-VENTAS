@@ -999,6 +999,7 @@ class SalesReportController extends Controller
         $branchIds = $branches->pluck('id')->map(fn ($id) => (int) $id)->values();
 
         $products = Product::query()
+            ->with('barcodes:id,product_id,code')
             ->select([
                 'products.id',
                 'products.name',
@@ -1039,6 +1040,11 @@ class SalesReportController extends Controller
                 ->map(fn ($product) => [
                     'id' => (int) $product->id,
                     'name' => $product->name,
+                    'barcodes' => $product->barcodes
+                        ->pluck('code')
+                        ->filter()
+                        ->values()
+                        ->all(),
                     'category_id' => (int) $product->category_id,
                     'product_department_id' => (int) $product->product_department_id,
                 ])
