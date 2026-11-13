@@ -53,10 +53,8 @@ const filteredOptions = computed(() => {
         .sort((a, b) => {
             const aName = String(getOptionLabel(a)).toLowerCase()
             const bName = String(getOptionLabel(b)).toLowerCase()
-            const aBarcode = getOptionBarcode(a).toLowerCase()
-            const bBarcode = getOptionBarcode(b).toLowerCase()
-            const aStarts = aName.startsWith(query) || aBarcode.startsWith(query)
-            const bStarts = bName.startsWith(query) || bBarcode.startsWith(query)
+            const aStarts = aName.startsWith(query) || getOptionBarcodes(a).some((barcode) => barcode.startsWith(query))
+            const bStarts = bName.startsWith(query) || getOptionBarcodes(b).some((barcode) => barcode.startsWith(query))
 
             if (aStarts !== bStarts) {
                 return aStarts ? -1 : 1
@@ -89,17 +87,25 @@ function getOptionValue(option) {
     return option?.[props.optionValue] ?? option?.value ?? option?.id ?? option
 }
 
-function getOptionBarcode(option) {
-    return String(option?.barcode ?? option?.code ?? '')
+function getOptionBarcodes(option) {
+    const codes = [option?.barcode, option?.code]
+
+    if (Array.isArray(option?.barcodes)) {
+        codes.push(...option.barcodes.map((barcode) => barcode?.code ?? barcode))
+    }
+
+    return [...new Set(codes
+        .map((barcode) => String(barcode ?? '').trim().toLowerCase())
+        .filter(Boolean))]
 }
 
 function matchesProductSearch(option, query) {
     const name = String(getOptionLabel(option)).toLowerCase()
-    const barcode = getOptionBarcode(option).toLowerCase()
+    const barcodes = getOptionBarcodes(option)
 
     // La búsqueda global sólo consulta los datos propios del producto. No se
     // consideran lotes, caducidades ni existencias para decidir una coincidencia.
-    return name.includes(query) || barcode.includes(query)
+    return name.includes(query) || barcodes.some((barcode) => barcode.includes(query))
 }
 
 function isSelected(option) {
