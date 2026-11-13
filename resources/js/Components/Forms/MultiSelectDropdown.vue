@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
     modelValue: {
@@ -38,6 +38,7 @@ const root = ref(null)
 const searchInput = ref(null)
 const open = ref(false)
 const search = ref('')
+const highlightedSuggestionIndex = ref(0)
 
 const selectedValues = computed(() => props.modelValue.map((value) => String(value)))
 
@@ -46,9 +47,24 @@ const filteredOptions = computed(() => {
 
     if (!query) return props.options
 
-    return props.options.filter((option) =>
-        String(getOptionLabel(option)).toLowerCase().includes(query)
-    )
+    return props.options
+        .filter((option) => matchesProductSearch(option, query))
+        .slice()
+        .sort((a, b) => {
+            const aName = String(getOptionLabel(a)).toLowerCase()
+            const bName = String(getOptionLabel(b)).toLowerCase()
+            const aBarcode = getOptionBarcode(a).toLowerCase()
+            const bBarcode = getOptionBarcode(b).toLowerCase()
+            const aStarts = aName.startsWith(query) || aBarcode.startsWith(query)
+            const bStarts = bName.startsWith(query) || bBarcode.startsWith(query)
+
+            if (aStarts !== bStarts) {
+                return aStarts ? -1 : 1
+            }
+
+            return aName.localeCompare(bName, 'es')
+        })
+        .slice(0, 6)
 })
 
 const displayLabel = computed(() => {
@@ -73,6 +89,19 @@ function getOptionValue(option) {
     return option?.[props.optionValue] ?? option?.value ?? option?.id ?? option
 }
 
+function getOptionBarcode(option) {
+    return String(option?.barcode ?? option?.code ?? '')
+}
+
+function matchesProductSearch(option, query) {
+    const name = String(getOptionLabel(option)).toLowerCase()
+    const barcode = getOptionBarcode(option).toLowerCase()
+
+    // La búsqueda global sólo consulta los datos propios del producto. No se
+    // consideran lotes, caducidades ni existencias para decidir una coincidencia.
+    return name.includes(query) || barcode.includes(query)
+}
+
 function isSelected(option) {
     return selectedValues.value.includes(String(getOptionValue(option)))
 }
@@ -84,11 +113,15 @@ function toggleOption(option) {
         : [...selectedValues.value, value]
 
     emit('update:modelValue', next)
+    search.value = ''
+    highlightedSuggestionIndex.value = 0
     focusSearch()
 }
 
 function clearSelection() {
     emit('update:modelValue', [])
+    search.value = ''
+    highlightedSuggestionIndex.value = 0
     focusSearch()
 }
 
@@ -97,6 +130,52 @@ function toggleDropdown() {
 
     if (open.value) focusSearch()
 }
+
+function moveSuggestion(delta) {
+    if (!filteredOptions.value.length) return
+
+    const maxIndex = filteredOptions.value.length - 1
+    const nextIndex = highlightedSuggestionIndex.value + delta
+
+    if (nextIndex < 0) {
+        highlightedSuggestionIndex.value = maxIndex
+        return
+    }
+
+    if (nextIndex > maxIndex) {
+        highlightedSuggestionIndex.value = 0
+        return
+    }
+
+    highlightedSuggestionIndex.value = nextIndex
+}
+
+function handleSearchKeydown(event) {
+    if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        moveSuggestion(1)
+        return
+    }
+
+    if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        moveSuggestion(-1)
+        return
+    }
+
+    if (event.key !== 'Enter' || !filteredOptions.value.length) return
+
+    event.preventDefault()
+    toggleOption(
+        filteredOptions.value[
+            Math.min(highlightedSuggestionIndex.value, filteredOptions.value.length - 1)
+        ]
+    )
+}
+
+watch(search, () => {
+    highlightedSuggestionIndex.value = 0
+})
 
 function focusSearch() {
     nextTick(() => {
@@ -142,13 +221,14 @@ onBeforeUnmount(() => {
             :class="floating ? 'absolute' : 'relative'"
         >
             <div class="mb-2 flex h-11 items-center gap-3 rounded-lg bg-secondary px-3">
-                <span class="material-symbols-outlined shrink-0 text-[18px] text-text opacity-60">filter_list</span>
+                <span class="material-symbols-outlined shrink-0 text-[18px] text-text opacity-60">barcode_scanner</span>
                 <input
                     ref="searchInput"
                     v-model="search"
                     type="text"
                     class="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-text placeholder:text-text placeholder:opacity-50 outline-none focus:border-0 focus:ring-0"
-                    placeholder="Escribe para filtrar"
+                    placeholder="Código de barras o nombre del producto"
+                    @keydown="handleSearchKeydown"
                 />
             </div>
 
@@ -161,10 +241,11 @@ onBeforeUnmount(() => {
             </button>
 
             <button
-                v-for="option in filteredOptions"
+                v-for="(option, index) in filteredOptions"
                 :key="getOptionValue(option)"
                 type="button"
                 class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-secondary"
+                :class="search && index === highlightedSuggestionIndex ? 'bg-primary text-white hover:bg-primary' : ''"
                 @click="toggleOption(option)"
             >
                 <span
@@ -176,7 +257,7 @@ onBeforeUnmount(() => {
                     </span>
                 </span>
 
-                <span class="min-w-0 truncate text-text" :title="getOptionLabel(option)">
+                <span class="min-w-0 truncate" :class="search && index === highlightedSuggestionIndex ? 'text-white' : 'text-text'" :title="getOptionLabel(option)">
                     {{ getOptionLabel(option) }}
                 </span>
             </button>
