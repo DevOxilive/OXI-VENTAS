@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import TableFrame from './TableFrame.vue'
 import { usePermissions } from '@/Composables/usePermissions'
 import ActionIconButton from '@/Components/Forms/ActionIconButton.vue'
 import { formatCellValue, getNestedValue } from './tableFormatters.js'
@@ -158,8 +159,7 @@ function columnStyle(column) {
 </script>
 
 <template>
-  <div class="hidden max-h-[560px] max-w-full overflow-x-auto overflow-y-auto lg:block">
-      <table class="w-max min-w-full table-auto border-collapse text-sm">
+  <TableFrame class="hidden lg:block">
         <thead class="border-b border-secondary bg-secondary text-text">
           <tr>
             <th v-if="selectable" class="sticky top-0 z-20 w-10 min-w-10 bg-secondary px-4 py-3">
@@ -299,6 +299,5 @@ function columnStyle(column) {
             </td>
           </tr>
         </tbody>
-      </table>
-  </div>
+  </TableFrame>
 </template>

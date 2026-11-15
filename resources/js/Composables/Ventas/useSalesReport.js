@@ -130,10 +130,21 @@ export function useSalesReport(props) {
 
     function reloadReport(pageUrl = null) {
         router.get(pageUrl ?? reportRoute(), getRequestFilters(), {
+            only: reportRefreshProps(),
             preserveState: true,
             preserveScroll: true,
             replace: true,
         })
+    }
+
+    function reportRefreshProps() {
+        if (isReplenishmentTab.value) {
+            return ['filters', 'activeTab', 'salesReplenishment']
+        }
+
+        return activeTab.value === 'sales'
+            ? ['filters', 'activeTab', 'registeredSales', 'salesSummary']
+            : ['filters', 'activeTab', 'productsSold']
     }
 
     function downloadReport(format) {
@@ -174,6 +185,12 @@ export function useSalesReport(props) {
 
     function handleToolbarAction(action) {
         const actionId = typeof action === 'string' ? action : action?.id
+
+        if (actionId === 'clear-planning-products') {
+            filtersState.search = ''
+            filtersState.productIds = []
+            return
+        }
 
         if (actionId === 'excel') {
             downloadReport('excel')

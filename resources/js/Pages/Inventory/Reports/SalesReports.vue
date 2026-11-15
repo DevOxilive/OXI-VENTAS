@@ -210,6 +210,14 @@ function handleTableAction({ action, row }) {
 function closeSaleModal() {
     selectedSale.value = null
 }
+
+function removeSelectedProduct(productId) {
+    updateFilter({
+        key: 'productIds',
+        value: (filtersState.productIds ?? []).filter((id) => String(id) !== String(productId)),
+    })
+}
+
 </script>
 
 <template>
@@ -233,7 +241,9 @@ function closeSaleModal() {
                 v-if="isReplenishmentTab"
                 :report="salesReplenishment"
                 :active-tab="activeTab"
+                :selected-product-ids="filtersState.productIds"
                 @update-section-period="updateSectionPeriod"
+                @remove-selected-product="removeSelectedProduct"
             />
 
             <SalesRegisteredReportTable
