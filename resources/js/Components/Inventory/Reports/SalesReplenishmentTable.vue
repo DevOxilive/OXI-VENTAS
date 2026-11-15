@@ -2,6 +2,8 @@
 import { formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter'
 import { computed, reactive, ref } from 'vue'
 import { TableSurface } from '@/Components/Tables'
+import TableFrame from '@/Components/Tables/TableFrame.vue'
+import AnimatedCheckbox from '@/Components/Forms/AnimatedCheckbox.vue'
 
 const props = defineProps({
     report: {
@@ -12,9 +14,13 @@ const props = defineProps({
         type: String,
         default: 'pedido',
     },
+    selectedProductIds: {
+        type: Array,
+        default: () => [],
+    },
 })
 
-const emit = defineEmits(['update-section-period'])
+const emit = defineEmits(['update-section-period', 'remove-selected-product'])
 const manualValues = reactive({})
 const manualRevision = ref(0)
 
@@ -24,25 +30,26 @@ const hasRows = computed(() => sections.value.some((section) => (section.rows ??
 const isTransferTab = computed(() => props.activeTab === 'transferencias')
 const isStoreOrderTab = computed(() => props.activeTab === 'pedido-tiendas')
 const showBranchActionColumn = computed(() => !isStoreOrderTab.value)
+const hasManualProductSelection = computed(() => props.selectedProductIds.length > 0)
 const tableMinWidth = computed(() => {
-    const baseWidth = isTransferTab.value ? 680 : 744
+    const selectionWidth = hasManualProductSelection.value ? 56 : 0
+    const baseWidth = (isTransferTab.value ? 680 : 744) + selectionWidth
     const branchWidth = branches.value.length * (showBranchActionColumn.value ? 256 : 144)
 
     return `${baseWidth + branchWidth}px`
 })
 const emptyColspan = computed(() => {
-    const baseColumns = isTransferTab.value ? 7 : 8
+    const selectionColumn = hasManualProductSelection.value ? 1 : 0
+    const baseColumns = (isTransferTab.value ? 7 : 8) + selectionColumn
     const branchColumns = branches.value.length * (showBranchActionColumn.value ? 3 : 2)
 
     return baseColumns + branchColumns
 })
 
 const tableClasses = {
-    scroll: 'max-w-full overflow-x-auto overflow-y-hidden',
-    table: 'w-full table-fixed border-collapse text-xs xl:text-sm',
     headRow: 'border-b border-secondary bg-secondary text-text',
-    sectionRow: 'border-y border-primary bg-secondary text-text',
-    bodyRow: 'border-b border-secondary bg-background odd:bg-secondary transition-colors hover:bg-primary/10',
+    sectionRow: 'bg-secondary text-text',
+    bodyRow: 'transition-colors hover:bg-primary/10',
     headerCell: 'px-2 py-3 font-semibold',
     sectionCell: 'px-2 py-2 font-semibold',
     bodyCell: 'px-2 py-2 align-middle',
@@ -94,6 +101,14 @@ function updateSectionPeriod(section, value) {
     if (!section?.key || !value) return
 
     emit('update-section-period', section.key, value)
+}
+
+function isProductSelected(productId) {
+    return props.selectedProductIds.some((id) => String(id) === String(productId))
+}
+
+function deselectProduct(row) {
+    emit('remove-selected-product', row.id)
 }
 
 function manualKey(row, key) {
@@ -287,17 +302,17 @@ function branchStockClasses(row, branchId) {
     }
 
     if (props.activeTab === 'transferencias' && Number(branch?.transfer_out || 0) > 0) {
-        return 'bg-secondary text-text'
+        return 'text-text'
     }
 
-    return 'bg-secondary text-text'
+    return 'text-text'
 }
 
 function branchTransferClasses(row, branchId) {
     const branch = branchFor(row, branchId)
 
     if (props.activeTab !== 'transferencias') {
-        return 'bg-warning/20'
+        return 'text-text'
     }
 
     const transferValue = parseTransferQuantity(editableBranchTransferValue(row, branchId))
@@ -307,7 +322,7 @@ function branchTransferClasses(row, branchId) {
     }
 
     if (transferValue < 0 || Number(branch?.transfer_out || 0) > 0) {
-        return 'bg-secondary text-text'
+        return 'text-text'
     }
 
     return 'bg-background text-text opacity-70'
@@ -315,14 +330,11 @@ function branchTransferClasses(row, branchId) {
 </script>
 
 <template>
-    <TableSurface>
-        <div :class="tableClasses.scroll">
-            <table
-                :class="tableClasses.table"
-                :style="{ minWidth: tableMinWidth }"
-            >
+    <TableSurface :clip-content="false">
+        <TableFrame :min-width="tableMinWidth" compact :scrollable="false">
                 <thead>
                     <tr :class="tableClasses.headRow">
+                        <th v-if="hasManualProductSelection" :class="[tableClasses.headerCell, 'w-14 min-w-14 text-center']">SELEC.</th>
                         <th :class="[tableClasses.headerCell, 'w-36 min-w-36 px-3 text-left']">CODIGO DE BARRAS</th>
                         <th v-if="!isTransferTab" :class="[tableClasses.headerCell, 'w-16 min-w-16 text-center']">P</th>
                         <th :class="[tableClasses.headerCell, 'w-16 min-w-16 text-center']">V</th>
@@ -342,19 +354,11 @@ function branchTransferClasses(row, branchId) {
                 <tbody v-if="hasRows">
                     <template v-for="section in sections" :key="section.label">
                         <tr :class="tableClasses.sectionRow">
-                            <th :class="[tableClasses.sectionCell, 'w-36 min-w-36 px-3 text-center']">CODIGO DE BARRAS</th>
-                            <th v-if="!isTransferTab" :class="[tableClasses.sectionCell, 'w-16 min-w-16 text-center']">P</th>
-                            <th :class="[tableClasses.sectionCell, 'w-16 min-w-16 text-center']">V</th>
-                            <th :class="[tableClasses.sectionCell, 'w-16 min-w-16 text-center']">E</th>
-                            <th :class="[tableClasses.sectionCell, 'w-72 min-w-72 px-3 text-left']">
-                                <div class="flex flex-col gap-2">
-                                    <button
-                                        type="button"
-                                        class="text-left text-sm font-bold uppercase text-primary underline-offset-4 hover:underline"
-                                        title="Cambiar periodo de esta seccion"
-                                    >
+                            <th :colspan="emptyColspan" class="px-4 py-3 text-left">
+                                <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+                                    <span class="text-xs font-bold uppercase tracking-wide text-primary">
                                         {{ section.label }}
-                                    </button>
+                                    </span>
 
                                     <label class="flex items-center gap-2 text-xs font-semibold normal-case text-text opacity-80">
                                         <span>Desde</span>
@@ -368,14 +372,6 @@ function branchTransferClasses(row, branchId) {
                                     </label>
                                 </div>
                             </th>
-                            <template v-for="branch in branches" :key="`section-${section.label}-${branch.id}`">
-                                <th :class="[tableClasses.sectionCell, 'w-20 min-w-20 text-center']">E {{ branch.name }}</th>
-                                <th :class="[tableClasses.sectionCell, 'w-16 min-w-16 text-center']">MES</th>
-                                <th v-if="showBranchActionColumn" :class="[tableClasses.sectionCell, 'w-20 min-w-20 text-center']">{{ branchMetricLabel() }}</th>
-                            </template>
-                            <th :class="[tableClasses.sectionCell, 'w-20 min-w-20 text-center']">P. P.</th>
-                            <th :class="[tableClasses.sectionCell, 'w-20 min-w-20 text-center']">P.C.</th>
-                            <th :class="[tableClasses.sectionCell, 'w-56 min-w-56 px-3 text-left']">OBSERVACIONES</th>
                         </tr>
 
                         <tr
@@ -383,6 +379,15 @@ function branchTransferClasses(row, branchId) {
                             :key="row.id"
                             :class="tableClasses.bodyRow"
                         >
+                            <td v-if="hasManualProductSelection" class="w-14 min-w-14 px-2 py-2 text-center">
+                                <AnimatedCheckbox
+                                    :model-value="isProductSelected(row.id)"
+                                    compact
+                                    :aria-label="`Deseleccionar ${row.product}`"
+                                    :title="`Deseleccionar ${row.product}`"
+                                    @change="deselectProduct(row)"
+                                />
+                            </td>
                             <td
                                 :class="[tableClasses.bodyCell, 'w-36 min-w-36 max-w-36 truncate px-3 font-medium']"
                                 :title="row.code"
@@ -416,7 +421,7 @@ function branchTransferClasses(row, branchId) {
                                 <td class="w-20 min-w-20 px-2 py-2 text-center font-semibold" :class="branchStockClasses(row, branch.id)">
                                     {{ quantityWithUnit(metricFor(row, branch.id, 'stock'), row.unit) }}
                                 </td>
-                                <td class="w-16 min-w-16 bg-warning/15 px-2 py-2 text-center font-semibold">
+                                <td class="w-16 min-w-16 px-2 py-2 text-center font-semibold">
                                     {{ quantityWithUnit(metricFor(row, branch.id, 'monthly_sales'), row.unit) }}
                                 </td>
                                 <td v-if="showBranchActionColumn" class="w-20 min-w-20 px-1 py-1 text-center" :class="branchTransferClasses(row, branch.id)">
@@ -463,7 +468,6 @@ function branchTransferClasses(row, branchId) {
                         </td>
                     </tr>
                 </tbody>
-            </table>
-        </div>
+        </TableFrame>
     </TableSurface>
 </template>

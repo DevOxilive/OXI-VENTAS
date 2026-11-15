@@ -28,8 +28,20 @@ class SalesReplenishmentReportService
         $sales = $this->salesByProductAndBranch($branchIds, $filters);
         $stocks = $this->stockByProductAndBranch($branchIds);
         $products = $this->products($branchIds, $sales, $stocks, $filters);
+        $salesByProductAndBranch = $sales
+            ->groupBy('product_id')
+            ->map(fn (Collection $productSales) => $productSales->groupBy('branch_id'));
+        $stocksByProductAndBranch = $stocks
+            ->groupBy('product_id')
+            ->map(fn (Collection $productStocks) => $productStocks->keyBy('branch_id'));
         $rows = $products
-            ->map(fn ($product) => $this->mapProductRow($product, $branches, $sales, $stocks, $filters))
+            ->map(fn ($product) => $this->mapProductRow(
+                $product,
+                $branches,
+                $salesByProductAndBranch,
+                $stocksByProductAndBranch,
+                $filters,
+            ))
             ->values();
 
         return [
@@ -40,7 +52,7 @@ class SalesReplenishmentReportService
             ])->values()->all(),
             'date_to' => $this->periodEnd($filters)->toDateString(),
             'sections' => [
-                'pedido' => $this->sectionRows($rows, 'pedido'),
+                'pedido' => $this->sectionRows($rows, 'pedido', $filters),
                 'transferencias' => $this->sectionRows($rows, 'transferencias'),
                 'sin-movimiento' => $this->sectionRows($rows, 'sin-movimiento'),
                 'pedido-tiendas' => $this->sectionRows($rows, 'pedido-tiendas'),
@@ -137,22 +149,23 @@ class SalesReplenishmentReportService
 
     private function salesByProductAndBranch(Collection $branchIds, array $filters): Collection
     {
-        $query = DB::table('sale_details')
-            ->join('sales', 'sales.id', '=', 'sale_details.sale_id')
-            ->whereIn('sales.branch_id', $branchIds)
-            ->where('sales.status', 'completed')
+        $query = DB::table('sales_daily_summaries')
+            ->whereIn('branch_id', $branchIds)
+            ->where('quantity', '!=', 0)
             ->select([
-                'sale_details.product_id',
-                'sales.branch_id',
-                DB::raw('DATE(sales.date) as sale_date'),
-                DB::raw('SUM(COALESCE(sale_details.base_quantity, sale_details.quantity)) as sold_quantity'),
-                DB::raw('MAX(sales.date) as last_sale_at'),
+                'product_id',
+                'branch_id',
+                'sale_date',
+                'quantity as sold_quantity',
+                'sale_date as last_sale_at',
             ])
-            ->groupBy('sale_details.product_id', 'sales.branch_id', DB::raw('DATE(sales.date)'));
+            ->orderBy('sale_date');
 
-        $query->whereDate('sales.date', '>=', $this->minimumPeriodStart($filters)->toDateString());
+        $periodStart = $this->minimumPeriodStart($filters)->copy()->startOfDay();
+        $periodEndExclusive = $this->periodEnd($filters)->copy()->addDay()->startOfDay();
 
-        $query->whereDate('sales.date', '<=', $this->periodEnd($filters)->toDateString());
+        $query->where('sale_date', '>=', $periodStart->toDateString())
+            ->where('sale_date', '<', $periodEndExclusive->toDateString());
 
         return $query->get();
     }
@@ -173,16 +186,20 @@ class SalesReplenishmentReportService
             ->get();
     }
 
-    private function mapProductRow($product, Collection $branches, Collection $sales, Collection $stocks, array $filters): array
+    private function mapProductRow(
+        $product,
+        Collection $branches,
+        Collection $salesByProductAndBranch,
+        Collection $stocksByProductAndBranch,
+        array $filters,
+    ): array
     {
         $unit = $this->baseUnit($product->inventory_unit ?? $product->unit ?? 'pza');
         $sectionKey = $this->sectionKey($product);
         $period = $this->periodForSection($filters, $sectionKey);
         $monthsInPeriod = $this->monthsBetween($period['from'], $period['to']);
-        $productSales = $sales
-            ->where('product_id', $product->id)
-            ->filter(fn ($sale) => Carbon::parse($sale->sale_date)->betweenIncluded($period['from'], $period['to']));
-        $productStocks = $stocks->where('product_id', $product->id);
+        $productSalesByBranch = $salesByProductAndBranch->get($product->id, collect());
+        $productStocksByBranch = $stocksByProductAndBranch->get($product->id, collect());
         $branchMetrics = [];
         $totalSold = 0.0;
         $totalStock = 0.0;
@@ -190,10 +207,11 @@ class SalesReplenishmentReportService
         $totalExcess = 0.0;
 
         foreach ($branches as $branch) {
-            $sold = (float) $productSales
-                ->where('branch_id', $branch->id)
+            $sold = (float) $productSalesByBranch
+                ->get($branch->id, collect())
+                ->filter(fn ($sale) => Carbon::parse($sale->sale_date)->betweenIncluded($period['from'], $period['to']))
                 ->sum('sold_quantity');
-            $stock = (float) ($productStocks->firstWhere('branch_id', $branch->id)->stock ?? 0);
+            $stock = (float) ($productStocksByBranch->get($branch->id)->stock ?? 0);
             $monthlyAverage = $sold / $monthsInPeriod;
             $target = $monthlyAverage;
             $suggested = max(0, $target - $stock);
@@ -261,9 +279,15 @@ class SalesReplenishmentReportService
         ];
     }
 
-    private function sectionRows(Collection $rows, string $section): array
+    private function sectionRows(Collection $rows, string $section, array $filters = []): array
     {
+        $hasManualProductFocus = filled($filters['search'] ?? null)
+            || collect($filters['product_ids'] ?? [])->filter()->isNotEmpty();
+
         $filtered = match ($section) {
+            'pedido' => $hasManualProductFocus
+                ? $rows
+                : $rows->where('flags.needs_order', true),
             'transferencias' => $rows->where('flags.has_transfer_opportunity', true),
             'sin-movimiento' => $rows->where('flags.no_movement', true),
             'pedido-tiendas' => $rows,

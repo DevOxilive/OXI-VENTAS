@@ -141,8 +141,10 @@ class SalesReportController extends Controller
             'currentBranch' => $branch ? $this->mapBranch($branch) : null,
             'reportScope' => $branch ? 'branch' : 'global',
             'reportMode' => $reportMode,
-            'branchesDB' => $branches->map(fn (Branch $availableBranch) => $this->mapBranch($availableBranch))->values(),
-            'selectionCatalogs' => $this->selectionCatalogs($branches),
+            'branchesDB' => fn () => $branches
+                ->map(fn (Branch $availableBranch) => $this->mapBranch($availableBranch))
+                ->values(),
+            'selectionCatalogs' => fn () => $this->selectionCatalogs($branches),
             'filters' => $this->mapFilters($filters),
             'activeTab' => $activeTab,
             'salesReplenishment' => $replenishmentReport,

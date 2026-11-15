@@ -269,8 +269,7 @@ function updateMultiFilter(filter, value) {
 
                     <PlanningProductSearch
                         v-else-if="filter.type === 'product-search'"
-                        :model-value="filter.value ?? []"
-                        :options="filter.options || []"
+                        :model-value="filter.value ?? ''"
                         @update:model-value="updateMultiFilter(filter, $event)"
                     />
 
@@ -282,6 +281,8 @@ function updateMultiFilter(filter, value) {
                         :placeholder="filter.placeholder || filter.label"
                         :option-label="filter.optionLabel || 'label'"
                         :option-value="filter.optionValue || 'value'"
+                        :prioritize-selected="filter.prioritizeSelected ?? false"
+                        :clear-label="filter.clearLabel || 'Eliminar selección'"
                         @update:model-value="updateMultiFilter(filter, $event)"
                     />
 

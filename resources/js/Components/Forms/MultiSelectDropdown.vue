@@ -30,6 +30,14 @@ const props = defineProps({
         type: Boolean,
         default: true,
     },
+    prioritizeSelected: {
+        type: Boolean,
+        default: false,
+    },
+    clearLabel: {
+        type: String,
+        default: 'Eliminar selección',
+    },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -41,16 +49,35 @@ const search = ref('')
 const highlightedSuggestionIndex = ref(0)
 
 const selectedValues = computed(() => props.modelValue.map((value) => String(value)))
+const orderedOptions = computed(() => {
+    if (!props.prioritizeSelected) return props.options
+
+    return props.options.slice().sort((a, b) => {
+        const aSelected = isSelected(a)
+        const bSelected = isSelected(b)
+
+        if (aSelected === bSelected) return 0
+
+        return aSelected ? -1 : 1
+    })
+})
 
 const filteredOptions = computed(() => {
     const query = search.value.trim().toLowerCase()
 
-    if (!query) return props.options
+    if (!query) return orderedOptions.value
 
-    return props.options
+    return orderedOptions.value
         .filter((option) => matchesProductSearch(option, query))
         .slice()
         .sort((a, b) => {
+            const aSelected = isSelected(a)
+            const bSelected = isSelected(b)
+
+            if (props.prioritizeSelected && aSelected !== bSelected) {
+                return aSelected ? -1 : 1
+            }
+
             const aName = String(getOptionLabel(a)).toLowerCase()
             const bName = String(getOptionLabel(b)).toLowerCase()
             const aStarts = aName.startsWith(query) || getOptionBarcodes(a).some((barcode) => barcode.startsWith(query))
@@ -129,6 +156,12 @@ function clearSelection() {
     search.value = ''
     highlightedSuggestionIndex.value = 0
     focusSearch()
+}
+
+const allSelected = computed(() => props.options.length > 0 && props.options.every(isSelected))
+
+function toggleAll() {
+    emit('update:modelValue', allSelected.value ? [] : props.options.map(option => String(getOptionValue(option))))
 }
 
 function toggleDropdown() {
@@ -238,12 +271,18 @@ onBeforeUnmount(() => {
                 />
             </div>
 
+            <label class="mb-2 flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-text">
+                <input type="checkbox" :checked="allSelected" :indeterminate="selectedValues.length > 0 && !allSelected" class="rounded border-secondary text-primary focus:ring-primary" @change="toggleAll" />
+                Seleccionar todos
+            </label>
+
             <button
                 type="button"
-                class="mb-2 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-text opacity-70 hover:bg-secondary"
+                class="mb-2 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-text opacity-70 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="selectedValues.length === 0"
                 @click="clearSelection"
             >
-                Todos
+                {{ clearLabel }}
             </button>
 
             <button

@@ -22,7 +22,10 @@ use Throwable;
 
 class SaleCancellationService
 {
-    public function __construct(private StockMovementService $stockMovementService) {}
+    public function __construct(
+        private StockMovementService $stockMovementService,
+        private SalesDailySummaryService $dailySummary,
+    ) {}
 
     /** Registra una devolución parcial o total sin alterar el ticket original. */
     public function cancel(Sale $sale, User $user, string $reason, array $items): SaleCancellation
@@ -164,6 +167,7 @@ class SaleCancellationService
                 );
 
                 $detail->update(['void_stock_movement_id' => $movement->id]);
+                $this->dailySummary->restoreVoidedReturn($sale, $detail);
             }
 
             $this->restoreEmployeeCreditForVoidedReturn($sale, $cancellation);
@@ -281,6 +285,7 @@ class SaleCancellationService
 
         $returnMovement = $this->createReturnMovement($sale, $detail, $cancellation, $cancellationDetail, $branchProduct, $originalMovements, $baseQuantity, $user);
         $cancellationDetail->update(['return_stock_movement_id' => $returnMovement->id]);
+        $this->dailySummary->recordReturn($sale, $cancellationDetail);
         $this->broadcastInventoryRefresh($branchProduct);
 
         return $subtotal;

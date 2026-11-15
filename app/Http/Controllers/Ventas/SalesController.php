@@ -24,6 +24,7 @@ use App\Models\User;
 use App\Search\ProductSearchOptions;
 use App\Search\ProductSearchService;
 use App\Services\SaleCancellationService;
+use App\Services\SalesDailySummaryService;
 use App\Services\SaleFolioService;
 use App\Services\StockMovementService;
 use App\Support\LocalDateTime;
@@ -319,7 +320,12 @@ class SalesController extends Controller
         return response()->json(['products' => $products]);
     }
 
-    public function store(Request $request, StockMovementService $stockService, SaleFolioService $folios)
+    public function store(
+        Request $request,
+        StockMovementService $stockService,
+        SaleFolioService $folios,
+        SalesDailySummaryService $dailySummary,
+    )
     {
         $data = $request->validate([
             'branch_id' => ['required', 'exists:branches,id'],
@@ -379,7 +385,7 @@ class SalesController extends Controller
             ->all();
 
         $accountId = null;
-        $sale = DB::transaction(function () use ($data, $user, $branch, $paymentMethod, $stockService, $folios, $isAccountCredit, &$accountId) {
+        $sale = DB::transaction(function () use ($data, $user, $branch, $paymentMethod, $stockService, $folios, $dailySummary, $isAccountCredit, &$accountId) {
             $creditEmployeeId = null;
             $creditCustomerId = null;
 
@@ -515,6 +521,8 @@ class SalesController extends Controller
                     saleId: $sale->id,
                     saleDetailId: $saleDetail->id,
                 );
+
+                $dailySummary->recordSale($sale, $saleDetail);
             }
 
             $total = round($total, 2);

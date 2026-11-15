@@ -63,11 +63,10 @@ export function getSalesReportToolbarConfig({
         filters: [
             {
                 id: 'planningProductSearch',
-                key: 'productIds',
+                key: 'search',
                 label: 'Buscar producto',
                 type: 'product-search',
-                value: filters?.productIds ?? [],
-                options: products,
+                value: filters?.search ?? '',
                 visible: !isSalesReport,
             },
             {
@@ -161,10 +160,18 @@ export function getSalesReportToolbarConfig({
                 options: products,
                 optionLabel: 'name',
                 optionValue: 'id',
+                prioritizeSelected: false,
+                clearLabel: 'Eliminar selección',
                 visible: !isSalesReport,
             },
         ],
         actions: [
+            {
+                id: 'clear-planning-products',
+                label: 'Limpiar productos',
+                icon: 'filter_alt_off',
+                hidden: isSalesReport,
+            },
             {
                 id: 'excel',
                 label: 'Excel',
