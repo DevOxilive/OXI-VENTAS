@@ -72,6 +72,14 @@ export const INVENTORY_REPORT_STATUS_FILTERS = [
         tone: 'rose',
         description: 'Sin existencia.',
     },
+    {
+        id: 'negative_stock',
+        label: 'Stock negativo',
+        report: 'dashboard',
+        icon: 'production_quantity_limits',
+        tone: 'red',
+        description: 'Lotes con una cantidad menor que cero que requieren revisión.',
+    },
 ]
 
 export function getInventoryReportType(reportId) {
