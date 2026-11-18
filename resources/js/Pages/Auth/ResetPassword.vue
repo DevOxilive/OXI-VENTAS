@@ -62,7 +62,7 @@ const submit = () => {
             <div class="mt-4">
                 <InputField
                     v-model="form.password_confirmation"
-                    :label="t('profile.password.confirm')"
+                    :label="t('auth.passwordConfirm')"
                     field="password_confirmation"
                     type="password"
                     :error="form.errors.password_confirmation"

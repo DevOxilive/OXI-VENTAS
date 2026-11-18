@@ -38,7 +38,7 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
-        $user = $request->user()?->loadMissing(['role', 'permissions', 'branches']);
+        $user = $request->user()?->loadMissing(['role', 'permissions', 'branches', 'employee']);
         $navigationBranches = fn () => $user
             ? $user->accessibleBranchesQuery()
                 ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
