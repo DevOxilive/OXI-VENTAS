@@ -59,7 +59,7 @@ const submit = () => {
                 <InputField
                     ref="codeInput"
                     v-model="form.code"
-                    :label="t('profile.twoFactor.code')"
+                    :label="t('auth.twoFactorCode')"
                     field="code"
                     validation-field="one_time_code"
                     type="text"

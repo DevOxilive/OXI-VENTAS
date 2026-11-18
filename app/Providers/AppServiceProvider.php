@@ -21,6 +21,7 @@ use App\Support\TrashRegistry;
 use Illuminate\Support\Facades\Vite;
 use Inertia\Inertia;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Jetstream\Jetstream;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,6 +30,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // El perfil se publica con una ruta propia de la aplicación. Así no se
+        // registran las rutas de Jetstream para foto, sesiones o cuenta.
+        Jetstream::ignoreRoutes();
+
         $this->app->bind(GenerateRegistrationOptions::class, GeneratePlatformPasskeyRegistrationOptions::class);
     }
 

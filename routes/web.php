@@ -158,6 +158,9 @@ Route::middleware([
         ->name('dashboard.products.search');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
+    Route::get('/user/profile', fn () => Inertia::render('Profile/Show'))
+        ->name('profile.show');
+
     Route::post('/sesion/continuar', function (Request $request) {
         $policy = RoleSessionPolicy::forUser($request->user());
         $expiresAt = RoleSessionPolicy::renew($request, $policy);
