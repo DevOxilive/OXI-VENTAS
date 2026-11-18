@@ -75,6 +75,9 @@ class InventoryReportService
 
     public function inventoryLots(Branch $branch, array $filters, bool $paginate = false)
     {
+        $currentDate = $this->currentDateExpression();
+        $nearExpirationDate = $this->dateAfterDaysExpression(30);
+
         $lastInSubquery = StockMovement::query()
             ->select('branch_product_id', DB::raw('MAX(created_at) as last_entry_at'))
             ->where('type', StockMovement::TYPE_IN)
@@ -110,7 +113,7 @@ class InventoryReportService
                 DB::raw('DATE(last_entries.last_entry_at) as last_entry_at'),
                 DB::raw('branch_products.stock as current_stock'),
                 'branch_products.min_stock',
-                DB::raw('DATEDIFF(product_batches.expiration_date, CURDATE()) as days'),
+                DB::raw($this->dateDifferenceExpression('product_batches.expiration_date').' as days'),
                 DB::raw('COALESCE(products.cost_per_piece, products.cost) as unit_cost'),
                 DB::raw('(product_batches.quantity * COALESCE(products.cost_per_piece, products.cost)) as estimated_loss'),
                 DB::raw('NULL as movement_date'),
@@ -124,8 +127,8 @@ class InventoryReportService
                 DB::raw('
                     CASE
                         WHEN product_batches.quantity < 0 THEN "Stock negativo"
-                        WHEN product_batches.expiration_date < CURDATE() THEN "Caducado"
-                        WHEN product_batches.expiration_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN "Proximo a caducar"
+                        WHEN product_batches.expiration_date < '.$currentDate.' THEN "Caducado"
+                        WHEN product_batches.expiration_date <= '.$nearExpirationDate.' THEN "Proximo a caducar"
                         ELSE "Vigente"
                     END as status_label
                 '),
@@ -150,6 +153,10 @@ class InventoryReportService
         match ($filters['status'] ?? null) {
             'expired' => $query->whereDate('product_batches.expiration_date', '<', today()),
             'near_expiration' => $this->applyNearExpirationFilter($query, $filters),
+            // A negative lot is an inventory inconsistency, distinct from a
+            // product that is simply out of stock. Keep it on the lots report
+            // so the user can identify the exact lot that needs review.
+            'negative_stock' => $query->where('product_batches.quantity', '<', 0),
             default => null,
         };
 
@@ -583,6 +590,25 @@ class InventoryReportService
             ORDER BY CASE WHEN UPPER(barcodes.type) = "PRINCIPAL" THEN 0 ELSE 1 END, barcodes.id
             LIMIT 1
         ))';
+    }
+
+    private function currentDateExpression(): string
+    {
+        return DB::getDriverName() === 'sqlite' ? "DATE('now')" : 'CURDATE()';
+    }
+
+    private function dateAfterDaysExpression(int $days): string
+    {
+        return DB::getDriverName() === 'sqlite'
+            ? "DATE('now', '+{$days} days')"
+            : "DATE_ADD(CURDATE(), INTERVAL {$days} DAY)";
+    }
+
+    private function dateDifferenceExpression(string $dateColumn): string
+    {
+        return DB::getDriverName() === 'sqlite'
+            ? "CAST(julianday({$dateColumn}) - julianday('now') AS INTEGER)"
+            : "DATEDIFF({$dateColumn}, CURDATE())";
     }
 
     private function applyPeriod($query, array $filters, string $column = 'created_at'): void

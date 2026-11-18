@@ -41,6 +41,7 @@ export const inventoryReportTableConfig = {
                     Caducado: 'red',
                     'Proximo a caducar': 'amber',
                     Vigente: 'green',
+                    'Stock negativo': 'red',
                     Agotado: 'red',
                     'Stock bajo': 'amber',
                     'Con lotes caducados': 'red',
