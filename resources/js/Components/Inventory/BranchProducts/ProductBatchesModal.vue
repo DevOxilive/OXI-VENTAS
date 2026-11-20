@@ -91,6 +91,12 @@ const batches = computed(() => {
     return props.product?.batches ?? []
 })
 
+// Los lotes en cero permanecen guardados para auditorías y ajustes, pero no
+// participan en la lista operativa de edición mientras no tengan existencia.
+const visibleBatches = computed(() => {
+    return batches.value.filter((batch) => Number(batch.quantity ?? 0) > 0)
+})
+
 const selectedBatchTitle = computed(() => {
     if (!props.selectedBatch) {
         return 'Selecciona un lote'
@@ -186,14 +192,14 @@ function quantity(value) {
                     <aside class="flex max-h-[34dvh] min-h-[180px] flex-col overflow-hidden rounded-2xl border border-secondary bg-secondary min-[1700px]:h-full min-[1700px]:max-h-full min-[1700px]:min-h-0 min-[1700px]:rounded-r-none min-[1700px]:border-r-0">
                         <div class="border-b border-secondary bg-background px-5 py-4">
                             <p class="text-sm font-semibold text-text">
-                                {{ batches.length }} lote(s) registrados
+                                {{ visibleBatches.length }} lote(s) disponibles
                             </p>
                         </div>
 
                         <div class="min-h-0 flex-1 overflow-y-auto p-3">
-                            <div v-if="batches.length" class="space-y-2">
+                            <div v-if="visibleBatches.length" class="space-y-2">
                                 <button
-                                    v-for="batch in batches"
+                                    v-for="batch in visibleBatches"
                                     :key="batch.id"
                                     type="button"
                                     class="w-full rounded-2xl border bg-background px-4 py-3 text-left transition"
@@ -230,7 +236,7 @@ function quantity(value) {
 
                             <div v-else class="rounded-2xl border border-secondary bg-background px-4 py-10 text-center">
                                 <p class="text-sm font-semibold text-text opacity-80">
-                                    Este producto no tiene lotes registrados.
+                                    No hay lotes con stock disponible.
                                 </p>
                             </div>
                         </div>
