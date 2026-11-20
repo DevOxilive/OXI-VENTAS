@@ -319,7 +319,7 @@ export function useBatchAdjustmentModal(products) {
         selectedBatchId.value = null;
     }
 
-    function saveEditedBatch(closeModal = null) {
+    function saveEditedBatch(closeModal = null, onSaved = null) {
         if (processing.value || !validateForm()) return;
 
         const payload = { expected_values: {}, notes: form.notes || null };
@@ -360,7 +360,10 @@ export function useBatchAdjustmentModal(products) {
                     errorMessage:
                         "Revisa la informacion del lote e intenta nuevamente.",
                     headers: { "Idempotency-Key": operationKey.get() },
-                    onSuccess: () => operationKey.reset(),
+                    onSuccess: () => {
+                        operationKey.reset();
+                        onSaved?.();
+                    },
                 }),
                 onFinish: () => {
                     processing.value = false;

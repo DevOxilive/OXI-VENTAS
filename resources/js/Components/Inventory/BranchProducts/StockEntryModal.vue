@@ -11,7 +11,7 @@ import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'saved'])
 
 const props = defineProps({
     product: {
@@ -440,6 +440,7 @@ function saveEntry() {
         branch_allocations: payloadAllocations,
     }), {
         onSuccess: () => {
+            emit('saved', props.product)
             emit('close')
         },
     })

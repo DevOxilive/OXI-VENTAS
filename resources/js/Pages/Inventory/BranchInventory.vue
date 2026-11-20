@@ -173,6 +173,7 @@ const {
     setBatchAdjustmentType,
     validateBatchAdjustmentField,
     saveEditedBatch,
+    refreshProductDetails,
 } = useBranchInventory(props, { onReloaded: focusInventorySearch })
 
 const showProductViewModal = ref(false)
@@ -219,7 +220,8 @@ const inventoryToolbarConfig = computed(() =>
 )
 
 function saveBatchChanges() {
-    saveEditedBatch(closeProductBatchesModal)
+    const product = liveSelectedBatchesProduct.value
+    saveEditedBatch(closeProductBatchesModal, () => refreshProductDetails(product))
 }
 
 function handleInventoryToolbarFilter({ key, value }) {
@@ -390,10 +392,10 @@ function closeProductEditModal() {
 
         <StockEntryModal v-if="showEntryModal && liveSelectedMovementProduct && can('inventory.branches.stock-in')"
             :product="liveSelectedMovementProduct" :branches="branchesDB" :current-branch="selectedMovementBranch"
-            @close="closeEntryModal" />
+            @saved="refreshProductDetails" @close="closeEntryModal" />
 
         <StockExitModal v-if="showExitModal && liveSelectedMovementProduct && can('inventory.branches.stock-out')"
-            :product="liveSelectedMovementProduct" @close="closeExitModal" />
+            :product="liveSelectedMovementProduct" @saved="refreshProductDetails" @close="closeExitModal" />
 
         <ProductMovementsModal
             v-if="showMovementsModal && liveSelectedMovementsProduct && can('inventory.branches.view')"

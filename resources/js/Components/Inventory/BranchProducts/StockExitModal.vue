@@ -10,7 +10,7 @@ import SelectField from '@/Components/Forms/SelectField.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 import { getStockExitModalConfig } from '@/config/ModalConfigs/stockExitModalConfig'
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'saved'])
 
 const props = defineProps({
     product: {
@@ -101,7 +101,7 @@ const isKilogramUnit = computed(() => String(unit.value).toLowerCase() === 'kg')
                     panel-class="min-w-0 bg-background shadow-sm"
                 >
                     <p v-if="!availableSources.length" class="mb-3 text-sm text-text opacity-70">
-                        La salida se registrará sin número de lote y podrá dejar existencias negativas.
+                        No hay lotes con existencias disponibles para registrar esta salida.
                     </p>
                     <div class="grid max-h-[380px] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
                         <button

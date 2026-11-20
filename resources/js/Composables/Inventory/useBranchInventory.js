@@ -625,6 +625,19 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
         );
     }
 
+    function refreshProductDetails(product) {
+        if (!product?.id) return;
+
+        staleDetails.add(product.id);
+        detailRevisions.set(product.id, (detailRevisions.get(product.id) ?? 0) + 1);
+
+        const cachedDetails = { ...detailCache.value };
+        delete cachedDetails[product.id];
+        detailCache.value = cachedDetails;
+
+        void ensureProductDetails(product, { forceRefresh: true });
+    }
+
     const openCreateModal = () => {
         showCreateModal.value = true;
     };
@@ -939,5 +952,6 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
         setBatchAdjustmentType,
         validateBatchAdjustmentField,
         saveEditedBatch,
+        refreshProductDetails,
     };
 }

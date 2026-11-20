@@ -42,14 +42,16 @@ export function useStockExitModal(props, emit) {
     });
 
     const availableSources = computed(() => {
-        return activeBatches.value.map((batch) => ({
+        return activeBatches.value
+            .filter((batch) => Number(batch.quantity || 0) > 0)
+            .map((batch) => ({
             key: `batch-${batch.id}`,
             id: batch.id,
             lot_number: batch.lot_number,
             expiration_date: normalizeDate(batch.expiration_date),
             quantity: Number(batch.quantity || 0),
             type: "batch",
-        }));
+            }));
     });
 
     const selectedSource = computed(() => {
@@ -187,6 +189,10 @@ export function useStockExitModal(props, emit) {
             frontendErrors.quantity = "La cantidad debe ser mayor a cero.";
         }
 
+        if (selectedSource.value && Number(form.quantity) > Number(selectedSource.value.quantity)) {
+            frontendErrors.quantity = `El lote seleccionado solo tiene ${formatNumber(selectedSource.value.quantity)} disponibles.`;
+        }
+
         if (!allowedReasons.includes(form.reason)) {
             frontendErrors.reason = "Selecciona un motivo.";
         }
@@ -207,7 +213,12 @@ export function useStockExitModal(props, emit) {
 
         if (!validateExit()) return;
 
-        saveAdjustment();
+        saveAdjustment(null, {
+            onSuccess: () => {
+                emit('saved', props.product);
+                emit('close');
+            },
+        });
     }
 
     function formatNumber(value) {
