@@ -40,6 +40,27 @@ export function useEditBranchProductConfig(product) {
         return product.value?.inventory_unit ?? product.value?.unit ?? "pza";
     });
 
+    const minimumStockFactor = computed(() => {
+        if (unit.value === "kg") return 1;
+
+        if (product.value?.has_box_presentation && Number(product.value?.pieces_per_box) >= 2) {
+            return Number(product.value.pieces_per_box);
+        }
+
+        if (product.value?.has_package_presentation && Number(product.value?.pieces_per_package) >= 2) {
+            return Number(product.value.pieces_per_package);
+        }
+
+        return 1;
+    });
+
+    const minimumStockUnit = computed(() => {
+        if (unit.value === "kg") return "kg";
+        if (product.value?.has_box_presentation) return "cajas";
+        if (product.value?.has_package_presentation) return "paquetes";
+        return "pzas";
+    });
+
     const stockLabel = computed(() => {
         return (
             product.value?.stockLabel ??
@@ -85,7 +106,9 @@ export function useEditBranchProductConfig(product) {
                 return;
             }
 
-            form.min_stock = displayDecimal(currentProduct.minStock ?? 0);
+            form.min_stock = displayDecimal(
+                Number(currentProduct.minStock ?? 0) / minimumStockFactor.value,
+            );
             form.status = currentProduct.administrativeStatus ?? "active";
             form.season_start_date = currentProduct.seasonStartDate ?? "";
             form.season_end_date = currentProduct.seasonEndDate ?? "";
@@ -151,6 +174,7 @@ export function useEditBranchProductConfig(product) {
         saveButtonText,
         productName,
         unit,
+        minimumStockUnit,
         stockLabel,
         isSeasonal,
         statusHelpText,

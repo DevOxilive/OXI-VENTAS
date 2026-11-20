@@ -92,3 +92,38 @@ export function formatInventoryPresentationStock(value, {
 
   return parts.join(' | ')
 }
+
+/**
+ * Muestra el mínimo en la presentación con la que se configura el producto.
+ * El mínimo ya llega convertido a piezas desde el servidor, pero no se
+ * desglosa porque el usuario define una cantidad completa de cajas o paquetes.
+ */
+export function formatMinimumStockPresentation(value, {
+  unit = 'pza',
+  hasBoxPresentation = false,
+  hasPackagePresentation = false,
+  piecesPerBox = 0,
+  piecesPerPackage = 0,
+} = {}) {
+  const normalizedUnit = normalizeInventoryUnit(unit)
+  const minimum = Number(String(value ?? 0).replace(',', '.'))
+
+  if (normalizedUnit !== 'pza' || !Number.isFinite(minimum)) {
+    return formatInventoryQuantityWithUnit(value, unit)
+  }
+
+  const boxSize = Math.round(Number(piecesPerBox))
+  const packageSize = Math.round(Number(piecesPerPackage))
+
+  if (hasBoxPresentation && boxSize >= 2) {
+    const boxes = Math.round(minimum / boxSize)
+    return `${formatInventoryQuantity(boxes)} ${boxes === 1 ? 'caja' : 'cajas'}`
+  }
+
+  if (hasPackagePresentation && packageSize >= 2) {
+    const packages = Math.round(minimum / packageSize)
+    return `${formatInventoryQuantity(packages)} ${packages === 1 ? 'paquete' : 'paquetes'}`
+  }
+
+  return formatInventoryQuantityWithUnit(minimum, 'pza')
+}

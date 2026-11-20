@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { router, usePage } from "@inertiajs/vue3";
-import { formatInventoryPresentationStock } from '@/utils/quantityFormatter';
+import { formatInventoryPresentationStock, formatMinimumStockPresentation } from '@/utils/quantityFormatter';
 import { useBatchAdjustmentModal } from "@/Composables/Inventory/useBatchAdjustmentModal";
 import { useGlobalTablePagination } from "@/Composables/useGlobalTablePagination";
 import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime, subscribeRealtimeReconnect } from "@/realtime";
@@ -229,7 +229,7 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
                     piecesPerBox: detail.product?.pieces_per_box ?? item.product?.pieces_per_box,
                     piecesPerPackage: detail.product?.pieces_per_package ?? item.product?.pieces_per_package,
                 }),
-                minStockLabel: `Stock Min. ${formatInventoryPresentationStock(minStock, {
+                minStockLabel: `Stock Min. ${formatMinimumStockPresentation(minStock, {
                     unit,
                     hasBoxPresentation: Boolean(
                         detail.product?.has_box_presentation ?? item.product?.has_box_presentation,

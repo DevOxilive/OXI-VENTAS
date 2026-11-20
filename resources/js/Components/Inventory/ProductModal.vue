@@ -105,6 +105,27 @@ function displayDecimal(value) {
   return String(value).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 }
 
+function minimumStockFactor(product = form) {
+  if ((product.inventory_unit ?? product.unit) === "kg") return 1;
+
+  if (Boolean(product.has_box_presentation) && Number(product.pieces_per_box) >= 2) {
+    return Number(product.pieces_per_box);
+  }
+
+  if (Boolean(product.has_package_presentation) && Number(product.pieces_per_package) >= 2) {
+    return Number(product.pieces_per_package);
+  }
+
+  return 1;
+}
+
+const minimumStockPresentationLabel = computed(() => {
+  if (form.inventory_unit === "kg") return "kg";
+  if (form.has_box_presentation) return "cajas";
+  if (form.has_package_presentation) return "paquetes";
+  return "pzas";
+});
+
 function initializePricingFields() {
   const product = props.mode === "create" ? null : props.product;
   for (const presentation of ["piece", "box"]) {
@@ -314,7 +335,7 @@ watch(
       : [product.branch_id].filter(Boolean).map(Number);
     ensureCurrentBranchSelected();
 
-    form.min_stock = displayDecimal(product.min_stock ?? 0);
+    form.min_stock = displayDecimal(Number(product.min_stock ?? 0) / minimumStockFactor(product));
     form.product_department_id = product.product_department_id ?? "";
     form.category_id = product.category_id ?? "";
     form.category_name = "";
@@ -1078,7 +1099,7 @@ function submit() {
             />
 
             <InputField
-              label="Stock mínimo"
+              :label="`Stock mínimo (${minimumStockPresentationLabel})`"
               field="min_stock"
               :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'product_piece_quantity'"
               v-model="form.min_stock"
