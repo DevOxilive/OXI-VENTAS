@@ -53,7 +53,8 @@ function summaryTextClass(item) {
 
 <template>
     <GlobalModal v-bind="modalConfig" @close="closeModal">
-        <div class="flex h-full min-h-0 flex-col">
+        <template #content>
+        <div class="history-scroll min-h-0 flex-1 overflow-auto overscroll-contain p-4 sm:p-6" tabindex="0" aria-label="Historial de movimientos desplazable">
             <section class="border-b border-secondary pb-3">
                 <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div class="min-w-0">
@@ -82,8 +83,15 @@ function summaryTextClass(item) {
                 </div>
             </section>
 
+            <div v-if="movementSummary.length" class="my-4 flex flex-wrap gap-2" aria-label="Resumen por operación">
+                <div v-for="item in movementSummary" :key="item.key" class="flex items-center gap-3 rounded-xl border border-secondary px-3 py-2">
+                    <span class="text-xs font-medium" :class="summaryTextClass(item)">{{ item.label }}</span>
+                    <span class="text-lg font-bold tabular-nums text-text">{{ item.count }}</span>
+                </div>
+            </div>
+
             <section class="border-b border-secondary py-3">
-                <div class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <label class="block">
                         <span class="mb-1 block text-[11px] font-semibold uppercase tracking-[0.18em] text-text opacity-50">
                             Grupo
@@ -130,7 +138,7 @@ function summaryTextClass(item) {
                 </div>
             </section>
 
-            <section class="min-h-0 flex-1 overflow-hidden">
+            <section class="history-table mt-4 overflow-auto rounded-xl border border-secondary" tabindex="0" aria-label="Tabla de movimientos desplazable">
                 <div v-if="error" role="alert" class="p-4">
                     {{ error }} <button type="button" class="underline" @click="emit('retry')">Reintentar</button>
                 </div>
@@ -151,10 +159,11 @@ function summaryTextClass(item) {
 
                     <template #cell-displayBatches="{ row }">
                         <div class="min-w-0 leading-5">
-                            <p class="truncate text-text">{{ row.displayBatches }}</p>
-                            <p v-if="row.notesText" class="truncate text-xs text-text opacity-60" :title="row.notesText">
-                                {{ row.notesText }}
-                            </p>
+                            <p class="whitespace-normal break-words text-text">{{ row.displayBatches }}</p>
+                            <details v-if="row.notesText" class="mt-1 text-xs text-text">
+                                <summary class="cursor-pointer opacity-70">Ver nota</summary>
+                                <p class="mt-2 whitespace-pre-wrap leading-relaxed">{{ row.notesText }}</p>
+                            </details>
                         </div>
                     </template>
                 </GlobalTable>
@@ -169,30 +178,11 @@ function summaryTextClass(item) {
             </div>
 
         </div>
+        </template>
 
         <template #footer="{ close }">
             <footer class="sticky bottom-0 flex flex-col gap-3 border-t border-secondary bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex min-w-0 flex-wrap items-center gap-2 text-sm text-text">
-                    <span class="mr-1 font-semibold text-violet-700">Resumen:</span>
-
-                    <template v-if="movementSummary.length">
-                        <span
-                            v-for="item in movementSummary"
-                            :key="item.key"
-                            class="inline-flex items-center gap-2 rounded-full border border-secondary bg-secondary/70 px-3 py-1.5 shadow-sm"
-                        >
-                            <span class="font-semibold" :class="summaryTextClass(item)">
-                                {{ item.label }}
-                            </span>
-
-                            <span class="inline-flex min-w-6 justify-center rounded-full bg-background px-2 py-0.5 text-xs font-bold text-text">
-                                {{ item.count }}
-                            </span>
-                        </span>
-                    </template>
-
-                    <span v-else class="text-text opacity-70">Sin movimientos para resumir.</span>
-                </div>
+                <span class="text-xs text-text opacity-60">{{ totalFilteredMovements }} movimientos encontrados</span>
 
                 <button
                     type="button"
@@ -205,3 +195,12 @@ function summaryTextClass(item) {
         </template>
     </GlobalModal>
 </template>
+
+<style scoped>
+.history-scroll { scrollbar-gutter: stable; }
+.history-table { max-height: 52dvh; scrollbar-gutter: stable; }
+.history-table :deep(thead) { position: sticky; top: 0; z-index: 10; }
+@media (max-height: 550px) {
+    .history-table { max-height: none; }
+}
+</style>
