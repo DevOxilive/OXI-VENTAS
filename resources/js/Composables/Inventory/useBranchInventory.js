@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { router, usePage } from "@inertiajs/vue3";
-import { formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter';
+import { formatInventoryPresentationStock, formatInventoryQuantityWithUnit } from '@/utils/quantityFormatter';
 import { useBatchAdjustmentModal } from "@/Composables/Inventory/useBatchAdjustmentModal";
 import { useGlobalTablePagination } from "@/Composables/useGlobalTablePagination";
 import { REALTIME_CHANNELS, REALTIME_EVENTS, subscribeRealtime, subscribeRealtimeReconnect } from "@/realtime";
@@ -218,8 +218,18 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
                 assigned_branch_ids: Array.isArray(detail.assigned_branch_ids)
                     ? detail.assigned_branch_ids.map(Number)
                     : [],
-                stockLabel: formatInventoryQuantityWithUnit(stock, unit),
-                minStockLabel: formatInventoryQuantityWithUnit(minStock, unit),
+                stockLabel: formatInventoryPresentationStock(stock, {
+                    unit,
+                    hasBoxPresentation: Boolean(
+                        detail.product?.has_box_presentation ?? item.product?.has_box_presentation,
+                    ),
+                    hasPackagePresentation: Boolean(
+                        detail.product?.has_package_presentation ?? item.product?.has_package_presentation,
+                    ),
+                    piecesPerBox: detail.product?.pieces_per_box ?? item.product?.pieces_per_box,
+                    piecesPerPackage: detail.product?.pieces_per_package ?? item.product?.pieces_per_package,
+                }),
+                minStockLabel: `Stock Min. ${formatInventoryQuantityWithUnit(minStock, unit)}`,
                 price,
                 tracksBatches,
                 expirationDate:
