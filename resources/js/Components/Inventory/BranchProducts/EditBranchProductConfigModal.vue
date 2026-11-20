@@ -27,6 +27,7 @@ const {
     totalErrors,
     productName,
     unit,
+    minimumStockUnit,
     stockLabel,
     isSeasonal,
     statusHelpText,
@@ -88,7 +89,7 @@ function submitConfig() {
                         <InputField
                             v-model="form.min_stock"
                             data-modal-autofocus
-                            :label="`Stock minimo (${unit})`"
+                            :label="`Stock minimo (${minimumStockUnit})`"
                             field="min_stock"
                             :validation-field="isKilogramUnit ? 'kilogram_quantity' : 'product_piece_quantity'"
                             type="text"

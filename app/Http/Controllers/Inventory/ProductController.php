@@ -271,6 +271,7 @@ class ProductController extends Controller
                 throw ValidationException::withMessages(['packages_per_box' => 'Una caja no puede representar más de 100,000 piezas.']);
             }
         }
+        $data['min_stock'] = $this->minimumStockBaseQuantity($data);
         $data['search_aliases'] = $this->normalizeSearchAliases($data['search_aliases'] ?? []);
 
         $this->resolvePresentationPricing($data, $canManagePricing);
@@ -438,6 +439,7 @@ class ProductController extends Controller
                 throw ValidationException::withMessages(['packages_per_box' => 'Una caja no puede representar más de 100,000 piezas.']);
             }
         }
+        $data['min_stock'] = $this->minimumStockBaseQuantity($data);
         $data['search_aliases'] = $this->normalizeSearchAliases($data['search_aliases'] ?? []);
 
         $this->resolvePresentationPricing($data, $canManagePricing, $product);
@@ -1023,6 +1025,25 @@ class ProductController extends Controller
         }
 
         return ['nullable', 'integer', 'min:0', 'max:999'];
+    }
+
+    private function minimumStockBaseQuantity(array $data): float|int
+    {
+        $minimum = (float) ($data['min_stock'] ?? 0);
+
+        if (($data['inventory_unit'] ?? 'pza') !== 'pza') {
+            return $minimum;
+        }
+
+        if (! empty($data['has_box_presentation']) && (int) ($data['pieces_per_box'] ?? 0) >= 2) {
+            return (int) $minimum * (int) $data['pieces_per_box'];
+        }
+
+        if (! empty($data['has_package_presentation']) && (int) ($data['pieces_per_package'] ?? 0) >= 2) {
+            return (int) $minimum * (int) $data['pieces_per_package'];
+        }
+
+        return (int) $minimum;
     }
 
     private function resolveCategoryId(array $data): int

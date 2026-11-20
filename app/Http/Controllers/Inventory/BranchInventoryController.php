@@ -367,10 +367,15 @@ class BranchInventoryController extends Controller
             'season_end_date' => ['nullable', 'date', 'required_if:status,seasonal', 'after_or_equal:season_start_date'],
         ]);
 
-        app(InventoryBackgroundContext::class)->run(fn () => DB::transaction(function () use ($validated, $branchProduct) {
+        $minimumStock = $this->minimumStockBaseQuantity(
+            $validated['min_stock'],
+            $branchProduct->product,
+        );
+
+        app(InventoryBackgroundContext::class)->run(fn () => DB::transaction(function () use ($validated, $minimumStock, $branchProduct) {
             $branchProduct = BranchProduct::query()->whereKey($branchProduct->id)->lockForUpdate()->firstOrFail();
             $branchProduct->update([
-                'min_stock' => $validated['min_stock'],
+                'min_stock' => $minimumStock,
                 'status' => $validated['status'],
                 'season_start_date' => $validated['status'] === 'seasonal'
                     ? $validated['season_start_date']
@@ -395,6 +400,25 @@ class BranchInventoryController extends Controller
         }
 
         return ['required', 'integer', 'min:0', 'max:999'];
+    }
+
+    private function minimumStockBaseQuantity(float|int|string $minimum, mixed $product): float|int
+    {
+        $minimum = (float) $minimum;
+
+        if (($product?->inventory_unit ?? $product?->unit ?? 'pza') !== 'pza') {
+            return $minimum;
+        }
+
+        if ($product?->has_box_presentation && (int) $product->pieces_per_box >= 2) {
+            return (int) $minimum * (int) $product->pieces_per_box;
+        }
+
+        if ($product?->has_package_presentation && (int) $product->pieces_per_package >= 2) {
+            return (int) $minimum * (int) $product->pieces_per_package;
+        }
+
+        return (int) $minimum;
     }
 
     private function serializeBranchProductRow(BranchProduct $branchProduct): array
