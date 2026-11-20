@@ -1134,6 +1134,11 @@ class SalesController extends Controller
             'payment_method' => $sale->paymentMethod
                 ? $this->displayPaymentMethodName($sale->paymentMethod->name)
                 : 'Sin metodo',
+            // El pulso del cajón se limita a ventas cobradas en efectivo.
+            // Tarjeta y crédito deben imprimir su ticket sin abrirlo.
+            'open_cash_drawer' => $sale->paymentMethod
+                ? $this->isCashPaymentMethod($sale->paymentMethod->name)
+                : false,
             'employee_name' => trim(
                 ($sale->employee?->first_name ?? '').' '.($sale->employee?->last_name ?? '')
             ) ?: 'Sin empleado',
