@@ -48,6 +48,10 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  tableMaxHeightClass: {
+    type: String,
+    default: '',
+  },
 })
 
 const emit = defineEmits([
@@ -193,6 +197,7 @@ onBeforeUnmount(() => {
       :striped="striped"
       :selectable="selectable"
       :selected-items="selectedItems"
+      :max-height-class="tableMaxHeightClass"
       @action="$emit('action', $event)"
       @row-click="$emit('row-click', $event)"
       @selection-change="$emit('selection-change', $event)"

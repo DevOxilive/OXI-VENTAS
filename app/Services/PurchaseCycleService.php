@@ -370,18 +370,14 @@ class PurchaseCycleService
 
             $user->loadMissing('role');
             $accessibleBranchIds = collect($user->accessibleBranchIds());
-            $isInventoryUser = $user->role?->name === 'Inventario';
-
             foreach ($orders as $branchOrder) {
                 $belongsToThisDraft = (int) $branchOrder->general_purchase_order_id === (int) $draft->id;
 
                 if (
                     $branchOrder->status !== PurchaseOrder::STATUS_GENERATED
                     || $branchOrder->review_status !== PurchaseOrder::REVIEW_APPROVED
-                    || ! $branchOrder->assigned_to_user_id
                     || ($branchOrder->general_purchase_order_id && ! $belongsToThisDraft)
                     || ! $accessibleBranchIds->contains((int) $branchOrder->branch_id)
-                    || ($isInventoryUser && (int) $branchOrder->assigned_to_user_id !== (int) $user->id)
                 ) {
                     throw ValidationException::withMessages([
                         'order_ids' => "La orden {$branchOrder->folio} no está disponible para esta orden general.",

@@ -1,8 +1,8 @@
 export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, mode = 'view', tabs = null, actions = [] } = {}) {
     const headings = {
-        view: ['Órdenes de compra generales', 'Selecciona Órdenes de compra de sucursal, prepara la Orden de compra general y consulta su seguimiento.'],
-        tracking: ['Seguimiento de compras', 'Registra lo comprado al regresar de Central.'],
-        history: ['Compras completadas', 'Consulta las compras generales que ya fueron cerradas.'],
+        view: ['Solicitudes de compra', 'Revisa solicitudes de sucursal y reúne las que comprarás.'],
+        tracking: ['Compras centrales', 'Registra los productos comprados.'],
+        history: ['Compras cerradas', 'Consulta las compras que ya fueron terminadas.'],
     }
     const [title, subtitle] = headings[mode] || headings.view
 
@@ -13,15 +13,15 @@ export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, mode =
         backButton: true,
         backLabel: 'Inventario',
         search: filters.search ?? '',
-        searchPlaceholder: 'Buscar por Orden de compra general, producto, código o sucursal',
+        searchPlaceholder: 'Buscar compra, producto, código o sucursal',
         showSearch: mode !== 'view' || filters.status !== 'GENERATE',
         compactFilters: true,
         filters: [],
         actions,
         tabs: mode === 'view' ? (tabs ?? [
-            { key: 'GENERATE', label: 'Generar', icon: 'playlist_add' },
-            { key: 'PURCHASING', label: 'En compra', icon: 'local_shipping' },
-            { key: 'COMPLETED', label: 'Completadas', icon: 'task_alt' },
+            { key: 'GENERATE', label: 'Solicitudes', icon: 'playlist_add' },
+            { key: 'PURCHASING', label: 'Compras centrales', icon: 'local_shipping' },
+            { key: 'COMPLETED', label: 'Cerradas', icon: 'task_alt' },
         ]) : [],
         activeTab: filters.status ?? 'GENERATE',
         recordsPerPage: Number(filters.per_page ?? 25),

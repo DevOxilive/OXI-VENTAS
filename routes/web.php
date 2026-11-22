@@ -744,10 +744,6 @@ Route::middleware([
             ->middleware(['permission:sales.purchase-lists.create', 'idempotent'])
             ->name('branches.purchase-reports.store');
 
-        Route::post('/branches/{branch}/purchase-reports/submit-empty', [PurchaseReportController::class, 'submitEmpty'])
-            ->middleware(['permission:sales.purchase-lists.create', 'idempotent'])
-            ->name('branches.purchase-reports.submit-empty');
-
         Route::get('/branches/{branch}/purchase-reports/{purchaseReport}', [PurchaseReportController::class, 'show'])
             ->middleware($purchaseReportsAccess)
             ->name('branches.purchase-reports.show');

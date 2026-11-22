@@ -32,7 +32,6 @@ const props = defineProps({
     currentBranch: { type: Object, required: true },
     ordersDB: { type: Object, default: () => ({}) },
     filters: { type: Object, default: () => ({}) },
-    purchaseCycle: { type: Object, default: () => ({}) },
     generation: {
         type: Object,
         default: () => ({ branches: [], orders: [], inventory_users: [], draft: null }),
@@ -110,9 +109,9 @@ const selectedBranchesCount = computed(() => new Set(
 const canPrepareGeneralOrder = computed(() => can('inventory.purchase-orders.general.create')
     && selectedSourceOrders.value.length > 0)
 const availableTabs = computed(() => [
-    can('inventory.purchase-orders.source.view') && { key: 'GENERATE', label: 'Generar', icon: 'playlist_add' },
-    can('inventory.purchase-orders.general.view') && { key: 'PURCHASING', label: 'En compra', icon: 'local_shipping' },
-    can('inventory.purchase-orders.general.view') && { key: 'COMPLETED', label: 'Completadas', icon: 'task_alt' },
+    can('inventory.purchase-orders.source.view') && { key: 'GENERATE', label: 'Solicitudes', icon: 'playlist_add' },
+    can('inventory.purchase-orders.general.view') && { key: 'PURCHASING', label: 'Compras centrales', icon: 'local_shipping' },
+    can('inventory.purchase-orders.general.view') && { key: 'COMPLETED', label: 'Cerradas', icon: 'task_alt' },
 ].filter(Boolean))
 const notificationItems = computed(() => props.notificationSummary?.items ?? [])
 const notificationSeenStorageKey = computed(() => `purchase-orders:inventory:seen:${page.props.auth.user.id}`)
@@ -265,12 +264,12 @@ async function reviewSourceOrder(order, reviewStatus) {
     const approved = reviewStatus === 'APPROVED'
     const result = await confirmModalAction({
         mode: approved ? 'update' : 'delete',
-        entityName: 'Orden de compra',
-        title: approved ? `Aprobar ${order.folio}` : `Rechazar ${order.folio}`,
-        confirmText: approved ? 'Aprobar orden' : 'Rechazar orden',
+        entityName: 'solicitud de compra',
+        title: approved ? `Aceptar ${order.folio}` : `Rechazar ${order.folio}`,
+        confirmText: approved ? 'Aceptar solicitud' : 'Rechazar solicitud',
         message: approved
-            ? 'La orden quedará disponible para transferirse y agregarse a una Orden de compra general.'
-            : 'La orden no podrá transferirse ni agregarse a una Orden de compra general.',
+            ? 'La solicitud quedará disponible para incluirla en una Compra central.'
+            : 'La solicitud no se incluirá en una Compra central.',
     })
 
     if (!result.isConfirmed) return
@@ -355,10 +354,10 @@ function disabledGeneralDraftSave() {
         },
         getModalRequestOptions({
             mode: 'create',
-            entityName: 'Orden de compra general',
-            successTitle: 'Orden de compra general generada correctamente',
-            errorTitle: 'No se pudo generar la Orden de compra general',
-            errorMessage: 'Verifica que las órdenes continúen asignadas y disponibles.',
+            entityName: 'Compra central',
+            successTitle: 'Compra central creada correctamente',
+            errorTitle: 'No se pudo crear la Compra central',
+            errorMessage: 'Verifica que las solicitudes continúen disponibles.',
         }),
     )
 }
@@ -368,10 +367,10 @@ async function generateGeneralOrder() {
 
     const confirmation = await confirmModalAction({
         mode: 'create',
-        entityName: 'orden general',
-        title: 'Generar Orden de compra general',
-        confirmText: 'Generar Orden general',
-        message: `Se incluirán ${selectedSourceOrders.value.length} Órdenes de compra de ${selectedBranchesCount.value} sucursal(es).`,
+        entityName: 'Compra central',
+        title: 'Crear Compra central',
+        confirmText: 'Crear Compra central',
+        message: `Se reunirán ${selectedSourceOrders.value.length} solicitudes de ${selectedBranchesCount.value} sucursal(es).`,
     })
 
     if (!confirmation.isConfirmed) return
@@ -385,10 +384,10 @@ async function generateGeneralOrder() {
         },
         getModalRequestOptions({
             mode: 'create',
-            entityName: 'Orden general',
-            successTitle: 'Orden de compra general generada correctamente',
-            errorTitle: 'No se pudo generar la Orden de compra general',
-            errorMessage: 'Verifica que todas las órdenes sigan pendientes y asignadas.',
+            entityName: 'Compra central',
+            successTitle: 'Compra central creada correctamente',
+            errorTitle: 'No se pudo crear la Compra central',
+            errorMessage: 'Verifica que las solicitudes sigan pendientes.',
             onSuccess: () => updateStatus('PURCHASING'),
         }),
     )
@@ -396,7 +395,7 @@ async function generateGeneralOrder() {
 </script>
 
 <template>
-    <Head title="Órdenes de compra generales" />
+    <Head title="Solicitudes de compra" />
 
     <PageLayout>
         <template #toolbar>
@@ -413,11 +412,11 @@ async function generateGeneralOrder() {
 
         <FloatingNotificationModal
             :open="notificationPanelOpen"
-            eyebrow="Órdenes de compra"
+            eyebrow="Solicitudes de compra"
             title="Avisos pendientes"
-            subtitle="Órdenes asignadas o transferidas que requieren atención de Inventario."
+            subtitle="Solicitudes de compra que requieren atención de Inventario."
             :items="visibleNotificationItems"
-            empty-description="No hay órdenes de compra asignadas por atender."
+            empty-description="No hay solicitudes de compra pendientes por atender."
             @close="closeNotificationPanel"
             @select="openNotificationOrder"
             @dismiss="dismissNotification"
@@ -425,12 +424,11 @@ async function generateGeneralOrder() {
 
         <div
             v-if="activeStatus === 'GENERATE'"
-            class="grid min-w-0 gap-4 xl:grid-cols-[250px_minmax(0,1fr)_310px]"
+            class="grid min-w-0 gap-4 xl:grid-cols-[230px_minmax(0,1fr)_310px]"
         >
             <FormPanel
-                title="1. Sucursal"
-                description="Elige una sucursal para consultar todas sus Órdenes de compra asignadas."
-                panel-class="min-w-0 shadow-none"
+                title="Sucursales"
+                panel-class="min-w-0 !bg-background shadow-sm"
             >
                 <div class="space-y-2">
                     <SelectionCheckboxCard
@@ -438,22 +436,21 @@ async function generateGeneralOrder() {
                         :key="branch.id"
                         :checked="Number(selectedBranchId) === Number(branch.id)"
                         :title="branch.name"
-                        :description="`${branch.orders_count} Orden(es) de compra pendiente(s)`"
+                        :description="`${branch.orders_count} solicitud(es) pendiente(s)`"
                         :badge="String(branch.orders_count)"
                         compact
                         @toggle="selectBranch(branch)"
                     />
 
                     <p v-if="!generation.branches?.length" class="py-6 text-center text-sm text-text opacity-60">
-                        No tienes sucursales asignadas.
+                        No tienes sucursales disponibles.
                     </p>
                 </div>
             </FormPanel>
 
             <FormPanel
-                title="2. Órdenes de compra"
-                description="Revisa, transfiere o agrega cada Orden de compra a la Orden de compra general."
-                panel-class="min-w-0 shadow-none"
+                title="Solicitudes enviadas"
+                panel-class="min-w-0 !bg-background shadow-sm"
             >
                 <div v-if="loadingSourceOrder" class="mb-3 rounded-xl bg-secondary px-4 py-3 text-sm text-text">
                     Cargando detalle de la orden...
@@ -470,14 +467,13 @@ async function generateGeneralOrder() {
             </FormPanel>
 
             <FormPanel
-                title="3. Resumen de Órdenes de compra generales"
-                :description="`Ciclo ${purchaseCycle.folio || 'actual'}`"
-                panel-class="min-w-0 shadow-none"
+                title="Compra central"
+                panel-class="min-w-0 !bg-background shadow-sm xl:sticky xl:top-4 xl:self-start"
             >
                 <div class="mb-4 grid grid-cols-2 gap-2">
                     <div class="rounded-xl bg-secondary p-3 text-center text-text">
                         <strong class="block text-xl">{{ selectedSourceOrders.length }}</strong>
-                        <span class="text-xs opacity-65">Órdenes</span>
+                        <span class="text-xs opacity-65">Solicitudes</span>
                     </div>
                     <div class="rounded-xl bg-secondary p-3 text-center text-text">
                         <strong class="block text-xl">{{ selectedBranchesCount }}</strong>
@@ -499,7 +495,7 @@ async function generateGeneralOrder() {
                             v-if="can('inventory.purchase-orders.general.create')"
                             variant="secondary"
                             class="!px-2 !py-2"
-                            title="Quitar de la Orden de compra general"
+                            title="Quitar de la Compra central"
                             @click="removeSourceOrder(order)"
                         >
                             <span class="material-symbols-outlined text-base">close</span>
@@ -507,7 +503,7 @@ async function generateGeneralOrder() {
                     </article>
 
                     <p v-if="!selectedSourceOrders.length" class="py-8 text-center text-sm text-text opacity-60">
-                        Agrega las Órdenes de compra que formarán parte de la Orden de compra general.
+                        Acepta y agrega las solicitudes que formarán parte de esta compra.
                     </p>
                 </div>
 
@@ -521,7 +517,7 @@ async function generateGeneralOrder() {
                         :disabled="!canPrepareGeneralOrder"
                         @click="generateGeneralOrder"
                     >
-                        Generar Orden de compra general
+                        Crear Compra central
                     </AppButton>
                 </div>
             </FormPanel>
