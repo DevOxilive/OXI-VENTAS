@@ -573,7 +573,7 @@ class SalesController extends Controller
         }, 3);
 
         if ($accountId) {
-            broadcast(new CreditAccountChanged('charge_created', $accountId))->toOthers();
+            DB::afterCommit(fn () => broadcast(new CreditAccountChanged('charge_created', $accountId))->toOthers());
         }
 
         $expirationAlerts = $this->buildRemainingNearExpirationAlertsAfterSale($sale);
@@ -615,7 +615,7 @@ class SalesController extends Controller
             ->where('sale_id', $sale->id)
             ->value('employee_credit_account_id');
         if ($creditAccountId) {
-            broadcast(new CreditAccountChanged('charge_adjusted', (int) $creditAccountId))->toOthers();
+            DB::afterCommit(fn () => broadcast(new CreditAccountChanged('charge_adjusted', (int) $creditAccountId))->toOthers());
         }
 
         $responsePayload = [
@@ -681,7 +681,7 @@ class SalesController extends Controller
             ->where('sale_id', $sale->id)
             ->value('employee_credit_account_id');
         if ($creditAccountId) {
-            broadcast(new CreditAccountChanged('return_voided', (int) $creditAccountId))->toOthers();
+            DB::afterCommit(fn () => broadcast(new CreditAccountChanged('return_voided', (int) $creditAccountId))->toOthers());
         }
 
         return back()->with('success', 'La devolución '.$this->returnFolio($cancellation).' fue anulada correctamente.');
