@@ -15,10 +15,14 @@ class PreventDuplicateSubmission
             return $next($request);
         }
 
-        if ($request->hasHeader('Idempotency-Key') && $request->routeIs(
-            'inventory.stock-movements.store', 'inventory.product-batches.update',
-        )) {
-            return app(PreventDuplicateInventoryOperation::class)->handle($request, $next);
+        if ($request->hasHeader('Idempotency-Key')) {
+            if ($request->routeIs('inventory.stock-movements.store', 'inventory.product-batches.update')) {
+                return app(PreventDuplicateInventoryOperation::class)->handle($request, $next);
+            }
+
+            if ($request->routeIs('ventas.store')) {
+                return app(PreventDuplicateSaleOperation::class)->handle($request, $next);
+            }
         }
 
         $fingerprint = $request->header('Idempotency-Key') ?: hash('sha256', json_encode([

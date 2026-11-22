@@ -143,6 +143,7 @@ const saleForm = useForm({
   estimated_payment_date: null,
 });
 const saleSubmitting = ref(false);
+const saleOperationKey = ref(null);
 const showCreditModal = ref(false);
 const showPaymentModal = ref(false);
 const creditHolder = ref("");
@@ -843,6 +844,7 @@ function resetSaleCapture() {
   showPaymentModal.value = false;
   cardPaymentConfirmed.value = false;
   highlightedSuggestionIndex.value = 0;
+  saleOperationKey.value = null;
 }
 
 function loadPendingSale(draft) {
@@ -857,6 +859,7 @@ function loadPendingSale(draft) {
   showPaymentModal.value = false;
   cardPaymentConfirmed.value = false;
   highlightedSuggestionIndex.value = 0;
+  saleOperationKey.value = null;
 }
 
 function startAdditionalSale() {
@@ -1327,7 +1330,16 @@ function clearCart() {
   showPaymentModal.value = false;
   cardPaymentConfirmed.value = false;
   highlightedSuggestionIndex.value = 0;
+  saleOperationKey.value = null;
   focusSearch();
+}
+
+function createSaleOperationKey() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `sale-${Date.now()}-${Math.random().toString(36).slice(2, 14)}`;
 }
 
 function switchBranch(branchId) {
@@ -1739,11 +1751,13 @@ async function submitSale(creditSelection = null, estimatedPaymentDate = null) {
 
   saleSubmitting.value = true;
   saleForm.clearErrors();
+  saleOperationKey.value ??= createSaleOperationKey();
 
   try {
     const { data } = await window.axios.post(route("ventas.store"), saleForm.data(), {
       headers: {
         Accept: "application/json",
+        "Idempotency-Key": saleOperationKey.value,
       },
     });
 
