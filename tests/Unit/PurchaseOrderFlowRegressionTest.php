@@ -63,7 +63,7 @@ class PurchaseOrderFlowRegressionTest extends TestCase
         $this->assertStringContainsString("'folio' => \$this->makeGeneratedFolio(\$branch)", $controller);
         $this->assertStringContainsString("'status' => PurchaseOrder::STATUS_GENERATED", $controller);
         $this->assertStringContainsString('$lockedOrder->delete();', $controller);
-        $this->assertStringContainsString('app(PurchaseCycleService::class)->registerOrder($generatedOrder, $request->user());', $controller);
+        $this->assertStringNotContainsString('registerOrder($generatedOrder', $controller);
         $this->assertStringContainsString("->where('status', PurchaseOrder::STATUS_DRAFT)", $controller);
     }
 
@@ -110,9 +110,8 @@ class PurchaseOrderFlowRegressionTest extends TestCase
         $notificationModal = file_get_contents(resource_path('js/Components/Notifications/FloatingNotificationModal.vue'));
         $seenState = file_get_contents(resource_path('js/Composables/useNotificationSeenState.js'));
 
-        $this->assertStringContainsString('Recibiste la Orden de compra', $purchaseReportController);
-        $this->assertStringContainsString("'purchase_order_assigned'", $purchaseReportController);
-        $this->assertStringContainsString("'purchase_order_assigned'", $inventoryOrdersPage);
+        $this->assertStringContainsString('Solicitud enviada a Compras correctamente.', $purchaseReportController);
+        $this->assertStringNotContainsString("'purchase_order_assigned'", $purchaseReportController);
         $this->assertStringContainsString('purchaseOrderNotificationSummary', $generalController);
         $this->assertStringContainsString("refreshRealtimeProps(page, ['generation', 'notificationSummary'])", $inventoryOrdersPage);
         $this->assertStringContainsString('markNotificationsSeen()', $inventoryOrdersPage);

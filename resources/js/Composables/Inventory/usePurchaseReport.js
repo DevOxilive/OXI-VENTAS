@@ -55,12 +55,12 @@ function quantityStep(item) {
 }
 
 export function usePurchaseReport(props) {
-    const assignedToUserId = ref("");
     const selectedItems = ref({});
     const editingOrder = ref(null);
     let filterTimer = null;
 
     const localFilters = ref({
+        search: props.filters?.search ?? "",
         departmentIds: props.filters?.department_ids ?? [],
         categoryIds: props.filters?.category_ids ?? [],
         productIds: props.filters?.product_ids ?? [],
@@ -198,7 +198,6 @@ export function usePurchaseReport(props) {
     }
 
     function clearDraft() {
-        assignedToUserId.value = "";
         selectedItems.value = {};
         editingOrder.value = null;
     }
@@ -208,6 +207,7 @@ export function usePurchaseReport(props) {
             route("ventas.purchase-reports.index"),
             {
                 branch: props.currentBranch.id,
+                search: localFilters.value.search || undefined,
                 department_ids: localFilters.value.departmentIds?.length ? localFilters.value.departmentIds : undefined,
                 category_ids: localFilters.value.categoryIds?.length ? localFilters.value.categoryIds : undefined,
                 product_ids: localFilters.value.productIds?.length ? localFilters.value.productIds : undefined,
@@ -250,14 +250,12 @@ export function usePurchaseReport(props) {
         }
 
         editingOrder.value = order;
-        assignedToUserId.value = order.assigned_to_user_id ?? "";
         selectedItems.value = mappedItems;
         window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     function buildPayload() {
         return {
-            assigned_to_user_id: assignedToUserId.value || null,
             record_version: editingOrder.value?.record_version || null,
             items: selectedProducts.value.map((item) => ({
                 branch_product_id: item.branch_product_id,
@@ -307,9 +305,9 @@ export function usePurchaseReport(props) {
     function generateOrder() {
         const options = getModalRequestOptions({
             mode: "create",
-            entityName: "Orden de compra",
-            successTitle: "Orden de compra generada correctamente",
-            errorTitle: "No se pudo generar la orden",
+            entityName: "Solicitud de compra",
+            successTitle: "Solicitud enviada a Compras correctamente",
+            errorTitle: "No se pudo enviar la solicitud",
             errorMessage: "Revisa los productos y cantidades antes de intentarlo nuevamente.",
             onSuccess: clearDraft,
         });
@@ -336,7 +334,6 @@ export function usePurchaseReport(props) {
     }
 
     return {
-        assignedToUserId,
         selectedItems,
         editingOrder,
         isEditing,

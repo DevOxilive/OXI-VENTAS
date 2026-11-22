@@ -69,7 +69,9 @@ function filterWrapperClasses(filter) {
         return 'min-w-full flex-[1_1_100%]'
     }
 
-    return 'min-w-[220px] max-w-[320px] flex-[1_1_240px]'
+    return props.compactFilters
+        ? 'min-w-[150px] max-w-[220px] flex-[1_1_180px]'
+        : 'min-w-[220px] max-w-[320px] flex-[1_1_240px]'
 }
 
 function optionToneClasses(option, active) {
@@ -128,7 +130,10 @@ function updateMultiFilter(filter, value) {
 </script>
 
 <template>
-    <section class="hidden space-y-4 rounded-2xl border border-secondary bg-background p-5 shadow-sm md:block">
+    <section
+        class="hidden rounded-2xl border border-secondary bg-background shadow-sm md:block"
+        :class="compactFilters ? 'space-y-2 p-3' : 'space-y-4 p-5'"
+    >
         <div class="hidden md:block space-y-3">
             <div v-if="backButton">
                 <button type="button"
@@ -142,20 +147,27 @@ function updateMultiFilter(filter, value) {
                 </button>
             </div>
         </div>
-        <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div class="flex min-w-0 items-start gap-4">
-                <div v-if="icon" class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-secondary text-primary">
-                    <span class="material-symbols-outlined text-[28px]">
+        <div
+            class="flex flex-col xl:flex-row xl:justify-between"
+            :class="compactFilters ? 'gap-2 xl:items-center' : 'gap-4 xl:items-start'"
+        >
+            <div class="flex min-w-0 items-center" :class="compactFilters ? 'gap-2' : 'items-start gap-4'">
+                <div
+                    v-if="icon"
+                    class="grid shrink-0 place-items-center bg-secondary text-primary"
+                    :class="compactFilters ? 'h-9 w-9 rounded-xl' : 'h-14 w-14 rounded-2xl'"
+                >
+                    <span class="material-symbols-outlined" :class="compactFilters ? 'text-[20px]' : 'text-[28px]'">
                         {{ icon }}
                     </span>
                 </div>
 
                 <div class="min-w-0">
-                    <h2 v-if="title" class="text-xl font-black text-text">
+                    <h2 v-if="title" class="font-black text-text" :class="compactFilters ? 'text-base' : 'text-xl'">
                         {{ title }}
                     </h2>
 
-                    <p v-if="subtitle" class="mt-1 text-sm text-text opacity-70">
+                    <p v-if="subtitle" class="text-text opacity-70" :class="compactFilters ? 'text-xs' : 'mt-1 text-sm'">
                         {{ subtitle }}
                     </p>
                 </div>
@@ -205,16 +217,17 @@ function updateMultiFilter(filter, value) {
         </div>
 
         <div v-if="hasSearch || hasRecordsPerPage || visibleFilters.length"
-            class="flex flex-wrap items-end gap-3">
+            class="flex flex-wrap items-end" :class="compactFilters ? 'gap-2' : 'gap-3'">
             <input v-if="hasSearch" data-toolbar-search :value="search" type="text" :placeholder="searchPlaceholder"
                 maxlength="120"
-                class="h-11 w-full min-w-[280px] flex-[2_1_360px] rounded-xl border border-secondary bg-background px-4 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                class="w-full rounded-xl border border-secondary bg-background text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                :class="compactFilters ? 'h-9 min-w-[220px] flex-[2_1_300px] px-3' : 'h-11 min-w-[280px] flex-[2_1_360px] px-4'"
                 @keydown="handleSearchKeydown"
                 @input="$emit('update:search', handleSearchInput($event))" />
 
             <div v-for="filter in visibleFilters" :key="filter.id || filter.key" :class="filterWrapperClasses(filter)">
                 <div v-if="filter.type === 'button-group'">
-                    <p v-if="filter.label" class="mb-2 text-xs font-black uppercase tracking-[0.18em] text-text opacity-50">
+                    <p v-if="filter.label && !compactFilters" class="mb-2 text-xs font-black uppercase tracking-[0.18em] text-text opacity-50">
                         {{ filter.label }}
                     </p>
 
@@ -243,12 +256,13 @@ function updateMultiFilter(filter, value) {
                 </div>
 
                 <label v-else class="block">
-                    <span v-if="filter.label" class="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-text opacity-50">
+                    <span v-if="filter.label && !compactFilters" class="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-text opacity-50">
                         {{ filter.label }}
                     </span>
 
                     <input v-if="filter.type === 'date'" :value="filter.value ?? ''" type="date"
-                        class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                        class="w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                        :class="compactFilters ? 'h-9' : 'h-11'"
                         :disabled="filter.disabled"
                         :min="filter.min"
                         :max="filter.max"
@@ -260,7 +274,8 @@ function updateMultiFilter(filter, value) {
                     <input v-else-if="filter.type === 'text'" :value="filter.value ?? ''" type="text"
                         :maxlength="filter.maxLength ?? 120"
                         :placeholder="filter.placeholder || filter.label"
-                        class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                        class="w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                        :class="compactFilters ? 'h-9' : 'h-11'"
                         :disabled="filter.disabled"
                         @input="$emit('update:filter', {
                             key: filter.key,
@@ -287,7 +302,8 @@ function updateMultiFilter(filter, value) {
                     />
 
                     <GlobalSelect v-else :value="filter.value ?? ''"
-                        class="h-11 w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                        class="w-full rounded-xl border border-secondary bg-background px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+                        :class="compactFilters ? 'h-9' : 'h-11'"
                         :disabled="filter.disabled"
                         @change="$emit('update:filter', {
                             key: filter.key,
@@ -310,7 +326,9 @@ function updateMultiFilter(filter, value) {
             </div>
 
             <div v-if="hasRecordsPerPage"
-                class="flex h-11 shrink-0 items-center gap-2 rounded-xl border border-secondary bg-secondary px-3">
+                class="flex shrink-0 items-center gap-2 rounded-xl border border-secondary bg-secondary px-3"
+                :class="compactFilters ? 'h-9' : 'h-11'"
+            >
                 <span class="whitespace-nowrap text-sm text-text opacity-70">
                     Mostrar
                 </span>

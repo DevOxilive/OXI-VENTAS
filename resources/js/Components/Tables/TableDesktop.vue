@@ -18,6 +18,7 @@ const props = defineProps({
   striped: Boolean,
   selectable: Boolean,
   selectedItems: Object,
+  maxHeightClass: { type: String, default: '' },
 })
 
 const emit = defineEmits([
@@ -159,7 +160,7 @@ function columnStyle(column) {
 </script>
 
 <template>
-  <TableFrame class="hidden lg:block">
+  <TableFrame class="hidden lg:block" :max-height-class="maxHeightClass">
         <thead class="border-b border-secondary bg-secondary text-text">
           <tr>
             <th v-if="selectable" class="sticky top-0 z-20 w-10 min-w-10 bg-secondary px-4 py-3">

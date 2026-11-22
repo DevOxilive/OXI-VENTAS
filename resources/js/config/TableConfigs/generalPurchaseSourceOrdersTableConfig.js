@@ -3,7 +3,7 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
         columns: [
             {
                 key: 'folio',
-                label: 'Orden de compra',
+                label: 'Solicitud',
                 width: '175px',
                 mobileSecondary: false,
             },
@@ -45,7 +45,7 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
             },
             {
                 id: 'approve',
-                label: 'Aprobar',
+                label: 'Aceptar',
                 icon: 'check_circle',
                 variant: 'green',
                 permission: 'inventory.purchase-orders.source.review',
@@ -85,7 +85,7 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
             },
             {
                 id: 'add',
-                label: 'Agregar a Orden de compra general',
+                label: 'Agregar a Compra central',
                 icon: 'add_circle',
                 variant: 'green',
                 permission: 'inventory.purchase-orders.general.create',
@@ -93,7 +93,7 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
             },
             {
                 id: 'remove',
-                label: 'Quitar de Orden de compra general',
+                label: 'Quitar de Compra central',
                 icon: 'remove_circle',
                 variant: 'red',
                 permission: 'inventory.purchase-orders.general.create',
@@ -101,7 +101,7 @@ export function getGeneralPurchaseSourceOrdersTableConfig() {
             },
         ],
         mobileCardHeaderField: 'folio',
-        noDataMessage: 'Esta sucursal no tiene órdenes pendientes asignadas.',
+        noDataMessage: 'Esta sucursal no tiene solicitudes pendientes.',
         rowKey: 'id',
         hoverEffect: true,
     }

@@ -37,7 +37,6 @@ class GeneralPurchaseOrderController extends Controller
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
-        $cycle = $this->cycles->currentOpenCycle($request->user());
         $status = $request->input('status', 'GENERATE');
 
         if (! in_array($status, ['GENERATE', GeneralPurchaseOrder::STATUS_PURCHASING, GeneralPurchaseOrder::STATUS_COMPLETED], true)) {
@@ -56,11 +55,6 @@ class GeneralPurchaseOrderController extends Controller
             : $this->listPayload($request, $branch, $status);
 
         return Inertia::render('Inventory/PurchaseOrders', array_merge($payload, [
-            'purchaseCycle' => [
-                'id' => $cycle->id,
-                'folio' => $cycle->folio,
-                'status' => $cycle->status,
-            ],
             'notificationSummary' => $this->purchaseOrderNotificationSummary($request),
             'generation' => $this->canViewStatus($request, 'GENERATE')
                 ? $this->generationPayload($request)
@@ -236,8 +230,8 @@ class GeneralPurchaseOrderController extends Controller
         return redirect()->back()->with(
             'success',
             $order
-                ? 'Orden general generada correctamente.'
-                : 'El ciclo se cerró sin productos por comprar.'
+                ? 'Compra central creada correctamente.'
+                : 'No había productos por incluir en la Compra central.'
         );
     }
 
@@ -553,8 +547,6 @@ class GeneralPurchaseOrderController extends Controller
         $user = $request->user();
         $user->loadMissing('role');
         $accessibleBranchIds = $user->accessibleBranchIds();
-        $isInventoryUser = $user->role?->name === 'Inventario';
-
         $orders = PurchaseOrder::query()
             ->with(['branch', 'user', 'assignedTo', 'reviewedBy'])
             ->withCount('items')
@@ -562,8 +554,6 @@ class GeneralPurchaseOrderController extends Controller
             ->withSum('items as requested_quantity', 'requested_quantity')
             ->whereIn('branch_id', $accessibleBranchIds)
             ->where('status', PurchaseOrder::STATUS_GENERATED)
-            ->whereNotNull('assigned_to_user_id')
-            ->when($isInventoryUser, fn ($query) => $query->where('assigned_to_user_id', $user->id))
             ->whereNull('general_purchase_order_id')
             ->oldest('generated_at')
             ->oldest('id')
@@ -626,8 +616,6 @@ class GeneralPurchaseOrderController extends Controller
         $user->loadMissing('role');
 
         $accessibleBranchIds = $user->accessibleBranchIds();
-        $isInventoryUser = $user->role?->name === 'Inventario';
-
         $items = PurchaseOrder::query()
             ->with(['branch', 'user', 'assignedTo'])
             ->withCount('items')
@@ -635,8 +623,6 @@ class GeneralPurchaseOrderController extends Controller
             ->whereIn('branch_id', $accessibleBranchIds)
             ->where('status', PurchaseOrder::STATUS_GENERATED)
             ->whereNull('general_purchase_order_id')
-            ->whereNotNull('assigned_to_user_id')
-            ->when($isInventoryUser, fn ($query) => $query->where('assigned_to_user_id', $user->id))
             ->latest('generated_at')
             ->latest('id')
             ->limit(8)
@@ -726,12 +712,7 @@ class GeneralPurchaseOrderController extends Controller
         $user->loadMissing('role');
 
         abort_unless($purchaseOrder->status === PurchaseOrder::STATUS_GENERATED, 404);
-        abort_unless($purchaseOrder->assigned_to_user_id, 404);
         abort_unless($user->hasBranchAccess((int) $purchaseOrder->branch_id), 403);
-
-        if ($user->role?->name === 'Inventario') {
-            abort_unless((int) $purchaseOrder->assigned_to_user_id === (int) $user->id, 403);
-        }
     }
 
     private function orderPayload(GeneralPurchaseOrder $order, bool $includePurchaseData = true): array
