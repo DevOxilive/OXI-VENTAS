@@ -2045,7 +2045,7 @@ function closeChangeModal() {
               </div>
             </section>
 
-            <div class="hidden grid-cols-[minmax(0,1.4fr)_120px_120px_140px_88px] gap-3 border-b border-secondary px-1 py-3 text-xs font-bold uppercase tracking-[0.14em] text-text opacity-70 md:grid">
+            <div class="hidden grid-cols-[minmax(0,1.4fr)_120px_240px_180px_88px] gap-3 border-b border-secondary px-1 py-3 text-xs font-bold uppercase tracking-[0.14em] text-text opacity-70 xl:grid">
               <span>Producto</span>
               <span>Precio</span>
               <span>Cantidad</span>
