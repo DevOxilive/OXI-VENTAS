@@ -10,6 +10,7 @@ use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Throwable;
 
@@ -293,7 +294,8 @@ class StockMovementService
         StockMovement $movement,
         BranchProduct $branchProduct,
         array $manualBatches,
-        float $expectedQuantity
+        float $expectedQuantity,
+        bool $allowUnnumberedDeficit = false,
     ): void {
         $totalManualQuantity = collect($manualBatches)
             ->sum(fn ($batch) => (float) ($batch['quantity'] ?? 0));
@@ -315,6 +317,17 @@ class StockMovementService
             }
 
             $previousBatchQuantity = (float) $batch->quantity;
+
+            $canStorePosDeficitWithoutLot = $allowUnnumberedDeficit && blank($batch->lot_number);
+            if ($quantityToConsume > $previousBatchQuantity && ! $canStorePosDeficitWithoutLot) {
+                throw ValidationException::withMessages([
+                    'items' => 'El lote '.($batch->lot_number ?: 'sin número')
+                        .' solo tiene '.number_format(max(0, $previousBatchQuantity), 3, '.', '')
+                        .' unidades disponibles; no se puede registrar una salida de '
+                        .number_format($quantityToConsume, 3, '.', '').'.',
+                ]);
+            }
+
             $newBatchQuantity = $previousBatchQuantity - $quantityToConsume;
 
             $batch->update([
@@ -343,7 +356,7 @@ class StockMovementService
                 movement: $movement,
                 branchProduct: $branchProduct,
                 manualBatches: $manualBatches,
-                expectedQuantity: abs($quantity)
+                expectedQuantity: abs($quantity),
             );
 
             return;
@@ -488,7 +501,8 @@ class StockMovementService
                 movement: $movement,
                 branchProduct: $branchProduct,
                 manualBatches: $manualBatches,
-                expectedQuantity: $quantity
+                expectedQuantity: $quantity,
+                allowUnnumberedDeficit: $reason === StockMovement::REASON_SALE && $saleId !== null,
             );
         }
 
@@ -540,7 +554,10 @@ class StockMovementService
         ]);
     }
 
-    /** Consume primero las existencias; conserva el faltante en un lote vinculado al movimiento. */
+    /**
+     * Distribuye la salida por FEFO. Cuando el total no alcanza, el faltante se deja
+     * en una entrada sin lote real: así el POS puede vender sin volver negativo un lote.
+     */
     private function allocateOutgoingBatches(BranchProduct $branchProduct, float $quantity): array
     {
         $batches = $branchProduct->batches()
@@ -566,11 +583,13 @@ class StockMovementService
         }
 
         if ($remaining > 0) {
-            // Sin un lote conocido se registra un saldo sin número de lote real.
-            $batch = $batches->first() ?? $this->createUnnumberedBatch($branchProduct);
-            $allocations[$batch->id] = [
-                'id' => $batch->id,
-                'quantity' => round(($allocations[$batch->id]['quantity'] ?? 0) + $remaining, 3),
+            $unassignedBatch = $batches->first(function (ProductBatch $batch) {
+                return blank($batch->lot_number);
+            }) ?? $this->createUnnumberedBatch($branchProduct);
+
+            $allocations[$unassignedBatch->id] = [
+                'id' => $unassignedBatch->id,
+                'quantity' => round(($allocations[$unassignedBatch->id]['quantity'] ?? 0) + $remaining, 3),
             ];
         }
 

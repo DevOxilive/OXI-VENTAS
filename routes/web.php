@@ -800,7 +800,7 @@ Route::middleware([
 
         Route::get('/reports/{report}', [ReportController::class, 'select'])
             ->middleware($reportsAccess)
-            ->whereIn('report', ['sales', 'audits', 'cash-closures', 'inventory', 'movements'])
+            ->whereIn('report', ['sales', 'audits', 'cash-closures', 'inventory', 'incidents', 'movements'])
             ->name('reports.select');
 
         Route::get('/branches/{branch}/reports', [ReportController::class, 'index'])
@@ -918,6 +918,10 @@ Route::middleware([
         Route::get('/branches/{branch}/reports/inventory', [ReportController::class, 'inventory'])
             ->middleware($inventoryReportsAccess)
             ->name('branches.reports.inventory');
+
+        Route::get('/branches/{branch}/reports/incidents', [ReportController::class, 'incidents'])
+            ->middleware($inventoryReportsAccess)
+            ->name('branches.reports.incidents');
 
         Route::get('/branches/{branch}/reports/inventory/excel', [ReportController::class, 'exportExcel'])
             ->middleware('permission:reports.inventory.export.excel')

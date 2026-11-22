@@ -412,6 +412,12 @@ export function generateMenu(role, permissions = [], branches = []) {
                 key: "reports.inventory",
                 icon: "inventory_2",
                 url: route("inventory.reports.select", { report: "inventory" }),
+            },
+            {
+                text: "Incidencias de inventario",
+                key: "reports.incidents",
+                icon: "warning",
+                url: route("inventory.reports.select", { report: "incidents" }),
             }]
             : []),
         ...(canUse("movementReports")

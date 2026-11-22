@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\ProductDepartment;
 use App\Models\User;
 use App\Services\InventoryReportService;
+use App\Services\InventoryIncidentReportService;
 use App\Support\LocalDateTime;
 use App\Support\TablePagination;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -61,6 +62,11 @@ class ReportController extends Controller
             'permission' => 'reports.inventory.view',
             'route' => 'inventory.branches.reports.inventory',
             'label' => 'Reportes de inventario',
+        ],
+        'incidents' => [
+            'permission' => 'reports.inventory.view',
+            'route' => 'inventory.branches.reports.incidents',
+            'label' => 'Incidencias de inventario',
         ],
         'movements' => [
             'permission' => 'reports.movements.view',
@@ -191,6 +197,23 @@ class ReportController extends Controller
                 'movementReasons' => $this->movementReasons($branch),
             ],
             'movements' => $reportService->rows($branch, $filters, true),
+        ]);
+    }
+
+    public function incidents(Request $request, Branch $branch, InventoryIncidentReportService $incidentReportService)
+    {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+
+        return Inertia::render('Inventory/Reports/Incidents', [
+            'currentBranch' => $branch,
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'per_page' => TablePagination::resolvePerPage($request),
+            ],
+            'incidents' => $incidentReportService->rows($branch, [
+                'search' => $request->input('search'),
+                'per_page' => TablePagination::resolvePerPage($request),
+            ]),
         ]);
     }
 

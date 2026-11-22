@@ -102,6 +102,10 @@ class ReportPermissionRoutingTest extends TestCase
                 'inventory.branches.reports.inventory',
                 'permission:reports.inventory.view',
             ],
+            'incidencias de inventario' => [
+                'inventory.branches.reports.incidents',
+                'permission:reports.inventory.view',
+            ],
             'exportar inventario excel' => [
                 'inventory.branches.reports.inventory.excel',
                 'permission:reports.inventory.export.excel',

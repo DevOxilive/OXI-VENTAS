@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Events\InventoryStockUpdated;
 use App\Events\SaleReturnChanged;
-use App\Http\Controllers\Inventory\BranchInventoryController;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
@@ -26,15 +25,14 @@ use App\Models\User;
 use App\Search\ProductIdentifierSearch;
 use App\Search\ProductSearchOptions;
 use App\Services\InventoryReportService;
+use App\Services\InventoryIncidentReportService;
 use App\Services\PhysicalCountSnapshotService;
 use App\Services\Reports\SalesReplenishmentReportService;
 use App\Services\SaleCancellationService;
 use App\Services\StockMovementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Validation\ValidationException;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class NegativeStockTest extends TestCase
@@ -76,43 +74,42 @@ class NegativeStockTest extends TestCase
         $this->payment = PaymentMethod::create(['name' => 'Efectivo', 'active' => true]);
     }
 
-    public static function startingStocks(): array
+    public function test_sale_above_available_stock_preserves_real_lots_and_records_the_pending_deficit_without_lot(): void
     {
-        return ['zero' => [0, false], 'negative' => [-4, false], 'tracked zero' => [0, true], 'tracked negative' => [-4, true], 'insufficient' => [2, true]];
-    }
+        $this->batch(2);
+        $this->inventory->update(['stock' => 2]);
 
-    #[DataProvider('startingStocks')]
-    public function test_sale_can_exceed_stock_and_preserves_batch_and_movement_totals(float $stock, bool $withBatch): void
-    {
-        $this->inventory->update(['stock' => $stock]);
-        if ($withBatch) {
-            $this->batch($stock);
-        }
         $sale = $this->sell(3);
-        $this->assertStock($stock - 3);
-        $movement = $sale->stockMovements()->firstOrFail();
-        $this->assertEquals($stock, $movement->previous_stock);
-        $this->assertEquals($stock - 3, $movement->new_stock);
-        $this->assertEquals(3, $movement->batches()->sum('quantity'));
-        $this->assertEquals(30, $sale->total);
-        Event::assertDispatched(InventoryStockUpdated::class);
+
+        $this->assertStock(-1);
+        $this->assertSame(0.0, (float) $this->inventory->batches()->where('lot_number', 'TEST-001')->value('quantity'));
+        $this->assertEquals(-1, $this->inventory->batches()->whereNull('lot_number')->value('quantity'));
+        $this->assertEquals(3, $sale->stockMovements()->firstOrFail()->batches()->sum('quantity'));
+
+        $incidents = app(InventoryIncidentReportService::class)->rows($this->branch);
+        $this->assertSame(1, $incidents->total());
+        $this->assertEquals(-1, $incidents->items()[0]['pending_quantity']);
+        $this->assertSame(0, $incidents->items()[0]['continued_sales_count']);
+
+        $this->incoming(4);
+        $this->assertStock(3);
+        $this->assertEquals(-1, $this->inventory->batches()->whereNull('lot_number')->value('quantity'));
     }
 
     public function test_repeated_sales_restock_and_partial_returns_keep_the_deficit(): void
     {
-        $this->batch(2);
-        $this->inventory->update(['stock' => 2]);
+        $this->batch(5);
+        $this->inventory->update(['stock' => 5]);
         $sale = $this->sell(5);
-        $this->sell(2);
-        $this->assertStock(-5);
+        $this->assertStock(0);
         $this->incoming(4);
-        $this->assertStock(-1);
+        $this->assertStock(4);
         $service = app(SaleCancellationService::class);
         $detail = $sale->details()->firstOrFail();
         $service->cancel($sale, $this->user, 'Devolución de prueba', [['sale_detail_id' => $detail->id, 'quantity' => 2]]);
-        $this->assertStock(1);
+        $this->assertStock(6);
         $service->cancel($sale->fresh(), $this->user, 'Resto de la devolución', [['sale_detail_id' => $detail->id, 'quantity' => 3]]);
-        $this->assertStock(4);
+        $this->assertStock(9);
         $this->assertSame('cancelled', $sale->fresh()->status);
     }
 
@@ -266,12 +263,14 @@ class NegativeStockTest extends TestCase
 
     public function test_boxes_and_kilograms_deduct_the_correct_base_quantity(): void
     {
+        $this->batch(30);
+        $this->inventory->update(['stock' => 30]);
         $this->inventory->product->update(['has_box_presentation' => true, 'pieces_per_box' => 12, 'sale_price_per_box' => 100]);
         $this->sell(2, 'box');
-        $this->assertStock(-24);
+        $this->assertStock(6);
         $this->inventory->product->update(['inventory_unit' => 'kg', 'unit' => 'kg']);
         $this->sell(0.125);
-        $this->assertStock(-24.125);
+        $this->assertStock(5.875);
     }
 
     public function test_independent_box_and_piece_prices_charge_and_deduct_the_correct_quantities(): void
@@ -281,11 +280,13 @@ class NegativeStockTest extends TestCase
             'cost_per_piece' => 0, 'sale_price_per_piece' => 18,
             'cost_per_box' => 180, 'sale_price_per_box' => 234,
         ]);
+        $this->batch(17);
+        $this->inventory->update(['stock' => 17]);
         $pieceSale = $this->sell(1);
         $this->assertEquals(18, $pieceSale->total);
         $boxSale = $this->sell(1, 'box');
         $this->assertEquals(234, $boxSale->total);
-        $this->assertStock(-17);
+        $this->assertStock(0);
     }
 
     public function test_entry_and_distribution_preserve_previous_untracked_negative_stock(): void
@@ -301,34 +302,52 @@ class NegativeStockTest extends TestCase
         $this->assertStock(1);
     }
 
-    public function test_manual_exit_and_signed_adjustment_accept_negative_result(): void
+    public function test_manual_exit_and_negative_adjustment_cannot_exceed_the_selected_lot(): void
     {
         $batch = $this->batch(0);
         $this->post(route('inventory.stock-movements.store'), [
             'branch_product_id' => $this->inventory->id, 'type' => 'OUT', 'reason' => 'DAMAGED',
             'quantity' => 3, 'manual_batches' => [['id' => $batch->id, 'quantity' => 3]],
-        ])->assertSessionHasNoErrors();
-        $this->assertStock(-3);
+        ])->assertSessionHasErrors('stock');
+        $this->assertStock(0);
         $this->post(route('inventory.stock-movements.store'), [
             'branch_product_id' => $this->inventory->id, 'type' => 'ADJUSTMENT',
             'reason' => 'INVENTORY_DIFFERENCE', 'quantity' => -2,
-        ])->assertSessionHasNoErrors();
-        $this->assertStock(-5);
+        ])->assertSessionHasErrors('stock');
+        $this->assertStock(0);
     }
 
-    public function test_batch_edit_accepts_negative_quantity_and_details_include_empty_and_negative_batches(): void
+    public function test_manual_exit_cannot_take_more_than_its_selected_lot_even_when_another_lot_has_stock(): void
+    {
+        $selectedBatch = $this->batch(2, 'MANUAL-001');
+        $otherBatch = $this->batch(10, 'MANUAL-002');
+        $this->inventory->update(['stock' => 12]);
+
+        $this->post(route('inventory.stock-movements.store'), [
+            'branch_product_id' => $this->inventory->id,
+            'type' => 'OUT',
+            'reason' => 'DAMAGED',
+            'quantity' => 3,
+            'manual_batches' => [['id' => $selectedBatch->id, 'quantity' => 3]],
+        ])->assertSessionHasErrors('stock');
+
+        $this->assertStock(12);
+        $this->assertEquals(2, $selectedBatch->fresh()->quantity);
+        $this->assertEquals(10, $otherBatch->fresh()->quantity);
+    }
+
+    public function test_batch_edit_cannot_reduce_a_lot_below_zero_but_can_correct_a_historical_negative(): void
     {
         $batch = $this->batch(0);
-        $emptyBatch = $this->batch(0, 'ZERO-002');
         $this->put(route('inventory.product-batches.update', $batch), ['quantity' => -7, 'expected_quantity' => 0, 'status' => 'ACTIVE', 'expected_values' => ['status' => 'ACTIVE']])
+            ->assertSessionHasErrors('quantity');
+        $this->assertStock(0);
+
+        $batch->update(['quantity' => -7]);
+        $this->inventory->update(['stock' => -7]);
+        $this->put(route('inventory.product-batches.update', $batch), ['quantity' => 0, 'expected_quantity' => -7, 'status' => 'ACTIVE', 'expected_values' => ['status' => 'ACTIVE']])
             ->assertSessionHasNoErrors();
-        $this->assertStock(-7);
-        $controller = app(BranchInventoryController::class);
-        $request = Request::create('/');
-        $request->setUserResolver(fn () => $this->user);
-        $data = $controller->details($request, $this->inventory->fresh())->getData(true);
-        $this->assertEquals(-7, $data['stock']);
-        $this->assertEqualsCanonicalizing([$batch->id, $emptyBatch->id], array_column($data['batches'], 'id'));
+        $this->assertStock(0);
     }
 
     public function test_multiple_batches_are_consumed_in_expiration_order_and_inactive_stock_is_preserved(): void
@@ -339,9 +358,9 @@ class NegativeStockTest extends TestCase
         $inactive = $this->batch(20, 'INACTIVE-003');
         $inactive->update(['status' => 'INACTIVE']);
         $this->inventory->update(['stock' => 6]);
-        $this->sell(9);
-        $this->assertStock(-3);
-        $this->assertEquals(-3, $first->fresh()->quantity);
+        $this->sell(6);
+        $this->assertStock(0);
+        $this->assertEquals(0, $first->fresh()->quantity);
         $this->assertEquals(0, $second->fresh()->quantity);
         $this->assertEquals(20, $inactive->fresh()->quantity);
     }
@@ -375,19 +394,21 @@ class NegativeStockTest extends TestCase
 
     public function test_legacy_return_after_batch_tracking_does_not_disappear_on_next_sale(): void
     {
+        $this->batch(3);
+        $this->inventory->update(['stock' => 3]);
         $sale = $this->sell(3);
         // Reproduce una venta anterior que solo tenía movimiento general, sin lotes vinculados.
         $sale->stockMovements()->firstOrFail()->batches()->delete();
         $this->inventory->batches()->delete();
         $this->inventory->update(['tracks_batches' => false]);
         $this->incoming(2);
-        $this->assertStock(-1);
+        $this->assertStock(2);
         app(SaleCancellationService::class)->cancel($sale, $this->user, 'Devolución histórica', [
             ['sale_detail_id' => $sale->details()->firstOrFail()->id, 'quantity' => 3],
         ]);
-        $this->assertStock(2);
+        $this->assertStock(5);
         $this->sell(1);
-        $this->assertStock(1);
+        $this->assertStock(4);
     }
 
     public function test_manual_exit_cannot_consume_a_batch_from_another_product(): void
@@ -415,7 +436,8 @@ class NegativeStockTest extends TestCase
 
     public function test_replenishment_includes_the_deficit_and_summary_keeps_its_sign(): void
     {
-        $this->sell(3);
+        $this->batch(-3);
+        $this->inventory->update(['stock' => -3]);
         $report = app(SalesReplenishmentReportService::class)->build(collect([$this->branch]), ['branch_ids' => [$this->branch->id]]);
         $row = $report['sections']['pedido-tiendas'][0]['rows'][0];
         $this->assertEquals(-3, $row['total_stock']);
@@ -429,7 +451,7 @@ class NegativeStockTest extends TestCase
         $this->assertSame(0, $summary['expired_batches']);
     }
 
-    public function test_audit_applies_snapshot_difference_even_when_sales_leave_a_negative_balance(): void
+    public function test_audit_applies_snapshot_difference_after_a_sale(): void
     {
         $batch = $this->batch(5);
         $this->inventory->update(['stock' => 5]);
@@ -442,9 +464,9 @@ class NegativeStockTest extends TestCase
             'product_id' => $this->inventory->product_id, 'user_id' => $this->user->id,
             'counted_quantity' => 3, 'damaged_quantity' => 0, 'expired_quantity' => 0,
         ]);
-        $this->sell(6);
+        $this->sell(5);
         $this->patch(route('audits.physical-counts.apply-adjustments', $audit))->assertSessionHasNoErrors()->assertRedirect(route('audits.physical-counts.show', $audit));
-        $this->assertStock(-3);
+        $this->assertStock(-2);
         $this->assertSame('applied', $audit->fresh()->status);
     }
 

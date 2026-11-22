@@ -141,6 +141,12 @@ class ProductBatchController extends Controller
             );
             $newData['quantity'] = round($newData['quantity'], 3);
 
+            if ($newData['quantity'] < 0 && $newData['quantity'] < $previousData['quantity']) {
+                throw ValidationException::withMessages([
+                    'quantity' => 'No puedes reducir un lote por debajo de cero. Registra únicamente una cantidad disponible o corrige el inventario físico.',
+                ]);
+            }
+
             if ($newData['season_start_date'] && $newData['season_end_date']
                 && $newData['season_end_date'] < $newData['season_start_date']) {
                 throw ValidationException::withMessages([
