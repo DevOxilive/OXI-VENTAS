@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { fieldRegistry } from '@/Validation/fieldRegistry'
 import { sanitizeFieldWithCursor } from '@/Validation/sanitizers'
 
@@ -52,6 +52,18 @@ const props = defineProps({
 
 const emit = defineEmits(["decrease", "increase", "update", "update:value"])
 const inputEl = ref(null)
+const editing = ref(false)
+const direction = ref('up')
+watch(() => props.value, (value, previous) => {
+  direction.value = Number(value) >= Number(previous) ? 'up' : 'down'
+})
+
+function step(action) {
+  editing.value = false
+  inputEl.value?.blur()
+  if (props.disabled || (action === 'increase' ? props.increaseDisabled : props.decreaseDisabled)) return
+  emit(action)
+}
 const isDecimalQuantity = computed(() => (
   fieldRegistry[props.validationField]?.type === 'decimal' || props.allowDecimal
 ))
@@ -99,12 +111,12 @@ function preventWheel(event) {
 
 function handleArrowUp() {
   if (props.disabled || props.increaseDisabled) return
-  emit('increase')
+  step('increase')
 }
 
 function handleArrowDown() {
   if (props.disabled || props.decreaseDisabled) return
-  emit('decrease')
+  step('decrease')
 }
 
 defineExpose({
@@ -113,17 +125,25 @@ defineExpose({
 </script>
 
 <template>
-  <div class="mt-1 flex items-center rounded-xl border border-secondary bg-background md:mt-0">
+  <div
+    class="quantity-stepper"
+    :class="{ 'quantity-stepper--disabled': disabled }"
+  >
     <button
       type="button"
-      class="h-9 w-9 text-lg font-bold text-text disabled:cursor-not-allowed disabled:opacity-35"
+      class="quantity-stepper__button"
       :disabled="disabled || decreaseDisabled"
       :tabindex="buttonsTabbable ? 0 : -1"
-      @click="$emit('decrease')"
+      :aria-label="`Disminuir ${ariaLabel}`"
+      @click="step('decrease')"
     >
-      -
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10" stroke="currentColor" stroke-width="2" /></svg>
     </button>
 
+    <div class="quantity-stepper__value">
+    <Transition :name="`quantity-${direction}`">
+      <span v-if="!editing" :key="String(value)" class="quantity-stepper__number" aria-hidden="true">{{ value }}</span>
+    </Transition>
     <input
       ref="inputEl"
       :value="value"
@@ -132,21 +152,81 @@ defineExpose({
       autocomplete="off"
       :aria-label="ariaLabel"
       :disabled="disabled"
-      class="h-9 min-w-10 max-w-16 bg-transparent px-2 text-center text-sm font-semibold text-text outline-none disabled:cursor-not-allowed disabled:opacity-60"
+      class="quantity-stepper__input"
+      :class="{ 'quantity-stepper__input--resting': !editing }"
+      @focus="editing = true"
+      @blur="editing = false"
+      @keydown.enter="inputEl?.blur()"
       @input="handleInput"
       @wheel="preventWheel"
       @keydown.up.prevent="handleArrowUp"
       @keydown.down.prevent="handleArrowDown"
     >
+    </div>
 
     <button
       type="button"
-      class="h-9 w-9 text-lg font-bold text-text disabled:cursor-not-allowed disabled:opacity-35"
+      class="quantity-stepper__button"
       :disabled="disabled || increaseDisabled"
       :tabindex="buttonsTabbable ? 0 : -1"
-      @click="$emit('increase')"
+      :aria-label="`Aumentar ${ariaLabel}`"
+      @click="step('increase')"
     >
-      +
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M8 3v10" stroke="currentColor" stroke-width="2" /></svg>
     </button>
   </div>
 </template>
+
+<style scoped>
+.quantity-stepper {
+  display: inline-flex;
+  align-items: stretch;
+  width: 240px;
+  min-width: 220px;
+  max-width: 100%;
+  height: 48px;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: 8px;
+  color: inherit;
+  background: transparent;
+  transition: border-color 160ms ease;
+}
+.quantity-stepper:focus-within { outline: 2px solid currentColor; outline-offset: 2px; }
+.quantity-stepper__button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  transition: background-color 160ms ease, opacity 160ms ease;
+}
+.quantity-stepper__button:hover:not(:disabled) { background: color-mix(in srgb, currentColor 6%, transparent); }
+.quantity-stepper__button:active:not(:disabled) { background: color-mix(in srgb, currentColor 12%, transparent); }
+.quantity-stepper__button:disabled { opacity: .3; cursor: not-allowed; }
+.quantity-stepper__value { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+.quantity-stepper__input,
+.quantity-stepper__number {
+  width: 100%;
+  height: 100%;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.quantity-stepper__number { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.quantity-stepper__input { position: relative; border: 0; border-radius: 0; padding: 0 2px; background: transparent; color: inherit; outline: none; box-shadow: none; }
+.quantity-stepper__input--resting { color: transparent; caret-color: transparent; }
+.quantity-stepper--disabled { opacity: .5; }
+.quantity-up-enter-active, .quantity-down-enter-active { transition: transform 280ms cubic-bezier(.2,.9,.25,1.15), opacity 200ms ease; }
+.quantity-up-leave-active, .quantity-down-leave-active { transition: transform 200ms ease, opacity 160ms ease; }
+.quantity-up-enter-from, .quantity-down-leave-to { transform: translateY(75%); opacity: 0; }
+.quantity-up-leave-to, .quantity-down-enter-from { transform: translateY(-75%); opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .quantity-stepper *, .quantity-stepper { transition: none !important; }
+}
+</style>

@@ -32,7 +32,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
 
 <template>
   <article class="px-1 py-3">
-    <div class="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_120px_120px_140px_88px] md:items-start">
+    <div class="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_120px_240px_180px_88px] xl:items-start">
       <div class="min-w-0">
         <div class="flex gap-3">
           <div class="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-secondary bg-background">
@@ -91,7 +91,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
       </div>
 
       <div class="rounded-lg bg-background px-3 py-2 md:bg-transparent md:px-0 md:py-0">
-        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50 xl:hidden">
           Precio
         </p>
         <p class="mt-1 flex flex-wrap items-baseline gap-x-2 text-base font-semibold text-text md:mt-0">
@@ -103,7 +103,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
       </div>
 
       <div class="rounded-lg bg-background px-3 py-2 md:bg-transparent md:px-0 md:py-0">
-        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50 xl:hidden">
           Cantidad
         </p>
         <QuantityStepper
@@ -121,7 +121,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
       </div>
 
       <div class="rounded-lg bg-background px-3 py-2 md:bg-transparent md:px-0 md:py-0">
-        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50 md:hidden">
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-text opacity-50 xl:hidden">
           Importe
         </p>
         <p class="mt-1 flex flex-wrap items-baseline gap-x-2 text-lg font-bold text-text md:mt-0">
