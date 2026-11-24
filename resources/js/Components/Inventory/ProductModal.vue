@@ -81,7 +81,13 @@ const modalSections = [
 const fileInput = ref(null);
 const isDragActive = ref(false);
 const filePreviewUrl = ref(null);
+const galleryImages = ref([]);
+const activeGalleryIndex = ref(0);
+const isEditingGalleryOrder = ref(false);
+const draggedGalleryIndex = ref(null);
 const pendingFormSnapshot = ref(null);
+const MAX_PRODUCT_IMAGES = 8;
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 function parseDecimal(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -349,6 +355,7 @@ watch(
       product.entry_date ?? localDateInput();
     form.active = true;
     form.image = product.image ?? null;
+    initializeImageGallery(product);
     form.record_version = product.record_version ?? "";
     form.catalog_version = product.catalog_version ?? null;
 
@@ -413,22 +420,52 @@ function goToFirstInvalidStep(errors) {
   activeStep.value = 1;
 }
 
-const imagePreview = computed(() => {
-  if (filePreviewUrl.value) return filePreviewUrl.value;
-  if (!form.image || form.image instanceof File) return null;
+const activeGalleryImage = computed(() => galleryImages.value[activeGalleryIndex.value] ?? null);
+const activeGalleryImageSource = computed(() => activeGalleryImage.value?.source ?? null);
+const canAddMoreImages = computed(() => galleryImages.value.length < MAX_PRODUCT_IMAGES);
 
-  if (
-    form.image.startsWith("blob:") ||
-    form.image.startsWith("data:") ||
-    form.image.startsWith("http://") ||
-    form.image.startsWith("https://") ||
-    form.image.startsWith("/")
-  ) {
-    return form.image;
+function revokeGalleryPreviews() {
+  galleryImages.value.forEach((image) => {
+    if (image.temporary && image.source) URL.revokeObjectURL(image.source);
+  });
+}
+
+function synchronizePrimaryImage() {
+  const primaryImage = galleryImages.value[0] ?? null;
+  form.image = primaryImage?.file ?? primaryImage?.source ?? null;
+
+  if (activeGalleryIndex.value >= galleryImages.value.length) {
+    activeGalleryIndex.value = Math.max(0, galleryImages.value.length - 1);
   }
+}
 
-  return `/storage/${form.image.replace(/^\/+/, "")}`;
-});
+function initializeImageGallery(product = null) {
+  revokeGalleryPreviews();
+  const existingImages = Array.isArray(product?.images) && product.images.length
+    ? product.images
+    : product?.image
+      ? [{ url: product.image }]
+      : [];
+
+  galleryImages.value = existingImages
+    .map((image, index) => {
+      const source = image?.url ?? image?.image ?? image?.path ?? image;
+      if (!source || typeof source !== "string") return null;
+
+      return {
+        id: image?.id ? `stored-${image.id}` : `stored-legacy-${index}`,
+        databaseId: image?.id ? Number(image.id) : null,
+        source,
+        file: null,
+        temporary: false,
+        label: `Imagen ${index + 1}`,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, MAX_PRODUCT_IMAGES);
+  activeGalleryIndex.value = 0;
+  isEditingGalleryOrder.value = false;
+}
 
 function revokeFilePreview() {
   if (!filePreviewUrl.value) return;
@@ -437,10 +474,12 @@ function revokeFilePreview() {
   filePreviewUrl.value = null;
 }
 
-function assignImageFile(file) {
-  if (!file) return;
+function addImageFiles(files) {
+  const selectedFiles = Array.from(files ?? []);
+  if (!selectedFiles.length) return;
 
-  if (!file.type.startsWith("image/")) {
+  const invalidFile = selectedFiles.find((file) => !ACCEPTED_IMAGE_TYPES.includes(file.type));
+  if (invalidFile) {
     ErrorAlert({
       title: "Archivo no válido",
       message: "Solo se permiten imágenes JPG, PNG o WEBP.",
@@ -448,10 +487,44 @@ function assignImageFile(file) {
     return;
   }
 
-  revokeFilePreview();
-  filePreviewUrl.value = URL.createObjectURL(file);
-  form.image = file;
+  const tooLargeFile = selectedFiles.find((file) => file.size > 2 * 1024 * 1024);
+  if (tooLargeFile) {
+    ErrorAlert({
+      title: "Imagen demasiado grande",
+      message: "Cada imagen debe pesar máximo 2 MB.",
+    });
+    return;
+  }
+
+  const availableSlots = MAX_PRODUCT_IMAGES - galleryImages.value.length;
+  const acceptedFiles = selectedFiles.slice(0, Math.max(0, availableSlots));
+
+  if (!acceptedFiles.length) {
+    ErrorAlert({
+      title: "Límite de imágenes alcanzado",
+      message: "Cada producto puede tener máximo 8 imágenes.",
+    });
+    return;
+  }
+
+  galleryImages.value.push(...acceptedFiles.map((file, index) => ({
+    id: `new-${Date.now()}-${index}-${file.name}`,
+    databaseId: null,
+    source: URL.createObjectURL(file),
+    file,
+    temporary: true,
+    label: file.name,
+  })));
+  activeGalleryIndex.value = galleryImages.value.length - acceptedFiles.length;
+  synchronizePrimaryImage();
   form.clearErrors("image");
+
+  if (selectedFiles.length > acceptedFiles.length) {
+    ErrorAlert({
+      title: "Se agregaron las imágenes disponibles",
+      message: "Solo se pueden conservar 8 imágenes por producto.",
+    });
+  }
 }
 
 function openFilePicker() {
@@ -460,8 +533,7 @@ function openFilePicker() {
 }
 
 function handleFileChange(event) {
-  const [file] = event.target.files || [];
-  assignImageFile(file);
+  addImageFiles(event.target.files);
   event.target.value = "";
 }
 
@@ -477,8 +549,79 @@ function handleDragLeave() {
 function handleDrop(event) {
   if (props.mode === "view") return;
   isDragActive.value = false;
-  const [file] = event.dataTransfer?.files || [];
-  assignImageFile(file);
+  addImageFiles(event.dataTransfer?.files);
+}
+
+function selectGalleryImage(index) {
+  activeGalleryIndex.value = index;
+}
+
+function showPreviousImage() {
+  if (galleryImages.value.length < 2) return;
+  activeGalleryIndex.value = (activeGalleryIndex.value - 1 + galleryImages.value.length) % galleryImages.value.length;
+}
+
+function showNextImage() {
+  if (galleryImages.value.length < 2) return;
+  activeGalleryIndex.value = (activeGalleryIndex.value + 1) % galleryImages.value.length;
+}
+
+function removeGalleryImage(index = activeGalleryIndex.value) {
+  if (props.mode === "view" || !galleryImages.value[index]) return;
+
+  const [removedImage] = galleryImages.value.splice(index, 1);
+  if (removedImage?.temporary) URL.revokeObjectURL(removedImage.source);
+  synchronizePrimaryImage();
+}
+
+function moveGalleryImage(fromIndex, toIndex) {
+  if (!isEditingGalleryOrder.value || fromIndex === toIndex || !galleryImages.value[fromIndex]) return;
+  const boundedTarget = Math.min(Math.max(toIndex, 0), galleryImages.value.length - 1);
+  const [image] = galleryImages.value.splice(fromIndex, 1);
+  galleryImages.value.splice(boundedTarget, 0, image);
+  activeGalleryIndex.value = boundedTarget;
+  synchronizePrimaryImage();
+}
+
+function startGalleryDrag(index) {
+  if (!isEditingGalleryOrder.value) return;
+  draggedGalleryIndex.value = index;
+}
+
+function dropGalleryImage(index) {
+  if (draggedGalleryIndex.value === null) return;
+  moveGalleryImage(draggedGalleryIndex.value, index);
+  draggedGalleryIndex.value = null;
+}
+
+function saveGalleryOrder() {
+  isEditingGalleryOrder.value = false;
+  synchronizePrimaryImage();
+}
+
+function galleryPayload(data) {
+  const images = {};
+  const imageOrder = [];
+
+  galleryImages.value.forEach((image) => {
+    if (image.file) {
+      images[image.id] = image.file;
+      imageOrder.push(`new:${image.id}`);
+      return;
+    }
+
+    if (image.databaseId) imageOrder.push(`stored:${image.databaseId}`);
+  });
+
+  return {
+    ...data,
+    // La galería sustituye al campo histórico; el servidor conservará esta
+    // primera posición como imagen principal para los módulos antiguos.
+    image: null,
+    images,
+    image_order: imageOrder,
+    has_gallery_images: true,
+  };
 }
 
 function addBarcode() {
@@ -495,6 +638,7 @@ function removeBarcode(index) {
 
 function setCreateDefaults() {
   revokeFilePreview();
+  revokeGalleryPreviews();
   if (fileInput.value) {
     fileInput.value.value = "";
   }
@@ -524,6 +668,9 @@ function setCreateDefaults() {
   form.entry_date = localDateInput();
   form.active = true;
   form.image = null;
+  galleryImages.value = [];
+  activeGalleryIndex.value = 0;
+  isEditingGalleryOrder.value = false;
   form.quantity = null;
   form.kilos = null;
   form.liters = null;
@@ -629,6 +776,7 @@ watch(
 
 onBeforeUnmount(() => {
   revokeFilePreview();
+  revokeGalleryPreviews();
 });
 
 function submit() {
@@ -651,7 +799,7 @@ function submit() {
   pendingFormSnapshot.value = captureFormSnapshot();
 
   if (props.mode === "create") {
-    form.post(
+    form.transform((data) => galleryPayload(data)).post(
       route("inventory.branches.products.store", {
         branch: branchSlug,
       }),
@@ -720,8 +868,7 @@ function submit() {
   if (props.mode === "edit") {
     form
       .transform((data) => ({
-        ...data,
-        image: data.image instanceof File ? data.image : null,
+        ...galleryPayload(data),
         _method: "PUT",
       }))
       .post(
@@ -804,91 +951,151 @@ function submit() {
         ref="fileInput"
         type="file"
         accept="image/*"
+        multiple
         class="hidden"
         @change="handleFileChange"
       />
 
       <div
         v-show="activeStep === 1"
-        class="grid gap-5"
-        :class="'grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)]'"
+        class="grid grid-cols-1 gap-5 xl:grid-cols-[260px_minmax(0,1fr)]"
       >
-        <section class="hidden xl:flex xl:flex-col">
-          <button
-            type="button"
-            class="flex h-full min-h-[480px] w-full items-center justify-center rounded-[24px] border border-dashed bg-secondary p-4 text-left transition"
-            :class="
-              mode === 'view'
-                ? 'cursor-default border-secondary'
-                : isDragActive
-                  ? 'border-primary bg-background'
-                  : 'border-secondary hover:border-primary'
-            "
-            :disabled="mode === 'view'"
-            @click="openFilePicker"
+        <section class="min-w-0 space-y-3 xl:sticky xl:top-4 xl:self-start">
+          <div
+            class="relative aspect-[5/4] overflow-hidden rounded-[22px] border bg-secondary transition md:aspect-square xl:aspect-[4/5]"
+            :class="isDragActive ? 'border-primary bg-background ring-2 ring-primary/20' : 'border-secondary'"
             @dragover.prevent="handleDragOver"
             @dragleave.prevent="handleDragLeave"
             @drop.prevent="handleDrop"
           >
-            <template v-if="imagePreview">
-              <img
-                :src="imagePreview"
-                class="h-[248px] w-full rounded-[18px] bg-background object-contain"
-              />
-            </template>
+            <img
+              v-if="activeGalleryImageSource"
+              :src="activeGalleryImageSource"
+              :alt="`${form.name || 'Producto'} — imagen ${activeGalleryIndex + 1}`"
+              class="h-full w-full bg-background object-contain"
+            />
+            <button
+              v-else
+              type="button"
+              class="flex h-full w-full flex-col items-center justify-center px-5 text-center"
+              :disabled="mode === 'view'"
+              @click="openFilePicker"
+            >
+              <span class="material-symbols-outlined text-[42px] text-text opacity-30">image</span>
+              <p class="mt-3 text-sm font-semibold text-text">
+                {{ mode === "view" ? "Sin imágenes" : "Selecciona o arrastra imágenes" }}
+              </p>
+              <p v-if="mode !== 'view'" class="mt-1 text-xs text-text opacity-70">JPG, PNG o WEBP · máximo 2 MB</p>
+            </button>
 
-            <template v-else>
-              <div class="flex h-[248px] w-full flex-col items-center justify-center rounded-[18px] bg-background px-4 text-center">
-                <span class="material-symbols-outlined text-[42px] text-text opacity-30">
-                  image
-                </span>
-                <p class="mt-3 text-sm font-semibold text-text">
-                  {{ mode === "view" ? "Sin imagen" : "Seleccionar o arrastrar archivo" }}
-                </p>
-                <p v-if="mode !== 'view'" class="mt-1 text-xs text-text opacity-70">
-                  JPG, PNG o WEBP
-                </p>
+            <template v-if="galleryImages.length > 1">
+              <button
+                type="button"
+                class="absolute left-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-background/90 text-text shadow-sm transition hover:bg-background focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                aria-label="Ver imagen anterior"
+                @click="showPreviousImage"
+              >
+                <span class="material-symbols-outlined">chevron_left</span>
+              </button>
+              <button
+                type="button"
+                class="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-background/90 text-text shadow-sm transition hover:bg-background focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                aria-label="Ver imagen siguiente"
+                @click="showNextImage"
+              >
+                <span class="material-symbols-outlined">chevron_right</span>
+              </button>
+              <p class="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-background/90 px-2.5 py-1 text-xs font-semibold text-text shadow-sm">
+                {{ activeGalleryIndex + 1 }} de {{ galleryImages.length }}
+              </p>
+            </template>
+          </div>
+
+          <div v-if="galleryImages.length" class="flex gap-2 overflow-x-auto pb-1" aria-label="Miniaturas de imágenes">
+            <button
+              v-for="(image, index) in galleryImages"
+              :key="image.id"
+              type="button"
+              class="h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 bg-secondary transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              :class="index === activeGalleryIndex ? 'border-primary' : 'border-transparent hover:border-secondary'"
+              :aria-label="`Ver imagen ${index + 1}`"
+              @click="selectGalleryImage(index)"
+            >
+              <img :src="image.source" :alt="image.label" class="h-full w-full object-cover" />
+            </button>
+          </div>
+
+          <div v-if="mode !== 'view'" class="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+            <button
+              v-if="canAddMoreImages"
+              type="button"
+              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-secondary bg-background px-3 py-2.5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
+              @click="openFilePicker"
+            >
+              <span class="material-symbols-outlined text-[20px]">add_photo_alternate</span>
+              Agregar imágenes
+            </button>
+            <button
+              v-if="galleryImages.length"
+              type="button"
+              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-secondary bg-background px-3 py-2.5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
+              @click="removeGalleryImage()"
+            >
+              <span class="material-symbols-outlined text-[20px]">delete</span>
+              Quitar imagen
+            </button>
+            <button
+              v-if="mode === 'edit' && galleryImages.length > 1"
+              type="button"
+              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-secondary bg-background px-3 py-2.5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
+              :class="isEditingGalleryOrder ? 'border-primary text-primary' : ''"
+              @click="isEditingGalleryOrder = !isEditingGalleryOrder"
+            >
+              <span class="material-symbols-outlined text-[20px]">reorder</span>
+              Editar orden
+            </button>
+            <button
+              v-if="mode === 'edit' && isEditingGalleryOrder"
+              type="button"
+              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-white transition hover:brightness-95"
+              @click="saveGalleryOrder"
+            >
+              <span class="material-symbols-outlined text-[20px]">save</span>
+              Guardar cambios
+            </button>
+          </div>
+
+          <p v-if="mode !== 'view'" class="text-center text-xs text-text opacity-65">
+            {{ galleryImages.length }} de {{ MAX_PRODUCT_IMAGES }} imágenes
+          </p>
+
+          <div v-if="isEditingGalleryOrder" class="rounded-2xl border border-secondary bg-secondary p-3">
+            <p class="mb-2 text-xs font-semibold text-text">Arrastra o usa las flechas para definir el orden.</p>
+            <div class="space-y-2">
+              <div
+                v-for="(image, index) in galleryImages"
+                :key="`order-${image.id}`"
+                class="flex items-center gap-2 rounded-xl bg-background p-2"
+                :class="draggedGalleryIndex === index ? 'ring-2 ring-primary/30' : ''"
+                draggable="true"
+                @dragstart="startGalleryDrag(index)"
+                @dragover.prevent
+                @drop.prevent="dropGalleryImage(index)"
+              >
+                <span class="material-symbols-outlined cursor-grab text-text opacity-55">drag_indicator</span>
+                <img :src="image.source" :alt="image.label" class="h-10 w-10 rounded-lg object-cover" />
+                <span class="min-w-0 flex-1 truncate text-xs font-semibold text-text">{{ index + 1 }}. {{ image.label }}</span>
+                <div class="flex shrink-0 gap-1">
+                  <button type="button" class="rounded-lg p-1 text-text hover:bg-secondary disabled:opacity-30" :disabled="index === 0" :aria-label="`Subir imagen ${index + 1}`" @click="moveGalleryImage(index, index - 1)">
+                    <span class="material-symbols-outlined text-[18px]">arrow_upward</span>
+                  </button>
+                  <button type="button" class="rounded-lg p-1 text-text hover:bg-secondary disabled:opacity-30" :disabled="index === galleryImages.length - 1" :aria-label="`Bajar imagen ${index + 1}`" @click="moveGalleryImage(index, index + 1)">
+                    <span class="material-symbols-outlined text-[18px]">arrow_downward</span>
+                  </button>
+                </div>
               </div>
-            </template>
-          </button>
-        </section>
-
-        <section class="space-y-3 xl:hidden">
-          <button
-            type="button"
-            class="flex min-h-[180px] w-full items-center justify-center rounded-[22px] border border-dashed bg-secondary p-4 text-left transition"
-            :class="
-              mode === 'view'
-                ? 'cursor-default border-secondary'
-                : isDragActive
-                  ? 'border-primary bg-background'
-                  : 'border-secondary hover:border-primary'
-            "
-            :disabled="mode === 'view'"
-            @click="openFilePicker"
-            @dragover.prevent="handleDragOver"
-            @dragleave.prevent="handleDragLeave"
-            @drop.prevent="handleDrop"
-          >
-            <template v-if="imagePreview">
-              <img
-                :src="imagePreview"
-                class="h-[148px] w-full rounded-[16px] bg-background object-contain"
-              />
-            </template>
-
-            <template v-else>
-              <div class="flex h-[148px] w-full flex-col items-center justify-center rounded-[16px] bg-background px-4 text-center">
-                <span class="material-symbols-outlined text-[36px] text-text opacity-30">
-                  image
-                </span>
-                <p class="mt-2 text-sm font-semibold text-text">
-                  {{ mode === "view" ? "Sin imagen" : "Seleccionar o arrastrar archivo" }}
-                </p>
-                <p v-if="mode !== 'view'" class="mt-1 text-xs text-text opacity-70">JPG, PNG o WEBP</p>
-              </div>
-            </template>
-          </button>
+            </div>
+          </div>
         </section>
 
         <div class="min-w-0 space-y-4">

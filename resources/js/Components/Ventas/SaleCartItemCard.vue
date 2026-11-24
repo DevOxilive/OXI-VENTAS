@@ -4,7 +4,7 @@ import InputField from "@/Components/Forms/InputField.vue"
 import QuantityStepper from "@/Components/Forms/QuantityStepper.vue"
 import ActionIconButton from "@/Components/Forms/ActionIconButton.vue"
 
-defineProps({
+const props = defineProps({
   item: {
     type: Object,
     required: true,
@@ -27,7 +27,12 @@ defineProps({
   },
 })
 
-defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-discount", "set-presentation", "update-quantity"])
+const emit = defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-discount", "set-presentation", "update-quantity", "view-images"])
+
+function openImageGallery() {
+  if (!props.item.image && !(props.item.images?.length)) return
+  emit("view-images", props.item)
+}
 </script>
 
 <template>
@@ -35,7 +40,14 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
     <div class="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_120px_240px_180px_88px] xl:items-start">
       <div class="min-w-0">
         <div class="flex gap-3">
-          <div class="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-secondary bg-background">
+          <button
+            type="button"
+            class="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-secondary bg-background transition hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            :class="item.image || item.images?.length ? 'cursor-zoom-in' : 'cursor-default'"
+            :aria-label="item.image || item.images?.length ? `Ver imágenes de ${item.name}` : `Producto sin imagen: ${item.name}`"
+            :disabled="!item.image && !item.images?.length"
+            @click="openImageGallery"
+          >
             <img
               v-if="item.image"
               :src="item.image"
@@ -47,7 +59,7 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
                 inventory_2
               </span>
             </div>
-          </div>
+          </button>
 
           <div class="min-w-0">
             <p class="truncate text-base font-semibold text-text">
@@ -197,4 +209,5 @@ defineEmits(["increase", "decrease", "remove", "toggle-discount", "normalize-dis
   height: 2.75rem;
   font-size: 1rem;
 }
+
 </style>

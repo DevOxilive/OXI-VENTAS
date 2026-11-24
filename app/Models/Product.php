@@ -6,6 +6,7 @@ use App\Search\ProductSearchDocumentBuilder;
 use App\Observers\InventoryProductSearchObserver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Laravel\Scout\Searchable;
@@ -106,6 +107,15 @@ class Product extends Model
     public function branchProducts()
     {
         return $this->hasMany(BranchProduct::class);
+    }
+
+    /**
+     * Fotografías ordenadas del catálogo. La columna image se conserva por
+     * compatibilidad mientras las pantallas existentes se trasladan a esta relación.
+     */
+    public function images(): HasMany
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('position');
     }
 
     public function searchableAs(): string

@@ -14,6 +14,7 @@ use App\Models\EmployeeCreditCharge;
 use App\Models\EmployeeCreditPayment;
 use App\Models\PaymentMethod;
 use App\Models\ProductBatch;
+use App\Models\ProductImage;
 use App\Models\Sale;
 use App\Models\SaleCancellation;
 use App\Models\SaleDetail;
@@ -286,6 +287,7 @@ class SalesController extends Controller
                 'product:id,name,image,category_id,cost,sale_price,margin_percentage,active,unit,inventory_unit,pieces_per_box,pieces_per_package,has_box_presentation,has_package_presentation,inventory_quantity_mode,cost_per_piece,sale_price_per_piece,cost_per_box,sale_price_per_box,cost_per_package,sale_price_per_package',
                 'product.category:id,name',
                 'product.barcodes:id,product_id,code',
+                'product.images:id,product_id,path,position',
             ])
             ->where('branch_id', $branch->id)
             ->where('status', BranchProduct::STATUS_ACTIVE)
@@ -740,6 +742,17 @@ class SalesController extends Controller
             'image' => $product?->image
                 ? route('inventory.products.image', ['product' => $product->id])
                 : null,
+            'images' => ($product?->images ?? collect())
+                ->map(fn (ProductImage $image) => [
+                    'id' => $image->id,
+                    'position' => $image->position,
+                    'url' => route('inventory.products.images.show', [
+                        'product' => $product->id,
+                        'productImage' => $image->id,
+                    ]),
+                ])
+                ->values()
+                ->all(),
             'price' => (float) ($product?->sale_price_per_piece ?? $product?->sale_price ?? 0),
             'sale_price_per_piece' => (float) ($product?->sale_price_per_piece ?? $product?->sale_price ?? 0),
             'sale_price_per_box' => (float) ($product?->sale_price_per_box ?? 0),

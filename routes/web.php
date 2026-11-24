@@ -642,6 +642,10 @@ Route::middleware([
             ->middleware($productImagesAccess)
             ->name('products.image');
 
+        Route::get('/products/{product}/images/{productImage}', [ProductController::class, 'galleryImage'])
+            ->middleware($productImagesAccess)
+            ->name('products.images.show');
+
         Route::post('/branches/{branch:slug}/products', [ProductController::class, 'store'])
             ->middleware('permission:inventory.products.create')
             ->name('branches.products.store');

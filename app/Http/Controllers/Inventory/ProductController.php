@@ -10,6 +10,7 @@ use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductBatch;
+use App\Models\ProductImage;
 use App\Services\InventoryBackgroundContext;
 use App\Services\InventoryOutbox;
 use App\Support\SystemPermission;
@@ -174,6 +175,7 @@ class ProductController extends Controller
                 'product.category:id,product_department_id,name',
                 'product.category.productDepartment:id,name',
                 'product.barcodes:id,product_id,code',
+                'product.images:id,product_id,path,position',
             ])
             ->when($canUseInventoryData, fn ($query) => $query
                 ->withCount(['activeBatches as active_batches_count']))
@@ -216,6 +218,19 @@ class ProductController extends Controller
         return Storage::disk($disk)->response($product->image);
     }
 
+    public function galleryImage(Product $product, ProductImage $productImage)
+    {
+        abort_unless($productImage->product_id === $product->id, 404);
+
+        $disk = $this->resolveImageDisk($productImage->path);
+
+        if (! $disk) {
+            abort(404);
+        }
+
+        return Storage::disk($disk)->response($productImage->path);
+    }
+
     public function store(Request $request, Branch $branch)
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
@@ -235,6 +250,11 @@ class ProductController extends Controller
             'search_aliases' => ['nullable', 'array', 'max:30'],
             'search_aliases.*' => ['nullable', 'string', 'max:60', 'regex:/^[^\p{C}]+$/u', 'distinct:ignore_case'],
             'image' => ['nullable', 'image', 'max:2048'],
+            'images' => ['nullable', 'array', 'max:8'],
+            'images.*' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'image_order' => ['nullable', 'array', 'max:8'],
+            'image_order.*' => ['string', 'max:100', 'distinct'],
+            'has_gallery_images' => ['nullable', 'boolean'],
 
             'min_stock' => $this->minimumStockRules((string) $request->input('inventory_unit')),
             'product_department_id' => ['nullable', 'required_with:category_name', 'exists:product_departments,id'],
@@ -302,10 +322,13 @@ class ProductController extends Controller
             $imagePath = $request->file('image')->store('products', self::PRODUCT_IMAGE_PRIVATE_DISK);
         }
 
+        $uploadedGalleryImages = $this->storeUploadedGalleryImages($request);
+        $removedImagePaths = [];
+
         $previousImagePath = $reusableDeletedProduct?->image;
 
         try {
-            $product = $this->persistProductChange(function () use ($data, $imagePath, $barcodes, $requestedBranchIds, $reusableDeletedProduct) {
+            $product = $this->persistProductChange(function () use ($data, $imagePath, $uploadedGalleryImages, $request, $barcodes, $requestedBranchIds, $reusableDeletedProduct, &$removedImagePaths) {
                 $product = $reusableDeletedProduct
                     ? Product::withTrashed()->lockForUpdate()->findOrFail($reusableDeletedProduct->id)
                     : new Product;
@@ -353,6 +376,13 @@ class ProductController extends Controller
                 ]);
                 $product->save();
 
+                $removedImagePaths = $this->synchronizeProductImageGallery(
+                    $product,
+                    $request,
+                    $uploadedGalleryImages,
+                    $imagePath,
+                );
+
                 $this->syncProductBarcodes($product, $barcodes);
 
                 foreach ($requestedBranchIds as $branchId) {
@@ -375,11 +405,14 @@ class ProductController extends Controller
             });
         } catch (Throwable $exception) {
             $this->deleteProductImage($imagePath);
+            foreach ($uploadedGalleryImages as $path) {
+                $this->deleteProductImage($path);
+            }
             throw $exception;
         }
 
-        if ($imagePath && $previousImagePath && $imagePath !== $previousImagePath) {
-            $this->deleteProductImage($previousImagePath);
+        foreach (array_unique($removedImagePaths) as $path) {
+            $this->deleteProductImage($path);
         }
 
         return back()->with('success', 'Producto creado correctamente');
@@ -404,6 +437,11 @@ class ProductController extends Controller
             'search_aliases' => ['nullable', 'array', 'max:30'],
             'search_aliases.*' => ['nullable', 'string', 'max:60', 'regex:/^[^\p{C}]+$/u', 'distinct:ignore_case'],
             'image' => ['nullable', 'image', 'max:2048'],
+            'images' => ['nullable', 'array', 'max:8'],
+            'images.*' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'image_order' => ['nullable', 'array', 'max:8'],
+            'image_order.*' => ['string', 'max:100', 'distinct'],
+            'has_gallery_images' => ['nullable', 'boolean'],
             'min_stock' => $this->minimumStockRules((string) $request->input('inventory_unit')),
             'product_department_id' => ['nullable', 'required_with:category_name', 'exists:product_departments,id'],
             'category_id' => ['nullable', 'required_without:category_name', 'exists:categories,id'],
@@ -487,6 +525,9 @@ class ProductController extends Controller
         }
 
         $changesGlobalProduct = $request->hasFile('image')
+            || $request->boolean('has_gallery_images')
+            || $request->has('image_order')
+            || $request->hasFile('images')
             || ($product->piece_pricing_mode ?? 'manual') !== $data['piece_pricing_mode']
             || ($product->box_pricing_mode ?? 'manual') !== $data['box_pricing_mode']
             || $product->piece_margin_percentage != $data['piece_margin_percentage']
@@ -532,9 +573,11 @@ class ProductController extends Controller
         $newImagePath = $request->hasFile('image')
             ? $request->file('image')->store('products', self::PRODUCT_IMAGE_PRIVATE_DISK)
             : $previousImagePath;
+        $uploadedGalleryImages = $this->storeUploadedGalleryImages($request);
+        $removedImagePaths = [];
 
         try {
-            $this->persistProductChange(function () use ($request, $data, $product, $barcodes, $branchIds, $previousBranchIds, $newImagePath, $storageUnit, $isLegacyPresentationProduct) {
+            $this->persistProductChange(function () use ($request, $data, $product, $barcodes, $branchIds, $previousBranchIds, $newImagePath, $uploadedGalleryImages, $storageUnit, $isLegacyPresentationProduct, &$removedImagePaths) {
 
                 $product = $this->lockCatalogVersion($request, $product);
                 $this->assertRetirementsHaveNoInventory($product, $branchIds->all(), 'branch_ids');
@@ -572,6 +615,13 @@ class ProductController extends Controller
                 $product->catalog_version++;
                 $product->save();
 
+                $removedImagePaths = $this->synchronizeProductImageGallery(
+                    $product,
+                    $request,
+                    $uploadedGalleryImages,
+                    $request->hasFile('image') ? $newImagePath : null,
+                );
+
                 $this->syncProductBarcodes($product, $barcodes);
 
                 foreach ($branchIds as $branchId) {
@@ -599,11 +649,14 @@ class ProductController extends Controller
             if ($newImagePath !== $previousImagePath) {
                 $this->deleteProductImage($newImagePath);
             }
+            foreach ($uploadedGalleryImages as $path) {
+                $this->deleteProductImage($path);
+            }
             throw $exception;
         }
 
-        if ($newImagePath !== $previousImagePath) {
-            $this->deleteProductImage($previousImagePath);
+        foreach (array_unique($removedImagePaths) as $path) {
+            $this->deleteProductImage($path);
         }
 
         return back()->with('success', 'Producto actualizado correctamente');
@@ -1009,6 +1062,111 @@ class ProductController extends Controller
         return null;
     }
 
+    /**
+     * Guarda primero los archivos nuevos y devuelve una llave temporal para
+     * poder mezclarlos después con las fotografías que ya existían.
+     */
+    private function storeUploadedGalleryImages(Request $request): array
+    {
+        $storedImages = [];
+
+        foreach ($request->file('images', []) as $key => $image) {
+            $storedImages[(string) $key] = $image->store('products', self::PRODUCT_IMAGE_PRIVATE_DISK);
+        }
+
+        return $storedImages;
+    }
+
+    /**
+     * Mantiene la galería y products.image alineadas. Esta última conserva la
+     * primera fotografía para no romper las pantallas que todavía leen un solo
+     * campo de imagen.
+     *
+     * @return array<int, string> rutas que ya no pertenecen al producto
+     */
+    private function synchronizeProductImageGallery(Product $product, Request $request, array $uploadedImages, ?string $legacyImagePath = null): array
+    {
+        $hasGalleryPayload = $request->boolean('has_gallery_images') || $request->has('image_order');
+
+        if (! $hasGalleryPayload && ! $legacyImagePath) {
+            return [];
+        }
+
+        $currentImages = $product->images()->get()->keyBy('id');
+        $orderedImages = [];
+
+        if ($hasGalleryPayload) {
+            foreach ($request->input('image_order', []) as $entry) {
+                if (preg_match('/^stored:(\d+)$/', (string) $entry, $matches)) {
+                    $storedImage = $currentImages->get((int) $matches[1]);
+
+                    if (! $storedImage) {
+                        throw ValidationException::withMessages([
+                            'image_order' => 'Una de las imágenes ya no pertenece a este producto. Actualiza la pantalla e inténtalo de nuevo.',
+                        ]);
+                    }
+
+                    $orderedImages[] = ['id' => $storedImage->id, 'path' => $storedImage->path];
+                    continue;
+                }
+
+                if (preg_match('/^new:(.+)$/', (string) $entry, $matches) && isset($uploadedImages[$matches[1]])) {
+                    $orderedImages[] = ['id' => null, 'path' => $uploadedImages[$matches[1]]];
+                    continue;
+                }
+
+                throw ValidationException::withMessages([
+                    'image_order' => 'El orden de las imágenes no es válido. Actualiza la pantalla e inténtalo de nuevo.',
+                ]);
+            }
+
+            $newImagesInOrder = collect($orderedImages)->whereNull('id')->count();
+            if ($newImagesInOrder !== count($uploadedImages)) {
+                throw ValidationException::withMessages([
+                    'image_order' => 'Todas las imágenes nuevas deben formar parte del carrusel.',
+                ]);
+            }
+        } elseif ($legacyImagePath) {
+            $orderedImages[] = ['id' => null, 'path' => $legacyImagePath];
+        }
+
+        $keptImageIds = collect($orderedImages)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
+        $removedImages = $currentImages->reject(fn (ProductImage $image) => in_array($image->id, $keptImageIds, true));
+        $pathsStillInUse = collect($orderedImages)->pluck('path')->all();
+
+        if ($currentImages->isNotEmpty()) {
+            // Evita colisiones temporales con la llave única product_id + position.
+            $product->images()->update(['position' => DB::raw('position + 100')]);
+        }
+
+        foreach ($orderedImages as $index => $image) {
+            if ($image['id']) {
+                $product->images()->whereKey($image['id'])->update(['position' => $index + 1]);
+                continue;
+            }
+
+            $product->images()->create([
+                'path' => $image['path'],
+                'position' => $index + 1,
+            ]);
+        }
+
+        if ($removedImages->isNotEmpty()) {
+            $product->images()->whereKey($removedImages->keys()->all())->delete();
+        }
+
+        $previousImagePath = $product->image;
+        $product->image = $orderedImages[0]['path'] ?? null;
+        $product->save();
+
+        $removedPaths = $removedImages->pluck('path')->all();
+        if ($previousImagePath && ! in_array($previousImagePath, $pathsStillInUse, true)) {
+            $removedPaths[] = $previousImagePath;
+        }
+
+        return array_values(array_unique($removedPaths));
+    }
+
     private function deleteProductImage(?string $path): void
     {
         $disk = $this->resolveImageDisk($path);
@@ -1115,6 +1273,17 @@ class ProductController extends Controller
             'search_aliases' => $product?->search_aliases ?? [],
             'image' => $imageUrl,
             'image_path' => $product?->image,
+            'images' => ($product?->images ?? collect())
+                ->map(fn (ProductImage $image) => [
+                    'id' => $image->id,
+                    'position' => $image->position,
+                    'url' => route('inventory.products.images.show', [
+                        'product' => $product->id,
+                        'productImage' => $image->id,
+                    ]),
+                ])
+                ->values()
+                ->all() ?? [],
             'product_department_id' => $product?->category?->product_department_id,
             'product_department_name' => $product?->category?->productDepartment?->name ?? 'Sin departamento',
             'category_id' => $product?->category_id,

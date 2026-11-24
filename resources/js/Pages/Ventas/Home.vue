@@ -13,6 +13,7 @@ import EmptyStateCard from "@/Components/Cards/EmptyStateCard.vue";
 import MetricCard from "@/Components/Cards/MetricCard.vue";
 import SaleCartItemCard from "@/Components/Ventas/SaleCartItemCard.vue";
 import SaleBranchSelectorCard from "@/Components/Ventas/SaleBranchSelectorCard.vue";
+import ProductImageGalleryModal from "@/Components/Ventas/ProductImageGalleryModal.vue";
 import { getSalesToolbarConfig } from "@/config/ToolbarConfigs/salesToolbarConfig";
 import {
   connectQzTray,
@@ -149,6 +150,8 @@ const showPaymentModal = ref(false);
 const creditHolder = ref("");
 const creditDueDate = ref("");
 const showChangeModal = ref(false);
+const showProductImageGallery = ref(false);
+const selectedCartProduct = ref(null);
 const completedSaleChange = ref(0);
 const completedSaleFolio = ref("");
 const cashReceivedInput = ref(null);
@@ -1063,6 +1066,7 @@ function addProduct(product) {
     name: product.name,
     barcode: product.barcode,
     image: product.image,
+    images: product.images ?? [],
     original_price: Number(product.price || 0),
     sale_price_per_piece: Number(product.sale_price_per_piece ?? product.price ?? 0),
     sale_price_per_box: Number(product.sale_price_per_box ?? 0),
@@ -1084,6 +1088,21 @@ function addProduct(product) {
   search.value = "";
   highlightedSuggestionIndex.value = 0;
   focusSearch();
+}
+
+function openProductImageGallery(item) {
+  if (!item?.image && !item?.images?.length) return;
+
+  selectedCartProduct.value = item;
+  showProductImageGallery.value = true;
+}
+
+function closeProductImageGallery() {
+  showProductImageGallery.value = false;
+}
+
+function clearProductImageGallery() {
+  selectedCartProduct.value = null;
 }
 
 function findExactProduct(query) {
@@ -2069,6 +2088,7 @@ function closeChangeModal() {
                 @update-quantity="updateCartQuantity(index, $event)"
                 @toggle-discount="toggleDiscount(item)"
                 @normalize-discount="normalizeDiscount(item)"
+                @view-images="openProductImageGallery"
               />
 
               <div
@@ -2405,6 +2425,14 @@ function closeChangeModal() {
       :subtitle="completedSaleFolio ? `Venta ${completedSaleFolio} registrada correctamente` : 'Venta registrada correctamente'"
       :amount="completedSaleChange"
       @close="closeChangeModal"
+    />
+
+    <ProductImageGalleryModal
+      v-if="selectedCartProduct"
+      :open="showProductImageGallery"
+      :item="selectedCartProduct"
+      @request-close="closeProductImageGallery"
+      @closed="clearProductImageGallery"
     />
 
     </template>
