@@ -103,7 +103,7 @@ watch(images, (gallery) => {
             @touchstart.passive="rememberTouchStart"
             @touchend.passive="handleTouchEnd"
           >
-            <img v-if="activeImage" :src="activeImage" :alt="`${item.name} — imagen ${activeImageIndex + 1}`" class="max-h-full max-w-full object-contain" />
+            <img v-if="activeImage" :src="activeImage" :alt="`${item.name} — imagen ${activeImageIndex + 1}`" class="h-full w-full object-contain" />
             <span v-else class="material-symbols-outlined text-5xl text-text opacity-30">image_not_supported</span>
 
             <template v-if="images.length > 1">
