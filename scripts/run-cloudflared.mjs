@@ -39,7 +39,12 @@ function saveTunnelConfig(path, label, publicUrl) {
     console.log(`[${label}] URL publica: ${publicUrl}`);
 }
 
-function startTunnel(label, localUrl, onPublicUrl = null) {
+function startTunnel(label, localUrl, onPublicUrl = null, options = {}) {
+    const {
+        required = true,
+        configPath = null,
+        unavailableMessage = 'El túnel no está disponible; la PWA seguirá funcionando sin tiempo real público.',
+    } = options;
     const child = spawn(command, [
         'tunnel',
         '--no-autoupdate',
@@ -75,6 +80,15 @@ function startTunnel(label, localUrl, onPublicUrl = null) {
     child.on('exit', (code, signal) => {
         if (shuttingDown) return;
 
+        if (!required) {
+            if (configPath) {
+                removeOwnedConfig(configPath, true);
+            }
+
+            console.warn(`[${label}] ${unavailableMessage}`);
+            return;
+        }
+
         shutdown(signal ? 1 : (code ?? 1));
     });
 
@@ -98,8 +112,22 @@ function shutdown(exitCode = 0) {
 
 removeOwnedConfig(appConfigPath, true);
 removeOwnedConfig(realtimeConfigPath, true);
-startTunnel('reverb-tunnel', 'http://127.0.0.1:8080', (publicUrl) => saveTunnelConfig(realtimeConfigPath, 'reverb-tunnel', publicUrl));
-startTunnel('app-tunnel', 'http://127.0.0.1:8000', (publicUrl) => saveTunnelConfig(appConfigPath, 'app-tunnel', publicUrl));
+startTunnel(
+    'reverb-tunnel',
+    'http://127.0.0.1:8080',
+    (publicUrl) => saveTunnelConfig(realtimeConfigPath, 'reverb-tunnel', publicUrl),
+    { required: false, configPath: realtimeConfigPath },
+);
+startTunnel(
+    'app-tunnel',
+    'http://127.0.0.1:8000',
+    (publicUrl) => saveTunnelConfig(appConfigPath, 'app-tunnel', publicUrl),
+    {
+        required: false,
+        configPath: appConfigPath,
+        unavailableMessage: 'El túnel público no está disponible; abre la PWA local en http://127.0.0.1:8000.',
+    },
+);
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => {
