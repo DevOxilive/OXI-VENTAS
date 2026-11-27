@@ -6,6 +6,7 @@ import { router, useForm } from '@inertiajs/vue3'
 import FormPanel from '@/Components/Cards/FormPanel.vue'
 import InputField from '@/Components/Forms/InputField.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
+import { resolveProductSearchSelection } from '@/Composables/useProductSearchMatch'
 
 const props = defineProps({
     physicalCountId: {
@@ -17,6 +18,7 @@ const props = defineProps({
 const searchInput = ref(null)
 const results = ref([])
 const loading = ref(false)
+const barcodeNotFoundMessage = ref('')
 let timeout = null
 
 const form = useForm({
@@ -27,15 +29,6 @@ function focusInput() {
     searchInput.value?.focus()
 }
 
-function isExactCodeMatch(product, value) {
-    const cleanValue = String(value || '').trim()
-
-    return (
-        String(product.barcode || '').trim() === cleanValue ||
-        String(product.matched_code || '').trim() === cleanValue
-    )
-}
-
 watch(
     () => form.code,
     (value) => {
@@ -43,6 +36,7 @@ watch(
 
         if (!value || value.trim().length < 2) {
             results.value = []
+            barcodeNotFoundMessage.value = ''
             return
         }
 
@@ -57,12 +51,13 @@ watch(
 
                 results.value = response.data
 
-                const exactMatch = results.value.find((product) =>
-                    isExactCodeMatch(product, value),
-                )
+                const selection = resolveProductSearchSelection(value, results.value)
+                barcodeNotFoundMessage.value = selection.isBarcodeQuery && !selection.exactProduct
+                    ? 'Código no registrado. Puedes elegir una coincidencia manualmente.'
+                    : ''
 
-                if (exactMatch) {
-                    selectProduct(exactMatch, value)
+                if (selection.canAutoSelect) {
+                    selectProduct(selection.exactProduct, value)
                 }
             } finally {
                 loading.value = false
@@ -131,6 +126,9 @@ onBeforeUnmount(() => clearTimeout(timeout))
                     v-if="results.length"
                     class="absolute z-30 mt-1.5 max-h-64 w-full overflow-y-auto rounded-xl border border-secondary bg-background p-1.5 shadow-xl"
                 >
+                    <p v-if="barcodeNotFoundMessage" class="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                        {{ barcodeNotFoundMessage }}
+                    </p>
                     <button
                         v-for="product in results"
                         :key="product.branch_product_id"
@@ -162,6 +160,9 @@ onBeforeUnmount(() => clearTimeout(timeout))
 
         <p v-if="loading" class="mt-2 text-xs text-text opacity-60">
             Buscando productos...
+        </p>
+        <p v-else-if="barcodeNotFoundMessage" class="mt-2 text-xs font-semibold text-amber-700">
+            {{ barcodeNotFoundMessage }}
         </p>
     </FormPanel>
 </template>

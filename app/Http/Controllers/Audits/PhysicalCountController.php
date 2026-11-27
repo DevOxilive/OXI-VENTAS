@@ -644,14 +644,8 @@ class PhysicalCountController extends Controller
                     ->filter()
                     ->unique()
                     ->values();
-                $matchedCode = $codes->first();
-
-                if (! $matchedCode) {
-                    $matchedCode = DB::table('barcodes')
-                        ->where('product_id', $branchProduct->product_id)
-                        ->where('code', $search)
-                        ->value('code');
-                }
+                $matchedCode = $codes->first(fn (string $code) => $code === $search)
+                    ?? $codes->first();
 
                 return [
                     'branch_product_id' => $branchProduct->id,
@@ -715,7 +709,7 @@ class PhysicalCountController extends Controller
         }
 
         if (! $branchProduct && $code !== '') {
-            $productIds = $this->productSearch->ids(
+            $searchResult = $this->productSearch->search(
                 $code,
                 new ProductSearchOptions(
                     branchIds: [$physicalCount->branch_id],
@@ -724,11 +718,17 @@ class PhysicalCountController extends Controller
                 ),
             );
 
+            if ($searchResult->isBarcodeQuery && ! $searchResult->hasExactBarcode()) {
+                return back()->withErrors([
+                    'code' => 'Código no registrado. Revisa las coincidencias sugeridas antes de seleccionarlo.',
+                ]);
+            }
+
             $branchProduct = BranchProduct::with('product')
                 ->where('branch_id', $physicalCount->branch_id)
                 ->when(
-                    $productIds->isNotEmpty(),
-                    fn ($query) => $query->whereIntegerInRaw('product_id', $productIds->all()),
+                    $searchResult->ids->isNotEmpty(),
+                    fn ($query) => $query->whereIntegerInRaw('product_id', $searchResult->ids->all()),
                     fn ($query) => $query->whereRaw('1 = 0'),
                 )
                 ->first();

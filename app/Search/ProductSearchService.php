@@ -24,25 +24,38 @@ class ProductSearchService
 
     public function ids(string $search, ?ProductSearchOptions $options = null): Collection
     {
+        return $this->search($search, $options)->ids;
+    }
+
+    /**
+     * Busca candidatos y expone por separado las coincidencias exactas de
+     * código. La lista mantiene las sugerencias por nombre, lote o código
+     * parcial para los selectores; un escáner debe decidir sólo con los
+     * identificadores exactos.
+     */
+    public function search(string $search, ?ProductSearchOptions $options = null): ProductSearchResult
+    {
         $this->inventoryTextMatchedTerms = [];
         $search = trim($search);
         $options ??= new ProductSearchOptions;
+        $isBarcodeQuery = $this->isBarcodeQuery($search);
 
         if ($search === '') {
-            return collect();
+            return new ProductSearchResult(collect(), collect(), false);
         }
 
-        if (preg_match('/^\d{8,14}$/', $search) === 1) {
-            $exactIds = $this->exactBarcodeIds($search, $options);
-
-            if ($exactIds->isNotEmpty()) {
-                return $exactIds;
-            }
+        $exactIds = $isBarcodeQuery
+            ? $this->exactBarcodeIds($search, $options)
+            : collect();
+        if ($exactIds->isNotEmpty()) {
+            return new ProductSearchResult($exactIds, $exactIds, $isBarcodeQuery);
         }
+
+        $ids = null;
 
         if (config('scout.driver') === 'meilisearch') {
             try {
-                return $this->searchWithIdentifiers(
+                $ids = $this->searchWithIdentifiers(
                     $search,
                     $options,
                     fn (string $value) => $this->meilisearchIds($value, $options),
@@ -59,19 +72,21 @@ class ProductSearchService
             }
         }
 
-        if ($options->inventorySqlPrefilter) {
+        if ($ids === null && $options->inventorySqlPrefilter) {
             $intersection = $this->inventoryIntersection($search, $options);
             if ($intersection !== null) {
-                return $intersection;
+                $ids = $intersection;
             }
         }
 
-        return $this->searchWithIdentifiers(
+        $ids ??= $this->searchWithIdentifiers(
             $search,
             $options,
             fn (string $value) => $this->databaseSearch->ids($value, $options),
             trackInventoryText: $options->inventorySqlPrefilter,
         );
+
+        return new ProductSearchResult($ids, collect(), $isBarcodeQuery);
     }
 
     public function constrain(
@@ -363,6 +378,12 @@ class ProductSearchService
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->values();
+    }
+
+    private function isBarcodeQuery(string $search): bool
+    {
+        return ctype_digit($search)
+            && mb_strlen($search) >= (int) config('product_search.minimum_barcode_suffix_length', 5);
     }
 
     private function assertColumn(string $column): void

@@ -30,6 +30,7 @@ import {
     subscribeToQzTrayRecovery,
 } from "@/Composables/useQzTray";
 import { usePermissions } from "@/Composables/usePermissions";
+import { resolveProductSearchSelection } from "@/Composables/useProductSearchMatch";
 
 defineOptions({
     layout: AdminLayout,
@@ -60,6 +61,7 @@ const productSearch = ref("");
 const searchInput = ref(null);
 const highlightedSuggestionIndex = ref(0);
 const remoteProductIds = ref(null);
+const barcodeNotFoundMessage = ref("");
 let productSearchTimer = null;
 let productSearchRequest = 0;
 const availablePrinters = ref([]);
@@ -326,7 +328,22 @@ function handleSearchKeydown(event) {
         return;
     }
 
-    if (event.key === 'Enter' && searchSuggestions.value.length) {
+    if (event.key !== 'Enter') return;
+
+    const selection = resolveProductSearchSelection(productSearch.value, searchSuggestions.value);
+    if (selection.canAutoSelect) {
+        event.preventDefault();
+        selectSuggestion(selection.exactProduct);
+        return;
+    }
+
+    if (selection.isBarcodeQuery) {
+        event.preventDefault();
+        barcodeNotFoundMessage.value = 'Código no registrado. Elige una coincidencia sólo si la confirmas visualmente.';
+        return;
+    }
+
+    if (searchSuggestions.value.length) {
         event.preventDefault();
         selectSuggestion(searchSuggestions.value[Math.min(highlightedSuggestionIndex.value, searchSuggestions.value.length - 1)]);
     }
@@ -337,6 +354,7 @@ watch(productSearch, (value) => {
     const query = value.trim();
     const requestId = ++productSearchRequest;
     remoteProductIds.value = null;
+    barcodeNotFoundMessage.value = '';
 
     if (!query) return;
 
@@ -620,6 +638,9 @@ async function printTestLabel() {
                                 :show-counter="false"
                                 @keydown="handleSearchKeydown"
                             />
+                            <p v-if="barcodeNotFoundMessage" class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                                {{ barcodeNotFoundMessage }}
+                            </p>
                             <div v-if="searchSuggestions.length" class="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 overflow-hidden rounded-2xl border border-secondary bg-background shadow-xl">
                                 <button
                                     v-for="(product, index) in searchSuggestions"

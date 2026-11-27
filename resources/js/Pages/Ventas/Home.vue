@@ -38,6 +38,7 @@ import {
   normalizeTicketTemplate,
 } from "@/config/ticketTemplate";
 import { usePermissions } from "@/Composables/usePermissions";
+import { resolveProductSearchSelection } from "@/Composables/useProductSearchMatch";
 import { createPendingSalesStorage } from "@/utils/pendingSalesStorage";
 import {
   REALTIME_CHANNELS,
@@ -98,8 +99,10 @@ const TICKET_LOGO_URL = "/icons/super-kay-ticket-bw.png";
 const search = ref("");
 const searchInput = ref(null);
 const remoteSearchProducts = ref([]);
+const remoteSearchExactProductIds = ref([]);
 const searchLoading = ref(false);
 const searchError = ref("");
+const barcodeNotFoundMessage = ref("");
 const selectedBranchId = ref(props.currentBranch?.id ?? "");
 const selectedCashBoxNumber = ref("1");
 const cart = ref([]);
@@ -356,10 +359,13 @@ watch(
     clearPendingProductSearch();
     const requestId = ++searchRequestId;
     remoteSearchProducts.value = [];
+    remoteSearchExactProductIds.value = [];
     searchError.value = "";
+    barcodeNotFoundMessage.value = "";
 
     if (!query || !branchId || props.selectorMode) {
       remoteSearchProducts.value = [];
+      remoteSearchExactProductIds.value = [];
       searchLoading.value = false;
       return;
     }
@@ -1117,17 +1123,6 @@ function clearProductImageGallery() {
   selectedCartProduct.value = null;
 }
 
-function findExactProduct(query) {
-  const normalized = query.toLowerCase();
-
-  return filteredProducts.value.find((product) => {
-    if (String(product.barcode || "").trim().toLowerCase() === normalized) return true;
-    if (String(product.name || "").trim().toLowerCase() === normalized) return true;
-
-    return (product.barcodes || []).some((code) => String(code).trim().toLowerCase() === normalized);
-  });
-}
-
 async function fetchProductsForSearch(query, requestId = ++searchRequestId) {
   const term = String(query || "").trim();
   const branchId = selectedBranchId.value;
@@ -1145,6 +1140,7 @@ async function fetchProductsForSearch(query, requestId = ++searchRequestId) {
   if (cached && Date.now() - cached.createdAt < PRODUCT_SEARCH_CACHE_TTL_MS) {
     if (requestId === searchRequestId) {
       remoteSearchProducts.value = cached.products;
+      remoteSearchExactProductIds.value = cached.exactProductIds;
       searchLoading.value = false;
     }
 
@@ -1168,15 +1164,19 @@ async function fetchProductsForSearch(query, requestId = ++searchRequestId) {
       .then(({ data }) => {
         if (!Array.isArray(data?.products)) throw new Error("Respuesta de búsqueda inválida");
         const products = data.products;
+        const exactProductIds = Array.isArray(data?.search?.exact_product_ids)
+          ? data.search.exact_product_ids
+          : [];
 
         if (cacheVersion === productSearchCacheVersion) {
           productSearchCache.set(requestKey, {
             createdAt: Date.now(),
             products,
+            exactProductIds,
           });
         }
 
-        return products;
+        return { products, exactProductIds };
       });
 
     productSearchRequests.set(requestKey, request);
@@ -1199,18 +1199,20 @@ async function fetchProductsForSearch(query, requestId = ++searchRequestId) {
   }
 
   try {
-    const products = await request;
+    const result = await request;
 
     if (requestId !== searchRequestId) {
       return remoteSearchProducts.value;
     }
 
-    remoteSearchProducts.value = products;
+    remoteSearchProducts.value = result.products;
+    remoteSearchExactProductIds.value = result.exactProductIds;
 
-    return products;
+    return result.products;
   } catch (error) {
     if (requestId === searchRequestId) {
       remoteSearchProducts.value = [];
+      remoteSearchExactProductIds.value = [];
       searchError.value = !navigator.onLine ? "Sin conexión."
         : error.code === "ECONNABORTED" || error.code === "ETIMEDOUT" ? "La búsqueda tardó demasiado."
         : "No se pudo completar la búsqueda.";
@@ -1264,18 +1266,33 @@ async function handleSearchKeydown(event) {
 
   event.preventDefault();
 
+  const query = search.value.trim();
+  if (!query) {
+    openPaymentModal();
+    return;
+  }
+
+  const selectionBeforeSearch = resolveProductSearchSelection(
+    query,
+    filteredProducts.value,
+    remoteSearchExactProductIds.value,
+  );
+  if (selectionBeforeSearch.canAutoSelect) {
+    addProduct(selectionBeforeSearch.exactProduct);
+    return;
+  }
+
+  if (selectionBeforeSearch.isBarcodeQuery && searchSuggestions.value.length) {
+    barcodeNotFoundMessage.value = "Código no registrado. Revisa las coincidencias sugeridas antes de agregarlas.";
+    return;
+  }
+
   if (searchSuggestions.value.length) {
     selectSuggestion(
       searchSuggestions.value[
         Math.min(highlightedSuggestionIndex.value, searchSuggestions.value.length - 1)
       ]
     );
-    return;
-  }
-
-  const query = search.value.trim();
-  if (!query) {
-    openPaymentModal();
     return;
   }
 
@@ -1284,18 +1301,27 @@ async function handleSearchKeydown(event) {
   await fetchProductsForSearch(query, requestId);
   if (requestId !== searchRequestId || searchError.value) return;
 
+  const selection = resolveProductSearchSelection(
+    query,
+    filteredProducts.value,
+    remoteSearchExactProductIds.value,
+  );
+  if (selection.canAutoSelect) {
+    addProduct(selection.exactProduct);
+    return;
+  }
+
+  if (selection.isBarcodeQuery) {
+    barcodeNotFoundMessage.value = "Código no registrado. Revisa las coincidencias sugeridas antes de agregarlas.";
+    return;
+  }
+
   if (searchSuggestions.value.length) {
     selectSuggestion(
       searchSuggestions.value[
         Math.min(highlightedSuggestionIndex.value, searchSuggestions.value.length - 1)
       ]
     );
-    return;
-  }
-
-  const exact = findExactProduct(query);
-  if (exact) {
-    addProduct(exact);
     return;
   }
 
@@ -1959,11 +1985,19 @@ function closeChangeModal() {
                   class="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 overflow-hidden rounded-2xl border border-secondary bg-background shadow-xl"
                 >
                   <div
+                    v-if="barcodeNotFoundMessage"
+                    role="status"
+                    class="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900"
+                  >
+                    {{ barcodeNotFoundMessage }}
+                  </div>
+
+                  <div
                     v-if="!searchSuggestions.length"
                     role="status"
                     class="px-4 py-3 text-base font-semibold text-text opacity-70"
                   >
-                    {{ searchLoading ? 'Buscando…' : searchError || 'Sin coincidencias.' }}
+                    {{ searchLoading ? 'Buscando…' : searchError || barcodeNotFoundMessage || 'Sin coincidencias.' }}
                     <button v-if="searchError" type="button" class="ml-2 font-semibold underline"
                       @click="fetchProductsForSearch(search)">Reintentar</button>
                   </div>
