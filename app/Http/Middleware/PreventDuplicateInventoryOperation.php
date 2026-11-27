@@ -66,6 +66,11 @@ class PreventDuplicateInventoryOperation
                     foreach (json_decode($operation->flash_payload ?? '{}', true, 512, JSON_THROW_ON_ERROR) as $name => $value) {
                         if ($request->hasSession()) {
                             $request->session()->flash($name, $value);
+                            if ($name === 'movement_id' && $request->routeIs('inventory.stock-movements.store')) {
+                                $request->session()->flash('movement_receipt', [
+                                    'id' => $value, 'key' => $request->header('Idempotency-Key'),
+                                ]);
+                            }
                         }
                     }
 

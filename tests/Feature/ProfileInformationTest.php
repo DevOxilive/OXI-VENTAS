@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -10,6 +13,24 @@ use Tests\TestCase;
 class ProfileInformationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_registering_shared_props_does_not_read_unused_navigation_data(): void
+    {
+        $user = User::factory()->create()->fresh();
+        $request = Request::create('/user/profile');
+        $request->setUserResolver(fn () => $user);
+        DB::enableQueryLog();
+        try {
+            $props = app(HandleInertiaRequests::class)->share($request);
+            $this->assertCount(0, DB::getQueryLog());
+            $branches = $props['branches']();
+            DB::flushQueryLog();
+            $this->assertSame($branches, $props['sidebarBranches']());
+            $this->assertCount(0, DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+        }
+    }
 
     public function test_profile_only_shows_the_assigned_information(): void
     {

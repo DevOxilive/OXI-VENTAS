@@ -303,6 +303,7 @@ class SalesController extends Controller
                 onlyActiveProducts: true,
                 onlyActiveBranchProducts: true,
                 limit: 50,
+                prefilterTextCandidates: true,
             ),
         );
 

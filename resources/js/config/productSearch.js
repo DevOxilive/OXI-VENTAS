@@ -1,0 +1,1 @@
+export const PRODUCT_SEARCH_TIMEOUT_MS = 15_000;

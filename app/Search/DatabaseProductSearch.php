@@ -21,7 +21,7 @@ class DatabaseProductSearch
             return collect();
         }
 
-        if ($options->inventorySqlPrefilter) {
+        if ($options->inventorySqlPrefilter || $options->prefilterTextCandidates) {
             $prefilter = app(InventoryProductSqlPrefilter::class);
             if ($prefilter->supportsConnection((new Product)->getConnection())) {
                 return $this->inventoryIds($queryTerms, $options, $prefilter);

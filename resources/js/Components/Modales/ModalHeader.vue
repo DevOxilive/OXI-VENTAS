@@ -32,7 +32,7 @@ defineEmits(['close', 'select-section'])
 </script>
 
 <template>
-    <header class="sticky top-0 z-10 border-b border-secondary bg-background px-5 py-4 md:px-8 md:py-5">
+    <header class="sticky top-0 z-10 bg-background px-5 py-4 md:px-8 md:py-5">
         <div class="flex items-center justify-between gap-4">
             <div class="min-w-0">
                 <h2 class="text-lg font-bold text-text md:text-2xl">
