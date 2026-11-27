@@ -21,6 +21,7 @@ use App\Models\SaleDetail;
 use App\Models\StockMovement;
 use App\Models\TicketTemplate;
 use App\Support\VisualPrintLayout;
+use App\Support\HalfPesoRounding;
 use App\Models\User;
 use App\Search\ProductSearchOptions;
 use App\Search\ProductSearchService;
@@ -491,7 +492,12 @@ class SalesController extends Controller
                     ]);
                 }
 
-                $subtotal = round($quantity * $unitPrice, 2);
+                $calculatedSubtotal = round($quantity * $unitPrice, 2);
+                $usesWeightRounding = $presentation === 'piece' && $isKilogram;
+                $subtotal = $usesWeightRounding
+                    ? HalfPesoRounding::apply($calculatedSubtotal)
+                    : $calculatedSubtotal;
+                $roundingAdjustment = round($subtotal - $calculatedSubtotal, 2);
                 $total += $subtotal;
 
                 $saleDetail = SaleDetail::create([
@@ -511,6 +517,8 @@ class SalesController extends Controller
                         ? ($product?->cost_per_box ?? 0)
                         : ($presentation === 'package' ? ($product?->cost_per_package ?? 0) : ($product?->cost_per_piece ?? $product?->cost ?? 0)),
                     'subtotal' => $subtotal,
+                    'calculated_subtotal' => $calculatedSubtotal,
+                    'rounding_adjustment' => $roundingAdjustment,
                 ]);
 
                 $stockService->move(

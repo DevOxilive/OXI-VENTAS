@@ -15,6 +15,7 @@ use App\Models\SaleDetail;
 use App\Models\StockMovement;
 use App\Models\StockMovementBatch;
 use App\Models\User;
+use App\Support\HalfPesoRounding;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -250,6 +251,15 @@ class SaleCancellationService
                 throw ValidationException::withMessages(['items' => 'La venta no tiene el movimiento de inventario vinculado para devolver '.$detail->product?->name.'.']);
             }
 
+            $previousReturnedSubtotal = (float) $detail->activeCancellationDetails->sum('subtotal');
+            $isFullRemainingReturn = abs($quantity - $remainingQuantity) <= 0.000001;
+            $calculatedSubtotal = round($quantity * (float) $detail->unit_price, 2);
+            $subtotal = $isFullRemainingReturn
+                ? round((float) $detail->subtotal - $previousReturnedSubtotal, 2)
+                : ($detail->sale_unit === 'piece' && $isKilogram
+                    ? HalfPesoRounding::apply($calculatedSubtotal)
+                    : $calculatedSubtotal);
+
             return [
                 'detail' => $detail,
                 'branch_product' => $branchProduct,
@@ -258,7 +268,7 @@ class SaleCancellationService
                 'base_quantity' => $detail->sale_unit === 'box'
                     ? $quantity * (float) $detail->pieces_per_box
                     : $quantity,
-                'subtotal' => round($quantity * (float) $detail->unit_price, 2),
+                'subtotal' => $subtotal,
             ];
         })->values();
     }

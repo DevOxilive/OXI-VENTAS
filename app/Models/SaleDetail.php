@@ -21,6 +21,8 @@ class SaleDetail extends Model
         'unit_price',
         'unit_cost',
         'subtotal',
+        'calculated_subtotal',
+        'rounding_adjustment',
     ];
 
     protected $casts = [
@@ -33,6 +35,8 @@ class SaleDetail extends Model
         'unit_price' => 'decimal:2',
         'unit_cost' => 'decimal:4',
         'subtotal' => 'decimal:2',
+        'calculated_subtotal' => 'decimal:2',
+        'rounding_adjustment' => 'decimal:2',
     ];
 
     public function sale()

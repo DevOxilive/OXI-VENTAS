@@ -33,6 +33,16 @@ function openImageGallery() {
   if (!props.item.image && !(props.item.images?.length)) return
   emit("view-images", props.item)
 }
+
+function calculatedBulkSubtotal() {
+  return Number((props.cartItemUnitPrice(props.item) * Number(props.item.quantity || 0)).toFixed(2))
+}
+
+function hasBulkRounding() {
+  return props.item.presentation === 'piece'
+    && props.item.inventory_unit === 'kg'
+    && calculatedBulkSubtotal() !== props.cartItemSubtotal(props.item)
+}
 </script>
 
 <template>
@@ -110,7 +120,9 @@ function openImageGallery() {
           <del v-if="item.discount_enabled && Number(item.discount_percentage || 0) > 0" class="text-xs font-normal opacity-50" title="Precio antes del descuento">
             {{ formatMoney(item.original_price || item.price || 0) }}
           </del>
-          <span title="Precio final">{{ formatMoney(cartItemUnitPrice(item)) }}</span>
+          <span title="Precio final">
+            {{ formatMoney(cartItemUnitPrice(item)) }}<span v-if="item.presentation === 'piece' && item.inventory_unit === 'kg'" class="ml-0.5 text-xs font-normal opacity-70">/kg</span>
+          </span>
         </p>
       </div>
 
@@ -130,6 +142,9 @@ function openImageGallery() {
           @increase="$emit('increase')"
           @update="$emit('update-quantity', $event)"
         />
+        <p v-if="item.presentation === 'piece' && item.inventory_unit === 'kg'" class="mt-1 text-xs font-medium text-text opacity-65">
+          Peso: {{ formatInventoryQuantityWithUnit(item.quantity, 'kg') }}
+        </p>
       </div>
 
       <div class="rounded-lg bg-background px-3 py-2 md:bg-transparent md:px-0 md:py-0">
@@ -141,6 +156,9 @@ function openImageGallery() {
             {{ formatMoney(Number(item.original_price || item.price || 0) * Number(item.quantity || 0)) }}
           </del>
           <span title="Importe final">{{ formatMoney(cartItemSubtotal(item)) }}</span>
+        </p>
+        <p v-if="hasBulkRounding()" class="mt-1 text-xs font-medium text-text opacity-65">
+          Cálculo {{ formatMoney(calculatedBulkSubtotal()) }} → redondeado {{ formatMoney(cartItemSubtotal(item)) }}
         </p>
       </div>
 

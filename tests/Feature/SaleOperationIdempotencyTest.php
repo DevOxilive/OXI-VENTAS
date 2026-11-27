@@ -96,6 +96,36 @@ class SaleOperationIdempotencyTest extends TestCase
         $this->assertDatabaseCount('sale_operations', 0);
     }
 
+    public function test_bulk_sales_are_rounded_to_the_nearest_half_peso_without_changing_weight(): void
+    {
+        $this->branchProduct->product->update([
+            'unit' => 'kg',
+            'inventory_unit' => 'kg',
+            'sale_price' => 91.24,
+            'sale_price_per_piece' => 91.24,
+        ]);
+
+        $this->postJson(route('ventas.store'), [
+            'branch_id' => $this->branch->id,
+            'payment_method_id' => $this->paymentMethod->id,
+            'cash_received' => 20,
+            'items' => [[
+                'branch_product_id' => $this->branchProduct->id,
+                'product_id' => $this->branchProduct->product_id,
+                'quantity' => 0.113,
+                'presentation' => 'piece',
+                'unit_price' => 0,
+            ]],
+        ])->assertSuccessful();
+
+        $detail = Sale::latest('id')->firstOrFail()->details()->firstOrFail();
+
+        $this->assertSame('0.113', $detail->quantity);
+        $this->assertSame('10.31', $detail->calculated_subtotal);
+        $this->assertSame('0.19', $detail->rounding_adjustment);
+        $this->assertSame('10.50', $detail->subtotal);
+    }
+
     private function payload(int $quantity = 1, float $cashReceived = 100): array
     {
         return [

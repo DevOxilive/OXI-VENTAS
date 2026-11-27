@@ -770,7 +770,12 @@ function cartItemDiscountAmount(item) {
 }
 
 function cartItemSubtotal(item) {
-  return Number((cartItemUnitPrice(item) * Number(item.quantity || 0)).toFixed(2));
+  const calculatedSubtotal = Number((cartItemUnitPrice(item) * Number(item.quantity || 0)).toFixed(2));
+
+  if (item.presentation !== "piece" || item.inventory_unit !== "kg") return calculatedSubtotal;
+
+  const cents = Math.round(calculatedSubtotal * 100);
+  return Math.floor((cents + 25) / 50) * 50 / 100;
 }
 
 function clonePendingSaleItems(items = []) {
