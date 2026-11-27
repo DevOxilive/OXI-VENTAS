@@ -134,6 +134,9 @@ const {
     hasPagination,
     visualProducts,
     filteredProducts,
+    searchPending,
+    searchError,
+    reloadInventory,
     inventoryPagination,
     movementLoading,
     historyError,
@@ -381,13 +384,18 @@ function closeProductEditModal() {
 
                 <GlobalToolbar ref="inventoryToolbar" v-bind="inventoryToolbarConfig" :search="search" :records-per-page="recordsToShow"
                     @keydown="handleSearchEnter($event, inventoryToolbarConfig.searchPlaceholder)"
-                    :filtered-records="filteredProducts.length" :total-records="visualProducts.length"
+                    :filtered-records="searchPending || searchError ? 0 : filteredProducts.length" :total-records="searchPending || searchError ? 0 : visualProducts.length"
                     @update:search="search = $event" @update:filter="handleInventoryToolbarFilter"
                     @update:records-per-page="recordsToShow = $event" @action="handleInventoryToolbarAction" />
             </div>
         </template>
 
-        <GlobalTable :items="filteredProducts" v-bind="inventoryTableConfig" :columns="inventoryColumns" :pagination="inventoryPagination"
+        <div v-if="searchPending || searchError || (search.trim() && !filteredProducts.length)"
+            role="status" class="rounded-xl border border-secondary p-4 text-center text-text">
+            {{ searchPending ? 'Buscando…' : searchError || 'Sin coincidencias.' }}
+            <button v-if="searchError" type="button" class="ml-2 font-semibold underline" @click="reloadInventory">Reintentar</button>
+        </div>
+        <GlobalTable v-else :items="filteredProducts" v-bind="inventoryTableConfig" :columns="inventoryColumns" :pagination="inventoryPagination"
             @page-change="goToPage" @action="handleInventoryAction" />
 
         <StockEntryModal v-if="showEntryModal && liveSelectedMovementProduct && can('inventory.branches.stock-in')"

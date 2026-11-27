@@ -9,6 +9,7 @@ use App\Models\BranchProduct;
 use App\Models\Category;
 use App\Models\ProductBatch;
 use App\Models\ProductDepartment;
+use App\Models\StockMovement;
 use App\Search\ProductSearchOptions;
 use App\Search\ProductSearchService;
 use App\Services\InventoryBackgroundContext;
@@ -336,7 +337,7 @@ class BranchInventoryController extends Controller
         $branch = Branch::query()->findOrFail($validated['branch_id']);
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
-        app(InventoryBackgroundContext::class)->run(fn () => DB::transaction(function () use ($validated) {
+        app(InventoryBackgroundContext::class)->run(fn () => DB::transaction(function () use ($validated, $request) {
             $branchProduct = BranchProduct::create([
                 'branch_id' => $validated['branch_id'],
                 'product_id' => $validated['product_id'],
@@ -346,6 +347,19 @@ class BranchInventoryController extends Controller
                 'last_restocked_at' => null,
                 'inactive_candidate_after_days' => 90,
             ]);
+
+            if ((float) $branchProduct->stock !== 0.0) {
+                $branchProduct->movements()->create([
+                    'type' => StockMovement::TYPE_ADJUSTMENT,
+                    'reason' => StockMovement::REASON_INVENTORY_DIFFERENCE,
+                    'quantity' => $branchProduct->stock,
+                    'previous_stock' => 0,
+                    'new_stock' => $branchProduct->stock,
+                    'unit_cost' => $branchProduct->product?->cost_per_piece ?? $branchProduct->product?->cost ?? 0,
+                    'user_id' => $request->user()->id,
+                    'notes' => 'Saldo inicial al asignar el producto a la sucursal.',
+                ]);
+            }
 
             app(InventoryOutbox::class)->stockChanged(
                 $branchProduct, 'asigno', 'el producto a una sucursal', 'assigned',

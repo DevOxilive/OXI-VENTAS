@@ -102,6 +102,7 @@ let unsubscribeTrashRealtime = null
 
 function itemUnitLabel(item) {
     if (item.presentation === "box") return "cajas";
+    if (item.presentation === "package") return "paquetes";
     if (item.presentation === "kilo") return "kg";
 
     return "piezas";
@@ -380,10 +381,12 @@ function selectBranch(branchId) {
                                     />
                                 </div>
 
-                                <div class="mt-2 flex items-center justify-between gap-2 border-t border-secondary pt-2">
+                                <div class="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-secondary pt-2">
                                     <PresentationSwitch
-                                        v-if="item.has_box_presentation"
+                                        v-if="item.has_box_presentation || item.has_package_presentation"
                                         :model-value="item.presentation"
+                                        :box-enabled="item.has_box_presentation"
+                                        :package-enabled="item.has_package_presentation"
                                         @change="report.setPresentation(item.branch_product_id, $event)"
                                     />
                                     <span

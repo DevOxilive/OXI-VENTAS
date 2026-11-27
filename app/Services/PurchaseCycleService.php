@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Branch;
+use App\Models\BranchProduct;
 use App\Models\GeneralPurchaseOrder;
 use App\Models\GeneralPurchaseOrderItem;
 use App\Models\Product;
@@ -45,6 +46,7 @@ class PurchaseCycleService
 
             $branchIds = Branch::query()
                 ->where('active', true)
+                ->where('is_central_warehouse', false)
                 ->orderBy('id')
                 ->pluck('id');
 
@@ -144,6 +146,24 @@ class PurchaseCycleService
                 }
 
                 $this->applyCapture($item, $input);
+                $item->update(['physically_reviewed' => (bool) ($input['physically_reviewed'] ?? false)]);
+                $this->syncPlannedBatches($item, $input);
+                $plan = collect($input['branch_allocations'] ?? []);
+                // La compra central puede repartir a cualquier sucursal activa.
+                // Las solicitudes originales siguen siendo la sugerencia, no una
+                // restricción que impida surtir otra tienda.
+                $permitted = Branch::query()->where('active', true)->pluck('id')->map(fn ($id) => (int) $id);
+                if ($plan->isNotEmpty()) {
+                    $ids = $plan->pluck('branch_id')->map(fn ($id) => (int) $id);
+                    $invalid = $ids->unique()->count() !== $ids->count()
+                        || $ids->contains(fn ($id) => ! $permitted->contains($id))
+                        || abs((float) $plan->sum('quantity') - (float) $item->purchased_quantity) > 0.0009
+                        || ($item->base_unit !== 'kg' && $plan->contains(fn ($row) => abs($row['quantity'] - round($row['quantity'])) > 0.0009));
+                    if ($invalid) {
+                        throw ValidationException::withMessages(['items' => "Revisa la distribución de {$item->product_name}: debe coincidir con la compra y sus sucursales."]);
+                    }
+                }
+                $item->update(['branch_allocations' => $plan->values()->all()]);
             });
 
             $this->refreshGeneralTotals($order, $payload);
@@ -157,6 +177,7 @@ class PurchaseCycleService
         return DB::transaction(function () use ($order, $payload, $user) {
             $order = $this->saveCapture($order, $payload);
             $order->load('items');
+            $this->syncCentralWarehouseOrder($order);
             PurchaseOrder::query()
                 ->where('general_purchase_order_id', $order->id)
                 ->orderBy('id')
@@ -165,14 +186,28 @@ class PurchaseCycleService
             $order->load('branchOrders.items');
 
             $invalidItem = $order->items->first(fn (GeneralPurchaseOrderItem $item) => ! $item->unavailable
-                && ((float) $item->package_quantity <= 0
+                && (! $item->physically_reviewed
+                    || empty($item->branch_allocations)
+                    || ! $item->plannedBatches()->exists()
+                    || (float) $item->package_quantity <= 0
                     || ($item->purchase_presentation === 'Caja' && (float) $item->units_per_package <= 0)
                     || (float) $item->purchase_price <= 0)
             );
 
             if ($invalidItem) {
                 throw ValidationException::withMessages([
-                    'items' => "Completa la cantidad y el precio de compra de {$invalidItem->product_name}.",
+                    'items' => "Revisa físicamente y completa cantidad, precio, lotes y distribución de {$invalidItem->product_name}.",
+                ]);
+            }
+
+            $incompleteBatchItem = $order->items->first(function (GeneralPurchaseOrderItem $item) {
+                if ($item->unavailable || ! $item->plannedBatches()->exists()) return false;
+
+                return abs((float) $item->plannedBatches()->sum('presentation_quantity') - (float) $item->package_quantity) > 0.0009;
+            });
+            if ($incompleteBatchItem) {
+                throw ValidationException::withMessages([
+                    'items' => "Completa la cantidad de lotes de {$incompleteBatchItem->product_name}.",
                 ]);
             }
 
@@ -252,6 +287,8 @@ class PurchaseCycleService
             $remainingQuantity = round((float) $generalItem->purchased_quantity, 2);
             $unitCost = round((float) $generalItem->net_unit_cost, 4);
             $lastIndex = $allocations->count() - 1;
+            $planned = collect($generalItem->branch_allocations ?? [])->keyBy('branch_id');
+            $branchRemaining = $planned->map(fn ($row) => (float) $row['quantity'])->all();
 
             foreach ($allocations as $index => $allocation) {
                 /** @var PurchaseOrderItem $branchItem */
@@ -262,9 +299,21 @@ class PurchaseCycleService
                 $allocatedQuantity = $isLast
                     ? $remainingQuantity
                     : round((float) $generalItem->purchased_quantity * $ratio, 2);
+                if ($planned->isNotEmpty()) {
+                    $branchId = $allocation['order']->branch_id;
+                    $sameBranch = $allocations->filter(fn ($row) => $row['order']->branch_id === $branchId);
+                    $lastForBranch = $sameBranch->last()['item']->id === $branchItem->id;
+                    $branchRequested = max(0.001, (float) $sameBranch->sum(fn ($row) => $row['item']->requested_quantity));
+                    $plannedQuantity = (float) ($planned->get($branchId)['quantity'] ?? 0);
+                    $share = $plannedQuantity * (float) $branchItem->requested_quantity / $branchRequested;
+                    $branchRemaining[$branchId] ??= $plannedQuantity;
+                    $allocatedQuantity = $lastForBranch ? $branchRemaining[$branchId]
+                        : min($branchRemaining[$branchId], $generalItem->base_unit === 'kg' ? floor($share * 1000) / 1000 : floor($share));
+                    $branchRemaining[$branchId] = round($branchRemaining[$branchId] - $allocatedQuantity, 3);
+                }
                 $branchItem->update([
                     'purchased_quantity' => $allocatedQuantity,
-                    'received_quantity' => $allocatedQuantity,
+                    'received_quantity' => null,
                     'actual_price' => $unitCost,
                     'discount_amount' => 0,
                     'actual_total' => round($allocatedQuantity * $unitCost, 2),
@@ -275,6 +324,75 @@ class PurchaseCycleService
 
                 $remainingQuantity = round($remainingQuantity - $allocatedQuantity, 2);
             }
+        }
+    }
+
+    private function syncCentralWarehouseOrder(GeneralPurchaseOrder $order): void
+    {
+        $warehouse = Branch::query()
+            ->where('is_central_warehouse', true)
+            ->where('active', true)
+            ->first();
+
+        if (! $warehouse) return;
+
+        $items = $order->items->map(function (GeneralPurchaseOrderItem $item) use ($warehouse) {
+            $allocation = collect($item->branch_allocations ?? [])
+                ->first(fn (array $row) => (int) ($row['branch_id'] ?? 0) === (int) $warehouse->id);
+
+            return [
+                'item' => $item,
+                'quantity' => round((float) ($allocation['quantity'] ?? 0), 3),
+            ];
+        })->filter(fn (array $row) => $row['quantity'] > 0)->values();
+
+        if ($items->isEmpty()) return;
+
+        $centralOrder = PurchaseOrder::query()->firstOrCreate(
+            [
+                'general_purchase_order_id' => $order->id,
+                'branch_id' => $warehouse->id,
+            ],
+            [
+                'purchase_cycle_id' => $order->purchase_cycle_id,
+                'user_id' => $order->created_by,
+                'folio' => "ALM-{$order->folio}",
+                'source' => PurchaseOrder::SOURCE_CENTRAL,
+                'status' => PurchaseOrder::STATUS_REVIEW,
+                'review_status' => PurchaseOrder::REVIEW_PENDING,
+                'generated_at' => now(),
+                'purchased_at' => $order->purchased_at,
+            ],
+        );
+
+        foreach ($items as ['item' => $generalItem, 'quantity' => $quantity]) {
+            $branchProduct = BranchProduct::query()->firstOrCreate(
+                [
+                    'branch_id' => $warehouse->id,
+                    'product_id' => $generalItem->product_id,
+                ],
+                [
+                    'stock' => 0,
+                    'min_stock' => 0,
+                    'status' => BranchProduct::STATUS_ACTIVE,
+                ],
+            );
+
+            $centralOrder->items()->updateOrCreate(
+                ['product_id' => $generalItem->product_id],
+                [
+                    'branch_product_id' => $branchProduct->id,
+                    'current_stock' => $branchProduct->stock,
+                    'min_stock' => $branchProduct->min_stock,
+                    'requested_quantity' => $quantity,
+                    'purchase_presentation' => $generalItem->purchase_presentation,
+                    'package_quantity' => $generalItem->package_quantity,
+                    'units_per_package' => $generalItem->units_per_package,
+                    'estimated_price' => $generalItem->purchase_price,
+                    'estimated_total' => round($quantity * (float) $generalItem->net_unit_cost, 2),
+                    'status' => PurchaseOrderItem::STATUS_REQUESTED,
+                ],
+            );
         }
     }
 
@@ -301,7 +419,12 @@ class PurchaseCycleService
                 continue;
             }
 
-            $pieceCost = (float) $item->purchase_price;
+            if ($item->purchase_presentation === 'Paquete') {
+                $product->update(['cost_per_package' => (float) $item->purchase_price]);
+                continue;
+            }
+
+            $pieceCost = (float) ($item->net_unit_cost ?: $item->purchase_price);
             $prices = [
                 'cost_per_piece' => $pieceCost,
                 'cost' => $pieceCost,
@@ -369,7 +492,9 @@ class PurchaseCycleService
             }
 
             $user->loadMissing('role');
-            $accessibleBranchIds = collect($user->accessibleBranchIds());
+            $accessibleBranchIds = $user->hasPermission('inventory.purchase-orders.general.create')
+                ? Branch::query()->where('active', true)->pluck('id')
+                : collect($user->accessibleBranchIds());
             foreach ($orders as $branchOrder) {
                 $belongsToThisDraft = (int) $branchOrder->general_purchase_order_id === (int) $draft->id;
 
@@ -482,12 +607,18 @@ class PurchaseCycleService
             ->unique()
             ->values();
         $purchasePresentation = $inventoryUnit === 'kg'
-            ? 'Kilo'
-            : ($presentations->count() === 1 && $presentations->first() === 'Caja' ? 'Caja' : 'Pieza');
-        $unitsPerPackage = $purchasePresentation === 'Caja'
-            ? max(1, (int) $product?->pieces_per_box)
-            : 1;
-        $packageQuantity = $purchasePresentation === 'Caja'
+            ? ($presentations->count() === 1 && $presentations->first() === 'Gramo' ? 'Gramo' : 'Kilo')
+            : match ($presentations->count() === 1 ? $presentations->first() : null) {
+                'Caja' => 'Caja',
+                'Paquete' => 'Paquete',
+                default => 'Pieza',
+            };
+        $unitsPerPackage = match ($purchasePresentation) {
+            'Caja' => max(1, (int) $product?->pieces_per_box),
+            'Paquete' => max(1, (int) $product?->pieces_per_package),
+            default => 1,
+        };
+        $packageQuantity = in_array($purchasePresentation, ['Caja', 'Paquete', 'Gramo'], true)
             ? (float) $items->sum('package_quantity')
             : $requestedQuantity;
 
@@ -524,11 +655,11 @@ class PurchaseCycleService
         $presentation = (string) ($input['purchase_presentation'] ?? 'Pieza');
         $inventoryUnit = $product->inventory_unit ?? $product->unit ?? 'pza';
 
-        if ($inventoryUnit === 'kg' && $presentation !== 'Kilo') {
-            throw ValidationException::withMessages(['items' => "{$product->name} debe comprarse en kilogramos."]);
+        if ($inventoryUnit === 'kg' && ! in_array($presentation, ['Kilo', 'Gramo'], true)) {
+            throw ValidationException::withMessages(['items' => "{$product->name} debe comprarse en kilos o gramos."]);
         }
 
-        if ($inventoryUnit !== 'kg' && ! in_array($presentation, ['Pieza', 'Caja'], true)) {
+        if ($inventoryUnit !== 'kg' && ! in_array($presentation, ['Pieza', 'Paquete', 'Caja'], true)) {
             throw ValidationException::withMessages(['items' => "La presentación de {$product->name} no es válida."]);
         }
 
@@ -536,20 +667,30 @@ class PurchaseCycleService
             throw ValidationException::withMessages(['items' => "{$product->name} no tiene una caja configurada."]);
         }
 
+        if ($presentation === 'Paquete' && (! $product->has_package_presentation || (int) $product->pieces_per_package < 2)) {
+            throw ValidationException::withMessages(['items' => "{$product->name} no tiene un paquete configurado."]);
+        }
+
         $packageQuantity = $unavailable ? 0 : (float) ($input['package_quantity'] ?? 0);
         $unitsPerPackage = $unavailable
             ? 0
-            : ($presentation === 'Caja' ? (int) $product->pieces_per_box : 1);
+            : match ($presentation) {
+                'Caja' => (int) $product->pieces_per_box,
+                'Paquete' => (int) $product->pieces_per_package,
+                default => 1,
+            };
 
         if ($presentation !== 'Kilo' && abs($packageQuantity - round($packageQuantity)) > 0.0000001) {
-            throw ValidationException::withMessages(['items' => 'Las piezas y cajas deben capturarse en cantidades enteras.']);
+            throw ValidationException::withMessages(['items' => 'Las piezas, paquetes, cajas y gramos deben capturarse en cantidades enteras.']);
         }
 
         if ($presentation === 'Kilo') {
             $packageQuantity = round($packageQuantity, 3);
         }
         $purchasePrice = $unavailable ? 0 : (float) ($input['purchase_price'] ?? 0);
-        $purchasedQuantity = $packageQuantity * $unitsPerPackage;
+        $purchasedQuantity = $presentation === 'Gramo'
+            ? $packageQuantity / 1000
+            : $packageQuantity * $unitsPerPackage;
         $grossTotal = $packageQuantity * $purchasePrice;
         $discountAmount = $unavailable ? 0 : (float) ($input['discount_amount'] ?? 0);
         $actualTotal = max(0, $grossTotal - $discountAmount);
@@ -567,6 +708,58 @@ class PurchaseCycleService
             'unavailable' => $unavailable,
             'purchase_notes' => $input['purchase_notes'] ?? null,
         ]);
+    }
+
+    private function syncPlannedBatches(GeneralPurchaseOrderItem $item, array $input): void
+    {
+        $batches = collect($input['batches'] ?? []);
+        $item->plannedBatches()->delete();
+
+        if ($item->unavailable || $batches->isEmpty()) {
+            return;
+        }
+
+        $presentationTotal = round((float) $batches->sum(fn (array $batch) => (float) ($batch['quantity'] ?? 0)), 3);
+        if ($presentationTotal - (float) $item->package_quantity > 0.0009) {
+            throw ValidationException::withMessages([
+                'items' => "Los lotes de {$item->product_name} superan la cantidad comprada.",
+            ]);
+        }
+
+        foreach ($batches as $batch) {
+            $presentationQuantity = round((float) $batch['quantity'], 3);
+            $baseQuantity = match ($item->purchase_presentation) {
+                'Gramo' => $presentationQuantity / 1000,
+                'Caja', 'Paquete' => $presentationQuantity * (float) $item->units_per_package,
+                default => $presentationQuantity,
+            };
+
+            $lotAllocations = collect($batch['allocations'] ?? []);
+            if ($lotAllocations->isNotEmpty()) {
+                $eligibleBranches = Branch::query()
+                    ->where('active', true)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+                if ($lotAllocations->pluck('branch_id')->unique()->count() !== $lotAllocations->count()
+                    || $lotAllocations->contains(fn ($row) => ! in_array((int) $row['branch_id'], $eligibleBranches)
+                        || ($item->base_unit !== 'kg' && abs($row['quantity'] - round($row['quantity'])) > 0.0009))
+                    || abs((float) $lotAllocations->sum('quantity') - $baseQuantity) > 0.0009) {
+                    throw ValidationException::withMessages(['items' => "Revisa la distribución del lote de {$item->product_name}."]);
+                }
+            }
+            $item->plannedBatches()->create([
+                'allocations' => $batch['allocations'] ?? [],
+                'supplier' => $batch['supplier'] ?? null,
+                'lot_number' => filled($batch['lot_number'] ?? null)
+                    ? mb_strtoupper(trim((string) $batch['lot_number']), 'UTF-8')
+                    : null,
+                'expiration_date' => $batch['expiration_date'] ?? null,
+                'purchase_presentation' => $item->purchase_presentation,
+                'presentation_quantity' => $presentationQuantity,
+                'base_quantity' => round($baseQuantity, 3),
+            ]);
+        }
     }
 
     private function refreshGeneralTotals(GeneralPurchaseOrder $order, array $payload): void

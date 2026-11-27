@@ -106,7 +106,9 @@ function renderCellContentFromValue(value, column, row) {
 
   if (column.format === 'badge') {
     const statusMap = column.formatOptions?.statusMap || {}
-    const color = column.formatOptions?.colorMap?.[value] || 'slate'
+    const color = column.formatOptions?.colorKey
+      ? (getNestedValue(row, column.formatOptions.colorKey) || 'slate')
+      : (column.formatOptions?.colorMap?.[value] || 'slate')
     const classes = getStatusClasses(value, statusMap, color)
 
     return {

@@ -16,7 +16,8 @@
         "dev:watch": "vite build --watch",
         "dev:tunnel": "node scripts/run-cloudflared.mjs",
         "dev:full": "npm run dev:prepare && concurrently --kill-others-on-fail -n meilisearch,laravel,reverb,vite -c yellow,blue,magenta,green \"npm run dev:meilisearch\" \"npm run dev:serve\" \"npm run dev:reverb\" \"npm run dev\"",
-        "dev:pwa": "node scripts/dev-full.mjs"
+        "dev:pwa": "node scripts/dev-full.mjs",
+        "dev:inventory": "node scripts/inventory-worker.mjs"
     },
     "devDependencies": {
         "@inertiajs/vue3": "^2.0",

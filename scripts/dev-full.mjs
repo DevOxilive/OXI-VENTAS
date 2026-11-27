@@ -106,6 +106,7 @@ if (await isPortAvailable(8080)) {
 }
 
 run('vite', npmCommand, npmRunArgs('dev:watch'));
+run('inventory', process.execPath, ['scripts/inventory-worker.mjs']);
 run('tunnel', npmCommand, npmRunArgs('dev:tunnel'));
 
 const stopChild = (child, signal) => {

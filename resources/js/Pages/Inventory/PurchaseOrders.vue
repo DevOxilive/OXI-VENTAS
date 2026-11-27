@@ -6,25 +6,21 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import PageLayout from '@/Layouts/PageLayout.vue'
 import GlobalToolbar from '@/Components/Toolbars/GlobalToolbar.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
-import FormPanel from '@/Components/Cards/FormPanel.vue'
-import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
+import GlobalSelect from '@/Components/Forms/GlobalSelect.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
+import { GlobalModal } from '@/Components/Modales'
 import GeneralPurchaseOrderModal from '@/Components/Inventory/PurchaseReports/GeneralPurchaseOrderModal.vue'
 import BranchPurchaseOrderModal from '@/Components/Inventory/PurchaseReports/BranchPurchaseOrderModal.vue'
-import PurchaseOrderTransferModal from '@/Components/Inventory/PurchaseReports/PurchaseOrderTransferModal.vue'
-import PurchaseOrderTransferHistoryModal from '@/Components/Inventory/PurchaseReports/PurchaseOrderTransferHistoryModal.vue'
 import PendingPurchaseOrderEditModal from '@/Components/Inventory/PurchaseReports/PendingPurchaseOrderEditModal.vue'
-import FloatingNotificationModal from '@/Components/Notifications/FloatingNotificationModal.vue'
 import { ErrorAlert } from '@/Components/Modales/UniversalActionModal'
 import { confirmModalAction, getModalRequestOptions } from '@/Components/Modales/useModalConfig'
 import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination'
 import { usePurchaseOrders } from '@/Composables/Inventory/usePurchaseOrders'
 import { usePermissions } from '@/Composables/usePermissions'
-import { useNotificationSeenState } from '@/Composables/useNotificationSeenState'
 import { getPurchaseOrdersTableConfig } from '@/config/TableConfigs/purchaseOrdersTableConfig'
 import { getGeneralPurchaseSourceOrdersTableConfig } from '@/config/TableConfigs/generalPurchaseSourceOrdersTableConfig'
 import { getPurchaseOrdersToolbarConfig } from '@/config/ToolbarConfigs/purchaseOrdersToolbarConfig'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime, subscribeRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
 
@@ -36,43 +32,118 @@ const props = defineProps({
         type: Object,
         default: () => ({ branches: [], orders: [], inventory_users: [], draft: null }),
     },
-    notificationSummary: { type: Object, default: () => ({ mode: 'inventory', count: 0, items: [] }) },
 })
 
 const page = usePage()
 const orders = usePurchaseOrders(props)
+const currentGeneration = ref(props.generation)
 const { can } = usePermissions()
 const { handlePageChange } = useGlobalTablePagination()
 const selectedOrder = ref(null)
 const selectedSourceOrder = ref(null)
-const transferOrder = ref(null)
-const transferHistoryOrder = ref(null)
 const editingSourceOrder = ref(null)
 const loadingSourceOrder = ref(false)
-const notificationPanelOpen = ref(false)
-const selectedOrderIds = ref([])
-const initialSelectedOrder = (props.generation?.orders ?? []).find((order) => selectedOrderIds.value.includes(Number(order.id)))
-const initialBranch = initialSelectedOrder?.branch_id
-    ?? (props.generation?.branches ?? []).find((branch) => Number(branch.orders_count) > 0)?.id
-    ?? props.generation?.branches?.[0]?.id
-    ?? null
-const selectedBranchId = ref(initialBranch ? Number(initialBranch) : null)
+const showInitialResponsibleModal = ref(false)
+const initialResponsibleChoice = ref('')
+const pendingApprovalOrder = ref(null)
+const selectedOrderIds = computed(() => currentGeneration.value?.preparation?.order_ids ?? [])
+const responsible = computed(() => currentGeneration.value?.preparation ?? {})
+const isResponsible = computed(() => Number(responsible.value.responsible_id) === Number(page.props.auth.user.id))
+const responsibleChoice = ref('')
+const eligibleInitialResponsibleUsers = computed(() => (currentGeneration.value?.inventory_users ?? [])
+    .filter((user) => (user.branch_ids ?? []).some((branchId) => Number(branchId) === Number(pendingApprovalOrder.value?.branch_id))))
+const canAssignResponsible = computed(() => can('inventory.purchase-orders.general.create')
+    && (!responsible.value.responsible_id || isResponsible.value))
+const openReview = ref(null)
+let reviewTimer = null
+let refreshTimer = null
+
+function preparationAction(action, order = null, responsibleId = null) {
+    router.put(route('inventory.branches.reports.purchase-orders.preparation', { branch: props.currentBranch.id }),
+        { action, order_id: order?.id, responsible_id: responsibleId }, { preserveScroll: true })
+}
+
+async function assignResponsible() {
+    const responsibleId = Number(responsibleChoice.value)
+    if (!responsibleId || responsibleId === Number(responsible.value.responsible_id)) return
+    const selectedUser = (currentGeneration.value?.inventory_users ?? []).find((user) => Number(user.id) === responsibleId)
+    const transfer = Boolean(responsible.value.responsible_id)
+    const result = await confirmModalAction({
+        mode: 'update',
+        entityName: 'responsable de compra',
+        title: transfer ? 'Pasar el mando' : 'Elegir responsable',
+        confirmText: transfer ? 'Pasar el mando' : 'Asignar responsable',
+        message: transfer
+            ? `${selectedUser?.name ?? 'La persona elegida'} quedará a cargo de crear la Compra central.`
+            : `${selectedUser?.name ?? 'La persona elegida'} quedará a cargo de esta Compra central.`,
+    })
+    if (!result.isConfirmed) return
+    preparationAction('assign', null, responsibleId)
+    responsibleChoice.value = ''
+}
+
+async function assignInitialResponsibleAndApprove() {
+    const responsibleId = Number(initialResponsibleChoice.value)
+    const order = pendingApprovalOrder.value
+    if (!responsibleId || !order) return
+
+    try {
+        await window.axios.put(
+            route('inventory.branches.reports.purchase-orders.preparation', { branch: props.currentBranch.id }),
+            { action: 'assign', responsible_id: responsibleId },
+        )
+        showInitialResponsibleModal.value = false
+        initialResponsibleChoice.value = ''
+        pendingApprovalOrder.value = null
+        await reviewSourceOrder(order, 'APPROVED', true)
+    } catch (error) {
+        ErrorAlert({
+            title: 'No se pudo elegir responsable',
+            message: error?.response?.data?.message || 'Actualiza la página e inténtalo de nuevo.',
+        })
+    }
+}
+
+function closeInitialResponsibleModal() {
+    showInitialResponsibleModal.value = false
+    initialResponsibleChoice.value = ''
+    pendingApprovalOrder.value = null
+}
+
+async function reviewPresence(open) {
+    if (!openReview.value) return
+    const order = openReview.value
+    await window.axios.put(route('inventory.branches.reports.purchase-orders.presence', { branch: order.branch_id, purchaseOrder: order.id }), { open }).catch(() => {})
+}
+
+watch([selectedSourceOrder, editingSourceOrder], ([viewing, editing]) => {
+    if (!viewing && !editing && openReview.value) {
+        reviewPresence(false)
+        openReview.value = null
+    }
+})
 const sourcePage = ref(1)
 const sourcePerPage = 10
 let unsubscribeOrderActivity = null
+let unsubscribePurchaseWorkflow = null
 
 const activeStatus = computed(() => orders.localFilters.value.status || 'GENERATE')
-const tableMode = computed(() => activeStatus.value === 'COMPLETED' ? 'history' : 'purchasing')
-const activeViewPermission = computed(() => activeStatus.value === 'COMPLETED'
-    ? 'inventory.purchase-orders.general.view'
-    : 'inventory.purchase-orders.general.view')
+const tableMode = computed(() => 'central')
+const activeViewPermission = computed(() => 'inventory.purchase-orders.general.view')
 const tableConfig = computed(() => getPurchaseOrdersTableConfig({
     mode: tableMode.value,
     viewPermission: activeViewPermission.value,
 }))
 const sourceTableConfig = getGeneralPurchaseSourceOrdersTableConfig()
-const allSourceRows = computed(() => (props.generation?.orders ?? [])
-    .filter((order) => Number(order.branch_id) === Number(selectedBranchId.value))
+const allSourceRows = computed(() => (currentGeneration.value?.orders ?? [])
+    .filter((order) => orders.localFilters.value.source_status === 'ALL'
+        || (order.review_status || 'PENDING') === orders.localFilters.value.source_status)
+    .filter((order) => {
+        const search = String(orders.localFilters.value.search || '').trim().toLocaleLowerCase()
+        if (!search) return true
+        return [order.folio, order.branch_name, order.requested_by_name]
+            .some((value) => String(value || '').toLocaleLowerCase().includes(search))
+    })
     .map((order) => ({
         ...order,
         selected: selectedOrderIds.value.includes(Number(order.id)),
@@ -101,85 +172,79 @@ const sourcePagination = computed(() => {
         })),
     }
 })
-const selectedSourceOrders = computed(() => (props.generation?.orders ?? [])
+const selectedSourceOrders = computed(() => (currentGeneration.value?.orders ?? [])
     .filter((order) => selectedOrderIds.value.includes(Number(order.id))))
 const selectedBranchesCount = computed(() => new Set(
     selectedSourceOrders.value.map((order) => Number(order.branch_id)),
 ).size)
 const canPrepareGeneralOrder = computed(() => can('inventory.purchase-orders.general.create')
+    && isResponsible.value
     && selectedSourceOrders.value.length > 0)
 const availableTabs = computed(() => [
-    can('inventory.purchase-orders.source.view') && { key: 'GENERATE', label: 'Solicitudes', icon: 'playlist_add' },
-    can('inventory.purchase-orders.general.view') && { key: 'PURCHASING', label: 'Compras centrales', icon: 'local_shipping' },
-    can('inventory.purchase-orders.general.view') && { key: 'COMPLETED', label: 'Cerradas', icon: 'task_alt' },
+    can('inventory.purchase-orders.source.view') && { key: 'GENERATE', label: 'Solicitudes de compra', icon: 'playlist_add' },
+    can('inventory.purchase-orders.general.view') && { key: 'CENTRAL', label: 'Compra Central', icon: 'local_shipping' },
 ].filter(Boolean))
-const notificationItems = computed(() => props.notificationSummary?.items ?? [])
-const notificationSeenStorageKey = computed(() => `purchase-orders:inventory:seen:${page.props.auth.user.id}`)
-const notificationDismissedStorageKey = computed(() => `purchase-orders:inventory:dismissed:${page.props.auth.user.id}`)
-const {
-    visibleItems: visibleNotificationItems,
-    unreadCount: notificationCount,
-    loadSeenNotifications,
-    loadDismissedNotifications,
-    markNotificationsSeen,
-    dismissNotification,
-} = useNotificationSeenState({
-    items: notificationItems,
-    storageKey: notificationSeenStorageKey,
-    dismissedStorageKey: notificationDismissedStorageKey,
-})
-const toolbarActions = computed(() => [
-    {
-        id: 'notifications',
-        label: 'Avisos',
-        icon: 'notifications',
-        variant: notificationCount.value ? 'amber' : 'slate',
-        badge: notificationCount.value || '',
-    },
-])
 const toolbarConfig = computed(() => getPurchaseOrdersToolbarConfig({
     filters: orders.localFilters.value,
     total: activeStatus.value === 'GENERATE'
-        ? Number(props.generation?.orders?.length ?? 0)
+        ? Number(allSourceRows.value.length)
         : Number(orders.pagination.value?.total ?? 0),
-    mode: 'view',
     tabs: availableTabs.value,
-    actions: toolbarActions.value,
 }))
 
-watch(() => props.generation?.orders, (availableOrders = []) => {
-    const availableIds = new Set(availableOrders.map((order) => Number(order.id)))
-    selectedOrderIds.value = selectedOrderIds.value.filter((orderId) => availableIds.has(Number(orderId)))
+watch(() => props.generation, (generation) => {
+    currentGeneration.value = generation
+})
 
-    if (!availableOrders.some((order) => Number(order.branch_id) === Number(selectedBranchId.value))) {
-        selectedBranchId.value = Number(
-            props.generation?.branches?.find((branch) => Number(branch.orders_count) > 0)?.id
-            ?? props.generation?.branches?.[0]?.id
-            ?? 0,
-        ) || null
-    }
-
+watch(() => currentGeneration.value?.orders, () => {
     const lastPage = Math.max(1, Math.ceil(allSourceRows.value.length / sourcePerPage))
     sourcePage.value = Math.min(sourcePage.value, lastPage)
 })
 
-onMounted(() => {
-    if (!page.props.auth?.user?.id) return
-    loadSeenNotifications()
-    loadDismissedNotifications()
+function refreshPurchaseWorkflow() {
+    return refreshRealtimeProps(page, ['generation'], {
+        onSuccess: (nextProps) => {
+            if (nextProps?.generation) currentGeneration.value = nextProps.generation
+        },
+    })
+}
 
+function refreshVisibleWorkflow() {
+    if (!document.hidden && activeStatus.value === 'GENERATE') refreshPurchaseWorkflow()
+}
+
+onMounted(() => {
+    reviewTimer = window.setInterval(() => reviewPresence(true), 25000)
+    refreshTimer = window.setInterval(refreshVisibleWorkflow, 3000)
+    window.addEventListener('focus', refreshVisibleWorkflow)
+    document.addEventListener('visibilitychange', refreshVisibleWorkflow)
+    if (!page.props.auth?.user?.id) return
     unsubscribeOrderActivity = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.activityLogged,
         (event) => {
             if (!['purchase_order_assigned', 'purchase_order_transferred'].includes(event?.action)) return
 
-            refreshRealtimeProps(page, ['generation', 'notificationSummary'])
+            refreshPurchaseWorkflow()
         },
+    )
+    unsubscribePurchaseWorkflow = subscribeRealtime(
+        REALTIME_CHANNELS.systems,
+        REALTIME_EVENTS.purchaseWorkflowChanged,
+        refreshPurchaseWorkflow,
     )
 })
 
-onBeforeUnmount(() => unsubscribeOrderActivity?.())
+onBeforeUnmount(() => {
+    unsubscribeOrderActivity?.()
+    unsubscribePurchaseWorkflow?.()
+    clearInterval(reviewTimer)
+    clearInterval(refreshTimer)
+    window.removeEventListener('focus', refreshVisibleWorkflow)
+    document.removeEventListener('visibilitychange', refreshVisibleWorkflow)
+    reviewPresence(false)
+})
+watch(() => [orders.localFilters.value.source_status, orders.localFilters.value.search], () => { sourcePage.value = 1 })
 
 async function openGeneralOrder(order) {
     if (!order?.id || orders.loadingOrder.value) return
@@ -205,6 +270,8 @@ async function openSourceOrder(order, edit = false) {
                 purchaseOrder: order.id,
             }),
         )
+        openReview.value = order
+        await reviewPresence(true)
         if (edit) {
             editingSourceOrder.value = data
             return
@@ -226,31 +293,13 @@ function updateStatus(status) {
     orders.localFilters.value.status = status
 }
 
-function selectBranch(branch) {
-    selectedBranchId.value = Number(branch.id)
-    sourcePage.value = 1
-}
-
-function addSourceOrder(order) {
-    const orderId = Number(order.id)
-    if (!selectedOrderIds.value.includes(orderId)) {
-        selectedOrderIds.value = [...selectedOrderIds.value, orderId]
-    }
-}
-
-function removeSourceOrder(order) {
-    selectedOrderIds.value = selectedOrderIds.value.filter((orderId) => Number(orderId) !== Number(order.id))
-}
-
 function handleSourceTableAction({ action, row }) {
     if (action === 'view') openSourceOrder(row)
     if (action === 'approve') reviewSourceOrder(row, 'APPROVED')
     if (action === 'reject') reviewSourceOrder(row, 'REJECTED')
-    if (action === 'transfer') transferOrder.value = row
     if (action === 'edit') openSourceOrder(row, true)
-    if (action === 'history') openTransferHistory(row)
-    if (action === 'add') addSourceOrder(row)
-    if (action === 'remove') removeSourceOrder(row)
+    if (action === 'reopen') reviewSourceOrder(row, 'PENDING')
+    if (action === 'delete') deleteSourceOrder(row)
 }
 
 function handleSourcePageChange(url) {
@@ -260,16 +309,25 @@ function handleSourcePageChange(url) {
     sourcePage.value = Math.max(1, Number(parsed.searchParams.get('source_page') || 1))
 }
 
-async function reviewSourceOrder(order, reviewStatus) {
+async function reviewSourceOrder(order, reviewStatus, responsibleJustAssigned = false) {
     const approved = reviewStatus === 'APPROVED'
+    const reopened = reviewStatus === 'PENDING'
+
+    if (approved && !responsible.value.responsible_id && !responsibleJustAssigned) {
+        pendingApprovalOrder.value = order
+        showInitialResponsibleModal.value = true
+        return
+    }
     const result = await confirmModalAction({
-        mode: approved ? 'update' : 'delete',
+        mode: reopened || approved ? 'update' : 'delete',
         entityName: 'solicitud de compra',
-        title: approved ? `Aceptar ${order.folio}` : `Rechazar ${order.folio}`,
-        confirmText: approved ? 'Aceptar solicitud' : 'Rechazar solicitud',
-        message: approved
-            ? 'La solicitud quedará disponible para incluirla en una Compra central.'
-            : 'La solicitud no se incluirá en una Compra central.',
+        title: reopened ? `Regresar ${order.folio} a revisión` : (approved ? `Aceptar ${order.folio}` : `Rechazar ${order.folio}`),
+        confirmText: reopened ? 'Regresar a pendientes' : (approved ? 'Aceptar solicitud' : 'Rechazar solicitud'),
+        message: reopened
+            ? 'La solicitud volverá a Pendientes para revisarla nuevamente.'
+            : (approved
+                ? 'La solicitud se agregará directamente a la Compra central.'
+                : 'La solicitud no se incluirá en una Compra central.'),
     })
 
     if (!result.isConfirmed) return
@@ -281,35 +339,38 @@ async function reviewSourceOrder(order, reviewStatus) {
         }),
         { review_status: reviewStatus },
         getModalRequestOptions({
-            mode: approved ? 'update' : 'delete',
+            mode: reopened || approved ? 'update' : 'delete',
             entityName: 'Orden de compra',
-            successTitle: approved ? 'Orden aprobada correctamente' : 'Orden rechazada correctamente',
+            successTitle: reopened ? 'Solicitud regresada a revisión' : (approved ? 'Orden aprobada correctamente' : 'Orden rechazada correctamente'),
             errorTitle: 'No se pudo revisar la orden',
             errorMessage: 'Actualiza la página y verifica que la orden siga disponible.',
         }),
     )
 }
 
-async function openTransferHistory(order) {
-    if (!order?.id || loadingSourceOrder.value) return
-    loadingSourceOrder.value = true
+async function deleteSourceOrder(order) {
+    const result = await confirmModalAction({
+        mode: 'delete',
+        entityName: 'solicitud de compra',
+        title: `Eliminar ${order.folio}`,
+        confirmText: 'Eliminar solicitud',
+        message: 'La solicitud rechazada y sus productos se eliminarán definitivamente.',
+    })
+    if (!result.isConfirmed) return
 
-    try {
-        const { data } = await window.axios.get(
-            route('inventory.branches.reports.purchase-orders.source-orders.show', {
-                branch: order.branch_id,
-                purchaseOrder: order.id,
-            }),
-        )
-        transferHistoryOrder.value = data
-    } catch {
-        ErrorAlert({
-            title: 'No se pudo abrir el historial',
-            message: 'Actualiza la página y vuelve a intentarlo.',
-        })
-    } finally {
-        loadingSourceOrder.value = false
-    }
+    router.delete(
+        route('inventory.branches.reports.purchase-orders.source-orders.destroy', {
+            branch: order.branch_id,
+            purchaseOrder: order.id,
+        }),
+        getModalRequestOptions({
+            mode: 'delete',
+            entityName: 'Solicitud de compra',
+            successTitle: 'Solicitud eliminada correctamente',
+            errorTitle: 'No se pudo eliminar la solicitud',
+            errorMessage: 'Verifica que la solicitud continúe rechazada.',
+        }),
+    )
 }
 
 function handleGeneralTableAction({ action, row }) {
@@ -321,25 +382,59 @@ function handleGeneralTableAction({ action, row }) {
             generalPurchaseOrder: row.id,
         }))
     }
+
+    if (action === 'reopen') reopenGeneralOrder(row)
+    if (action === 'discard') discardGeneralOrder(row)
 }
 
-function handleToolbarAction(action) {
-    if (action === 'notifications') {
-        notificationPanelOpen.value = true
-        markNotificationsSeen()
-    }
-}
-
-function closeNotificationPanel() {
-    notificationPanelOpen.value = false
-}
-
-function openNotificationOrder(item) {
-    closeNotificationPanel()
-    openSourceOrder({
-        id: item.id,
-        branch_id: item.branch_id,
+async function reopenGeneralOrder(order) {
+    const confirmation = await confirmModalAction({
+        mode: 'update',
+        entityName: 'Compra central',
+        title: `Regresar ${order.folio} a edición`,
+        confirmText: 'Regresar a edición',
+        message: 'La compra central se desmontará y sus solicitudes volverán a la selección compartida. Sólo está disponible si todavía no se capturó mercancía.',
     })
+    if (!confirmation.isConfirmed) return
+
+    router.delete(
+        route('inventory.branches.reports.purchase-orders.reopen', {
+            branch: props.currentBranch.id,
+            generalPurchaseOrder: order.id,
+        }),
+        getModalRequestOptions({
+            mode: 'update',
+            entityName: 'Compra central',
+            successTitle: 'Compra central regresada a edición',
+            errorTitle: 'No se pudo regresar la compra a edición',
+            errorMessage: 'Sólo puede hacerse antes de capturar lotes, cantidades o una revisión física.',
+        }),
+    )
+}
+
+async function discardGeneralOrder(order) {
+    const confirmation = await confirmModalAction({
+        mode: 'delete',
+        entityName: 'Compra central',
+        title: `Descartar ${order.folio}`,
+        confirmText: 'Descartar compra',
+        message: 'Se guardará una fotografía de esta compra antes de descartarla. Las solicitudes regresarán a Pendientes y deberán revisarse nuevamente.',
+    })
+    if (!confirmation.isConfirmed) return
+
+    router.delete(
+        route('inventory.branches.reports.purchase-orders.discard', {
+            branch: props.currentBranch.id,
+            generalPurchaseOrder: order.id,
+        }),
+        getModalRequestOptions({
+            mode: 'delete',
+            entityName: 'Compra central',
+            successTitle: 'Compra central descartada',
+            errorTitle: 'No se pudo descartar la compra central',
+            errorMessage: 'Sólo puede descartarse antes de capturar lotes, cantidades o una revisión física.',
+        }),
+    )
 }
 
 function disabledGeneralDraftSave() {
@@ -370,7 +465,7 @@ async function generateGeneralOrder() {
         entityName: 'Compra central',
         title: 'Crear Compra central',
         confirmText: 'Crear Compra central',
-        message: `Se reunirán ${selectedSourceOrders.value.length} solicitudes de ${selectedBranchesCount.value} sucursal(es).`,
+        message: `Se reunirán ${selectedSourceOrders.value.length} solicitudes de ${selectedBranchesCount.value} sucursal(es). Responsable de compra: ${page.props.auth.user.name}.`,
     })
 
     if (!confirmation.isConfirmed) return
@@ -388,7 +483,7 @@ async function generateGeneralOrder() {
             successTitle: 'Compra central creada correctamente',
             errorTitle: 'No se pudo crear la Compra central',
             errorMessage: 'Verifica que las solicitudes sigan pendientes.',
-            onSuccess: () => updateStatus('PURCHASING'),
+            onSuccess: () => updateStatus('CENTRAL'),
         }),
     )
 }
@@ -406,52 +501,49 @@ async function generateGeneralOrder() {
                 @update:filter="orders.updateFilter"
                 @update:records-per-page="orders.localFilters.value.per_page = $event"
                 @update:active-tab="updateStatus"
-                @action="handleToolbarAction"
             />
         </template>
 
-        <FloatingNotificationModal
-            :open="notificationPanelOpen"
-            eyebrow="Solicitudes de compra"
-            title="Avisos pendientes"
-            subtitle="Solicitudes de compra que requieren atención de Inventario."
-            :items="visibleNotificationItems"
-            empty-description="No hay solicitudes de compra pendientes por atender."
-            @close="closeNotificationPanel"
-            @select="openNotificationOrder"
-            @dismiss="dismissNotification"
-        />
-
         <div
             v-if="activeStatus === 'GENERATE'"
-            class="grid min-w-0 gap-4 xl:grid-cols-[230px_minmax(0,1fr)_310px]"
+            class="grid min-w-0 gap-4"
         >
-            <FormPanel
-                title="Sucursales"
-                panel-class="min-w-0 !bg-background shadow-sm"
-            >
-                <div class="space-y-2">
-                    <SelectionCheckboxCard
-                        v-for="branch in generation.branches"
-                        :key="branch.id"
-                        :checked="Number(selectedBranchId) === Number(branch.id)"
-                        :title="branch.name"
-                        :description="`${branch.orders_count} solicitud(es) pendiente(s)`"
-                        :badge="String(branch.orders_count)"
-                        compact
-                        @toggle="selectBranch(branch)"
-                    />
-
-                    <p v-if="!generation.branches?.length" class="py-6 text-center text-sm text-text opacity-60">
-                        No tienes sucursales disponibles.
-                    </p>
+                <div class="flex flex-wrap items-center justify-end gap-3 text-sm">
+                        <span class="text-text opacity-70">
+                            Responsable: <strong class="font-semibold opacity-100">{{ responsible.responsible_name || 'Sin asignar' }}</strong>
+                        </span>
+                        <div v-if="canAssignResponsible && responsible.responsible_id" class="flex items-center gap-2">
+                            <GlobalSelect
+                                v-model="responsibleChoice"
+                                class="w-52"
+                                aria-label="Elegir responsable de la compra central"
+                            >
+                                <option value="">{{ responsible.responsible_id ? 'Pasar el mando a…' : 'Elegir responsable…' }}</option>
+                                <option
+                                    v-for="inventoryUser in currentGeneration.inventory_users"
+                                    :key="inventoryUser.id"
+                                    :value="String(inventoryUser.id)"
+                                    :disabled="Number(inventoryUser.id) === Number(responsible.responsible_id)"
+                                >
+                                    {{ inventoryUser.name }}
+                                </option>
+                            </GlobalSelect>
+                            <AppButton
+                                variant="secondary"
+                                :disabled="!responsibleChoice"
+                                @click="assignResponsible"
+                            >
+                                {{ responsible.responsible_id ? 'Pasar mando' : 'Asignar' }}
+                            </AppButton>
+                        </div>
+                        <AppButton
+                            v-if="isResponsible"
+                            :disabled="!canPrepareGeneralOrder"
+                            @click="generateGeneralOrder"
+                        >
+                            Crear compra central · {{ selectedOrderIds.length }}
+                        </AppButton>
                 </div>
-            </FormPanel>
-
-            <FormPanel
-                title="Solicitudes enviadas"
-                panel-class="min-w-0 !bg-background shadow-sm"
-            >
                 <div v-if="loadingSourceOrder" class="mb-3 rounded-xl bg-secondary px-4 py-3 text-sm text-text">
                     Cargando detalle de la orden...
                 </div>
@@ -464,63 +556,7 @@ async function generateGeneralOrder() {
                     @action="handleSourceTableAction"
                     @page-change="handleSourcePageChange"
                 />
-            </FormPanel>
 
-            <FormPanel
-                title="Compra central"
-                panel-class="min-w-0 !bg-background shadow-sm xl:sticky xl:top-4 xl:self-start"
-            >
-                <div class="mb-4 grid grid-cols-2 gap-2">
-                    <div class="rounded-xl bg-secondary p-3 text-center text-text">
-                        <strong class="block text-xl">{{ selectedSourceOrders.length }}</strong>
-                        <span class="text-xs opacity-65">Solicitudes</span>
-                    </div>
-                    <div class="rounded-xl bg-secondary p-3 text-center text-text">
-                        <strong class="block text-xl">{{ selectedBranchesCount }}</strong>
-                        <span class="text-xs opacity-65">Sucursales</span>
-                    </div>
-                </div>
-
-                <div class="max-h-[430px] space-y-2 overflow-y-auto pr-1">
-                    <article
-                        v-for="order in selectedSourceOrders"
-                        :key="order.id"
-                        class="flex items-center justify-between gap-2 rounded-xl border border-secondary bg-background p-3 text-text"
-                    >
-                        <div class="min-w-0">
-                            <p class="truncate text-sm font-black">{{ order.folio }}</p>
-                            <p class="truncate text-xs opacity-60">{{ order.branch_name }}</p>
-                        </div>
-                        <AppButton
-                            v-if="can('inventory.purchase-orders.general.create')"
-                            variant="secondary"
-                            class="!px-2 !py-2"
-                            title="Quitar de la Compra central"
-                            @click="removeSourceOrder(order)"
-                        >
-                            <span class="material-symbols-outlined text-base">close</span>
-                        </AppButton>
-                    </article>
-
-                    <p v-if="!selectedSourceOrders.length" class="py-8 text-center text-sm text-text opacity-60">
-                        Acepta y agrega las solicitudes que formarán parte de esta compra.
-                    </p>
-                </div>
-
-                <div
-                    v-if="can('inventory.purchase-orders.general.create')"
-                    class="mt-4 grid gap-2"
-                >
-                    <AppButton
-                        variant="primary"
-                        block
-                        :disabled="!canPrepareGeneralOrder"
-                        @click="generateGeneralOrder"
-                    >
-                        Crear Compra central
-                    </AppButton>
-                </div>
-            </FormPanel>
         </div>
 
         <template v-else>
@@ -552,21 +588,6 @@ async function generateGeneralOrder() {
             @close="selectedSourceOrder = null"
         />
 
-        <PurchaseOrderTransferModal
-            v-if="transferOrder"
-            :order="transferOrder"
-            :inventory-users="generation.inventory_users"
-            :context-branch-id="transferOrder.branch_id"
-            @close="transferOrder = null"
-            @transferred="transferOrder = null"
-        />
-
-        <PurchaseOrderTransferHistoryModal
-            v-if="transferHistoryOrder"
-            :order="transferHistoryOrder"
-            @close="transferHistoryOrder = null"
-        />
-
         <PendingPurchaseOrderEditModal
             v-if="editingSourceOrder"
             :order="editingSourceOrder"
@@ -575,5 +596,57 @@ async function generateGeneralOrder() {
             @close="editingSourceOrder = null"
             @updated="editingSourceOrder = null"
         />
+
+        <GlobalModal
+            v-if="showInitialResponsibleModal"
+            title="Elegir responsable de compra"
+            subtitle="Esta solicitud se guardará como aprobada y se agregará a la Compra central de la persona elegida."
+            mode="create"
+            size="md"
+            height="auto"
+            :columns="1"
+            :show-save="false"
+            :close-on-backdrop="false"
+            :close-on-esc="false"
+            @close="closeInitialResponsibleModal"
+        >
+            <div class="space-y-4">
+                <div class="rounded-2xl border border-secondary bg-secondary p-4 text-sm text-text">
+                    <p class="font-black">Primera solicitud aprobada</p>
+                    <p class="mt-1 opacity-70">
+                        Antes de guardarla, elijan quién llevará la Compra central.
+                    </p>
+                </div>
+
+                <GlobalSelect
+                    v-model="initialResponsibleChoice"
+                    class="w-full"
+                    aria-label="Elegir responsable de la compra central"
+                >
+                    <option value="">Elegir responsable…</option>
+                    <option
+                        v-for="inventoryUser in eligibleInitialResponsibleUsers"
+                        :key="inventoryUser.id"
+                        :value="String(inventoryUser.id)"
+                    >
+                        {{ inventoryUser.name }}
+                    </option>
+                </GlobalSelect>
+                <p v-if="!eligibleInitialResponsibleUsers.length" class="text-sm text-primary">
+                    No hay una responsable de Inventario con acceso a esta sucursal.
+                </p>
+            </div>
+
+            <template #footer>
+                <footer class="flex w-full justify-end gap-2 border-t border-secondary bg-background p-3">
+                    <AppButton variant="secondary" @click="closeInitialResponsibleModal">
+                        Cancelar
+                    </AppButton>
+                    <AppButton :disabled="!initialResponsibleChoice || !eligibleInitialResponsibleUsers.length" @click="assignInitialResponsibleAndApprove">
+                        Guardar y aprobar
+                    </AppButton>
+                </footer>
+            </template>
+        </GlobalModal>
     </PageLayout>
 </template>

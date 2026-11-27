@@ -166,7 +166,11 @@ class InventoryBatchConcurrencyTest extends TestCase
 
     public function test_negative_balance_is_preserved_and_its_inactivation_has_a_positive_stock_delta(): void
     {
-        $this->put($this->batchUrl(), $this->delta(-13))->assertSessionHasNoErrors();
+        $this->put($this->batchUrl(), $this->delta(-13))->assertSessionHasErrors('quantity');
+        $this->assertStock(10);
+        // Un saldo negativo preexistente puede provenir de una venta con faltante.
+        $this->batch->update(['quantity' => -3]);
+        $this->inventory->update(['stock' => -3]);
         $this->assertStock(-3);
 
         $this->put($this->batchUrl(), [

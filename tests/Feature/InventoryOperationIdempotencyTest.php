@@ -75,6 +75,9 @@ class InventoryOperationIdempotencyTest extends TestCase
 
         Cache::flush();
         $this->travel(2)->days();
+        // Es una sesión nueva del mismo operador al reintentar dos días después.
+        $this->app['session']->flush();
+        $this->actingAs($this->user);
         $this->withHeader('Idempotency-Key', $key)->put($this->batchUrl(), $this->delta(5))
             ->assertRedirect()->assertHeader('Idempotency-Replayed', 'true')
             ->assertSessionHas('success', 'Lote actualizado correctamente.');
@@ -125,8 +128,11 @@ class InventoryOperationIdempotencyTest extends TestCase
         $url = route('inventory.stock-movements.store');
         $this->withHeader('Idempotency-Key', $key)->post($url, $payload)->assertSessionHasNoErrors();
         $movementId = StockMovement::latest('id')->firstOrFail()->id;
+        $this->assertEquals(['id' => $movementId, 'key' => $key], session('movement_receipt'));
+        session()->forget('movement_receipt');
         $this->withHeader('Idempotency-Key', $key)->post($url, $payload)
-            ->assertHeader('Idempotency-Replayed', 'true')->assertSessionHas('movement_id', $movementId);
+            ->assertHeader('Idempotency-Replayed', 'true')->assertSessionHas('movement_id', $movementId)
+            ->assertSessionHas('movement_receipt', ['id' => $movementId, 'key' => $key]);
 
         $this->assertEquals(14, $this->inventory->fresh()->stock);
         $this->assertSame(1, $this->inventory->movements()->count());

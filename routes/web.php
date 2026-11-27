@@ -161,6 +161,10 @@ Route::middleware([
     Route::get('/user/profile', fn () => Inertia::render('Profile/Show'))
         ->name('profile.show');
 
+    Route::put('/attendance/pin', [AttendanceController::class, 'updateAttendancePin'])
+        ->middleware(['permission:attendance.register', 'role:Ventas', 'throttle:5,1'])
+        ->name('attendance.pin.update');
+
     Route::post('/sesion/continuar', function (Request $request) {
         $policy = RoleSessionPolicy::forUser($request->user());
         $expiresAt = RoleSessionPolicy::renew($request, $policy);
@@ -823,9 +827,25 @@ Route::middleware([
             ->middleware($generalPurchaseOrdersAccess)
             ->name('branches.reports.purchase-orders');
 
+        Route::put('/branches/{branch}/reports/purchase-orders/preparation', [\App\Http\Controllers\Inventory\PurchasePreparationController::class, 'update'])
+            ->middleware('permission:inventory.purchase-orders.source.view')
+            ->name('branches.reports.purchase-orders.preparation');
+
+        Route::put('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}/presence', [\App\Http\Controllers\Inventory\PurchasePreparationController::class, 'presence'])
+            ->middleware('permission:inventory.purchase-orders.source.view')
+            ->name('branches.reports.purchase-orders.presence');
+
         Route::post('/branches/{branch}/reports/purchase-orders/consolidate', [GeneralPurchaseOrderController::class, 'consolidate'])
             ->middleware(['permission:inventory.purchase-orders.general.create', 'idempotent'])
             ->name('branches.reports.purchase-orders.consolidate');
+
+        Route::delete('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}/reopen', [GeneralPurchaseOrderController::class, 'reopen'])
+            ->middleware('permission:inventory.purchase-orders.general.create')
+            ->name('branches.reports.purchase-orders.reopen');
+
+        Route::delete('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}/discard', [GeneralPurchaseOrderController::class, 'discard'])
+            ->middleware('permission:inventory.purchase-orders.general.create')
+            ->name('branches.reports.purchase-orders.discard');
 
         Route::get('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}', [GeneralPurchaseOrderController::class, 'sourceOrder'])
             ->middleware('permission:inventory.purchase-orders.source.view')
@@ -838,6 +858,10 @@ Route::middleware([
         Route::put('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}/review', [GeneralPurchaseOrderController::class, 'reviewSourceOrder'])
             ->middleware('permission:inventory.purchase-orders.source.review')
             ->name('branches.reports.purchase-orders.source-orders.review');
+
+        Route::delete('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}', [GeneralPurchaseOrderController::class, 'destroySourceOrder'])
+            ->middleware('permission:inventory.purchase-orders.source.review')
+            ->name('branches.reports.purchase-orders.source-orders.destroy');
 
         Route::put('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}', [GeneralPurchaseOrderController::class, 'updateSourceOrder'])
             ->middleware('permission:inventory.purchase-orders.source.update')

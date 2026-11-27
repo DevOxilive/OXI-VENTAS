@@ -8,6 +8,7 @@ use App\Models\GeneralPurchaseOrder;
 use App\Models\GeneralPurchaseOrderItem;
 use App\Models\Permission;
 use App\Models\Product;
+use App\Models\PurchaseCycle;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\PurchaseCycleService;
@@ -104,6 +105,74 @@ class IndependentProductPricingTest extends TestCase
         $this->assertEquals(250, $product->sale_price_per_box);
         $this->assertEquals(18, $product->sale_price_per_piece);
         $this->assertEquals(18, $product->sale_price);
+    }
+
+    public function test_package_purchase_updates_only_its_independent_cost(): void
+    {
+        $product = $this->createProduct(['cost_per_piece' => 10, 'cost_per_package' => 50, 'cost_per_box' => 180]);
+        $this->purchase($product, 'Paquete', 60);
+        $product->refresh();
+
+        $this->assertEquals(10, $product->cost_per_piece);
+        $this->assertEquals(60, $product->cost_per_package);
+        $this->assertEquals(180, $product->cost_per_box);
+    }
+
+    public function test_general_purchase_saves_planned_batches_without_creating_branch_stock(): void
+    {
+        $product = $this->createProduct();
+        $product->update(['has_package_presentation' => true, 'pieces_per_package' => 6]);
+        $user = auth()->user();
+        $cycle = PurchaseCycle::create([
+            'folio' => 'CYCLE-BATCH-1',
+            'status' => PurchaseCycle::STATUS_OPEN,
+            'created_by' => $user->id,
+            'opened_at' => now(),
+        ]);
+        $order = GeneralPurchaseOrder::create([
+            'purchase_cycle_id' => $cycle->id,
+            'created_by' => $user->id,
+            'folio' => 'OCG-BATCH-1',
+            'status' => GeneralPurchaseOrder::STATUS_PURCHASING,
+        ]);
+        $item = $order->items()->create([
+            'product_id' => $product->id,
+            'product_name' => $product->name,
+            'base_unit' => 'pza',
+            'requested_quantity' => 18,
+        ]);
+
+        app(PurchaseCycleService::class)->saveCapture($order, [
+            'purchased_at' => now()->toDateString(),
+            'record_version' => $order->updated_at->toJSON(),
+            'items' => [[
+                'id' => $item->id,
+                'purchase_presentation' => 'Paquete',
+                'package_quantity' => 3,
+                'units_per_package' => 6,
+                'purchase_price' => 60,
+                'unavailable' => false,
+                'batches' => [
+                    ['lot_number' => 'lote-a', 'expiration_date' => '2027-01-10', 'quantity' => 1],
+                    ['lot_number' => 'LOTE-B', 'expiration_date' => '2027-02-10', 'quantity' => 2],
+                ],
+            ]],
+        ]);
+
+        $this->assertDatabaseHas('general_purchase_order_item_batches', [
+            'general_purchase_order_item_id' => $item->id,
+            'lot_number' => 'LOTE-A',
+            'presentation_quantity' => 1,
+            'base_quantity' => 6,
+        ]);
+        $this->assertDatabaseHas('general_purchase_order_item_batches', [
+            'general_purchase_order_item_id' => $item->id,
+            'lot_number' => 'LOTE-B',
+            'presentation_quantity' => 2,
+            'base_quantity' => 12,
+        ]);
+        $this->assertDatabaseCount('product_batches', 0);
+        $this->assertDatabaseCount('stock_movements', 0);
     }
 
     public function test_percentage_requires_positive_cost_and_low_margin_requires_authorization(): void

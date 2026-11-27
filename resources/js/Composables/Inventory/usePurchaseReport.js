@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { router } from "@inertiajs/vue3";
 import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
+import { formatInventoryPresentationStock } from "@/utils/quantityFormatter";
 
 function resolveStockStatus(product) {
     const stock = Number(product.stock || 0);
@@ -30,28 +31,36 @@ function defaultPresentation(product) {
     return product.inventory_unit === "kg" ? "kilo" : "piece";
 }
 
+function defaultQuantity(product) {
+    return product.inventory_unit === "kg" ? 0.05 : 1;
+}
+
 function presentationToServer(value) {
     return {
         box: "Caja",
+        package: "Paquete",
         kilo: "Kilo",
         piece: "Pieza",
     }[value] || "Pieza";
 }
 
 function unitsPerPackage(item) {
-    return item.presentation === "box" ? Number(item.pieces_per_box || 1) : 1;
+    if (item.presentation === "box") return Number(item.pieces_per_box || 1);
+    if (item.presentation === "package") return Number(item.pieces_per_package || 1);
+
+    return 1;
 }
 
 function baseQuantity(item) {
     const quantity = Number(item.requested_quantity || 0);
 
-    return item.presentation === "box"
+    return ["box", "package"].includes(item.presentation)
         ? quantity * unitsPerPackage(item)
         : quantity;
 }
 
 function quantityStep(item) {
-    return item.presentation === "kilo" ? 0.001 : 1;
+    return item.presentation === "kilo" ? 0.05 : 1;
 }
 
 export function usePurchaseReport(props) {
@@ -76,6 +85,13 @@ export function usePurchaseReport(props) {
         products.value.map((product) => ({
             ...product,
             primary_code: product.primary_code || product.main_barcode || product.code || "",
+            stock_display: formatInventoryPresentationStock(product.stock, {
+                unit: product.inventory_unit,
+                hasBoxPresentation: product.has_box_presentation,
+                hasPackagePresentation: product.has_package_presentation,
+                piecesPerBox: product.pieces_per_box,
+                piecesPerPackage: product.pieces_per_package,
+            }),
             stock_status: resolveStockStatus(product),
             in_purchase_list: Boolean(selectedItems.value[product.id]),
         }))
@@ -114,8 +130,10 @@ export function usePurchaseReport(props) {
                 inventory_unit: product.inventory_unit ?? "pza",
                 has_box_presentation: Boolean(product.has_box_presentation),
                 pieces_per_box: Number(product.pieces_per_box || 0),
+                has_package_presentation: Boolean(product.has_package_presentation),
+                pieces_per_package: Number(product.pieces_per_package || 0),
                 presentation: defaultPresentation(product),
-                requested_quantity: 1,
+                requested_quantity: defaultQuantity(product),
             },
         };
     }
@@ -171,6 +189,7 @@ export function usePurchaseReport(props) {
         const item = selectedItems.value[productId];
         if (!item) return;
         if (presentation === "box" && !item.has_box_presentation) return;
+        if (presentation === "package" && !item.has_package_presentation) return;
         if (presentation === "kilo" && item.inventory_unit !== "kg") return;
 
         selectedItems.value = {
@@ -242,9 +261,13 @@ export function usePurchaseReport(props) {
                 inventory_unit: product.inventory_unit ?? "pza",
                 has_box_presentation: Boolean(product.has_box_presentation),
                 pieces_per_box: Number(product.pieces_per_box || 0),
+                has_package_presentation: Boolean(product.has_package_presentation),
+                pieces_per_package: Number(product.pieces_per_package || 0),
                 presentation: item.purchase_presentation === "Caja"
                     ? "box"
-                    : ((product.inventory_unit ?? "pza") === "kg" ? "kilo" : "piece"),
+                    : (item.purchase_presentation === "Paquete"
+                        ? "package"
+                        : ((product.inventory_unit ?? "pza") === "kg" ? "kilo" : "piece")),
                 requested_quantity: Number(item.package_quantity || item.requested_quantity || 1),
             };
         }

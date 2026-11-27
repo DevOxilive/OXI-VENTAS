@@ -181,11 +181,12 @@ defineExpose({
 .quantity-stepper {
   display: inline-flex;
   align-items: stretch;
-  width: 240px;
-  min-width: 220px;
-  max-width: 100%;
+  width: 100%;
+  min-width: min(120px, 100%);
+  max-width: 240px;
   height: 48px;
-  flex-shrink: 0;
+  flex: 1 1 140px;
+  container-type: inline-size;
   border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
   border-radius: 8px;
   color: inherit;
@@ -196,8 +197,8 @@ defineExpose({
 .quantity-stepper__button {
   display: grid;
   place-items: center;
-  width: 46px;
-  flex-shrink: 0;
+  width: clamp(36px, 22%, 46px);
+  flex: 0 1 46px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -228,5 +229,34 @@ defineExpose({
 .quantity-up-leave-to, .quantity-down-enter-from { transform: translateY(-75%); opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .quantity-stepper *, .quantity-stepper { transition: none !important; }
+}
+
+@media (max-width: 480px) {
+  .quantity-stepper { height: 40px; }
+  .quantity-stepper__button { flex-basis: 40px; }
+}
+
+@container (max-width: 160px) {
+  .quantity-stepper__button {
+    width: 34px;
+    flex-basis: 34px;
+  }
+
+  .quantity-stepper__input,
+  .quantity-stepper__number {
+    font-size: 13px;
+  }
+}
+
+@container (max-width: 130px) {
+  .quantity-stepper__button {
+    width: 30px;
+    flex-basis: 30px;
+  }
+
+  .quantity-stepper__input,
+  .quantity-stepper__number {
+    font-size: 12px;
+  }
 }
 </style>

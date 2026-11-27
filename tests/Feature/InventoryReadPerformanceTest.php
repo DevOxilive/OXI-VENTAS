@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Inventory\BranchInventoryController;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
@@ -55,6 +56,7 @@ class InventoryReadPerformanceTest extends TestCase
         $response = $this->get($this->inventoryUrl().'?stock=Agotado', [
             'X-Inertia' => 'true',
             'X-Inertia-Partial-Component' => 'Inventory/BranchInventory',
+            'X-Inertia-Version' => (string) app(HandleInertiaRequests::class)->version($this->request()),
             'X-Inertia-Partial-Data' => 'branchProductsDB,filters',
         ]);
 
@@ -67,6 +69,24 @@ class InventoryReadPerformanceTest extends TestCase
         $this->assertStringNotContainsString('limit 300', $sql);
         $this->assertStringNotContainsString('limit 50', $sql);
         DB::disableQueryLog();
+    }
+
+    public function test_assigning_initial_stock_is_immediately_visible_in_the_branch_history(): void
+    {
+        $this->user->role->permissions()->attach(Permission::firstOrCreate(['name' => 'inventory.branches.config.update']));
+        $target = Branch::create(['name' => 'Segunda', 'slug' => 'segunda', 'active' => true]);
+        $this->user->branches()->attach($target);
+        $this->post(route('inventory.branch-inventory.store'), [
+            'branch_id' => $target->id, 'product_id' => $this->inventory->product_id,
+            'stock' => 7, 'min_stock' => 0,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $row = BranchProduct::where('branch_id', $target->id)->where('product_id', $this->inventory->product_id)->firstOrFail();
+        $this->assertEquals(7, $row->stock);
+        $this->getJson(route('inventory.branch-inventory.history', $row))->assertOk()
+            ->assertJsonPath('movements_total', 1)
+            ->assertJsonPath('movements.0.previous_stock', '0.000')
+            ->assertJsonPath('movements.0.new_stock', '7.000')
+            ->assertJsonPath('movements.0.user_id', $this->user->id);
     }
 
     public function test_summary_counts_use_two_aggregate_queries_and_preserve_negative_stock(): void
@@ -263,6 +283,7 @@ class InventoryReadPerformanceTest extends TestCase
         $this->user->role->permissions()->sync([Permission::firstOrCreate(['name' => 'inventory.products.create'])->id]);
         $this->get($this->inventoryUrl(), [
             'X-Inertia' => 'true',
+            'X-Inertia-Version' => (string) app(HandleInertiaRequests::class)->version($this->request()),
         ])->assertOk()->assertJsonPath('props.canUseInventory', false)
             ->assertJsonPath('props.branchProductsDB.data.0.product_id', $this->inventory->product_id)
             ->assertJsonMissingPath('props.branchProductsDB.data.0.stock')

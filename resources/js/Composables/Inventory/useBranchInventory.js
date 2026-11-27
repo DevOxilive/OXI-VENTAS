@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { router, usePage } from "@inertiajs/vue3";
+import { PRODUCT_SEARCH_TIMEOUT_MS } from "@/config/productSearch";
 import { formatInventoryPresentationStock, formatMinimumStockPresentation } from '@/utils/quantityFormatter';
 import { useBatchAdjustmentModal } from "@/Composables/Inventory/useBatchAdjustmentModal";
 import { useGlobalTablePagination } from "@/Composables/useGlobalTablePagination";
@@ -80,7 +81,17 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
     const movementLoading = ref(false);
     const movementParams = ref({});
     let movementLoadSequence = 0;
-    let lastSearchVisit = { key: "", at: 0 };
+    const searchPending = ref(false);
+    const searchError = ref("");
+    let searchSequence = 0;
+    let activeSearch = null;
+    let searchDeadline = null;
+    function invalidateSearch() {
+        searchSequence++;
+        clearTimeout(searchDeadline);
+        activeSearch?.cancel();
+        activeSearch = null;
+    }
     const realtimeState = createInventoryRealtimeState();
     const detailState = createInventoryRealtimeState();
     const summaryState = createInventoryRealtimeState();
@@ -414,10 +425,16 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
     const reloadInventory = () => {
         clearTimeout(searchTimeout);
         pageRefresh.invalidate();
-        const requestKey = JSON.stringify([search.value, productDepartmentFilter.value, categoryFilter.value,
-            stockFilter.value, recordsToShow.value]);
-        if (requestKey === lastSearchVisit.key && Date.now() - lastSearchVisit.at < 300) return;
-        lastSearchVisit = { key: requestKey, at: Date.now() };
+        invalidateSearch();
+        const sequence = searchSequence;
+        searchPending.value = true;
+        searchError.value = "";
+        searchDeadline = setTimeout(() => {
+            if (sequence !== searchSequence) return;
+            invalidateSearch();
+            searchPending.value = false;
+            searchError.value = "La búsqueda tardó demasiado.";
+        }, PRODUCT_SEARCH_TIMEOUT_MS);
         router.get(
             window.location.pathname,
             {
@@ -436,7 +453,20 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
                 preserveScroll: true,
                 replace: true,
                 only: ["branchProductsDB", "filters"],
-                onFinish: () => onReloaded?.(),
+                onCancelToken: (token) => { activeSearch = token; },
+                onSuccess: () => {
+                    if (sequence === searchSequence) searchPending.value = false;
+                },
+                onFinish: () => {
+                    if (sequence !== searchSequence) return;
+                    clearTimeout(searchDeadline);
+                    activeSearch = null;
+                    if (searchPending.value) {
+                        searchError.value = navigator.onLine ? "No se pudo completar la búsqueda." : "Sin conexión.";
+                        searchPending.value = false;
+                    }
+                    onReloaded?.();
+                },
             },
         );
     };
@@ -636,6 +666,7 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
         detailCache.value = cachedDetails;
 
         void ensureProductDetails(product, { forceRefresh: true });
+        void refreshInventorySummary();
     }
 
     const openCreateModal = () => {
@@ -747,6 +778,9 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
 
     watch(search, () => {
         clearTimeout(searchTimeout);
+        invalidateSearch();
+        searchPending.value = true;
+        searchError.value = "";
         pageRefresh.invalidate();
 
         searchTimeout = setTimeout(() => {
@@ -833,7 +867,9 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
         movementLoading.value = false;
         inventoryStatsState.value = { ...(props.inventoryStats ?? {}) };
         inventoryAlertsState.value = cloneInventoryAlerts(props.inventoryAlerts);
-        lastSearchVisit = { key: "", at: 0 };
+        invalidateSearch();
+        searchPending.value = false;
+        searchError.value = "";
         if (realtimeMounted) subscribeForCurrentBranch();
     }, { flush: "post" });
 
@@ -849,6 +885,7 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
 
     onBeforeUnmount(() => {
         clearTimeout(searchTimeout);
+        invalidateSearch();
         realtimeMounted = false;
         realtimeState.dispose();
         detailState.dispose();
@@ -863,6 +900,8 @@ export function useBranchInventory(props, { onReloaded = null } = {}) {
 
     return {
         historyError,
+        searchPending,
+        searchError,
         branches,
         productDepartments,
         categories,

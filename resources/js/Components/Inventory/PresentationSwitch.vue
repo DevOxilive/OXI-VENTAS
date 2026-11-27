@@ -12,6 +12,18 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  boxEnabled: {
+    type: Boolean,
+    default: true,
+  },
+  packageDisabled: {
+    type: Boolean,
+    default: false,
+  },
+  packageEnabled: {
+    type: Boolean,
+    default: false,
+  },
   pieceLabel: {
     type: String,
     default: 'Piezas',
@@ -20,12 +32,18 @@ const props = defineProps({
     type: String,
     default: 'Cajas',
   },
+  packageLabel: {
+    type: String,
+    default: 'Paquetes',
+  },
 })
 
 const emit = defineEmits(['update:modelValue', 'change'])
 
 function select(value) {
-  if (props.disabled || (value === 'box' && props.boxDisabled)) return
+  if (props.disabled
+    || (value === 'box' && (!props.boxEnabled || props.boxDisabled))
+    || (value === 'package' && (!props.packageEnabled || props.packageDisabled))) return
 
   emit('update:modelValue', value)
   emit('change', value)
@@ -45,6 +63,18 @@ function select(value) {
     </button>
 
     <button
+      v-if="packageEnabled"
+      type="button"
+      class="rounded-md px-2 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40"
+      :class="modelValue === 'package' ? 'bg-primary text-white' : 'text-text hover:text-primary'"
+      :disabled="disabled || packageDisabled"
+      @click="select('package')"
+    >
+      {{ packageLabel }}
+    </button>
+
+    <button
+      v-if="boxEnabled"
       type="button"
       class="rounded-md px-2 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40"
       :class="modelValue === 'box' ? 'bg-primary text-white' : 'text-text hover:text-primary'"
