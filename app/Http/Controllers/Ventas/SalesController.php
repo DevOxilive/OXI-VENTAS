@@ -296,7 +296,7 @@ class SalesController extends Controller
                 ->where('active', true)
                 ->where('inventory_quantity_mode', '!=', 'legacy_presentation'));
 
-        $productIds = $productSearch->ids(
+        $searchResult = $productSearch->search(
             $term,
             new ProductSearchOptions(
                 branchIds: [$branch->id],
@@ -306,9 +306,16 @@ class SalesController extends Controller
                 prefilterTextCandidates: true,
             ),
         );
+        $productIds = $searchResult->ids;
 
         if ($productIds->isEmpty()) {
-            return response()->json(['products' => []]);
+            return response()->json([
+                'products' => [],
+                'search' => [
+                    'is_barcode_query' => $searchResult->isBarcodeQuery,
+                    'exact_product_ids' => [],
+                ],
+            ]);
         }
 
         $matches = $products
@@ -321,7 +328,13 @@ class SalesController extends Controller
             ->map(fn (BranchProduct $branchProduct) => $this->mapBranchProduct($branchProduct, false))
             ->values();
 
-        return response()->json(['products' => $products]);
+        return response()->json([
+            'products' => $products,
+            'search' => [
+                'is_barcode_query' => $searchResult->isBarcodeQuery,
+                'exact_product_ids' => $searchResult->exactBarcodeIds->all(),
+            ],
+        ]);
     }
 
     public function store(
