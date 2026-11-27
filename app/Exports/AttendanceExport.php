@@ -39,7 +39,11 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping, Sho
                 'corrected' => 'Corregida',
                 default => $record->status,
             },
-            $record->authentication_method === 'platform_biometric' ? 'Biometría del dispositivo' : $record->authentication_method,
+            match ($record->authentication_method) {
+                'platform_biometric' => 'Biometría del dispositivo',
+                'attendance_pin' => 'PIN personal',
+                default => $record->authentication_method,
+            },
         ];
     }
 }

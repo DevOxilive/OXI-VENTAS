@@ -6,6 +6,7 @@ import PageLayout from '@/Layouts/PageLayout.vue'
 import MetricCard from '@/Components/Cards/MetricCard.vue'
 import GlobalTable from '@/Components/Tables/GlobalTable.vue'
 import SelectField from '@/Components/Forms/SelectField.vue'
+import InputField from '@/Components/Forms/InputField.vue'
 import AppButton from '@/Components/Buttons/AppButton.vue'
 import { GlobalToolbar } from '@/Components/Toolbars'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
@@ -28,6 +29,7 @@ const props = defineProps({
     canRequestCorrection: Boolean,
     canReviewCorrections: Boolean,
     passkeyEnabled: Boolean,
+    attendancePinEnabled: Boolean,
     attendanceShifts: { type: Array, default: () => [] },
     attendanceBranches: { type: Array, default: () => [] },
 })
@@ -76,9 +78,15 @@ const availableAttendanceTypeOptions = computed(() =>
 )
 const hasAvailableAttendanceTypes = computed(() => availableAttendanceTypeOptions.value.length > 0)
 const passkeyReady = ref(props.passkeyEnabled)
-const biometricActionLabel = computed(() => (
-    passkeyReady.value ? 'Agregar o cambiar Face ID/huella' : 'Configurar Face ID o huella'
-))
+const attendancePinReady = ref(props.attendancePinEnabled)
+const biometricsAvailable = ref(false)
+const showPinModal = ref(false)
+const pinModalMode = ref('configure')
+const attendancePin = ref('')
+const attendancePinConfirmation = ref('')
+const pinForRegistration = ref('')
+const savingPin = ref(false)
+const identityActionLabel = computed(() => 'Configurar asistencia')
 const selfie = ref(null)
 const selfieInput = ref(null)
 const evidenceRecord = ref(null)
@@ -101,9 +109,9 @@ const toolbarActions = computed(() => [
             disabled: registering.value || !hasAvailableAttendanceTypes.value,
         },
         {
-            id: 'passkey',
-            label: biometricActionLabel.value,
-            icon: 'face',
+            id: 'identity',
+            label: identityActionLabel.value,
+            icon: biometricsAvailable.value ? 'face' : 'pin',
             variant: 'amber',
             disabled: registering.value,
         },
@@ -207,8 +215,12 @@ function handleToolbarAction(action) {
         return
     }
 
-    if (action === 'passkey') {
-        registerPasskey()
+    if (action === 'identity') {
+        if (biometricsAvailable.value) {
+            registerPasskey()
+        } else {
+            openPinConfiguration()
+        }
         return
     }
 
@@ -226,7 +238,8 @@ async function registerAttendance() {
     registering.value = true
     try {
         if (!selfie.value) throw new Error('Toma una foto de asistencia antes de registrar.')
-        const verification = await verifyDeviceAuthentication()
+        const verification = await verifyAttendanceIdentity()
+        if (!verification) return
         const location = await resolveLocation()
         if (!location) {
             ErrorAlert({
@@ -244,6 +257,7 @@ async function registerAttendance() {
             longitude: location?.longitude ?? null,
             accuracy: location?.accuracy ?? null,
             authenticationMethod: verification.method,
+            attendancePin: verification.pin,
             device: deviceDetails(),
             selfie: selfie.value,
         }, {
@@ -262,6 +276,7 @@ async function registerAttendance() {
             fallbackMessage: 'No fue posible validar la autenticacion del dispositivo.',
         })
     } finally {
+        pinForRegistration.value = ''
         registering.value = false
     }
 }
@@ -276,6 +291,24 @@ async function verifyDeviceAuthentication() {
     return { method: 'platform_biometric' }
 }
 
+async function verifyAttendanceIdentity() {
+    if (biometricsAvailable.value) {
+        return verifyDeviceAuthentication()
+    }
+
+    if (!attendancePinReady.value) {
+        openPinConfiguration()
+        return null
+    }
+
+    if (!pinForRegistration.value) {
+        openPinVerification()
+        return null
+    }
+
+    return { method: 'attendance_pin', pin: pinForRegistration.value }
+}
+
 async function registerPasskey() {
     registering.value = true
     try {
@@ -287,7 +320,7 @@ async function registerPasskey() {
             credential: credentialToJson(credential),
         }, { headers: { Accept: 'application/json' } })
         passkeyReady.value = true
-        ToastAlert({ title: 'Huella o rostro configurado correctamente' })
+        ToastAlert({ title: 'Asistencia configurada correctamente' })
     } catch (error) {
         await showBiometricError({
             title: 'No fue posible configurar la biometria',
@@ -295,6 +328,77 @@ async function registerPasskey() {
             fallbackMessage: 'Intentalo nuevamente.',
         })
     } finally { registering.value = false }
+}
+
+async function detectBiometricsAvailability() {
+    if (!window.isSecureContext || window.location.protocol !== 'https:') return false
+    if (!window.PublicKeyCredential || !navigator.credentials?.create || !navigator.credentials?.get) return false
+    if (typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable !== 'function') return false
+
+    try {
+        return await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+    } catch {
+        return false
+    }
+}
+
+function resetPinForm() {
+    attendancePin.value = ''
+    attendancePinConfirmation.value = ''
+}
+
+function openPinConfiguration() {
+    pinModalMode.value = 'configure'
+    resetPinForm()
+    showPinModal.value = true
+}
+
+function openPinVerification() {
+    pinModalMode.value = 'verify'
+    resetPinForm()
+    showPinModal.value = true
+}
+
+function closePinModal() {
+    showPinModal.value = false
+    resetPinForm()
+}
+
+async function submitPinModal() {
+    if (!/^\d{4}$/.test(attendancePin.value)) {
+        ErrorAlert({ title: 'PIN incompleto', message: 'Escribe exactamente cuatro números.' })
+        return
+    }
+
+    if (pinModalMode.value === 'verify') {
+        pinForRegistration.value = attendancePin.value
+        closePinModal()
+        registerAttendance()
+        return
+    }
+
+    if (attendancePin.value !== attendancePinConfirmation.value) {
+        ErrorAlert({ title: 'Los PIN no coinciden', message: 'Escribe los mismos cuatro números en ambos campos.' })
+        return
+    }
+
+    savingPin.value = true
+    try {
+        await window.axios.put(route('attendance.pin.update'), {
+            pin: attendancePin.value,
+            pin_confirmation: attendancePinConfirmation.value,
+        })
+        attendancePinReady.value = true
+        closePinModal()
+        ToastAlert({ title: 'PIN personal configurado correctamente' })
+    } catch (error) {
+        ErrorAlert({
+            title: 'No fue posible guardar el PIN',
+            message: error?.response?.data?.errors?.pin?.[0] || error?.response?.data?.message || 'Inténtalo nuevamente.',
+        })
+    } finally {
+        savingPin.value = false
+    }
 }
 
 async function assertPlatformBiometricsAvailable() {
@@ -317,6 +421,14 @@ async function assertPlatformBiometricsAvailable() {
 async function showBiometricError({ title, error, fallbackMessage }) {
     const message = error?.response?.data?.message || error?.message || fallbackMessage
 
+    if (isRegisteredAuthenticatorError(message)) {
+        ErrorAlert({
+            title: 'Asistencia ya configurada',
+            message: 'Esta huella o Face ID ya está registrada para tu asistencia. Puedes continuar y registrar tu entrada, comida o salida.',
+        })
+        return
+    }
+
     if (isAndroidTryCloudflareStandalone() && isTlsCertificateError(message)) {
         await clearPwaRuntime()
 
@@ -334,6 +446,10 @@ async function showBiometricError({ title, error, fallbackMessage }) {
     }
 
     ErrorAlert({ title, message })
+}
+
+function isRegisteredAuthenticatorError(message) {
+    return /already registered|credentials already registered|contains one of the credentials/i.test(String(message || ''))
 }
 
 function isTlsCertificateError(message) {
@@ -418,6 +534,7 @@ function deviceDetails() {
 }
 
 onMounted(() => {
+    detectBiometricsAvailability().then((available) => { biometricsAvailable.value = available })
     unsubscribeAttendance = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.attendanceChanged,
@@ -432,7 +549,7 @@ onMounted(() => {
             refreshRealtimeProps(page, [
                     'records', 'dashboard', 'options', 'canViewAttendance',
                     'canManage', 'canViewEvidence', 'canRegister', 'canRequestCorrection',
-                    'canReviewCorrections', 'passkeyEnabled', 'attendanceShifts', 'attendanceBranches',
+                    'canReviewCorrections', 'passkeyEnabled', 'attendancePinEnabled', 'attendanceShifts', 'attendanceBranches',
             ])
         },
     )
@@ -456,6 +573,45 @@ onBeforeUnmount(() => {
         />
 
         <input ref="selfieInput" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp" capture="user" @change="selfie = $event.target.files?.[0] || null">
+
+        <GlobalModal
+            v-if="showPinModal"
+            :title="pinModalMode === 'configure' ? 'Configurar PIN personal' : 'Confirmar PIN personal'"
+            :subtitle="pinModalMode === 'configure'
+                ? 'Este PIN de cuatro números se usa solamente cuando el teléfono no cuenta con huella o Face ID.'
+                : 'Escribe tu PIN personal para confirmar esta asistencia.'"
+            size="sm"
+            height="auto"
+            :columns="1"
+            :processing="savingPin"
+            :save-button-text="pinModalMode === 'configure' ? 'Guardar PIN' : 'Confirmar asistencia'"
+            @save="submitPinModal"
+            @close="closePinModal"
+        >
+            <form class="grid gap-4" @submit.prevent="submitPinModal">
+                <InputField
+                    v-model="attendancePin"
+                    label="PIN de 4 dígitos"
+                    field="attendance-pin"
+                    type="password"
+                    inputmode="numeric"
+                    maxlength="4"
+                    autocomplete="one-time-code"
+                    placeholder="••••"
+                />
+                <InputField
+                    v-if="pinModalMode === 'configure'"
+                    v-model="attendancePinConfirmation"
+                    label="Repite el PIN"
+                    field="attendance-pin-confirmation"
+                    type="password"
+                    inputmode="numeric"
+                    maxlength="4"
+                    autocomplete="new-password"
+                    placeholder="••••"
+                />
+            </form>
+        </GlobalModal>
 
         <section v-if="canRegister" class="grid gap-3 rounded-2xl border border-secondary bg-background p-4 shadow-sm md:grid-cols-3">
             <SelectField v-if="showAttendanceBranchSelector" v-model="attendanceBranchId" label="Sucursal" field="attendance-branch" :options="attendanceBranches" :disabled="registering" />
