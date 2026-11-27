@@ -35,6 +35,8 @@ class User extends Authenticatable implements PasskeyUser
         'remember_token',
         'two_factor_recovery_codes',
         'two_factor_secret',
+        'attendance_pin_hash',
+        'attendance_pin_fingerprint',
     ];
 
     protected function casts(): array
@@ -43,6 +45,7 @@ class User extends Authenticatable implements PasskeyUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'attendance_pin_set_at' => 'datetime',
         ];
     }
 

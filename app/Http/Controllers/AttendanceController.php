@@ -16,6 +16,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -67,6 +69,7 @@ class AttendanceController extends Controller
             'canRequestCorrection' => $request->user()->hasPermission('attendance.corrections.request'),
             'canReviewCorrections' => $request->user()->hasPermission('attendance.corrections.review'),
             'passkeyEnabled' => $request->user()->hasPasskeysEnabled(),
+            'attendancePinEnabled' => filled($request->user()->attendance_pin_hash),
             'attendanceShifts' => $attendanceShifts,
             'attendanceBranches' => $attendanceBranches,
         ]);
@@ -87,7 +90,8 @@ class AttendanceController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'accuracy' => ['nullable', 'integer', 'min:0'],
             'approximateAddress' => ['nullable', 'string', 'max:255'],
-            'authenticationMethod' => ['required', 'in:platform_biometric'],
+            'authenticationMethod' => ['required', 'in:platform_biometric,attendance_pin'],
+            'attendancePin' => ['nullable', 'digits:4'],
             'device' => ['nullable', 'array'],
             'selfie' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
@@ -98,6 +102,7 @@ class AttendanceController extends Controller
                 'type' => 'Solo los usuarios con rol Ventas pueden registrar asistencia.',
             ]);
         }
+        $this->validateAttendanceAuthentication($user, $data);
         $branch = $this->resolveAttendanceBranch($user, $data['attendance_branch_id'] ?? null);
         if (filled($data['attendance_branch_id'] ?? null) && ! $branch) {
             return back()->withErrors([
@@ -169,6 +174,44 @@ class AttendanceController extends Controller
         broadcast(new AttendanceChanged($record->id, 'created', $user->id));
 
         return back()->with('success', 'Asistencia registrada correctamente.');
+    }
+
+    /**
+     * Guarda un PIN personal de asistencia. Se conserva solo su huella cifrada,
+     * nunca los cuatro dígitos que eligió la persona.
+     */
+    public function updateAttendancePin(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($this->canRegisterAttendance($user), 403);
+
+        $data = $request->validate([
+            'pin' => ['required', 'digits:4', 'confirmed'],
+        ]);
+        $fingerprint = hash_hmac('sha256', $data['pin'], (string) config('app.key'));
+
+        $alreadyAssigned = \App\Models\User::withTrashed()
+            ->where('attendance_pin_fingerprint', $fingerprint)
+            ->whereKeyNot($user->id)
+            ->exists();
+
+        if ($alreadyAssigned) {
+            throw ValidationException::withMessages([
+                'pin' => 'Ese PIN ya está asignado a otra persona. Elige cuatro dígitos distintos.',
+            ]);
+        }
+
+        $user->forceFill([
+            'attendance_pin_hash' => Hash::make($data['pin']),
+            'attendance_pin_fingerprint' => $fingerprint,
+            'attendance_pin_set_at' => now(),
+        ])->save();
+
+        $this->audit->record('attendance', 'configure_pin', 'success', $request, [
+            'record_label' => 'PIN personal de asistencia',
+        ]);
+
+        return response()->json(['message' => 'PIN personal configurado correctamente.']);
     }
 
     public function evidencePhoto(Request $request, AttendanceRecord $attendanceRecord)
@@ -323,6 +366,31 @@ class AttendanceController extends Controller
         }
 
         return $user->role?->name === 'Ventas';
+    }
+
+    private function validateAttendanceAuthentication($user, array $data): void
+    {
+        if ($data['authenticationMethod'] !== 'attendance_pin') {
+            return;
+        }
+
+        $attemptKey = "attendance-pin:{$user->id}";
+        if (RateLimiter::tooManyAttempts($attemptKey, 5)) {
+            $seconds = RateLimiter::availableIn($attemptKey);
+            throw ValidationException::withMessages([
+                'attendancePin' => "Demasiados intentos. Espera {$seconds} segundos antes de volver a intentarlo.",
+            ]);
+        }
+
+        if (! filled($user->attendance_pin_hash) || ! Hash::check((string) ($data['attendancePin'] ?? ''), $user->attendance_pin_hash)) {
+            RateLimiter::hit($attemptKey, 300);
+
+            throw ValidationException::withMessages([
+                'attendancePin' => 'El PIN personal no es correcto.',
+            ]);
+        }
+
+        RateLimiter::clear($attemptKey);
     }
 
     private function attendanceBranchesForUser($user): array
@@ -503,7 +571,9 @@ class AttendanceController extends Controller
             'shift' => $record->shift_label ?? $record->scheduleAssignment?->schedule?->name ?? 'Turno general',
             'type' => $this->typeLabel($record->type),
             'status' => $this->statusLabel($record->status),
-            'authentication' => 'Biometría del dispositivo',
+            'authentication' => $record->authentication_method === 'attendance_pin'
+                ? 'PIN personal'
+                : 'Biometría del dispositivo',
         ];
     }
     private function evidencePayload(AttendanceRecord $record): ?array

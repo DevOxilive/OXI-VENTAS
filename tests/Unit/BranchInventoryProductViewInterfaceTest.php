@@ -42,7 +42,7 @@ class BranchInventoryProductViewInterfaceTest extends TestCase
         $this->assertStringContainsString('focusSearch()', $page);
         $this->assertStringNotContainsString('select-search-on-enter', $page);
         $this->assertStringContainsString('onReloaded: focusInventorySearch', $page);
-        $this->assertStringContainsString('onFinish: () => onReloaded?.()', $inventory);
+        $this->assertStringContainsString('onReloaded?.();', $inventory);
         $this->assertStringContainsString('product_id: item.product_id', $inventory);
         $this->assertStringContainsString('id: "create"', $toolbarConfig);
         $this->assertStringContainsString("can('inventory.products.create')", $page);

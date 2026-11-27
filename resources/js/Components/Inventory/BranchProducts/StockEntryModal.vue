@@ -11,9 +11,11 @@ import QuantityStepper from '@/Components/Forms/QuantityStepper.vue'
 import SelectionCheckboxCard from '@/Components/Forms/SelectionCheckboxCard.vue'
 import TextareaField from '@/Components/Forms/TextareaField.vue'
 
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close', 'saved', 'preloaded'])
 
 const props = defineProps({
+    preload: { type: Boolean, default: false },
+    initialPreload: { type: Object, default: null },
     product: {
         type: Object,
         required: true,
@@ -84,7 +86,67 @@ const quantityLimit = computed(() => {
 })
 const quantityStep = computed(() => isKilogramUnit.value ? 0.001 : 1)
 
+const activeBatch = ref(0)
+const preloadLots = ref([])
+const preloadError = ref('')
+const preview = ref(false)
+const previewLots = ref([])
 const entry = computed(() => form.batches?.[0] ?? null)
+function keepLot() {
+    if (!props.preload || !entry.value) return
+    preloadLots.value[activeBatch.value] = {
+        ...entry.value,
+        quantity: quantityNumber(entry.value.quantity),
+        presentation: entryPresentation.value,
+        allocations: form.branch_allocations.map(row => ({ branch_id: Number(row.branch_id), quantity: allocationQuantityInPieces(row.quantity) })),
+    }
+}
+function selectLot(index) {
+    keepLot()
+    activeBatch.value = index
+    const lot = preloadLots.value[index]
+    entryPresentation.value = lot.presentation || 'piece'
+    distributionUnit.value = 'pieces'
+    form.branch_allocations = JSON.parse(JSON.stringify(lot.allocations || []))
+    form.batches = [{ ...lot }]
+    preview.value = false
+}
+function newLot() {
+    keepLot()
+    preloadLots.value.push({ quantity: '', lot_number: '', expiration_date: '', supplier: '', presentation: entryPresentation.value, allocations: [] })
+    selectLot(preloadLots.value.length - 1)
+    goToSection(1)
+}
+function removeLot(index) {
+    keepLot()
+    preloadLots.value.splice(index, 1)
+    if (!preloadLots.value.length) preloadLots.value.push({ quantity: '', presentation: 'piece', allocations: [] })
+    const lot = preloadLots.value[0]
+    activeBatch.value = 0
+    entryPresentation.value = lot.presentation || 'piece'
+    distributionUnit.value = 'pieces'
+    form.branch_allocations = JSON.parse(JSON.stringify(lot.allocations || []))
+    form.batches = [{ ...lot }]
+    preview.value = false
+}
+function preloadPayload() {
+    keepLot()
+    return preloadLots.value.map(lot => {
+        const factor = lot.presentation === 'box' ? piecesPerBox.value : lot.presentation === 'package' ? piecesPerPackage.value : 1
+        return { ...lot, base_quantity: Math.round(Number(lot.quantity) * factor * 1000) / 1000 }
+    })
+}
+
+function preloadLotStock(lot) {
+    const presentation = lot?.presentation ?? 'piece'
+    const quantity = quantityNumber(lot?.quantity)
+    const factor = presentation === 'box'
+        ? piecesPerBox.value
+        : presentation === 'package' ? piecesPerPackage.value : 1
+    const stock = Math.round(quantity * factor * 1000) / 1000
+
+    return `${stock || 0} ${isKilogramUnit.value ? 'kg' : 'pzas'}`
+}
 
 const today = computed(() => localDateInput())
 const activeSection = ref(1)
@@ -103,11 +165,18 @@ const minExpirationDate = computed(() => {
 
 const totalErrors = computed(() => errorSummary.value.length)
 
-const modalConfig = computed(() => getStockEntryModalConfig({
+const modalConfig = computed(() => ({ ...getStockEntryModalConfig({
     totalErrors: totalErrors.value,
     processing: form.processing,
     productName: productName.value,
-}))
+}), ...(props.preload ? {
+    title: `Precarga - ${productName.value}`,
+    subtitle: 'Captura los lotes y reparte su stock antes de enviarlo a cada sucursal.',
+    size: '2xl',
+    height: 'full',
+    scrollMode: 'controlled',
+    contentClass: 'p-0',
+} : {}) }))
 
 const branchOptions = computed(() => {
     const assignedBranchIds = new Set(
@@ -310,14 +379,25 @@ function updateBranchAllocation(branchId, value) {
     const allocation = findAllocation(branchId)
     if (!allocation) return
 
-    allocation.quantity = value === '' ? '' : quantityText(value)
+    if (value === '') {
+        allocation.quantity = ''
+        return
+    }
+
+    allocation.quantity = formattedQuantity(Math.min(
+        quantityNumber(value),
+        allocationLimitInCurrentUnit(branchId),
+    ))
 }
 
 function increaseBranchAllocation(branchId) {
     const allocation = findAllocation(branchId)
     if (!allocation) return
 
-    allocation.quantity = formattedQuantity(quantityNumber(allocation.quantity) + quantityStep.value)
+    allocation.quantity = formattedQuantity(Math.min(
+        quantityNumber(allocation.quantity) + quantityStep.value,
+        allocationLimitInCurrentUnit(branchId),
+    ))
 }
 
 function decreaseBranchAllocation(branchId) {
@@ -325,6 +405,30 @@ function decreaseBranchAllocation(branchId) {
     if (!allocation) return
 
     allocation.quantity = formattedQuantity(Math.max(0, quantityNumber(allocation.quantity) - quantityStep.value))
+}
+
+function allocationLimitInPieces(branchId) {
+    const currentQuantity = allocationQuantityInPieces(findAllocation(branchId)?.quantity)
+
+    return Math.max(0, totalPieces.value - (totalAllocatedInPieces.value - currentQuantity))
+}
+
+function allocationLimitInCurrentUnit(branchId) {
+    const limit = allocationLimitInPieces(branchId)
+
+    if (isBoxUnit.value && distributionUnit.value === 'boxes') {
+        return Math.floor(limit / piecesPerBox.value)
+    }
+
+    return limit
+}
+
+function requestedQuantityLabel(branch) {
+    const quantity = storedQuantityNumber(branch?.requested_quantity)
+
+    if (!quantity) return branch?.is_central_warehouse ? 'Almacén central' : 'Sin solicitud'
+
+    return `Solicitó ${quantity} ${isKilogramUnit.value ? 'kg' : 'pzas'}`
 }
 
 function updateEntryQuantity(value) {
@@ -354,6 +458,7 @@ function decreaseEntryQuantity() {
 }
 
 function goToSection(section) {
+    if (props.preload) keepLot()
     activeSection.value = Math.min(3, Math.max(1, Number(section) || 1))
 }
 
@@ -419,6 +524,19 @@ function setDistributionUnit(nextUnit) {
 }
 
 function saveEntry() {
+    if (props.preload) {
+        const lots = preloadPayload()
+        const validIds = new Set(branchOptions.value.map(branch => Number(branch.id)))
+        const invalid = lots.some(lot => !(lot.base_quantity > 0)
+            || (lot.expiration_date && lot.expiration_date <= today.value)
+            || lot.allocations.some(row => !validIds.has(row.branch_id) || !Number.isFinite(row.quantity) || row.quantity < 0 || (!isKilogramUnit.value && !Number.isInteger(row.quantity)))
+            || Math.abs(lot.allocations.reduce((sum, row) => sum + row.quantity, 0) - lot.base_quantity) > 0.0009)
+        if (invalid) { preloadError.value = 'Revisa las cantidades, la caducidad y el reparto de cada lote.'; return }
+        preloadError.value = ''
+        if (!preview.value) { previewLots.value = lots; preview.value = true; return }
+        emit('preloaded', { lots, notes: form.notes })
+        return
+    }
     if (isLegacyPresentation.value) {
         form.setError('branch_product_id', 'Este producto conserva existencias históricas por conciliar antes de recibir nuevas piezas.')
         return
@@ -477,6 +595,16 @@ watch(
 onMounted(() => {
     activeSection.value = 1
     ensureEntryReady()
+    if (props.preload) {
+        preloadLots.value = JSON.parse(JSON.stringify(props.initialPreload?.lots || []))
+        form.notes = props.initialPreload?.notes || ''
+        if (!preloadLots.value.length) preloadLots.value.push({ quantity: '', presentation: 'piece', allocations: [] })
+        const lot = preloadLots.value[0]
+        entryPresentation.value = lot.presentation || 'piece'
+        distributionUnit.value = 'pieces'
+        form.branch_allocations = JSON.parse(JSON.stringify(lot.allocations || []))
+        form.batches = [{ ...lot }]
+    }
 })
 </script>
 
@@ -493,8 +621,24 @@ onMounted(() => {
         <section
             v-if="entry"
             class="min-h-0 w-full"
+            :class="preload ? 'h-full' : ''"
         >
-            <div class="bg-background p-4 md:p-5 xl:p-6">
+            <div :class="preload ? 'grid h-full min-h-0 grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)]' : ''">
+                <div class="min-w-0 xl:order-2">
+                    <div v-if="preload && preview" class="bg-background p-4 md:p-5 xl:p-6">
+                        <div class="space-y-3">
+                            <p v-if="preloadError" class="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ preloadError }}</p>
+                            <div v-for="(lot, index) in previewLots" :key="index" class="rounded-xl border border-secondary bg-secondary/20 p-3 text-sm">
+                                <div class="flex items-center justify-between gap-3">
+                                    <strong>Lote: {{ lot.lot_number || `Lote ${index + 1}` }}</strong>
+                                    <span class="rounded-full bg-background px-2.5 py-1 text-xs font-semibold">Stock: {{ lot.base_quantity }} {{ isKilogramUnit ? 'kg' : 'pzas' }}</span>
+                                </div>
+                                <p class="mt-1 text-xs text-text opacity-70">{{ lot.expiration_date || 'Sin caducidad' }} · {{ lot.supplier || 'Sin proveedor' }}</p>
+                                <p v-for="row in lot.allocations" :key="row.branch_id" class="mt-1 text-xs">{{ branchOptions.find(branch => Number(branch.id) === row.branch_id)?.name }}: {{ row.quantity }} {{ isKilogramUnit ? 'kg' : 'pzas' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-show="!preview" class="bg-background p-4 md:p-5 xl:p-6">
                 <FormPanel
                     v-show="activeSection === 1"
                     title="Datos del lote"
@@ -564,6 +708,7 @@ onMounted(() => {
                             label="Proveedor"
                             placeholder="Opcional"
                             field="supplier"
+                            tabindex="-1"
                             :readonly="form.processing"
                         />
                     </div>
@@ -616,10 +761,11 @@ onMounted(() => {
                             class="grid grid-cols-1 gap-3 rounded-2xl border border-secondary bg-background p-3 sm:grid-cols-[minmax(0,1fr)_132px] sm:items-center"
                         >
                             <SelectionCheckboxCard
+                                :data-modal-autofocus="activeSection === 2 && branch.id === branchOptions[0]?.id ? '' : null"
                                 :checked="branchSelected(branch.id)"
                                 :disabled="isCurrentBranch(branch.id) || form.processing"
                                 :title="branch.name"
-                                :description="isCurrentBranch(branch.id) ? 'Sucursal actual' : 'Incluir en la entrada'"
+                                :description="requestedQuantityLabel(branch)"
                                 :badge="isCurrentBranch(branch.id) ? 'Fija' : ''"
                                 :highlighted="isCurrentBranch(branch.id)"
                                 variant="solid"
@@ -637,6 +783,7 @@ onMounted(() => {
                                 :max-integer-digits="3"
                                 :max-decimal-digits="3"
                                 :decrease-disabled="quantityNumber(findAllocation(branch.id)?.quantity) <= 0"
+                                :increase-disabled="allocationQuantityInPieces(findAllocation(branch.id)?.quantity) >= allocationLimitInPieces(branch.id)"
                                 @decrease="decreaseBranchAllocation(branch.id)"
                                 @increase="increaseBranchAllocation(branch.id)"
                                 @update="updateBranchAllocation(branch.id, $event)"
@@ -688,6 +835,55 @@ onMounted(() => {
                         :max="today"
                     />
                 </div>
+                    </div>
+                </div>
+
+                <aside
+                    v-if="preload"
+                    class="order-first flex min-h-0 items-center gap-3 border-b border-secondary bg-secondary/10 px-4 py-3 xl:order-1 xl:flex-col xl:items-stretch xl:gap-0 xl:border-b-0 xl:border-r xl:p-4"
+                >
+                    <div class="flex shrink-0 items-center gap-2 xl:mb-3 xl:justify-between">
+                        <h3 class="hidden text-sm font-bold text-text xl:block">Lotes</h3>
+                        <button
+                            type="button"
+                            class="rounded-lg border border-primary bg-primary px-2.5 py-1.5 text-xs font-semibold text-white transition hover:brightness-95"
+                            :disabled="form.processing"
+                            @click="newLot"
+                        >
+                            <span class="xl:hidden">+ Lote</span>
+                            <span class="hidden xl:inline">+ Agregar</span>
+                        </button>
+                    </div>
+
+                    <p v-if="preloadError" class="hidden rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 xl:mb-3 xl:block">{{ preloadError }}</p>
+
+                    <div class="flex min-w-0 flex-1 gap-2 overflow-x-auto overscroll-x-contain pb-1 pr-1 xl:block xl:max-h-none xl:space-y-2 xl:overflow-y-auto xl:overflow-x-hidden">
+                        <button
+                            v-for="(lot, index) in preloadLots"
+                            :key="index"
+                            type="button"
+                            class="min-w-[112px] shrink-0 rounded-lg border px-3 py-2.5 text-left text-xs transition xl:w-full xl:min-w-0 xl:rounded-xl xl:p-3"
+                            :class="activeBatch === index ? 'border-primary bg-background ring-1 ring-primary/30' : 'border-secondary bg-background hover:border-primary/60'"
+                            :disabled="form.processing"
+                            @click="selectLot(index)"
+                        >
+                            <span class="block whitespace-nowrap font-semibold text-text xl:hidden">{{ lot.lot_number || `Lote ${index + 1}` }}</span>
+                            <span class="hidden text-[11px] font-semibold uppercase tracking-wide text-text opacity-60 xl:block">Lote</span>
+                            <strong class="mt-0.5 hidden truncate text-sm text-text xl:block">{{ lot.lot_number || `Lote ${index + 1}` }}</strong>
+                            <span class="mt-2 hidden text-xs text-text opacity-75 xl:block">Stock: {{ preloadLotStock(lot) }}</span>
+                        </button>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="shrink-0 text-xs font-semibold text-primary transition hover:underline disabled:opacity-50 lg:mt-3 lg:self-start"
+                        :disabled="form.processing || preloadLots.length <= 1"
+                        @click="removeLot(activeBatch)"
+                    >
+                        <span class="xl:hidden">Eliminar</span>
+                        <span class="hidden xl:inline">Eliminar lote seleccionado</span>
+                    </button>
+                </aside>
             </div>
         </section>
 
@@ -698,6 +894,7 @@ onMounted(() => {
                     type="button"
                     class="rounded-xl border border-secondary bg-background px-4 py-2.5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
                     :disabled="form.processing"
+                    :tabindex="preload ? -1 : 0"
                     @click="goToSection(activeSection - 1)"
                 >
                     Volver
@@ -709,6 +906,7 @@ onMounted(() => {
                         type="button"
                         class="rounded-xl border border-secondary bg-background px-4 py-2.5 text-sm font-semibold text-text transition hover:border-primary hover:text-primary"
                         :disabled="form.processing"
+                        :tabindex="preload ? -1 : 0"
                         @click="closeModal"
                     >
                         Cancelar
@@ -717,7 +915,7 @@ onMounted(() => {
                         v-if="activeSection < 3"
                         type="button"
                         class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-                        :data-modal-autofocus="activeSection === 2 ? '' : null"
+                        :data-modal-autofocus="activeSection === 2 ? null : ''"
                         :disabled="form.processing"
                         @click="goToSection(activeSection + 1)"
                     >
@@ -731,7 +929,7 @@ onMounted(() => {
                         :disabled="form.processing"
                         @click="saveEntry"
                     >
-                        {{ form.processing ? 'Registrando...' : 'Registrar entrada' }}
+                        {{ preload ? (preview ? 'Aplicar precarga' : 'Previsualizar') : (form.processing ? 'Registrando...' : 'Registrar entrada') }}
                     </button>
                 </div>
             </div>

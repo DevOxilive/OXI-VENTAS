@@ -5,6 +5,8 @@ export function usePurchaseOrders(props, routeName = 'inventory.branches.reports
     const localFilters = ref({
         search: props.filters?.search ?? '',
         status: props.filters?.status ?? 'GENERATE',
+        source_status: props.filters?.source_status ?? 'ALL',
+        central_status: props.filters?.central_status ?? 'ALL',
         per_page: Number(props.filters?.per_page ?? 25),
     })
     let filterTimer = null
@@ -28,6 +30,8 @@ export function usePurchaseOrders(props, routeName = 'inventory.branches.reports
             {
                 search: localFilters.value.search || undefined,
                 status: localFilters.value.status || undefined,
+                source_status: localFilters.value.source_status || undefined,
+                central_status: localFilters.value.central_status || undefined,
                 per_page: localFilters.value.per_page,
                 ...overrides,
             },

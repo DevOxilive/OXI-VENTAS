@@ -2,6 +2,7 @@ import { computed, reactive, watch } from "vue";
 import { useForm } from "@inertiajs/vue3";
 import {
     WarningAlert,
+    ToastAlert,
 } from "@/Components/Modales/UniversalActionModal";
 import { getModalRequestOptions } from "@/Components/Modales/useModalConfig";
 import { validateSingleField, validateForm } from "@/Validation/schemaBuilder";
@@ -345,16 +346,24 @@ export function useAdjustStockForm(props, emit) {
             ? transformPayload(form.data())
             : form.data();
         const requestForm = form.transform(() => payload);
+        const key = operationKey.get();
 
         requestForm.post(route("inventory.stock-movements.store"), getModalRequestOptions({
             mode: "create",
             entityName: "Movimiento de stock",
             closeOnSuccess: false,
-            headers: { "Idempotency-Key": operationKey.get() },
-            successTitle: "Movimiento registrado correctamente",
+            headers: { "Idempotency-Key": key },
+            only: ["branchProductsDB", "filters", "flash", "errors", "auth"],
+            showSuccess: false,
             errorTitle: "Error en la operación",
             errorMessage: "No fue posible registrar el movimiento de stock",
-            onSuccess: () => {
+            onSuccess: (page) => {
+                const receipt = page.props.flash?.movement_receipt;
+                if (!receipt?.id || receipt.key !== key) {
+                    WarningAlert({ title: "Movimiento sin confirmar", message: "Consulta el historial antes de volver a registrar." });
+                    return;
+                }
+                ToastAlert({ title: `Movimiento #${receipt.id} registrado.` });
                 resetForm();
                 onSuccess?.();
             },

@@ -5,6 +5,8 @@ import test from "node:test";
 import { parse } from "@babel/parser";
 import { parse as parseVue } from "@vue/compiler-sfc";
 import { computed, ref, reactive, watch, effectScope, nextTick } from "vue";
+import { PRODUCT_SEARCH_TIMEOUT_MS } from "../../resources/js/config/productSearch.js";
+import { formatInventoryPresentationStock, formatMinimumStockPresentation } from "../../resources/js/utils/quantityFormatter.js";
 import { createInventoryRealtimeState } from "../../resources/js/utils/inventoryRealtimeState.mjs";
 import { createInventoryRealtimeBatch, createInventoryPageRefresh, readInventoryPage, inventoryPartialHeaders } from "../../resources/js/utils/inventoryRealtimeBatch.mjs";
 
@@ -36,7 +38,7 @@ test("the inventory composable groups events, refreshes the current page and pre
     const props = reactive({ canUseInventory: true, currentBranch: { id: 1 }, branchProductsDB: { current_page: 3, total: 60,
         data: [original], links: [] }, filters: { search: "coc", per_page: 25 }, inventoryAlerts: {}, inventoryStats: {} });
     const context = vm.createContext({
-        computed, ref, reactive, watch, console, AbortController,
+        computed, ref, reactive, watch, console, AbortController, PRODUCT_SEARCH_TIMEOUT_MS, formatInventoryPresentationStock, formatMinimumStockPresentation,
         onMounted: (callback) => mounts.push(callback), onBeforeUnmount: (callback) => unmounts.push(callback),
         router: { get: () => assert.fail("a collaborative event must not navigate") },
         usePage: () => ({ component: "Inventory/BranchInventory", version: "assets1" }),
@@ -144,6 +146,26 @@ test("the inventory composable groups events, refreshes the current page and pre
     assert.equal(inventory.showProductBatchesModal.value, true);
     assert.equal(inventory.liveSelectedBatchesProduct.value.id, 12);
     assert.equal(inventory.batchAdjustmentForm.notes, "Captura sin guardar");
+    const visits = [];
+    context.router.get = (_url, _params, visit) => visits.push(visit);
+    context.navigator = { onLine: false };
+    inventory.search.value = "639936";
+    await nextTick();
+    assert.equal(inventory.searchPending.value, true);
+    inventory.reloadInventory();
+    inventory.search.value = "458734";
+    await nextTick();
+    visits[0].onSuccess();
+    visits[0].onFinish();
+    assert.equal(inventory.searchPending.value, true);
+    inventory.reloadInventory();
+    visits[1].onFinish();
+    assert.equal(inventory.searchError.value, "Sin conexión.");
+    inventory.reloadInventory();
+    visits[2].onSuccess();
+    visits[2].onFinish();
+    assert.equal(inventory.searchPending.value, false);
+    assert.equal(inventory.searchError.value, "");
     unmounts.forEach((callback) => callback());
     assert.equal(listeners.size, 0);
 });
@@ -159,7 +181,7 @@ test("movement filters request the whole server-side history and retain paginati
         movementsUsers: [{ id: 5, name: "Ana" }], movementsSummary: [{ key: "adjustments", count: 40 }] } });
     const context = vm.createContext({ computed, reactive, watch, console,
         onMounted() {}, onBeforeUnmount: (callback) => cleanup.push(callback),
-        formatInventoryQuantity: (value) => String(value), setTimeout, clearTimeout,
+        formatInventoryQuantity: String, formatInventoryQuantityWithUnit: String, setTimeout, clearTimeout,
         window: { addEventListener() {}, removeEventListener() {} },
     });
     const modal = scope.run(() => vm.runInContext(`${sourceWithoutImports("../../resources/js/Composables/Inventory/useProductMovementsModal.js")}\nuseProductMovementsModal(__props, __emit)`, Object.assign(context, { __props: props, __emit: (...args) => emissions.push(args) })));
@@ -180,6 +202,30 @@ test("movement filters request the whole server-side history and retain paginati
     assert.equal(modal.tableRows.value.length, 1);
     assert.equal(modal.movementSummary.value[0].count, 40);
     cleanup.forEach((callback) => callback());
+});
+
+test("una actualización tardía de otra sucursal no reemplaza los datos de la pantalla actual", async () => {
+    const source = readFileSync(new URL("../../resources/js/realtime.js", import.meta.url), "utf8");
+    const declaration = parse(source, { sourceType: "module" }).program.body
+        .find(node => node.declaration?.id?.name === "refreshRealtimeProps").declaration;
+    const calls = [];
+    const window = { location: { href: "http://local/ventas?branch=1" }, axios: { get: () => {
+        const request = deferredResponse();
+        calls.push(request);
+        return request.promise;
+    } } };
+    const refresh = vm.runInNewContext(source.slice(declaration.start, declaration.end) + "\nrefreshRealtimeProps",
+        { window, pendingPropRefreshes: new Map(), console });
+    const page = { component: "Ventas/Home", props: { accounts: [] } };
+    const old = refresh(page, ["accounts"]);
+    window.location.href = "http://local/ventas?branch=2";
+    const current = refresh(page, ["accounts"]);
+    assert.equal(calls.length, 2);
+    calls[1].resolve({ data: { component: page.component, props: { accounts: [2] } } });
+    await current;
+    calls[0].resolve({ data: { component: page.component, props: { accounts: [1] } } });
+    await old;
+    assert.deepEqual(page.props.accounts, [2]);
 });
 
 test("reconnect subscriptions reuse the existing connection and unbind on cleanup", () => {

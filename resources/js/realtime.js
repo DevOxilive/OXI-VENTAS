@@ -34,6 +34,7 @@ export const REALTIME_EVENTS = Object.freeze({
     employeeChanged: '.employee.changed',
     organizationStructureChanged: '.organization-structure.changed',
     physicalCountChanged: '.PhysicalCountChanged',
+    purchaseWorkflowChanged: '.purchase-workflow.changed',
     productChanged: '.product.changed',
     stockUpdated: '.stock.updated',
     saleReturnChanged: '.sale-return.changed',
@@ -169,11 +170,14 @@ export async function refreshRealtimeProps(page, propNames, options = {}) {
         return null
     }
 
-    const requestKey = `${page.component}:${names.sort().join(',')}`
+    const url = window.location.href
+    const component = page.component
+    const requestKey = JSON.stringify([component, url, names.sort()])
     const pendingRequest = pendingPropRefreshes.get(requestKey)
     if (pendingRequest) return pendingRequest
 
-    const request = window.axios.get(window.location.href, {
+    const request = window.axios.get(url, {
+        timeout: 15000,
         headers: {
             Accept: 'text/html, application/xhtml+xml',
             'X-Inertia': 'true',
@@ -182,6 +186,7 @@ export async function refreshRealtimeProps(page, propNames, options = {}) {
             ...(page.version ? { 'X-Inertia-Version': page.version } : {}),
         },
     }).then(({ data }) => {
+        if (window.location.href !== url || page.component !== component || data?.component !== component) return null
         const nextProps = data?.props ?? {}
 
         names.forEach((name) => {

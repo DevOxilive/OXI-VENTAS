@@ -1,4 +1,5 @@
 <script setup>
+import { PRODUCT_SEARCH_TIMEOUT_MS } from "@/config/productSearch";
 import { renderTicketHeaderImage } from "@/config/ticketTemplate";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { router, useForm, usePage } from "@inertiajs/vue3";
@@ -88,7 +89,7 @@ const props = defineProps({
 const page = usePage();
 const { can } = usePermissions();
 const CASH_BOX_STORAGE_KEY = "ventas_cash_box_by_branch";
-const DEFAULT_PENDING_DRAFTS = 5;
+const DEFAULT_PENDING_DRAFTS = 1;
 const MAX_PENDING_SALES = 8;
 const PRODUCT_SEARCH_DEBOUNCE_MS = 120;
 const PRODUCT_SEARCH_CACHE_TTL_MS = 5000;
@@ -98,6 +99,7 @@ const search = ref("");
 const searchInput = ref(null);
 const remoteSearchProducts = ref([]);
 const searchLoading = ref(false);
+const searchError = ref("");
 const selectedBranchId = ref(props.currentBranch?.id ?? "");
 const selectedCashBoxNumber = ref("1");
 const cart = ref([]);
@@ -310,7 +312,7 @@ const filteredProducts = computed(() => {
 const searchSuggestions = computed(() => {
   const query = search.value.trim().toLowerCase();
 
-  if (!query) return [];
+  if (!query || searchLoading.value || searchError.value) return [];
 
   if (remoteSearchProducts.value.length) {
     return filteredProducts.value.slice(0, 20);
@@ -353,6 +355,8 @@ watch(
 
     clearPendingProductSearch();
     const requestId = ++searchRequestId;
+    remoteSearchProducts.value = [];
+    searchError.value = "";
 
     if (!query || !branchId || props.selectorMode) {
       remoteSearchProducts.value = [];
@@ -360,11 +364,13 @@ watch(
       return;
     }
 
+    searchLoading.value = true;
     searchDebounceTimer = window.setTimeout(() => {
       searchDebounceTimer = null;
       void fetchProductsForSearch(query, requestId);
     }, PRODUCT_SEARCH_DEBOUNCE_MS);
-  }
+  },
+  { flush: "sync" }
 );
 
 const totalItems = computed(() =>
@@ -872,6 +878,7 @@ function loadPendingSale(draft) {
 
 function startAdditionalSale() {
   if (saleSubmitting.value) return;
+  if (!cart.value.length) return;
 
   syncActivePendingSale();
   const emptyDraft = pendingSalesForCurrentBranch.value.find(
@@ -885,8 +892,8 @@ function startAdditionalSale() {
 
   if (pendingSalesForCurrentBranch.value.length >= MAX_PENDING_SALES) {
     WarningAlert({
-      title: "Límite de borradores",
-      message: `Puedes tener hasta ${MAX_PENDING_SALES} borradores por sucursal en esta pestaña.`,
+      title: "Límite de ventas en espera",
+      message: `Puedes tener hasta ${MAX_PENDING_SALES} ventas en espera por sucursal en esta pestaña.`,
     });
     return;
   }
@@ -915,9 +922,9 @@ async function removePendingSale(id) {
   if (saleSubmitting.value) return;
 
   const result = await UniversalActionModal({
-    title: "¿Vaciar borrador?",
-    message: "Se eliminarán los artículos de este borrador temporal.",
-    confirmText: "Vaciar borrador",
+    title: "¿Vaciar venta en espera?",
+    message: "Se eliminarán los artículos de esta venta en espera.",
+    confirmText: "Vaciar venta",
   });
 
   if (!result.isConfirmed) return;
@@ -954,7 +961,7 @@ async function clearPendingSales() {
   activePendingSaleId.value = pendingSalesForCurrentBranch.value[0]?.id || null;
   resetSaleCapture();
   persistPendingSales();
-  ToastAlert({ title: "Borradores vaciados" });
+  ToastAlert({ title: "Ventas en espera vaciadas" });
 }
 
 watch(
@@ -1121,7 +1128,7 @@ function findExactProduct(query) {
   });
 }
 
-async function fetchProductsForSearch(query, requestId = ++searchRequestId, { throwOnError = false } = {}) {
+async function fetchProductsForSearch(query, requestId = ++searchRequestId) {
   const term = String(query || "").trim();
   const branchId = selectedBranchId.value;
 
@@ -1132,6 +1139,7 @@ async function fetchProductsForSearch(query, requestId = ++searchRequestId, { th
 
   const requestKey = `${branchId}:${term.toLocaleLowerCase("es-MX")}`;
   const cacheVersion = productSearchCacheVersion;
+  if (requestId === searchRequestId) searchError.value = "";
   const cached = productSearchCache.get(requestKey);
 
   if (cached && Date.now() - cached.createdAt < PRODUCT_SEARCH_CACHE_TTL_MS) {
@@ -1155,10 +1163,11 @@ async function fetchProductsForSearch(query, requestId = ++searchRequestId, { th
         headers: {
           Accept: "application/json",
         },
-        timeout: 8000,
+        timeout: PRODUCT_SEARCH_TIMEOUT_MS,
       })
       .then(({ data }) => {
-        const products = Array.isArray(data?.products) ? data.products : [];
+        if (!Array.isArray(data?.products)) throw new Error("Respuesta de búsqueda inválida");
+        const products = data.products;
 
         if (cacheVersion === productSearchCacheVersion) {
           productSearchCache.set(requestKey, {
@@ -1202,10 +1211,9 @@ async function fetchProductsForSearch(query, requestId = ++searchRequestId, { th
   } catch (error) {
     if (requestId === searchRequestId) {
       remoteSearchProducts.value = [];
-    }
-
-    if (throwOnError) {
-      throw error;
+      searchError.value = !navigator.onLine ? "Sin conexión."
+        : error.code === "ECONNABORTED" || error.code === "ETIMEDOUT" ? "La búsqueda tardó demasiado."
+        : "No se pudo completar la búsqueda.";
     }
 
     return [];
@@ -1271,19 +1279,10 @@ async function handleSearchKeydown(event) {
     return;
   }
 
-  if (!searchSuggestions.value.length) {
-    clearPendingProductSearch();
-
-    try {
-      await fetchProductsForSearch(query, ++searchRequestId, { throwOnError: true });
-    } catch (error) {
-      ErrorAlert({
-        title: "No se pudo buscar",
-        message: "Revisa la conexion e intenta escanear o escribir de nuevo.",
-      });
-      return;
-    }
-  }
+  clearPendingProductSearch();
+  const requestId = ++searchRequestId;
+  await fetchProductsForSearch(query, requestId);
+  if (requestId !== searchRequestId || searchError.value) return;
 
   if (searchSuggestions.value.length) {
     selectSuggestion(
@@ -1304,11 +1303,6 @@ async function handleSearchKeydown(event) {
     addProduct(filteredProducts.value[0]);
     return;
   }
-
-  ErrorAlert({
-    title: "Producto no encontrado",
-    message: "Escanea el codigo o escribe el nombre del producto para buscarlo rapido.",
-  });
 }
 
 function increaseQuantity(index) {
@@ -1828,7 +1822,7 @@ function closeChangeModal() {
 </script>
 
 <template>
-  <PageLayout fill-height>
+  <PageLayout>
     <template #toolbar>
       <GlobalToolbar
         v-bind="toolbarConfig"
@@ -1944,7 +1938,7 @@ function closeChangeModal() {
       </GlobalModal>
 
       <div class="min-h-0 flex-1">
-        <section class="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-secondary bg-background p-3 shadow-sm lg:h-full md:p-4">
+        <section class="pos-capture flex flex-col rounded-2xl border border-secondary bg-background p-3 shadow-sm">
           <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end">
             <div class="min-w-0 flex-1">
               <div class="pos-search relative">
@@ -1961,14 +1955,17 @@ function closeChangeModal() {
                 />
 
                 <div
-                  v-if="searchSuggestions.length || searchLoading"
+                  v-if="search.trim() && selectedBranchId && !props.selectorMode"
                   class="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 overflow-hidden rounded-2xl border border-secondary bg-background shadow-xl"
                 >
                   <div
-                    v-if="searchLoading && !searchSuggestions.length"
+                    v-if="!searchSuggestions.length"
+                    role="status"
                     class="px-4 py-3 text-base font-semibold text-text opacity-70"
                   >
-                    Buscando productos...
+                    {{ searchLoading ? 'Buscando…' : searchError || 'Sin coincidencias.' }}
+                    <button v-if="searchError" type="button" class="ml-2 font-semibold underline"
+                      @click="fetchProductsForSearch(search)">Reintentar</button>
                   </div>
 
                   <button
@@ -2012,26 +2009,27 @@ function closeChangeModal() {
           </div>
 
           <div class="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden">
-            <section class="mb-3 shrink-0 rounded-xl border border-secondary bg-secondary/60 p-2.5" aria-label="Borradores de venta">
+            <section class="mb-3 shrink-0 rounded-xl border border-secondary bg-secondary/60 p-2" aria-label="Ventas en espera">
               <div class="flex items-center gap-2 overflow-x-auto pb-0.5">
-                <div class="flex shrink-0 items-center gap-2 pr-1">
-                  <span class="material-symbols-outlined text-[19px] text-primary">pause_circle</span>
-                  <p class="whitespace-nowrap text-xs font-black text-text">Borradores</p>
-                </div>
+                <button type="button" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50" :disabled="saleSubmitting || !cart.length" @click="startAdditionalSale">
+                  <span class="material-symbols-outlined text-[18px]">pause_circle</span>
+                  Poner venta en espera
+                </button>
 
                 <article
                   v-for="(pendingSale, index) in pendingSalesForCurrentBranch"
                   :key="pendingSale.id"
-                  class="flex min-w-[190px] shrink-0 items-center gap-2 rounded-lg border bg-background px-2.5 py-2 shadow-sm transition"
-                  :class="pendingSale.id === activePendingSaleId ? 'border-primary ring-1 ring-primary/25' : 'border-secondary hover:border-primary/45'"
+                  class="pending-sale flex min-w-[180px] shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1.5 transition"
+                  :class="pendingSale.id === activePendingSaleId ? 'pending-sale--active' : 'pending-sale--waiting'"
                 >
                   <button
                     type="button"
                     class="min-w-0 flex-1 text-left"
                     :disabled="saleSubmitting"
+                    :aria-pressed="pendingSale.id === activePendingSaleId"
                     @click="resumePendingSale(pendingSale.id)"
                   >
-                    <p class="truncate text-xs font-black text-text">Venta {{ index + 1 }}</p>
+                    <p class="flex items-center gap-2 text-xs font-black text-text"><span class="pending-sale__light" aria-hidden="true"></span><span class="truncate">Venta en espera {{ index + 1 }}</span></p>
                     <p class="mt-0.5 text-[11px] font-semibold text-text opacity-65">
                       {{ pendingSale.items.length }} artículo(s) · {{ formatMoney(pendingSale.items.reduce((total, item) => total + cartItemSubtotal(item), 0)) }}
                     </p>
@@ -2039,7 +2037,7 @@ function closeChangeModal() {
                   <button
                     type="button"
                     class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text opacity-55 transition hover:bg-secondary hover:text-primary hover:opacity-100 disabled:cursor-not-allowed"
-                    :aria-label="`Vaciar borrador ${index + 1}`"
+                    :aria-label="`Vaciar venta en espera ${index + 1}`"
                     :disabled="saleSubmitting"
                     @click="removePendingSale(pendingSale.id)"
                   >
@@ -2056,15 +2054,6 @@ function closeChangeModal() {
                   >
                     Limpiar esperas
                   </button>
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-black text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="saleSubmitting"
-                    @click="startAdditionalSale"
-                  >
-                    <span class="material-symbols-outlined text-[16px]">add</span>
-                    Añadir venta
-                  </button>
                 </div>
               </div>
             </section>
@@ -2077,7 +2066,7 @@ function closeChangeModal() {
               <span></span>
             </div>
 
-            <div class="min-h-0 flex-1 divide-y divide-secondary overflow-y-auto">
+            <div class="pos-cart-list divide-y divide-secondary overflow-y-auto">
               <SaleCartItemCard
                 v-for="(item, index) in cart"
                 :key="`${item.branch_product_id}-${index}`"
@@ -2445,13 +2434,57 @@ function closeChangeModal() {
 </template>
 
 <style scoped>
+.pos-cart-list { max-height: max(320px, 65dvh); }
+.pending-sale {
+  position: relative;
+  isolation: isolate;
+  border-color: color-mix(in srgb, var(--primary) 24%, transparent);
+  background: var(--background);
+  border-radius: 12px;
+  transition: border-color 300ms ease, box-shadow 300ms ease;
+}
+.pending-sale::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 0% 0%, color-mix(in srgb, var(--primary) 22%, transparent), transparent 75%), linear-gradient(120deg, transparent 30%, color-mix(in srgb, var(--primary) 7%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 45%, transparent), 0 2px 9px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+.pending-sale__light {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent), 0 0 9px color-mix(in srgb, var(--primary) 55%, transparent);
+}
+.pending-sale--waiting::before, .pending-sale--waiting .pending-sale__light { animation: waiting-sale-glow 2.8s ease-in-out infinite; }
+.pending-sale--active {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+.pending-sale--active::before, .pending-sale--active .pending-sale__light { opacity: 1; }
+.pending-sale:hover { border-color: var(--primary); }
+@keyframes waiting-sale-glow {
+  0%, 100% { opacity: .12; }
+  50% { opacity: .95; }
+}
+.pos-capture :deep(.quantity-stepper) { height: 40px; }
+.pos-capture :deep(.pos-quantity-stepper button), .pos-capture :deep(.pos-quantity-stepper input) { height: 38px; }
+.pos-capture :deep(article > .grid) { row-gap: 8px; }
+@media (prefers-reduced-motion: reduce) {
+  .pending-sale--waiting::before, .pending-sale--waiting .pending-sale__light { animation: none; opacity: .65; }
+}
 .pos-search :deep(label) {
-  font-size: 1rem;
+  font-size: .875rem;
 }
 
 .pos-search :deep(input) {
-  min-height: 3.5rem;
-  font-size: 1rem;
+  min-height: 2.75rem;
+  font-size: .875rem;
 }
 
 .pos-search :deep(.material-symbols-outlined) {

@@ -208,7 +208,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         ...(canUse("purchaseOrders")
             ? [
                   {
-                      text: "Órdenes de compra generales",
+                      text: "Compra Central",
                       key: `inventory.${branch.slug}.general-purchase-orders`,
                       icon: "receipt_long",
                       url: route("inventory.branches.reports.purchase-orders", {
@@ -261,36 +261,41 @@ export function generateMenu(role, permissions = [], branches = []) {
         canUse("audits");
 
     if (canSeeBranchesSection) {
-        menu.push({
+        const visibleBranches = branches
+            .filter((branch) => branch.slug)
+            .map((branch) => ({
+                text: branch.name,
+                key: branch.slug,
+                slug: branch.slug,
+                color: branch.color,
+                bgColor: branch.color,
+                icon: "store",
+                isBranch: true,
+                isOpen: false,
+                children: inventoryOptions(branch),
+            }))
+            .filter((branchItem) => branchItem.children.length);
+
+        const branchesMenuItem = {
             text: "Sucursales",
             key: "branches",
             icon: "inventory_2",
             isOpen: false,
-            children: branches
-                .filter((branch) => branch.slug)
-                .map((branch) => ({
-                    text: branch.name,
-                    key: branch.slug,
-                    slug: branch.slug,
-                    color: branch.color,
-                    bgColor: branch.color,
-                    icon: "store",
-                    isBranch: true,
-                    isOpen: false,
-                    children: inventoryOptions(branch),
-                }))
-                .filter((branchItem) => branchItem.children.length),
-        });
+            children: visibleBranches,
+        };
+
+        // Una sola sucursal no necesita el nivel intermedio "Sucursales".
+        menu.push(visibleBranches.length === 1 ? visibleBranches[0] : branchesMenuItem);
     }
 
     const purchaseListsMenuItem = {
-        text: "Lista de compra",
+        text: "Listas de compra",
         key: "sales.purchase-lists",
         icon: "shopping_cart",
         url: route("ventas.purchase-reports.index"),
     };
     const branchPurchaseOrdersMenuItem = {
-        text: "Órdenes de compra",
+        text: "Solicitudes de compra",
         key: "sales.purchase-orders",
         icon: "shopping_bag",
         url: route("ventas.purchase-orders.index"),
@@ -324,7 +329,7 @@ export function generateMenu(role, permissions = [], branches = []) {
         canUsePurchaseOrderTracking ||
         canRegisterSalesAttendance
     ) {
-        menu.push({
+        const salesMenuItem = {
             text: "Ventas",
             key: "sales",
             icon: "point_of_sale",
@@ -372,7 +377,10 @@ export function generateMenu(role, permissions = [], branches = []) {
                     }]
                     : []),
             ],
-        });
+        };
+
+        // Si solo hay una acción de ventas, se muestra directamente en el menú.
+        menu.push(salesMenuItem.children.length === 1 ? salesMenuItem.children[0] : salesMenuItem);
     }
 
     const reportMenuItems = [

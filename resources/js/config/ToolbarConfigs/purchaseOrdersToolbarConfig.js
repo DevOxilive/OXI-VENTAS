@@ -1,33 +1,49 @@
-export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, mode = 'view', tabs = null, actions = [] } = {}) {
-    const headings = {
-        view: ['Solicitudes de compra', 'Revisa solicitudes de sucursal y reúne las que comprarás.'],
-        tracking: ['Compras centrales', 'Registra los productos comprados.'],
-        history: ['Compras cerradas', 'Consulta las compras que ya fueron terminadas.'],
-    }
-    const [title, subtitle] = headings[mode] || headings.view
+export function getPurchaseOrdersToolbarConfig({ filters = {}, total = 0, tabs = [] } = {}) {
+    const showingCentralPurchases = filters.status === 'CENTRAL'
 
     return {
-        icon: mode === 'tracking' ? 'local_shipping' : mode === 'history' ? 'history' : 'shopping_cart',
-        title,
-        subtitle,
+        icon: showingCentralPurchases ? 'local_shipping' : 'shopping_cart',
+        title: showingCentralPurchases ? 'Compra Central' : 'Solicitudes de compra',
+        subtitle: '',
         backButton: true,
         backLabel: 'Inventario',
         search: filters.search ?? '',
-        searchPlaceholder: 'Buscar compra, producto, código o sucursal',
-        showSearch: mode !== 'view' || filters.status !== 'GENERATE',
+        searchPlaceholder: showingCentralPurchases
+            ? 'Buscar compra central, producto o sucursal'
+            : 'Buscar solicitud, sucursal o solicitante',
+        showSearch: true,
         compactFilters: true,
-        filters: [],
-        actions,
-        tabs: mode === 'view' ? (tabs ?? [
-            { key: 'GENERATE', label: 'Solicitudes', icon: 'playlist_add' },
-            { key: 'PURCHASING', label: 'Compras centrales', icon: 'local_shipping' },
-            { key: 'COMPLETED', label: 'Cerradas', icon: 'task_alt' },
-        ]) : [],
+        filters: [showingCentralPurchases
+            ? {
+                key: 'central_status',
+                label: 'Estado',
+                placeholder: 'Todos los estados',
+                value: filters.central_status ?? 'ALL',
+                options: [
+                    { label: 'Todos los estados', value: 'ALL' },
+                    { label: 'En compra', value: 'PURCHASING' },
+                    { label: 'Completada', value: 'COMPLETED' },
+                ],
+            }
+            : {
+                key: 'source_status',
+                label: 'Estado',
+                placeholder: 'Todos los estados',
+                value: filters.source_status ?? 'ALL',
+                options: [
+                    { label: 'Todos los estados', value: 'ALL' },
+                    { label: 'Pendiente', value: 'PENDING' },
+                    { label: 'Aprobada', value: 'APPROVED' },
+                    { label: 'Rechazada', value: 'REJECTED' },
+                ],
+            }],
+        actions: [],
+        tabs,
         activeTab: filters.status ?? 'GENERATE',
         recordsPerPage: Number(filters.per_page ?? 25),
-        showRecordsPerPage: mode !== 'view' || filters.status !== 'GENERATE',
+        showRecordsPerPage: true,
         totalRecords: total,
         filteredRecords: total,
-        showCounter: true,
+        showCounter: false,
     }
 }

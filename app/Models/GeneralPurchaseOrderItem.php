@@ -27,9 +27,13 @@ class GeneralPurchaseOrderItem extends Model
         'net_unit_cost',
         'unavailable',
         'purchase_notes',
+        'branch_allocations',
+        'physically_reviewed',
     ];
 
     protected $casts = [
+        'branch_allocations' => 'array',
+        'physically_reviewed' => 'boolean',
         'requested_quantity' => 'decimal:3',
         'estimated_unit_price' => 'decimal:2',
         'estimated_total' => 'decimal:2',
@@ -52,5 +56,10 @@ class GeneralPurchaseOrderItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function plannedBatches()
+    {
+        return $this->hasMany(GeneralPurchaseOrderItemBatch::class);
     }
 }

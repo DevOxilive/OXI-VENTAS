@@ -100,6 +100,26 @@ class InventoryBackgroundTasksTest extends TestCase
         $this->assertDatabaseCount('inventory_tasks', 0);
     }
 
+    public function test_cashier_reads_the_confirmed_stock_and_receipt_before_notifications_run(): void
+    {
+        $key = 'local-inventory-receipt';
+        $url = route('inventory.branches.inventory', ['branch' => $this->inventory->branch_id]);
+        $this->from($url)->withHeader('Idempotency-Key', $key)
+            ->post(route('inventory.stock-movements.store'), $this->incoming())
+            ->assertRedirect($url)->assertSessionHasNoErrors();
+        $movement = $this->inventory->movements()->sole();
+        $version = app(\App\Http\Middleware\HandleInertiaRequests::class)->version(request());
+        $this->get($url, [
+            'X-Inertia' => 'true', 'X-Inertia-Version' => (string) $version,
+            'X-Inertia-Partial-Component' => 'Inventory/BranchInventory',
+            'X-Inertia-Partial-Data' => 'branchProductsDB,filters,flash,errors,auth',
+        ])->assertOk()->assertJsonPath('props.flash.movement_receipt.id', $movement->id)
+            ->assertJsonPath('props.flash.movement_receipt.key', $key)
+            ->assertJsonPath('props.branchProductsDB.data.0.stock', '4.000')
+            ->assertJsonMissingPath('props.inventoryAlerts');
+        $this->assertDatabaseHas('inventory_tasks', ['type' => 'stock.updated', 'status' => 'pending']);
+    }
+
     public function test_worker_delivers_current_stock_without_repeating_the_original_movement(): void
     {
         $this->move();

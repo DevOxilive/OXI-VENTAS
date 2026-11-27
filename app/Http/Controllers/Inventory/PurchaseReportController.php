@@ -2,25 +2,36 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Events\PurchaseWorkflowChanged;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Concerns\ValidatesRecordVersion;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\BranchProduct;
 use App\Models\Category;
+use App\Models\GeneralPurchaseOrderItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\ProductDepartment;
+use App\Models\StockMovement;
+use App\Models\SystemAudit;
+use App\Search\ProductSearchOptions;
+use App\Search\ProductSearchService;
+use App\Services\StockMovementService;
 use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class PurchaseReportController extends Controller
 {
     use AuthorizesBranchAccess, ValidatesRecordVersion;
+
+    public function __construct(
+        private readonly ProductSearchService $productSearch,
+        private readonly StockMovementService $stockMovementService,
+    ) {}
 
     public function salesPurchaseLists(Request $request)
     {
@@ -63,7 +74,7 @@ class PurchaseReportController extends Controller
                 'currentBranch' => null,
                 'branchesDB' => $this->mapPurchaseBranches($branches),
                 'ordersDB' => ['data' => []],
-                'filters' => ['status' => PurchaseOrder::STATUS_GENERATED],
+                'filters' => ['status' => 'ALL'],
             ]);
         }
 
@@ -75,9 +86,15 @@ class PurchaseReportController extends Controller
         $this->abortIfUserCannotAccessBranch($request, $branch);
 
         $perPage = TablePagination::resolvePerPage($request);
-        $status = $request->input('status', PurchaseOrder::STATUS_GENERATED);
+        $status = $request->input('status', 'ALL');
+        $search = trim((string) $request->input('search', ''));
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
         $allowedStatuses = [
-            PurchaseOrder::STATUS_GENERATED,
+            'ALL',
+            'PENDING',
+            'APPROVED',
+            'REJECTED',
             PurchaseOrder::STATUS_REVIEW,
             PurchaseOrder::STATUS_COMPLETED,
         ];
@@ -88,27 +105,61 @@ class PurchaseReportController extends Controller
 
         $filters = [
             'status' => $status,
+            'search' => $search,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
             'per_page' => $perPage,
         ];
 
         $orders = PurchaseOrder::query()
             ->withCount('items')
             ->where('branch_id', $branch->id)
-            ->where('status', $filters['status']);
+            ->where('status', '!=', PurchaseOrder::STATUS_DRAFT)
+            ->when($filters['status'] === 'PENDING', fn ($query) => $query
+                ->where('status', PurchaseOrder::STATUS_GENERATED)
+                ->where('review_status', PurchaseOrder::REVIEW_PENDING))
+            ->when($filters['status'] === 'APPROVED', fn ($query) => $query
+                ->where('status', PurchaseOrder::STATUS_GENERATED)
+                ->where('review_status', PurchaseOrder::REVIEW_APPROVED))
+            ->when($filters['status'] === 'REJECTED', fn ($query) => $query
+                ->where('status', PurchaseOrder::STATUS_GENERATED)
+                ->where('review_status', PurchaseOrder::REVIEW_REJECTED))
+            ->when(in_array($filters['status'], [PurchaseOrder::STATUS_REVIEW, PurchaseOrder::STATUS_COMPLETED], true), fn ($query) => $query->where('status', $filters['status']))
+            ->when($search !== '', fn ($query) => $query->where('folio', 'like', "%{$search}%"))
+            ->when($dateFrom, fn ($query) => $query->whereDate('generated_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($query) => $query->whereDate('generated_at', '<=', $dateTo));
 
         $orders = $orders
             ->latest('id')
             ->paginate($filters['per_page'])
-            ->withQueryString()
-            ->through(fn (PurchaseOrder $order) => [
+            ->withQueryString();
+
+        $reviewActivity = $this->reviewActivityByOrderId(
+            $orders->getCollection()->pluck('id')->all(),
+        );
+
+        $orders->through(function (PurchaseOrder $order) use ($reviewActivity) {
+            $activity = $reviewActivity[$order->id] ?? 'Sin abrir';
+
+            return [
                 'id' => $order->id,
-                'folio' => $order->folio,
+                'folio' => $this->displayPurchaseFolio($order->folio),
+                'stored_folio' => $order->folio,
                 'status' => $order->status,
-                'status_label' => $this->statusLabel($order->status, $order->review_status),
-                'inventory_edit_label' => $order->inventory_edited_at ? 'Editado' : null,
+                'review_status' => $order->review_status,
+                'review_status_label' => $this->reviewStatusLabel($order->review_status),
+                'review_activity' => $activity,
+                'workflow_status_label' => $this->workflowStatusLabel($order, $activity),
+                'workflow_status_tone' => $this->workflowStatusTone($order, $activity),
+                'status_label' => $this->statusLabel(
+                    $order->status,
+                    $order->review_status,
+                    (bool) $order->inventory_edited_at,
+                ),
                 'items_count' => $order->items_count,
                 'display_date' => $order->completed_at ?? $order->generated_at ?? $order->created_at,
-            ]);
+            ];
+        });
 
         return Inertia::render('Inventory/BranchPurchaseOrders', [
             'currentBranch' => $branch,
@@ -136,7 +187,7 @@ class PurchaseReportController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.branch_product_id' => ['required', 'exists:branch_products,id'],
             'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
-            'items.*.purchase_presentation' => ['nullable', 'in:Pieza,Caja,Kilo'],
+            'items.*.purchase_presentation' => ['nullable', 'in:Pieza,Paquete,Caja,Kilo'],
             'items.*.package_quantity' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
             'items.*.units_per_package' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
         ]);
@@ -155,7 +206,7 @@ class PurchaseReportController extends Controller
                     'branch_id' => $branch->id,
                     'user_id' => $request->user()?->id,
                     'source' => PurchaseOrder::SOURCE_CENTRAL,
-                    'folio' => $generateOrder ? $this->makeGeneratedFolio($branch) : null,
+                    'folio' => $generateOrder ? $this->makeGeneratedFolio() : null,
                     'status' => $generateOrder
                         ? PurchaseOrder::STATUS_GENERATED
                         : PurchaseOrder::STATUS_DRAFT,
@@ -168,7 +219,7 @@ class PurchaseReportController extends Controller
 
             if ($generateOrder && $report->status === PurchaseOrder::STATUS_DRAFT) {
                 $report->update([
-                    'folio' => $this->makeGeneratedFolio($branch),
+                    'folio' => $this->makeGeneratedFolio(),
                     'status' => PurchaseOrder::STATUS_GENERATED,
                     'generated_at' => now(),
                 ]);
@@ -233,7 +284,7 @@ class PurchaseReportController extends Controller
                 'updated_at',
             ]);
             $generatedOrder->forceFill([
-                'folio' => $this->makeGeneratedFolio($branch),
+                'folio' => $this->makeGeneratedFolio(),
                 'status' => PurchaseOrder::STATUS_GENERATED,
                 'generated_at' => now(),
             ])->save();
@@ -279,16 +330,16 @@ class PurchaseReportController extends Controller
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'integer'],
-            'items.*.received_quantity' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999.99'],
+            'items.*.received_quantity' => ['required', 'numeric', 'decimal:0,3', 'min:0', 'max:9999.999'],
             'items.*.receipt_notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $receivedItems = collect($validated['items'])->keyBy(fn ($item) => (int) $item['id']);
 
-        DB::transaction(function () use ($purchaseReport, $receivedItems, $request) {
+        $inventoryWasPreloaded = DB::transaction(function () use ($purchaseReport, $receivedItems, $request) {
             $lockedOrder = $this->lockCurrentVersion($request, $purchaseReport);
             abort_unless($lockedOrder->status === PurchaseOrder::STATUS_REVIEW, 422, 'La orden debe estar por revisar antes de confirmar la recepcion.');
-            $items = $lockedOrder->items()->lockForUpdate()->get();
+            $items = $lockedOrder->items()->with('branchProduct.product')->lockForUpdate()->get();
 
             if ($receivedItems->keys()->sort()->values()->all() !== $items->pluck('id')->sort()->values()->all()) {
                 throw ValidationException::withMessages([
@@ -296,18 +347,41 @@ class PurchaseReportController extends Controller
                 ]);
             }
 
+            $generalItems = $lockedOrder->general_purchase_order_id
+                ? GeneralPurchaseOrderItem::query()
+                    ->where('general_purchase_order_id', $lockedOrder->general_purchase_order_id)
+                    ->with('plannedBatches')
+                    ->get()
+                    ->keyBy('product_id')
+                : collect();
+            $inventoryWasPreloaded = false;
+
             foreach ($items as $item) {
                 $received = $receivedItems->get((int) $item->id);
                 $receivedQuantity = (float) $received['received_quantity'];
-                $requestedQuantity = (float) $item->requested_quantity;
+                $expectedQuantity = (float) ($item->purchased_quantity ?? $item->requested_quantity);
+                $generalItem = $generalItems->get($item->product_id);
+                $enteredQuantity = $this->registerPreloadedInventory(
+                    item: $item,
+                    generalItem: $generalItem,
+                    receivedQuantity: $receivedQuantity,
+                    userId: $lockedOrder->generalOrder?->created_by ?? $request->user()?->id,
+                    orderFolio: $lockedOrder->folio,
+                );
+                $inventoryWasPreloaded = $inventoryWasPreloaded || $enteredQuantity > 0;
+                $receiptNotes = $this->receiptNotesWithPreloadDifference(
+                    notes: $received['receipt_notes'] ?? null,
+                    receivedQuantity: $receivedQuantity,
+                    enteredQuantity: $enteredQuantity,
+                );
 
                 $item->update([
                     'received_quantity' => $receivedQuantity,
-                    'receipt_notes' => $received['receipt_notes'] ?? null,
+                    'receipt_notes' => $receiptNotes,
                     'actual_total' => round($receivedQuantity * (float) $item->actual_price, 2),
                     'status' => $receivedQuantity <= 0
                         ? PurchaseOrderItem::STATUS_UNAVAILABLE
-                        : (abs($receivedQuantity - $requestedQuantity) < 0.001
+                        : (abs($receivedQuantity - $expectedQuantity) < 0.001
                             ? PurchaseOrderItem::STATUS_PURCHASED
                             : PurchaseOrderItem::STATUS_ADJUSTED),
                 ]);
@@ -320,9 +394,92 @@ class PurchaseReportController extends Controller
                 'completed_by' => $request->user()?->id,
                 'completed_at' => now(),
             ]);
+
+            return $inventoryWasPreloaded;
         }, 3);
 
-        return redirect()->back()->with('success', 'Orden completada correctamente.');
+        PurchaseWorkflowChanged::dispatch('receipt_completed', $purchaseReport->id);
+
+        return redirect()->back()->with(
+            'success',
+            $inventoryWasPreloaded
+                ? 'Recepcion confirmada e inventario actualizado correctamente.'
+                : 'Orden completada correctamente.'
+        );
+    }
+
+    /**
+     * Convierte la parte confirmada de una precarga en existencias reales.
+     * La precarga sigue siendo el limite: un sobrante se conserva en la
+     * recepcion como diferencia, pero no inventa lotes ni aumenta el stock.
+     */
+    private function registerPreloadedInventory(
+        PurchaseOrderItem $item,
+        ?GeneralPurchaseOrderItem $generalItem,
+        float $receivedQuantity,
+        ?int $userId,
+        ?string $orderFolio,
+    ): float {
+        if (! $generalItem || $receivedQuantity <= 0 || ! $item->branchProduct) {
+            return 0;
+        }
+
+        $remainingToEnter = round($receivedQuantity, 3);
+        $enteredQuantity = 0.0;
+
+        foreach ($generalItem->plannedBatches->sortBy('id') as $plannedBatch) {
+            $allocation = collect($plannedBatch->allocations ?? [])
+                ->first(fn (array $row) => (int) ($row['branch_id'] ?? 0) === (int) $item->branchProduct->branch_id);
+            $plannedQuantity = round((float) ($allocation['quantity'] ?? 0), 3);
+
+            if ($plannedQuantity <= 0 || $remainingToEnter <= 0) {
+                continue;
+            }
+
+            $quantityToEnter = min($remainingToEnter, $plannedQuantity);
+            if (blank($plannedBatch->lot_number) || ! $plannedBatch->expiration_date) {
+                throw ValidationException::withMessages([
+                    'items' => "La precarga de {$item->product?->name} necesita numero de lote y caducidad antes de confirmar la recepcion.",
+                ]);
+            }
+
+            $this->stockMovementService->move(
+                branchProduct: $item->branchProduct,
+                type: StockMovement::TYPE_IN,
+                reason: StockMovement::REASON_PURCHASE,
+                quantity: $quantityToEnter,
+                notes: "Recepcion de {$orderFolio}. Precarga de compra central.",
+                userId: $userId,
+                batches: [[
+                    'lot_number' => $plannedBatch->lot_number,
+                    'expiration_date' => $plannedBatch->expiration_date->toDateString(),
+                    'received_at' => now()->toDateString(),
+                    'supplier' => $plannedBatch->supplier,
+                    'quantity' => $quantityToEnter,
+                ]],
+            );
+
+            $remainingToEnter = round($remainingToEnter - $quantityToEnter, 3);
+            $enteredQuantity = round($enteredQuantity + $quantityToEnter, 3);
+        }
+
+        return $enteredQuantity;
+    }
+
+    private function receiptNotesWithPreloadDifference(?string $notes, float $receivedQuantity, float $enteredQuantity): ?string
+    {
+        $notes = trim((string) $notes);
+        $difference = round($receivedQuantity - $enteredQuantity, 3);
+
+        if ($difference <= 0.0009) {
+            return $notes !== '' ? $notes : null;
+        }
+
+        $preloadNote = "Sobrante registrado: {$difference}. Queda pendiente de aclarar; no se agrego al inventario.";
+
+        return $notes === ''
+            ? $preloadNote
+            : "{$notes}\n{$preloadNote}";
     }
 
     public function destroy(
@@ -380,6 +537,8 @@ class PurchaseReportController extends Controller
                 'inventory_unit' => $item->product?->inventory_unit ?? $item->product?->unit ?? 'pza',
                 'has_box_presentation' => (bool) $item->product?->has_box_presentation,
                 'pieces_per_box' => $item->product?->pieces_per_box,
+                'has_package_presentation' => (bool) $item->product?->has_package_presentation,
+                'pieces_per_package' => $item->product?->pieces_per_package,
                 'label' => trim(($item->product?->name ?? 'Producto sin nombre')
                     .' - '
                     .($item->product?->barcodes?->first()?->code ?: ($item->barcode ?: 'Sin codigo'))),
@@ -434,6 +593,8 @@ class PurchaseReportController extends Controller
                                 'inventory_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
                                 'has_box_presentation' => (bool) $product?->has_box_presentation,
                                 'pieces_per_box' => $product?->pieces_per_box,
+                                'has_package_presentation' => (bool) $product?->has_package_presentation,
+                                'pieces_per_package' => $product?->pieces_per_package,
                                 'barcodes' => $product?->barcodes?->map(fn ($barcode) => [
                                     'id' => $barcode->id,
                                     'code' => $barcode->code,
@@ -479,12 +640,23 @@ class PurchaseReportController extends Controller
             'items.branchProduct.product.barcodes',
             'items.branchProduct.product.category.productDepartment',
         ]);
+        $reviewActivity = $this->reviewActivityByOrderId([$purchaseReport->id])[$purchaseReport->id] ?? 'Sin abrir';
 
         return response()->json([
             'id' => $purchaseReport->id,
             'folio' => $purchaseReport->folio,
             'status' => $purchaseReport->status,
-            'status_label' => $this->statusLabel($purchaseReport->status, $purchaseReport->review_status),
+            'status_label' => $this->statusLabel(
+                $purchaseReport->status,
+                $purchaseReport->review_status,
+                (bool) $purchaseReport->inventory_edited_at,
+            ),
+            'review_status' => $purchaseReport->review_status,
+            'review_status_label' => $this->reviewStatusLabel($purchaseReport->review_status),
+            'review_activity' => $reviewActivity,
+            'workflow_status_label' => $this->workflowStatusLabel($purchaseReport, $reviewActivity),
+            'workflow_status_tone' => $this->workflowStatusTone($purchaseReport, $reviewActivity),
+            'change_history' => $this->sourceOrderChangeHistory($purchaseReport->id),
             'record_version' => $purchaseReport->updated_at?->toJSON(),
             'requested_at' => $purchaseReport->generated_at ?? $purchaseReport->created_at,
             'items_count' => $purchaseReport->items->count(),
@@ -510,6 +682,9 @@ class PurchaseReportController extends Controller
                     'product_department_name' => $product?->category?->productDepartment?->name ?? 'Sin departamento',
                     'department' => $product?->category?->productDepartment?->name ?? 'Sin departamento',
                     'category_name' => $product?->category?->name ?? 'Sin categoria',
+                    'purchase_presentation' => $item->purchase_presentation ?? 'Pieza',
+                    'package_quantity' => (float) ($item->package_quantity ?? $item->requested_quantity),
+                    'units_per_package' => (float) ($item->units_per_package ?? 1),
                     'requested_quantity' => (float) $item->requested_quantity,
                     'received_quantity' => $item->received_quantity === null
                         ? null
@@ -530,18 +705,21 @@ class PurchaseReportController extends Controller
                 'product.barcodes',
             ])
             ->where('branch_id', $branch->id)
-            ->when($filters['search'] !== '', function ($query) use ($filters) {
-                $search = $filters['search'];
-
-                $query->where(function ($searchQuery) use ($search) {
-                    $searchQuery->where('branch_products.barcode', 'like', "%{$search}%")
-                        ->orWhereHas('product', fn ($productQuery) => $productQuery
-                            ->where('name', 'like', "%{$search}%")
-                            ->orWhereHas('barcodes', fn ($barcodeQuery) => $barcodeQuery
-                                ->where('code', 'like', "%{$search}%")
-                            )
-                        );
-                });
+            ->when($filters['search'] !== '', function ($query) use ($branch, $filters) {
+                $this->productSearch->constrainBranchProducts(
+                    $query,
+                    $filters['search'],
+                    'branch_products.product_id',
+                    'batches',
+                    new ProductSearchOptions(
+                        branchIds: [$branch->id],
+                        limit: (int) config('product_search.max_results'),
+                        includeLotNumbers: false,
+                        inventorySqlPrefilter: true,
+                    ),
+                    orderByRelevance: true,
+                    resetExistingOrder: true,
+                );
             })
             ->when($filters['department_ids'], function ($query, $departmentIds) {
                 $query->whereHas('product.category', function ($categoryQuery) use ($departmentIds) {
@@ -724,13 +902,86 @@ class PurchaseReportController extends Controller
         ];
     }
 
+    /**
+     * Resume quién tiene abierta cada solicitud sin exponer detalles internos.
+     * La vigencia coincide con el latido de presencia enviado por la interfaz.
+     *
+     * @param array<int, int> $orderIds
+     * @return array<int, string>
+     */
+    private function reviewActivityByOrderId(array $orderIds): array
+    {
+        if ($orderIds === []) {
+            return [];
+        }
+
+        return DB::table('purchase_review_presence')
+            ->join('users', 'users.id', '=', 'purchase_review_presence.user_id')
+            ->whereIn('purchase_order_id', $orderIds)
+            ->get(['purchase_order_id', 'users.name', 'last_seen_at'])
+            ->groupBy('purchase_order_id')
+            ->map(function ($visits): string {
+                $activeNames = $visits
+                    ->filter(fn ($visit) => $visit->last_seen_at && now()->diffInSeconds($visit->last_seen_at) <= 75)
+                    ->pluck('name')
+                    ->unique()
+                    ->implode(', ');
+
+                return $activeNames !== ''
+                    ? 'Abierta por: '.$activeNames
+                    : ($visits->isNotEmpty() ? 'En revisión' : 'Sin abrir');
+            })
+            ->mapWithKeys(fn (string $activity, $orderId) => [(int) $orderId => $activity])
+            ->all();
+    }
+
+    private function workflowStatusLabel(PurchaseOrder $order, string $activity): string
+    {
+        // Cuando Compras ya reunió la solicitud en una compra central, Ventas no
+        // necesita interpretar "aprobada" como si el proceso hubiera terminado.
+        if ($order->general_purchase_order_id && $order->status === PurchaseOrder::STATUS_GENERATED) return 'En compra';
+        if ($order->review_status === PurchaseOrder::REVIEW_APPROVED) return 'Aprobada';
+        if ($order->review_status === PurchaseOrder::REVIEW_REJECTED) return 'Rechazada';
+        if ($order->status !== PurchaseOrder::STATUS_GENERATED) return $this->statusLabel($order->status, $order->review_status);
+        if ($order->inventory_edited_at) return 'Modificada';
+
+        return $activity === 'Sin abrir' ? 'Pendiente' : $activity;
+    }
+
+    private function workflowStatusTone(PurchaseOrder $order, string $activity): string
+    {
+        if ($order->general_purchase_order_id && $order->status === PurchaseOrder::STATUS_GENERATED) return 'blue';
+        if ($order->review_status === PurchaseOrder::REVIEW_APPROVED || $order->status === PurchaseOrder::STATUS_COMPLETED) return 'green';
+        if ($order->review_status === PurchaseOrder::REVIEW_REJECTED || $order->inventory_edited_at) return 'red';
+        return $activity === 'Sin abrir' ? 'amber' : 'blue';
+    }
+
+    private function sourceOrderChangeHistory(int $purchaseOrderId): array
+    {
+        return SystemAudit::query()
+            ->where('auditable_type', PurchaseOrder::class)
+            ->where('auditable_id', $purchaseOrderId)
+            ->whereIn('action', ['inventory_edit', 'review'])
+            ->latest('occurred_at')
+            ->limit(20)
+            ->get()
+            ->map(fn (SystemAudit $audit) => [
+                'id' => $audit->id,
+                'user_name' => $audit->user_name,
+                'occurred_at' => $audit->occurred_at,
+                'summary' => $audit->observations ?: 'Se actualizó la solicitud.',
+                'changes' => $audit->metadata['changes'] ?? [],
+            ])
+            ->all();
+    }
+
     private function validateOrderPayload(Request $request): array
     {
         $rules = [
             'items' => ['required', 'array', 'min:1'],
             'items.*.branch_product_id' => ['required', 'exists:branch_products,id'],
             'items.*.requested_quantity' => ['required', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
-            'items.*.purchase_presentation' => ['nullable', 'in:Pieza,Caja,Kilo'],
+            'items.*.purchase_presentation' => ['nullable', 'in:Pieza,Paquete,Caja,Kilo'],
             'items.*.package_quantity' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
             'items.*.units_per_package' => ['nullable', 'numeric', 'decimal:0,3', 'min:0.001', 'max:9999.999'],
         ];
@@ -820,9 +1071,9 @@ class PurchaseReportController extends Controller
             ]);
         }
 
-        if ($inventoryUnit !== 'kg' && ! in_array($presentation, ['Pieza', 'Caja'], true)) {
+        if ($inventoryUnit !== 'kg' && ! in_array($presentation, ['Pieza', 'Paquete', 'Caja'], true)) {
             throw ValidationException::withMessages([
-                'items' => "{$product?->name} debe solicitarse en piezas o cajas.",
+                'items' => "{$product?->name} debe solicitarse en piezas, paquetes o cajas.",
             ]);
         }
 
@@ -832,18 +1083,26 @@ class PurchaseReportController extends Controller
             ]);
         }
 
-        $packageQuantity = (float) ($item['package_quantity'] ?? $item['requested_quantity'] ?? 0);
-        $unitsPerPackage = $presentation === 'Caja'
-            ? (int) $product?->pieces_per_box
-            : 1;
-
-        if ($presentation !== 'Kilo' && abs($packageQuantity - round($packageQuantity)) > 0.0000001) {
+        if ($presentation === 'Paquete' && (! $product?->has_package_presentation || (int) $product?->pieces_per_package < 2)) {
             throw ValidationException::withMessages([
-                'items' => 'Las piezas y cajas deben solicitarse con números enteros.',
+                'items' => "{$product?->name} no tiene compra/venta por paquete configurada.",
             ]);
         }
 
-        $requestedQuantity = $presentation === 'Caja'
+        $packageQuantity = (float) ($item['package_quantity'] ?? $item['requested_quantity'] ?? 0);
+        $unitsPerPackage = match ($presentation) {
+            'Caja' => (int) $product?->pieces_per_box,
+            'Paquete' => (int) $product?->pieces_per_package,
+            default => 1,
+        };
+
+        if ($presentation !== 'Kilo' && abs($packageQuantity - round($packageQuantity)) > 0.0000001) {
+            throw ValidationException::withMessages([
+                'items' => 'Las piezas, paquetes y cajas deben solicitarse con números enteros.',
+            ]);
+        }
+
+        $requestedQuantity = in_array($presentation, ['Caja', 'Paquete'], true)
             ? $packageQuantity * $unitsPerPackage
             : (float) ($item['requested_quantity'] ?? $packageQuantity);
 
@@ -897,21 +1156,16 @@ class PurchaseReportController extends Controller
         ]);
     }
 
-    private function makeGeneratedFolio(Branch $branch): string
+    private function makeGeneratedFolio(): string
     {
-        $branchName = Str::of($branch->name ?: 'Sucursal')
-            ->ascii()
-            ->replaceMatches('/[^A-Za-z0-9]+/', '_')
-            ->trim('_')
-            ->value() ?: 'Sucursal';
-        $prefix = "OC_{$branchName}";
+        $prefix = 'SC';
         $nextSequence = PurchaseOrder::query()
             ->where('status', '!=', PurchaseOrder::STATUS_DRAFT)
-            ->where('folio', 'like', "{$prefix}_%")
+            ->where('folio', 'like', "{$prefix}-%")
             ->lockForUpdate()
             ->pluck('folio')
             ->map(function (?string $folio): int {
-                if (! $folio || ! preg_match('/_(\d+)$/', $folio, $matches)) {
+                if (! $folio || ! preg_match('/-(\d+)$/', $folio, $matches)) {
                     return 0;
                 }
 
@@ -919,25 +1173,43 @@ class PurchaseReportController extends Controller
             })
             ->max();
 
-        return sprintf('%s_%d', $prefix, max(1, $nextSequence + 1));
+        return sprintf('%s-%d', $prefix, max(1, $nextSequence + 1));
     }
 
-    private function statusLabel(string $status, ?string $reviewStatus = null): string
+    private function displayPurchaseFolio(?string $folio): ?string
+    {
+        if (! $folio) return null;
+        if (preg_match('/^OC_[A-Za-z0-9]+_(\d+)$/', $folio, $matches)) return 'SC-'.$matches[1];
+        return $folio;
+    }
+
+    private function statusLabel(string $status, ?string $reviewStatus = null, bool $edited = false): string
     {
         if ($status === PurchaseOrder::STATUS_GENERATED) {
-            return match ($reviewStatus) {
+            $label = match ($reviewStatus) {
                 PurchaseOrder::REVIEW_APPROVED => 'Aprobada',
                 PurchaseOrder::REVIEW_REJECTED => 'Rechazada',
                 default => 'Pendiente',
             };
+        } else {
+            $label = match ($status) {
+                PurchaseOrder::STATUS_DRAFT => 'Borrador',
+                PurchaseOrder::STATUS_REVIEW => 'En revisión',
+                PurchaseOrder::STATUS_COMPLETED => 'Completada',
+                PurchaseOrder::STATUS_CANCELLED => 'Cancelada',
+                default => $status,
+            };
         }
 
-        return match ($status) {
-            PurchaseOrder::STATUS_DRAFT => 'Borrador',
-            PurchaseOrder::STATUS_REVIEW => 'Por revisar',
-            PurchaseOrder::STATUS_COMPLETED => 'Completada',
-            PurchaseOrder::STATUS_CANCELLED => 'Cancelada',
-            default => $status,
+        return $edited ? "{$label} · Editada" : $label;
+    }
+
+    private function reviewStatusLabel(?string $reviewStatus): string
+    {
+        return match ($reviewStatus) {
+            PurchaseOrder::REVIEW_APPROVED => 'Aprobada',
+            PurchaseOrder::REVIEW_REJECTED => 'Rechazada',
+            default => 'Pendiente',
         };
     }
 

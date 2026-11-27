@@ -25,12 +25,14 @@ const form = useForm({
         product_name: item.product_name,
         product_code: item.product_code,
         base_unit: item.base_unit ?? item.inventory_unit ?? item.unit ?? 'pza',
+        purchase_presentation: item.purchase_presentation ?? 'Pieza',
+        units_per_package: Number(item.units_per_package ?? 1) || 1,
     })),
 })
 
 const modalConfig = computed(() => ({
     title: `Editar ${props.order.folio || 'orden de compra'}`,
-    subtitle: 'Ajusta únicamente los productos y cantidades pendientes antes de generar la Orden de compra general.',
+    subtitle: '',
     mode: 'edit',
     size: '2xl',
     showFooter: false,
@@ -51,22 +53,35 @@ function removeItem(index) {
     form.items.splice(index, 1)
 }
 
-function increase(item) {
-    item.requested_quantity = Number(item.requested_quantity || 0) + 1
-}
-
-function decrease(item) {
-    const next = Number(item.requested_quantity || 0) - 1
-    if (next >= 1) item.requested_quantity = next
-}
-
-function updateQuantity(item, value) {
-    item.requested_quantity = value === '' ? '' : Math.max(1, Number(value || 1))
-}
-
 function itemUnit(item) { return normalizeInventoryUnit(item.base_unit ?? item.inventory_unit ?? item.unit ?? 'pza') }
-function unitLabel(item) { return itemUnit(item) === 'kg' ? 'kg' : 'pzas.' }
-function quantity(value, item = null) { return formatInventoryQuantityWithUnit(value, item ? itemUnit(item) : 'pza') }
+function presentationFactor(item) {
+    return ['Caja', 'Paquete'].includes(item.purchase_presentation)
+        ? Math.max(1, Number(item.units_per_package || 1))
+        : 1
+}
+function presentationQuantity(item) { return Number(item.requested_quantity || 0) / presentationFactor(item) }
+function presentationLabel(item) {
+    return { Caja: 'cajas', Paquete: 'paquetes', Kilo: 'kg', Gramo: 'g', Pieza: 'pzas.' }[item.purchase_presentation] || (itemUnit(item) === 'kg' ? 'kg' : 'pzas.')
+}
+function quantity(value, item = null) {
+    if (!item) return formatInventoryQuantityWithUnit(value, 'pza')
+    const amount = presentationQuantity(item)
+    const formatted = new Intl.NumberFormat('es-MX', { maximumFractionDigits: itemUnit(item) === 'kg' ? 3 : 0 }).format(amount)
+    return `${formatted} ${presentationLabel(item)}`
+}
+function increase(item) { item.requested_quantity = Number(item.requested_quantity || 0) + presentationFactor(item) }
+function decrease(item) {
+    const next = Number(item.requested_quantity || 0) - presentationFactor(item)
+    if (next >= presentationFactor(item)) item.requested_quantity = next
+}
+function updateQuantity(item, value) {
+    if (value === '') {
+        item.requested_quantity = ''
+        return
+    }
+    const minimum = itemUnit(item) === 'kg' ? 0.001 : 1
+    item.requested_quantity = Math.max(minimum, Number(value || minimum) * presentationFactor(item))
+}
 
 function formatDate(value) {
     if (!value) return 'Sin fecha'
@@ -116,7 +131,7 @@ function save() {
 
                 <div class="text-sm text-text"><span class="lg:hidden text-xs opacity-55">Solicitadas: </span><strong>{{ quantity(item.requested_quantity, item) }}</strong></div>
 
-                <div><span class="mb-1 block text-xs opacity-55 lg:hidden">Ajustar cantidad</span><QuantityStepper :data-modal-autofocus="index === 0 ? '' : null" :value="item.requested_quantity" :allow-decimal="itemUnit(item) === 'kg'" :validation-field="itemUnit(item) === 'kg' ? 'kilogram_quantity' : 'product_piece_quantity'" :aria-label="`Cantidad solicitada de ${item.product_name}`" :decrease-disabled="Number(item.requested_quantity) <= 1" @decrease="decrease(item)" @increase="increase(item)" @update="updateQuantity(item, $event)" /></div>
+                <div><span class="mb-1 block text-xs opacity-55 lg:hidden">Ajustar {{ presentationLabel(item) }}</span><QuantityStepper :data-modal-autofocus="index === 0 ? '' : null" :value="presentationQuantity(item)" :allow-decimal="itemUnit(item) === 'kg'" :validation-field="itemUnit(item) === 'kg' ? 'kilogram_quantity' : 'product_piece_quantity'" :aria-label="`Cantidad solicitada de ${item.product_name} en ${presentationLabel(item)}`" :decrease-disabled="Number(item.requested_quantity) <= presentationFactor(item)" @decrease="decrease(item)" @increase="increase(item)" @update="updateQuantity(item, $event)" /></div>
 
                 <ActionIconButton
                     icon="delete"

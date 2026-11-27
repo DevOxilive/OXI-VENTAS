@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Inventory;
 
+use App\Events\PurchaseWorkflowChanged;
 use App\Events\RealtimeActivityLogged;
 use App\Http\Controllers\Concerns\AuthorizesBranchAccess;
 use App\Http\Controllers\Controller;
@@ -10,7 +11,9 @@ use App\Models\GeneralPurchaseOrder;
 use App\Models\GeneralPurchaseOrderItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseCycle;
 use App\Models\PurchaseOrderTransfer;
+use App\Models\SystemAudit;
 use App\Models\User;
 use App\Search\ProductSearchOptions;
 use App\Search\ProductSearchService;
@@ -22,6 +25,7 @@ use App\Support\TablePagination;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class GeneralPurchaseOrderController extends Controller
@@ -39,12 +43,12 @@ class GeneralPurchaseOrderController extends Controller
 
         $status = $request->input('status', 'GENERATE');
 
-        if (! in_array($status, ['GENERATE', GeneralPurchaseOrder::STATUS_PURCHASING, GeneralPurchaseOrder::STATUS_COMPLETED], true)) {
+        if (! in_array($status, ['GENERATE', 'CENTRAL'], true)) {
             $status = 'GENERATE';
         }
 
         if (! $this->canViewStatus($request, $status)) {
-            $status = collect(['GENERATE', GeneralPurchaseOrder::STATUS_PURCHASING, GeneralPurchaseOrder::STATUS_COMPLETED])
+            $status = collect(['GENERATE', 'CENTRAL'])
                 ->first(fn (string $candidate) => $this->canViewStatus($request, $candidate));
 
             abort_unless($status, 403);
@@ -52,7 +56,7 @@ class GeneralPurchaseOrderController extends Controller
 
         $payload = $status === 'GENERATE'
             ? $this->generationListPayload($request, $branch)
-            : $this->listPayload($request, $branch, $status);
+            : $this->listPayload($request, $branch, 'CENTRAL');
 
         return Inertia::render('Inventory/PurchaseOrders', array_merge($payload, [
             'notificationSummary' => $this->purchaseOrderNotificationSummary($request),
@@ -90,13 +94,25 @@ class GeneralPurchaseOrderController extends Controller
 
         $generalPurchaseOrder->load([
             'creator',
-            'items.product:id,image,cost,description,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,cost_per_box',
+            'items.product:id,image,cost,description,unit,inventory_unit,pieces_per_box,pieces_per_package,packages_per_box,has_box_presentation,has_package_presentation,inventory_quantity_mode,cost_per_piece,cost_per_package,cost_per_box',
+            'items.plannedBatches',
             'branchOrders.branch',
             'branchOrders.items',
         ]);
 
         return Inertia::render('Inventory/PurchaseOrderCapture', [
             'currentBranch' => $branch,
+            // La distribución puede prepararse para cualquier sucursal activa,
+            // aunque esa sucursal no haya solicitado este producto.
+            'distributionBranches' => Branch::query()
+                ->where('active', true)
+                ->orderBy('is_central_warehouse')
+                ->orderBy('name')
+                ->get(['id', 'name', 'is_central_warehouse']),
+            'centralWarehouse' => Branch::query()
+                ->where('is_central_warehouse', true)
+                ->where('active', true)
+                ->first(['id', 'name']),
             'orderDB' => $this->orderPayload($generalPurchaseOrder),
         ]);
     }
@@ -118,8 +134,9 @@ class GeneralPurchaseOrderController extends Controller
                 'links' => [],
             ],
             'filters' => [
-                'search' => '',
+                'search' => trim((string) $request->input('search', '')),
                 'status' => 'GENERATE',
+                'source_status' => $request->input('source_status', 'ALL'),
                 'per_page' => $perPage,
             ],
         ];
@@ -130,16 +147,25 @@ class GeneralPurchaseOrderController extends Controller
 
         $perPage = TablePagination::resolvePerPage($request);
 
+        $centralStatus = $status === 'CENTRAL'
+            ? $request->input('central_status', 'ALL')
+            : $status;
+        if (! in_array($centralStatus, ['ALL', GeneralPurchaseOrder::STATUS_PURCHASING, GeneralPurchaseOrder::STATUS_COMPLETED], true)) {
+            $centralStatus = 'ALL';
+        }
+
         $filters = [
             'search' => trim((string) $request->input('search', '')),
             'status' => $status,
+            'central_status' => $centralStatus,
             'per_page' => $perPage,
         ];
 
         $orders = GeneralPurchaseOrder::query()
-            ->with(['branchOrders:id,general_purchase_order_id,branch_id'])
+            ->with(['branchOrders:id,general_purchase_order_id,branch_id', 'creator:id,name'])
             ->withCount('items')
-            ->where('status', $status);
+            ->whereIn('status', [GeneralPurchaseOrder::STATUS_PURCHASING, GeneralPurchaseOrder::STATUS_COMPLETED])
+            ->when($centralStatus !== 'ALL', fn ($query) => $query->where('status', $centralStatus));
 
         if ($filters['search'] !== '') {
             $matchingProductIds = $this->productSearch->ids(
@@ -180,6 +206,7 @@ class GeneralPurchaseOrderController extends Controller
                 'branches_count' => $order->branchOrders->pluck('branch_id')->unique()->count(),
                 'display_date' => $order->completed_at ?? $order->created_at,
                 'can_edit' => $this->canManageGeneralOrder($request, $order),
+                'responsible_name' => $order->creator?->name ?? 'Sin información',
             ]);
 
         return [
@@ -198,7 +225,8 @@ class GeneralPurchaseOrderController extends Controller
 
         $generalPurchaseOrder->load([
             'creator',
-            'items.product:id,image,cost,description,unit,inventory_unit,pieces_per_box,has_box_presentation,inventory_quantity_mode,cost_per_piece,cost_per_box',
+            'items.product:id,image,cost,description,unit,inventory_unit,pieces_per_box,pieces_per_package,packages_per_box,has_box_presentation,has_package_presentation,inventory_quantity_mode,cost_per_piece,cost_per_package,cost_per_box',
+            'items.plannedBatches',
             'branchOrders.branch',
             'branchOrders.items',
         ]);
@@ -220,12 +248,18 @@ class GeneralPurchaseOrderController extends Controller
             'order_ids.*' => ['required', 'integer', 'distinct'],
         ]);
 
-        $cycle = $this->cycles->currentOpenCycle($request->user());
-        $order = $this->cycles->consolidate(
-            $cycle,
-            $request->user(),
-            $payload['order_ids'],
-        );
+        $order = DB::transaction(function () use ($request, $payload) {
+            $preparation = DB::table('purchase_preparations')->where('id', 1)->lockForUpdate()->first();
+            abort_unless($preparation && (int) $preparation->responsible_id === $request->user()->id, 403, 'Sólo la responsable puede crear la compra central.');
+            $savedIds = collect(json_decode($preparation->order_ids ?? '[]', true))->map(fn ($id) => (int) $id)->sort()->values();
+            $submittedIds = collect($payload['order_ids'])->map(fn ($id) => (int) $id)->sort()->values();
+            abort_unless($savedIds->isNotEmpty() && $savedIds->all() === $submittedIds->all(), 422, 'La selección cambió. Actualiza antes de crear la compra.');
+            $cycle = $this->cycles->currentOpenCycle($request->user());
+            $order = $this->cycles->consolidate($cycle, $request->user(), $savedIds->all());
+            DB::table('purchase_preparations')->where('id', 1)->update(['responsible_id' => null, 'order_ids' => '[]', 'updated_at' => now()]);
+            return $order;
+        });
+        PurchaseWorkflowChanged::dispatch('central_purchase_created');
 
         return redirect()->back()->with(
             'success',
@@ -235,9 +269,61 @@ class GeneralPurchaseOrderController extends Controller
         );
     }
 
-    public function sourceOrder(Request $request, Branch $branch, PurchaseOrder $purchaseOrder)
+    /**
+     * Devuelve una compra central sin captura a la selección compartida.
+     * No borra ni altera mercancía: sólo es posible antes de registrar lotes,
+     * cantidades compradas o una revisión física.
+     */
+    public function reopen(Request $request, Branch $branch, GeneralPurchaseOrder $generalPurchaseOrder)
     {
         $this->abortIfUserCannotAccessBranch($request, $branch);
+        $this->abortIfCannotManageGeneralOrder($request, $generalPurchaseOrder);
+
+        $snapshot = $this->restoreCentralPurchase($request, $generalPurchaseOrder, true);
+
+        app(SystemAuditService::class)->record('purchase-orders', 'central_reopened', 'success', $request, [
+            'record_type' => GeneralPurchaseOrder::class,
+            'record_id' => $snapshot['general_purchase_order']['id'],
+            'record_label' => $snapshot['general_purchase_order']['folio'],
+            'observations' => 'La compra central se regresó a edición; se conservó una fotografía previa.',
+            'metadata' => ['snapshot' => $snapshot],
+        ]);
+
+        PurchaseWorkflowChanged::dispatch('central_purchase_reopened');
+
+        return redirect()->route('inventory.branches.reports.purchase-orders', [
+            'branch' => $branch->id,
+            'status' => 'GENERATE',
+        ])->with('success', 'Compra central regresada a edición. Puedes agregar o quitar solicitudes antes de crearla nuevamente.');
+    }
+
+    /** Descarta la compra central y devuelve las solicitudes a Pendiente. */
+    public function discard(Request $request, Branch $branch, GeneralPurchaseOrder $generalPurchaseOrder)
+    {
+        $this->abortIfUserCannotAccessBranch($request, $branch);
+        $this->abortIfCannotManageGeneralOrder($request, $generalPurchaseOrder);
+
+        $snapshot = $this->restoreCentralPurchase($request, $generalPurchaseOrder, false);
+
+        app(SystemAuditService::class)->record('purchase-orders', 'central_discarded', 'success', $request, [
+            'record_type' => GeneralPurchaseOrder::class,
+            'record_id' => $snapshot['general_purchase_order']['id'],
+            'record_label' => $snapshot['general_purchase_order']['folio'],
+            'observations' => 'La compra central se descartó y las solicitudes regresaron a Pendiente; se conservó una fotografía previa.',
+            'metadata' => ['snapshot' => $snapshot],
+        ]);
+
+        PurchaseWorkflowChanged::dispatch('central_purchase_discarded');
+
+        return redirect()->route('inventory.branches.reports.purchase-orders', [
+            'branch' => $branch->id,
+            'status' => 'GENERATE',
+        ])->with('success', 'Compra central descartada. Las solicitudes regresaron a Pendientes.');
+    }
+
+    public function sourceOrder(Request $request, Branch $branch, PurchaseOrder $purchaseOrder)
+    {
+        abort_unless((int) $purchaseOrder->branch_id === (int) $branch->id, 404);
         $this->abortIfCannotManageSourceOrder($request, $purchaseOrder);
 
         $purchaseOrder->load([
@@ -324,7 +410,7 @@ class GeneralPurchaseOrderController extends Controller
 
     public function reviewSourceOrder(Request $request, Branch $branch, PurchaseOrder $purchaseOrder)
     {
-        $this->abortIfUserCannotAccessBranch($request, $branch);
+        abort_unless((int) $purchaseOrder->branch_id === (int) $branch->id, 404);
         $this->abortIfCannotManageSourceOrder($request, $purchaseOrder);
         abort_if($purchaseOrder->general_purchase_order_id, 422, 'La orden ya forma parte de una Orden de compra general.');
 
@@ -332,6 +418,7 @@ class GeneralPurchaseOrderController extends Controller
             'review_status' => [
                 'required',
                 Rule::in([
+                    PurchaseOrder::REVIEW_PENDING,
                     PurchaseOrder::REVIEW_APPROVED,
                     PurchaseOrder::REVIEW_REJECTED,
                 ]),
@@ -339,19 +426,39 @@ class GeneralPurchaseOrderController extends Controller
         ]);
 
         DB::transaction(function () use ($purchaseOrder, $payload, $request) {
+            DB::table('purchase_preparations')->insertOrIgnore(['id' => 1, 'created_at' => now(), 'updated_at' => now()]);
+            $preparation = DB::table('purchase_preparations')->where('id', 1)->lockForUpdate()->first();
             $lockedOrder = PurchaseOrder::query()->lockForUpdate()->findOrFail($purchaseOrder->id);
             abort_if($lockedOrder->general_purchase_order_id, 422, 'La orden ya forma parte de una Orden de compra general.');
+
+            $selectedIds = collect(json_decode($preparation->order_ids ?? '[]', true))
+                ->map(fn ($id) => (int) $id);
+            if ($payload['review_status'] === PurchaseOrder::REVIEW_APPROVED) {
+                abort_unless($preparation->responsible_id, 422, 'Primero debe asumir la compra una responsable.');
+                $responsible = User::query()->findOrFail($preparation->responsible_id);
+                abort_unless($responsible->hasBranchAccess($lockedOrder->branch_id), 422, 'La responsable elegida no tiene acceso a esta sucursal.');
+                $selectedIds->push($lockedOrder->id);
+            } else {
+                $selectedIds = $selectedIds->reject(fn (int $id) => $id === (int) $lockedOrder->id);
+            }
+
             $lockedOrder->update([
                 'review_status' => $payload['review_status'],
                 'reviewed_by' => $request->user()?->id,
                 'reviewed_at' => now(),
             ]);
+            DB::table('purchase_preparations')->where('id', 1)->update([
+                'order_ids' => $selectedIds->unique()->values()->toJson(),
+                'updated_at' => now(),
+            ]);
         }, 3);
         $purchaseOrder->refresh();
 
-        $label = $payload['review_status'] === PurchaseOrder::REVIEW_APPROVED
-            ? 'aprobada'
-            : 'rechazada';
+        $label = match ($payload['review_status']) {
+            PurchaseOrder::REVIEW_APPROVED => 'aprobada',
+            PurchaseOrder::REVIEW_REJECTED => 'rechazada',
+            default => 'regresada a revisión',
+        };
 
         app(SystemAuditService::class)->record('purchase-orders', 'review', 'success', $request, [
             'record_type' => PurchaseOrder::class,
@@ -371,16 +478,48 @@ class GeneralPurchaseOrderController extends Controller
             ));
         }
 
+        PurchaseWorkflowChanged::dispatch('request_reviewed', $purchaseOrder->id);
+
         return redirect()->back()->with('success', "Orden {$label} correctamente.");
+    }
+
+    public function destroySourceOrder(Request $request, Branch $branch, PurchaseOrder $purchaseOrder)
+    {
+        abort_unless((int) $purchaseOrder->branch_id === (int) $branch->id, 404);
+        $this->abortIfCannotManageSourceOrder($request, $purchaseOrder);
+        abort_unless($purchaseOrder->review_status === PurchaseOrder::REVIEW_REJECTED, 422, 'Sólo se pueden eliminar solicitudes rechazadas.');
+        abort_if($purchaseOrder->general_purchase_order_id, 422, 'La solicitud ya forma parte de una compra central.');
+
+        DB::transaction(function () use ($purchaseOrder) {
+            $preparation = DB::table('purchase_preparations')->where('id', 1)->lockForUpdate()->first();
+            if ($preparation) {
+                $ids = collect(json_decode($preparation->order_ids ?? '[]', true))
+                    ->reject(fn ($id) => (int) $id === (int) $purchaseOrder->id)
+                    ->values();
+                DB::table('purchase_preparations')->where('id', 1)->update(['order_ids' => $ids->toJson(), 'updated_at' => now()]);
+            }
+            $purchaseOrder->delete();
+        });
+
+        app(SystemAuditService::class)->record('purchase-orders', 'delete', 'success', $request, [
+            'record_type' => PurchaseOrder::class,
+            'record_id' => $purchaseOrder->id,
+            'record_label' => $purchaseOrder->folio,
+            'observations' => 'Se eliminó una solicitud de compra rechazada.',
+        ]);
+        PurchaseWorkflowChanged::dispatch('request_deleted', $purchaseOrder->id);
+
+        return redirect()->back()->with('success', 'Solicitud rechazada eliminada correctamente.');
     }
 
     public function updateSourceOrder(Request $request, Branch $branch, PurchaseOrder $purchaseOrder)
     {
-        $this->abortIfUserCannotAccessBranch($request, $branch);
+        abort_unless((int) $purchaseOrder->branch_id === (int) $branch->id, 404);
         $this->abortIfCannotManageSourceOrder($request, $purchaseOrder);
         abort_if($purchaseOrder->general_purchase_order_id, 422, 'La orden ya forma parte de una Orden de compra general.');
 
-        $purchaseOrder->loadMissing('branch');
+        $purchaseOrder->loadMissing('branch', 'items.branchProduct.product');
+        $beforeItems = $this->sourceOrderItemSnapshot($purchaseOrder);
         $editor = app(PendingPurchaseOrderEditor::class);
         $validated = $request->validate($editor->rules());
         $updatedOrder = $editor->update(
@@ -391,12 +530,14 @@ class GeneralPurchaseOrderController extends Controller
             true,
             $validated['record_version'],
         );
+        $changes = $this->sourceOrderChangeSummary($beforeItems, $this->sourceOrderItemSnapshot($updatedOrder));
 
         app(SystemAuditService::class)->record('purchase-orders', 'inventory_edit', 'success', $request, [
             'record_type' => PurchaseOrder::class,
             'record_id' => $updatedOrder->id,
             'record_label' => $updatedOrder->folio,
             'observations' => 'Inventario modificó una Orden de compra pendiente antes de integrarla a una Orden de compra general.',
+            'metadata' => ['changes' => $changes],
         ]);
 
         if ($updatedOrder->user_id) {
@@ -409,6 +550,8 @@ class GeneralPurchaseOrderController extends Controller
                 false,
             ));
         }
+
+        PurchaseWorkflowChanged::dispatch('request_edited', $updatedOrder->id);
 
         return redirect()->back()->with('success', 'Orden de compra actualizada y notificada a Ventas.');
     }
@@ -484,6 +627,99 @@ class GeneralPurchaseOrderController extends Controller
         ]);
     }
 
+    /**
+     * Guarda una fotografía completa de la central y restaura sus solicitudes.
+     * En edición se mantienen aprobadas y seleccionadas; al descartar vuelven a
+     * Pendiente para que Inventario las revise de nuevo.
+     */
+    private function restoreCentralPurchase(
+        Request $request,
+        GeneralPurchaseOrder $generalPurchaseOrder,
+        bool $returnToEdition,
+    ): array {
+        return DB::transaction(function () use ($request, $generalPurchaseOrder, $returnToEdition) {
+            $order = GeneralPurchaseOrder::query()
+                ->with(['items.plannedBatches', 'branchOrders.items'])
+                ->lockForUpdate()
+                ->findOrFail($generalPurchaseOrder->id);
+
+            if ($order->status !== GeneralPurchaseOrder::STATUS_PURCHASING) {
+                throw ValidationException::withMessages([
+                    'order' => 'Sólo se puede deshacer una compra que aún está en compra.',
+                ]);
+            }
+
+            $hasCapture = $order->items->contains(fn (GeneralPurchaseOrderItem $item) =>
+                $item->physically_reviewed
+                || $item->plannedBatches->isNotEmpty()
+                || (float) $item->purchased_quantity > 0
+                || (bool) $item->unavailable
+            );
+            if ($hasCapture) {
+                throw ValidationException::withMessages([
+                    'order' => 'Esta compra ya tiene captura. No se puede deshacer para proteger la mercancía registrada.',
+                ]);
+            }
+
+            $sourceIds = $order->branchOrders->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+            if (! $sourceIds) {
+                throw ValidationException::withMessages([
+                    'order' => 'La compra central ya no tiene solicitudes para restaurar.',
+                ]);
+            }
+
+            $snapshot = [
+                'captured_at' => now()->toJSON(),
+                'general_purchase_order' => $order->attributesToArray(),
+                'items' => $order->items->map(fn (GeneralPurchaseOrderItem $item) => [
+                    'item' => $item->attributesToArray(),
+                    'planned_batches' => $item->plannedBatches->map->attributesToArray()->all(),
+                ])->all(),
+                'source_orders' => $order->branchOrders->map(fn (PurchaseOrder $sourceOrder) => [
+                    'order' => $sourceOrder->attributesToArray(),
+                    'items' => $sourceOrder->items->map->attributesToArray()->all(),
+                ])->all(),
+            ];
+
+            $cycle = PurchaseCycle::query()->lockForUpdate()->find($order->purchase_cycle_id);
+            if ($cycle && $cycle->status === PurchaseCycle::STATUS_CONSOLIDATED) {
+                $cycle->update([
+                    'status' => PurchaseCycle::STATUS_OPEN,
+                    'consolidated_at' => null,
+                ]);
+            }
+
+            $sourceQuery = PurchaseOrder::query()->whereIn('id', $sourceIds);
+            $sourceQuery->update(['general_purchase_order_id' => null]);
+
+            $preparation = DB::table('purchase_preparations')->where('id', 1)->lockForUpdate()->first();
+            $preparationPayload = [
+                'responsible_id' => $returnToEdition ? $request->user()->id : null,
+                'order_ids' => $returnToEdition ? json_encode($sourceIds) : '[]',
+                'updated_at' => now(),
+            ];
+            if ($preparation) {
+                DB::table('purchase_preparations')->where('id', 1)->update($preparationPayload);
+            } else {
+                DB::table('purchase_preparations')->insert($preparationPayload + ['id' => 1, 'created_at' => now()]);
+            }
+
+            if (! $returnToEdition) {
+                $sourceQuery->update([
+                    'review_status' => PurchaseOrder::REVIEW_PENDING,
+                    'reviewed_by' => null,
+                    'reviewed_at' => null,
+                    'inventory_edited_by' => null,
+                    'inventory_edited_at' => null,
+                ]);
+            }
+
+            $order->delete();
+
+            return $snapshot;
+        });
+    }
+
     private function abortIfCannotManageGeneralOrder(
         Request $request,
         GeneralPurchaseOrder $generalPurchaseOrder,
@@ -516,6 +752,10 @@ class GeneralPurchaseOrderController extends Controller
 
     private function canViewStatus(Request $request, string $status): bool
     {
+        if ($status === 'CENTRAL') {
+            return $request->user()?->hasPermission('inventory.purchase-orders.general.view') ?? false;
+        }
+
         $permission = match ($status) {
             'GENERATE' => 'inventory.purchase-orders.source.view',
             GeneralPurchaseOrder::STATUS_PURCHASING => 'inventory.purchase-orders.general.view',
@@ -533,12 +773,24 @@ class GeneralPurchaseOrderController extends Controller
             'record_version' => ['required', 'date'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id' => ['required', 'integer', 'exists:general_purchase_order_items,id'],
-            'items.*.purchase_presentation' => ['required', 'in:Pieza,Caja,Kilo'],
+            'items.*.purchase_presentation' => ['required', 'in:Pieza,Paquete,Caja,Kilo,Gramo'],
             'items.*.package_quantity' => ['nullable', 'numeric', 'decimal:0,3', 'min:0', 'max:9999.999'],
             'items.*.units_per_package' => ['nullable', 'integer', 'min:0', 'max:9999'],
             'items.*.purchase_price' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:999999.99'],
             'items.*.purchase_notes' => ['nullable', 'string', 'max:1000'],
             'items.*.unavailable' => ['nullable', 'boolean'],
+            'items.*.batches' => ['nullable', 'array', 'max:50'],
+            'items.*.branch_allocations' => ['nullable', 'array'],
+            'items.*.physically_reviewed' => ['sometimes', 'boolean'],
+            'items.*.branch_allocations.*.branch_id' => ['required', 'integer'],
+            'items.*.branch_allocations.*.quantity' => ['required', 'numeric', 'min:0', 'decimal:0,3'],
+            'items.*.batches.*.lot_number' => ['nullable', 'string', 'max:100'],
+            'items.*.batches.*.supplier' => ['nullable', 'string', 'max:80'],
+            'items.*.batches.*.allocations' => ['nullable', 'array'],
+            'items.*.batches.*.allocations.*.branch_id' => ['required', 'integer'],
+            'items.*.batches.*.allocations.*.quantity' => ['required', 'numeric', 'min:0', 'decimal:0,3'],
+            'items.*.batches.*.expiration_date' => ['nullable', 'date'],
+            'items.*.batches.*.quantity' => ['required', 'numeric', 'decimal:0,3', 'min:0.001', 'max:999999.999'],
         ]);
     }
 
@@ -546,7 +798,7 @@ class GeneralPurchaseOrderController extends Controller
     {
         $user = $request->user();
         $user->loadMissing('role');
-        $accessibleBranchIds = $user->accessibleBranchIds();
+        $accessibleBranchIds = Branch::query()->where('active', true)->pluck('id');
         $orders = PurchaseOrder::query()
             ->with(['branch', 'user', 'assignedTo', 'reviewedBy'])
             ->withCount('items')
@@ -575,6 +827,17 @@ class GeneralPurchaseOrderController extends Controller
                 'requested_quantity' => (float) ($order->requested_quantity ?? 0),
                 'generated_at' => $order->generated_at ?? $order->created_at,
             ]);
+        $preparation = DB::table('purchase_preparations')->where('id', 1)->first();
+        $selectedIds = json_decode($preparation?->order_ids ?? '[]', true);
+        $presence = DB::table('purchase_review_presence')->join('users', 'users.id', '=', 'purchase_review_presence.user_id')
+            ->whereIn('purchase_order_id', $orders->pluck('id'))->get()->groupBy('purchase_order_id');
+        $orders = $orders->map(function ($order) use ($selectedIds, $presence) {
+            $visits = $presence->get($order['id'], collect());
+            $names = $visits->filter(fn ($visit) => $visit->last_seen_at && \Carbon\Carbon::parse($visit->last_seen_at)->gt(now()->subSeconds(75)))->pluck('name')->unique()->implode(', ');
+            $order['selected'] = in_array($order['id'], $selectedIds);
+            $order['review_activity'] = $names ? 'Abierta por: '.$names : ($visits->isNotEmpty() ? 'En revisión' : 'Sin abrir');
+            return $order;
+        });
         $orderCounts = $orders->countBy(fn ($order) => (int) $order['branch_id']);
 
         $branches = Branch::query()
@@ -595,6 +858,7 @@ class GeneralPurchaseOrderController extends Controller
             ->whereHas('role', fn ($query) => $query->where('name', 'Inventario'))
             ->orderBy('name')
             ->get()
+            ->filter(fn (User $inventoryUser) => $inventoryUser->hasPermission('inventory.purchase-orders.general.create'))
             ->map(fn (User $inventoryUser) => [
                 'id' => $inventoryUser->id,
                 'name' => $inventoryUser->name,
@@ -602,11 +866,20 @@ class GeneralPurchaseOrderController extends Controller
             ])
             ->values();
 
+        $activeResponsible = $preparation?->responsible_id
+            ? User::query()->whereKey($preparation->responsible_id)->where('is_active', true)->first()
+            : null;
+
         return [
             'branches' => $branches,
             'orders' => $orders->values(),
             'inventory_users' => $inventoryUsers,
             'draft' => null,
+            'preparation' => [
+                'responsible_id' => $activeResponsible?->id,
+                'responsible_name' => $activeResponsible?->name,
+                'order_ids' => $selectedIds,
+            ],
         ];
     }
 
@@ -649,14 +922,19 @@ class GeneralPurchaseOrderController extends Controller
 
     private function sourceOrderPayload(PurchaseOrder $purchaseOrder): array
     {
+        $activity = $this->sourceOrderReviewActivity($purchaseOrder->id);
+
         return [
             'id' => $purchaseOrder->id,
             'folio' => $purchaseOrder->folio,
             'status' => $purchaseOrder->status,
             'record_version' => $purchaseOrder->updated_at?->toJSON(),
-            'status_label' => $this->reviewStatusLabel($purchaseOrder->review_status),
+            'status_label' => $this->sourceOrderWorkflowLabel($purchaseOrder, $activity),
+            'workflow_status_label' => $this->sourceOrderWorkflowLabel($purchaseOrder, $activity),
             'review_status' => $purchaseOrder->review_status,
             'review_status_label' => $this->reviewStatusLabel($purchaseOrder->review_status),
+            'review_activity' => $activity,
+            'change_history' => $this->sourceOrderChangeHistory($purchaseOrder->id),
             'requested_at' => $purchaseOrder->generated_at ?? $purchaseOrder->created_at,
             'items_count' => $purchaseOrder->items->count(),
             'branch' => [
@@ -696,6 +974,9 @@ class GeneralPurchaseOrderController extends Controller
                     'category_name' => $product?->category?->name ?? 'Sin categoría',
                     'base_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
                     'inventory_unit' => $product?->inventory_unit ?? $product?->unit ?? 'pza',
+                    'purchase_presentation' => $item->purchase_presentation ?? 'Pieza',
+                    'package_quantity' => (float) ($item->package_quantity ?? $item->requested_quantity),
+                    'units_per_package' => (float) ($item->units_per_package ?? 1),
                     'requested_quantity' => (float) $item->requested_quantity,
                     'received_quantity' => null,
                     'receipt_notes' => null,
@@ -712,7 +993,7 @@ class GeneralPurchaseOrderController extends Controller
         $user->loadMissing('role');
 
         abort_unless($purchaseOrder->status === PurchaseOrder::STATUS_GENERATED, 404);
-        abort_unless($user->hasBranchAccess((int) $purchaseOrder->branch_id), 403);
+        abort_unless($user->hasPermission('inventory.purchase-orders.source.view'), 403);
     }
 
     private function orderPayload(GeneralPurchaseOrder $order, bool $includePurchaseData = true): array
@@ -779,7 +1060,10 @@ class GeneralPurchaseOrderController extends Controller
                         ?? $item->product?->unit
                         ?? $item->base_unit,
                     'has_box_presentation' => (bool) $item->product?->has_box_presentation,
+                    'has_package_presentation' => (bool) $item->product?->has_package_presentation,
                     'product_pieces_per_box' => (int) ($item->product?->pieces_per_box ?? 0),
+                    'product_pieces_per_package' => (int) ($item->product?->pieces_per_package ?? 0),
+                    'product_packages_per_box' => (int) ($item->product?->packages_per_box ?? 0),
                     'branch_breakdown' => $breakdown,
                     'image_url' => $item->product?->image
                         ? route('inventory.products.image', ['product' => $item->product_id])
@@ -787,6 +1071,15 @@ class GeneralPurchaseOrderController extends Controller
                     'product_description' => $item->product_description
                         ?: $item->product?->description,
                     'previous_cost' => (float) ($item->estimated_unit_price ?? $item->product?->cost_per_piece ?? $item->product?->cost ?? 0),
+                    'batches' => $item->plannedBatches->map(fn ($batch) => [
+                        'id' => $batch->id,
+                        'allocations' => $batch->allocations,
+                        'supplier' => $batch->supplier,
+                        'lot_number' => $batch->lot_number,
+                        'expiration_date' => $batch->expiration_date?->format('Y-m-d'),
+                        'quantity' => (float) $batch->presentation_quantity,
+                        'base_quantity' => (float) $batch->base_quantity,
+                    ])->values(),
                 ]);
             })->values(),
         ];
@@ -807,5 +1100,65 @@ class GeneralPurchaseOrderController extends Controller
             PurchaseOrder::REVIEW_REJECTED => 'Rechazada',
             default => 'Pendiente',
         };
+    }
+
+    private function sourceOrderReviewActivity(int $purchaseOrderId): string
+    {
+        $visits = DB::table('purchase_review_presence')
+            ->join('users', 'users.id', '=', 'purchase_review_presence.user_id')
+            ->where('purchase_order_id', $purchaseOrderId)
+            ->get(['users.name', 'last_seen_at']);
+        $names = $visits->filter(fn ($visit) => $visit->last_seen_at && now()->diffInSeconds($visit->last_seen_at) <= 75)->pluck('name')->unique()->implode(', ');
+
+        return $names !== '' ? 'Abierta por: '.$names : ($visits->isNotEmpty() ? 'En revisión' : 'Sin abrir');
+    }
+
+    private function sourceOrderWorkflowLabel(PurchaseOrder $order, string $activity): string
+    {
+        if ($order->review_status === PurchaseOrder::REVIEW_APPROVED) return 'Aprobada';
+        if ($order->review_status === PurchaseOrder::REVIEW_REJECTED) return 'Rechazada';
+        if ($order->inventory_edited_at) return 'Modificada';
+
+        return $activity === 'Sin abrir' ? 'Pendiente' : $activity;
+    }
+
+    private function sourceOrderItemSnapshot(PurchaseOrder $order): array
+    {
+        return $order->items->mapWithKeys(fn (PurchaseOrderItem $item) => [
+            $item->branch_product_id => [
+                'name' => $item->branchProduct?->product?->name ?? 'Producto',
+                'quantity' => (float) $item->requested_quantity,
+            ],
+        ])->all();
+    }
+
+    private function sourceOrderChangeSummary(array $before, array $after): array
+    {
+        $changes = [];
+        foreach ($after as $id => $item) {
+            if (! isset($before[$id])) $changes[] = "Agregó {$item['name']}: {$item['quantity']}";
+            elseif (abs($before[$id]['quantity'] - $item['quantity']) >= 0.001) $changes[] = "{$item['name']}: {$before[$id]['quantity']} → {$item['quantity']}";
+        }
+        foreach ($before as $id => $item) {
+            if (! isset($after[$id])) $changes[] = "Quitó {$item['name']}";
+        }
+
+        return $changes;
+    }
+
+    private function sourceOrderChangeHistory(int $purchaseOrderId): array
+    {
+        return SystemAudit::query()
+            ->where('auditable_type', PurchaseOrder::class)
+            ->where('auditable_id', $purchaseOrderId)
+            ->whereIn('action', ['inventory_edit', 'review'])
+            ->latest('occurred_at')->limit(20)->get()
+            ->map(fn (SystemAudit $audit) => [
+                'id' => $audit->id,
+                'user_name' => $audit->user_name,
+                'occurred_at' => $audit->occurred_at,
+                'summary' => $audit->observations ?: 'Se actualizó la solicitud.',
+                'changes' => $audit->metadata['changes'] ?? [],
+            ])->all();
     }
 }

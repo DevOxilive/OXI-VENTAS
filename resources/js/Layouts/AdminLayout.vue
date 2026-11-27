@@ -1,5 +1,6 @@
 <script setup>
 import SidebarItem from '@/Components/Layout/SidebarItem.vue'
+import SalesBranchToolbar from '@/Components/Layout/salesSideBarItem.vue'
 import SessionExpiryWarningModal from '@/Components/Modales/SessionExpiryWarningModal.vue'
 import { Link, usePage, router } from '@inertiajs/vue3'
 import { generateMenu } from '@/config/menuConfig'
@@ -38,10 +39,33 @@ const menuItems = computed(() => generateMenu(
     page.props.sidebarBranches ?? page.props.branches ?? [],
 ))
 
+const salesToolbarBranch = computed(() => {
+    const branches = page.props.sidebarBranches ?? page.props.branches ?? []
+    if (role.value !== 'Ventas' || branches.length !== 1) return null
+    return branches[0]
+})
+
+const salesToolbarActions = computed(() => {
+    if (!salesToolbarBranch.value) return []
+    const branchItem = menuItems.value.find(item => item.isBranch && item.key === salesToolbarBranch.value.slug)
+        ?? menuItems.value.find(item => item.key === 'branches')?.children?.find(item => item.key === salesToolbarBranch.value.slug)
+    const salesItem = menuItems.value.find(item => item.key === 'sales')
+    const salesActions = salesItem?.children ?? menuItems.value.filter(item => item.key?.startsWith('sales.'))
+    return [...(branchItem?.children ?? []), ...salesActions]
+})
+
+const salesToolbarMenuItems = computed(() => salesToolbarBranch.value
+    ? menuItems.value.filter(item => item.key !== 'sales' && item.key !== 'branches' && !item.isBranch && !item.key?.startsWith('sales.'))
+    : menuItems.value)
+
 const branchKeys = computed(() =>
-    menuItems.value
-        .find((item) => item.key === 'branches')
-        ?.children?.map((branch) => branch.key) ?? [],
+    menuItems.value.flatMap((item) =>
+        item.isBranch
+            ? [item.key]
+            : item.key === 'branches'
+                ? item.children?.map((branch) => branch.key) ?? []
+                : [],
+    ),
 )
 
 const sidebarOpen = ref(false)
@@ -56,6 +80,8 @@ const collapseEventName = 'sidebar:collapse-all'
 const isDesktopViewport = ref(false)
 const currentTheme = ref('light')
 const profileMenu = ref(null)
+const salesToolbar = ref(null)
+const isSalesNavbarCustomizing = ref(false)
 let unsubscribeUserChanged = null
 let unsubscribeRealtimeActivity = null
 let unsubscribeGlobalDataChanged = null
@@ -73,6 +99,7 @@ const activeSessionExpiresAt = ref(null)
 const showSessionExpiryWarning = ref(false)
 const sessionWarningRemainingSeconds = ref(0)
 const continuingRoleSession = ref(false)
+const sessionRenewalError = ref('')
 
 function clearRoleSessionTimers() {
     window.clearTimeout(sessionExpiryTimer)
@@ -102,14 +129,21 @@ function closeExpiredSession() {
 }
 
 async function continueRoleSession() {
+    if (continuingRoleSession.value || sessionLogoutStarted) return
     continuingRoleSession.value = true
+    sessionRenewalError.value = ''
 
     try {
-        const { data } = await window.axios.post(route('session.continue'))
+        const { data } = await window.axios.post(route('session.continue'), {}, { timeout: 15000, headers: { Accept: 'application/json' } })
+        if (sessionLogoutStarted) return
         showSessionExpiryWarning.value = false
         scheduleRoleSessionTimeout(data?.expires_at)
-    } catch {
-        closeExpiredSession()
+    } catch (error) {
+        if ([401, 419].includes(error.response?.status)) {
+            closeExpiredSession()
+        } else {
+            sessionRenewalError.value = 'No se pudo renovar la sesión. Intenta de nuevo.'
+        }
     } finally {
         continuingRoleSession.value = false
     }
@@ -121,6 +155,7 @@ function renewRoleSessionFromActivity() {
         || !page.props.auth?.user?.id
         || sessionLogoutStarted
         || roleSessionActivityRequest
+        || showSessionExpiryWarning.value
     ) return
 
     const now = Date.now()
@@ -130,15 +165,14 @@ function renewRoleSessionFromActivity() {
     // usuario escribe, se desplaza o navega varias veces seguidas.
     lastRoleSessionActivityAt = now
     roleSessionActivityRequest = window.axios
-        .post(route('session.continue'))
+        .post(route('session.continue'), {}, { timeout: 15000, headers: { Accept: 'application/json' } })
         .then(({ data }) => {
+            if (sessionLogoutStarted) return
             showSessionExpiryWarning.value = false
             scheduleRoleSessionTimeout(data?.expires_at)
         })
         .catch(() => {
-            // La siguiente interacción podrá reintentar la renovación. No se
-            // amplía el contador local si el servidor no confirmó la sesión.
-            lastRoleSessionActivityAt = 0
+            // Conserva el intervalo entre intentos aun cuando la red falla.
         })
         .finally(() => {
             roleSessionActivityRequest = null
@@ -152,6 +186,7 @@ function showRoleSessionWarning() {
     if (sessionWarningRemainingSeconds.value <= 0) return
 
     showSessionExpiryWarning.value = true
+    sessionRenewalError.value = ''
     sessionCountdownTimer = window.setInterval(updateSessionWarningCountdown, 1000)
 }
 
@@ -296,6 +331,25 @@ function toggleTheme() {
 
 function closeProfileMenu() {
     profileMenu.value?.removeAttribute('open')
+}
+
+function toggleSalesNavbarCustomization() {
+    isSalesNavbarCustomizing.value = !isSalesNavbarCustomizing.value
+    salesToolbar.value?.setCustomizing?.(isSalesNavbarCustomizing.value)
+    closeProfileMenu()
+}
+
+function finishSalesNavbarCustomization() {
+    isSalesNavbarCustomizing.value = false
+    salesToolbar.value?.setCustomizing?.(false)
+    closeProfileMenu()
+}
+
+function resetSalesNavbarOrder() {
+    salesToolbar.value?.resetOrder?.()
+    isSalesNavbarCustomizing.value = true
+    salesToolbar.value?.setCustomizing?.(true)
+    closeProfileMenu()
 }
 
 function handleMainClick(event) {
@@ -456,8 +510,19 @@ watch(
                 </div>
             </div>
 
+            <SalesBranchToolbar
+                v-if="salesToolbarBranch"
+                ref="salesToolbar"
+                :branch="salesToolbarBranch"
+                :actions="salesToolbarActions"
+                :user-id="page.props.auth.user.id"
+                :extended="isDesktopViewport ? !desktopSidebarCollapsed : true"
+                @expand-request="expandDesktopSidebar"
+                @navigate="closeSidebarAfterNavigation"
+            />
             <SidebarItem
-                :items="menuItems"
+                v-else
+                :items="salesToolbarMenuItems"
                 :extended="isDesktopViewport ? !desktopSidebarCollapsed : true"
                 :branch-keys="branchKeys"
                 @expand-request="expandDesktopSidebar"
@@ -513,6 +578,28 @@ watch(
                                             </span>
                                         </button>
 
+                                        <template v-if="salesToolbarBranch">
+                                            <button
+                                                v-if="!isSalesNavbarCustomizing"
+                                                type="button"
+                                                class="flex w-full items-center gap-3 border-b border-secondary px-4 py-3 text-left text-sm font-medium text-text transition hover:bg-secondary focus:bg-secondary focus:outline-none"
+                                                @click="toggleSalesNavbarCustomization"
+                                            >
+                                                <span class="material-symbols-outlined text-[20px]">tune</span>
+                                                <span>Personalizar mi navbar</span>
+                                            </button>
+                                            <template v-else>
+                                                <button type="button" class="flex w-full items-center gap-3 border-b border-secondary px-4 py-3 text-left text-sm font-medium text-text transition hover:bg-secondary" @click="finishSalesNavbarCustomization">
+                                                    <span class="material-symbols-outlined text-[20px]">check</span>
+                                                    <span>Terminar personalización</span>
+                                                </button>
+                                                <button type="button" class="flex w-full items-center gap-3 border-b border-secondary px-4 py-3 text-left text-sm font-medium text-text transition hover:bg-secondary" @click="resetSalesNavbarOrder">
+                                                    <span class="material-symbols-outlined text-[20px]">restart_alt</span>
+                                                    <span>Restaurar orden inicial</span>
+                                                </button>
+                                            </template>
+                                        </template>
+
                                         <Link
                                             :href="route('profile.show')"
                                             class="flex items-center gap-3 border-b border-secondary px-4 py-3 text-sm font-medium text-text transition hover:bg-secondary focus:bg-secondary"
@@ -551,6 +638,7 @@ watch(
             :remaining-seconds="sessionWarningRemainingSeconds"
             :warning-seconds="Number(sessionPolicy?.warning_minutes || 5) * 60"
             :processing="continuingRoleSession"
+            :error="sessionRenewalError"
             @continue="continueRoleSession"
             @logout="closeExpiredSession"
         />

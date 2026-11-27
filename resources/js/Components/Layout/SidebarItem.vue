@@ -297,7 +297,7 @@ onBeforeUnmount(() => {
                 <Link
                     v-if="item.url && !hasChildren(item)"
                     :href="item.url"
-                    class="group flex items-center rounded-xl text-text transition hover:bg-secondary"
+                    class="group flex min-w-0 items-center overflow-hidden rounded-xl text-text transition-colors hover:bg-secondary"
                     :class="extended ? 'gap-3 px-3 py-3' : 'justify-center px-2 py-3'"
                     :style="itemStyle(item)"
                     @click="handleLinkClick(item)"
@@ -313,7 +313,7 @@ onBeforeUnmount(() => {
 
                     <span
                         v-if="extended"
-                        class="min-w-0 flex-1 whitespace-normal break-words text-sm font-medium leading-5"
+                        class="block min-w-0 flex-1 truncate text-sm font-medium leading-5"
                     >
                         {{ item.text }}
                     </span>
@@ -322,14 +322,14 @@ onBeforeUnmount(() => {
                 <button
                     v-else
                     type="button"
-                    class="group flex w-full items-center rounded-xl text-text transition hover:bg-secondary"
+                    class="group flex w-full min-w-0 items-center overflow-hidden rounded-xl text-text transition-colors hover:bg-secondary"
                     :class="extended ? 'justify-between gap-3 px-3 py-3' : 'justify-center px-2 py-3'"
                     :style="itemStyle(item)"
                     @mouseenter="hoveredItem = item.key"
                     @mouseleave="hoveredItem = null"
                     @click="toggleItem(item)"
                 >
-                    <div class="flex min-w-0 items-center" :class="extended ? 'gap-3' : 'justify-center'">
+                    <div class="flex min-w-0 items-center overflow-hidden" :class="extended ? 'gap-3' : 'justify-center'">
                         <span
                             class="material-symbols-outlined flex h-10 w-10 shrink-0 items-center justify-center text-[22px]"
                             :style="iconStyle(item)"
@@ -339,7 +339,7 @@ onBeforeUnmount(() => {
 
                         <span
                             v-if="extended"
-                            class="min-w-0 flex-1 whitespace-normal break-words text-left text-sm font-medium leading-5"
+                            class="block min-w-0 flex-1 truncate text-left text-sm font-medium leading-5"
                         >
                             {{ item.text }}
                         </span>
@@ -347,27 +347,52 @@ onBeforeUnmount(() => {
 
                     <span
                         v-if="hasChildren(item) && extended"
-                        class="material-symbols-outlined text-[18px] text-text opacity-50 transition"
+                        class="material-symbols-outlined shrink-0 text-[18px] text-text opacity-50 transition-colors"
                     >
                         {{ isOpen(item) ? "expand_more" : "chevron_right" }}
                     </span>
                 </button>
             </div>
 
-            <div
-                v-if="hasChildren(item) && isOpen(item) && extended"
-                class="ml-5 mt-1 space-y-1 border-l border-secondary pl-2.5"
-            >
-                <SidebarItem
-                    :items="item.children"
-                    :extended="extended"
-                    :parent-color="getItemTone(item)"
-                    :branch-keys="branchKeys"
-                    :ancestor-keys="[...ancestorKeys, item.key]"
-                    @expand-request="$emit('expand-request', $event)"
-                    @navigate="$emit('navigate')"
-                />
-            </div>
+            <Transition name="sidebar-submenu">
+                <div
+                    v-if="hasChildren(item) && isOpen(item) && extended"
+                    class="ml-5 mt-1 space-y-1 overflow-hidden border-l border-secondary pl-2.5"
+                >
+                    <SidebarItem
+                        :items="item.children"
+                        :extended="extended"
+                        :parent-color="getItemTone(item)"
+                        :branch-keys="branchKeys"
+                        :ancestor-keys="[...ancestorKeys, item.key]"
+                        @expand-request="$emit('expand-request', $event)"
+                        @navigate="$emit('navigate')"
+                    />
+                </div>
+            </Transition>
         </li>
     </ul>
 </template>
+
+<style scoped>
+.sidebar-submenu-enter-active,
+.sidebar-submenu-leave-active {
+    max-height: 1200px;
+    opacity: 1;
+    transition: max-height 220ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+.sidebar-submenu-enter-from,
+.sidebar-submenu-leave-to {
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar-submenu-enter-active,
+    .sidebar-submenu-leave-active {
+        transition: none;
+    }
+}
+</style>

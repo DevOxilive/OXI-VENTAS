@@ -223,6 +223,7 @@ class StockMovementController extends Controller
         return back()->with([
             'success' => 'Movimiento de stock registrado correctamente.',
             'movement_id' => $movementId,
+            'movement_receipt' => ['id' => $movementId, 'key' => $request->header('Idempotency-Key')],
         ]);
     }
 

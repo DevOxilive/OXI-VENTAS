@@ -1,14 +1,20 @@
 export function getPurchaseOrdersTableConfig({ mode = 'view', viewPermission = null } = {}) {
-    const completed = mode === 'history'
-    const purchasing = mode === 'purchasing' || mode === 'tracking'
+    const purchasing = mode === 'central'
 
     return {
         columns: [
             {
                 key: 'folio',
-                label: 'Orden general',
+                label: 'Compra central',
                 width: '190px',
                 mobileSecondary: false,
+            },
+            {
+                key: 'responsible_name',
+                label: 'Responsable de compra',
+                mobileLabel: 'Responsable',
+                mobileDisplay: true,
+                fallback: 'Sin información',
             },
             {
                 key: 'items_count',
@@ -59,13 +65,27 @@ export function getPurchaseOrdersTableConfig({ mode = 'view', viewPermission = n
                 icon: 'edit',
                 variant: 'yellow',
                 permission: 'inventory.purchase-orders.general.update',
-                hidden: (row) => !purchasing || !row.can_edit,
+                hidden: (row) => !purchasing || row.status !== 'PURCHASING' || !row.can_edit,
+            },
+            {
+                id: 'reopen',
+                label: 'Regresar a edición',
+                icon: 'undo',
+                variant: 'secondary',
+                permission: 'inventory.purchase-orders.general.create',
+                hidden: (row) => !purchasing || row.status !== 'PURCHASING' || !row.can_edit,
+            },
+            {
+                id: 'discard',
+                label: 'Descartar compra',
+                icon: 'delete_forever',
+                variant: 'red',
+                permission: 'inventory.purchase-orders.general.create',
+                hidden: (row) => !purchasing || row.status !== 'PURCHASING' || !row.can_edit,
             },
         ],
         mobileCardHeaderField: 'folio',
-        noDataMessage: completed
-            ? 'Todavia no hay compras generales completadas.'
-            : 'Todavia no hay ordenes generales de compra.',
+        noDataMessage: 'No hay compras centrales para mostrar.',
         rowKey: 'id',
         hoverEffect: true,
     }

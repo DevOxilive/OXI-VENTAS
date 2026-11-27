@@ -25,9 +25,15 @@ class Branch extends Model
         'slug',
         'color',
         'active',
+        'is_central_warehouse',
         'attendance_latitude',
         'attendance_longitude',
         'attendance_geofence_radius_meters',
+    ];
+
+    protected $casts = [
+        'active' => 'boolean',
+        'is_central_warehouse' => 'boolean',
     ];
 
     public function users()

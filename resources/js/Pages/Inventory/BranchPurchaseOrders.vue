@@ -14,7 +14,7 @@ import { useGlobalTablePagination } from '@/Composables/useGlobalTablePagination
 import { useNotificationSeenState } from '@/Composables/useNotificationSeenState'
 import { getBranchPurchaseOrdersTableConfig } from '@/config/TableConfigs/branchPurchaseOrdersTableConfig'
 import { getBranchPurchaseOrdersToolbarConfig } from '@/config/ToolbarConfigs/branchPurchaseOrdersToolbarConfig'
-import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime } from '@/realtime'
+import { REALTIME_CHANNELS, REALTIME_EVENTS, refreshRealtimeProps, subscribePrivateRealtime, subscribeRealtime } from '@/realtime'
 
 defineOptions({ layout: AdminLayout })
 
@@ -52,10 +52,15 @@ const modalMode = ref('view')
 const loadingOrder = ref(false)
 const notificationPanelOpen = ref(false)
 const localFilters = ref({
-    status: props.filters?.status ?? 'GENERATED',
+    status: props.filters?.status ?? 'ALL',
+    search: props.filters?.search ?? '',
+    date_from: props.filters?.date_from ?? '',
+    date_to: props.filters?.date_to ?? '',
     per_page: Number(props.filters?.per_page ?? 25),
 })
 let unsubscribeOrderActivity = null
+let unsubscribePurchaseWorkflow = null
+let realtimeRefreshTimer = null
 
 const rows = computed(() => props.ordersDB?.data ?? [])
 const pagination = computed(() => props.ordersDB ?? {})
@@ -74,41 +79,62 @@ const {
     storageKey: notificationSeenStorageKey,
     dismissedStorageKey: notificationDismissedStorageKey,
 })
-const toolbarActions = computed(() => props.selectorMode ? [] : [
-    {
-        id: 'notifications',
-        label: 'Avisos',
-        icon: 'notifications',
-        variant: notificationCount.value ? 'amber' : 'slate',
-        badge: notificationCount.value || '',
-    },
-])
 const tableConfig = computed(() => getBranchPurchaseOrdersTableConfig({
     status: localFilters.value.status,
 }))
 const toolbarConfig = computed(() => props.selectorMode
     ? {
-        title: 'Órdenes de compra',
-        subtitle: 'Selecciona la sucursal cuyas órdenes deseas consultar.',
+        title: 'Solicitudes de compra',
+        subtitle: 'Selecciona la sucursal que deseas consultar.',
         showSearch: false,
         showRecordsPerPage: false,
         showCounter: false,
         filters: [],
-        actions: [],
+        actions: [
+            {
+                id: 'notifications',
+                label: 'Avisos',
+                icon: 'notifications',
+                variant: notificationCount.value ? 'amber' : 'slate',
+                badge: notificationCount.value || '',
+            },
+        ],
         tabs: [],
     }
     : getBranchPurchaseOrdersToolbarConfig({
         filters: localFilters.value,
         total: Number(pagination.value?.total ?? 0),
         branchName: props.currentBranch?.name,
-        actions: toolbarActions.value,
+        actions: [],
     }))
+
+async function refreshOpenView(orderId = null) {
+    if (modalMode.value !== 'view' || !selectedOrder.value?.id) return
+    if (orderId && Number(orderId) !== Number(selectedOrder.value.id)) return
+
+    try {
+        const { data } = await window.axios.get(route('inventory.branches.reports.purchases.show', {
+            branch: props.currentBranch.id,
+            purchaseReport: selectedOrder.value.id,
+        }))
+        selectedOrder.value = data
+    } catch {
+        // La tabla ya se sincronizó; no se interrumpe a la usuaria por un detalle que pudo cerrarse.
+    }
+}
+
+function refreshPurchaseOrdersRealtime(event = null) {
+    clearTimeout(realtimeRefreshTimer)
+    realtimeRefreshTimer = window.setTimeout(async () => {
+        await refreshRealtimeProps(page, ['ordersDB', 'notificationSummary'])
+        await refreshOpenView(event?.purchaseOrderId ?? event?.purchase_order_id)
+    }, 120)
+}
 
 onMounted(() => {
     if (!page.props.auth?.user?.id || props.selectorMode) return
     loadSeenNotifications()
     loadDismissedNotifications()
-
     unsubscribeOrderActivity = subscribePrivateRealtime(
         REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.activityLogged,
@@ -119,19 +145,34 @@ onMounted(() => {
                 'purchase_order_edited',
             ].includes(event?.action)) return
 
-            refreshRealtimeProps(page, ['ordersDB', 'notificationSummary'])
+            refreshPurchaseOrdersRealtime(event)
         },
+    )
+
+    unsubscribePurchaseWorkflow = subscribeRealtime(
+        REALTIME_CHANNELS.systems,
+        REALTIME_EVENTS.purchaseWorkflowChanged,
+        refreshPurchaseOrdersRealtime,
     )
 })
 
-onBeforeUnmount(() => unsubscribeOrderActivity?.())
+onBeforeUnmount(() => {
+    unsubscribeOrderActivity?.()
+    unsubscribePurchaseWorkflow?.()
+    clearTimeout(realtimeRefreshTimer)
+})
 
-function applyStatus(status) {
+let searchTimer = null
+
+function applyFilters() {
     router.get(
         route('ventas.purchase-orders.index'),
         {
             branch: props.currentBranch.id,
-            status: status || 'GENERATED',
+            status: localFilters.value.status || 'ALL',
+            search: localFilters.value.search,
+            date_from: localFilters.value.date_from,
+            date_to: localFilters.value.date_to,
             per_page: localFilters.value.per_page,
         },
         {
@@ -142,16 +183,22 @@ function applyStatus(status) {
     )
 }
 
-function updateStatus(status) {
-    if (!status || status === localFilters.value.status) return
+function updateFilter({ key, value }) {
+    if (!['status', 'date_from', 'date_to'].includes(key)) return
 
-    localFilters.value.status = status
-    applyStatus(status)
+    localFilters.value[key] = value
+    applyFilters()
 }
 
 function updatePerPage(perPage) {
     localFilters.value.per_page = Number(perPage)
-    applyStatus(localFilters.value.status)
+    applyFilters()
+}
+
+function updateSearch(search) {
+    localFilters.value.search = search
+    clearTimeout(searchTimer)
+    searchTimer = setTimeout(applyFilters, 300)
 }
 
 function selectBranch(branchId) {
@@ -190,7 +237,7 @@ async function openOrder(order, mode = 'view') {
 }
 
 function handleTableAction({ action, row }) {
-    if (action === 'receive') {
+    if (action === 'review') {
         openOrder(row, 'edit')
         return
     }
@@ -199,10 +246,9 @@ function handleTableAction({ action, row }) {
 }
 
 function handleToolbarAction(action) {
-    if (action === 'notifications') {
-        notificationPanelOpen.value = true
-        markNotificationsSeen()
-    }
+    if (action !== 'notifications') return
+    notificationPanelOpen.value = true
+    markNotificationsSeen()
 }
 
 function closeNotificationPanel() {
@@ -216,18 +262,19 @@ function openNotificationOrder(item) {
 
 function handleCompleted() {
     selectedOrder.value = null
-    applyStatus('REVIEW')
+    applyFilters()
 }
 </script>
 
 <template>
-    <Head title="Órdenes de compra" />
+    <Head title="Solicitudes de compra" />
 
     <PageLayout>
         <template #toolbar>
             <GlobalToolbar
                 v-bind="toolbarConfig"
-                @update:active-tab="updateStatus"
+                @update:search="updateSearch"
+                @update:filter="updateFilter"
                 @update:records-per-page="updatePerPage"
                 @action="handleToolbarAction"
             />
@@ -235,11 +282,11 @@ function handleCompleted() {
 
         <FloatingNotificationModal
             :open="notificationPanelOpen"
-            eyebrow="Órdenes de compra"
+            eyebrow="Solicitudes de compra"
             title="Avisos de seguimiento"
-            subtitle="Cambios de Inventario y órdenes listas para revisar."
+            subtitle="Cambios de Inventario y solicitudes listas para revisar."
             :items="visibleNotificationItems"
-            empty-description="No hay órdenes de compra con avisos pendientes."
+            empty-description="No hay cambios pendientes por revisar."
             @close="closeNotificationPanel"
             @select="openNotificationOrder"
             @dismiss="dismissNotification"
@@ -253,8 +300,8 @@ function handleCompleted() {
                 v-for="branch in branchesDB"
                 :key="branch.id"
                 :title="branch.name"
-                subtitle="Órdenes de compra"
-                description="Consulta las órdenes pendientes, por revisar y completadas de esta sucursal."
+                subtitle="Solicitudes de compra"
+                description="Consulta las solicitudes de esta sucursal."
                 icon="shopping_bag"
                 badge="Seleccionar"
                 @click="selectBranch(branch.id)"

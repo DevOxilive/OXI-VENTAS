@@ -38,23 +38,20 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
-        $user = $request->user()?->loadMissing(['role', 'permissions', 'branches', 'employee']);
-        $navigationBranches = fn () => $user
-            ? $user->accessibleBranchesQuery()
+        $user = $request->user();
+        $branches = null;
+        $navigationBranches = function () use ($user, &$branches) {
+            return $branches ??= $user ? $user->accessibleBranchesQuery()
                 ->select('branches.id', 'branches.name', 'branches.slug', 'branches.color')
                 ->orderBy('branches.name')
                 ->get()
-            : collect();
+                : collect();
+        };
 
         return array_merge(parent::share($request), [
             'auth' => [
-                'user' => $user
-                    ? $user
-                    : null,
-
-               'permissions' => $user
-    ? $user->all_permissions->pluck('name')->values()
-    : [],
+                'user' => fn () => $user?->loadMissing(['role.permissions', 'permissions', 'branches', 'employee']),
+                'permissions' => fn () => $user?->all_permissions->pluck('name')->values() ?? [],
 
                 'sessionPolicy' => $user
                     ? function () use ($request, $user) {
@@ -72,6 +69,7 @@ class HandleInertiaRequests extends Middleware
             'sidebarBranches' => $navigationBranches,
 
             'flash' => [
+                'movement_receipt' => fn () => $request->session()->get('movement_receipt'),
                 'success' => fn () => $request->session()->get('success'),
                 'warning' => fn () => $request->session()->get('warning'),
                 'error' => fn () => $request->session()->get('error'),

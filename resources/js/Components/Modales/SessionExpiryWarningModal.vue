@@ -5,6 +5,7 @@ import AppButton from '@/Components/Buttons/AppButton.vue'
 import GlobalModal from '@/Components/Modales/GlobalModal.vue'
 
 const props = defineProps({
+    error: { type: String, default: '' },
     remainingSeconds: {
         type: Number,
         required: true,
@@ -86,6 +87,7 @@ const countdownRingStyle = computed(() => ({
                         </div>
                     </div>
                 </div>
+                <p v-if="error" role="alert" class="text-sm font-semibold text-text">{{ error }}</p>
             </section>
         </template>
 

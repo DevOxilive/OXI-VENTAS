@@ -37,14 +37,13 @@ export function getPurchaseReportProductsTableConfig({ canManage = false } = {})
                 mobileDisplay: false,
             },
             {
-                key: "stock",
+                key: "stock_display",
                 label: "Stock",
-                format: "number",
+                format: "text",
                 mobileLabel: "Stock",
                 subKey: "stock_status",
                 formatOptions: {
                     multiline: true,
-                    decimals: 0,
                     fallback: "0",
                 },
             },
