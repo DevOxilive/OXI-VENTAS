@@ -9,13 +9,13 @@
         "check:realtime-safety": "node scripts/check-realtime-safety.mjs",
         "dev": "vite",
         "dev:prepare": "node scripts/prepare-dev.mjs",
-        "dev:meilisearch": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-meilisearch.ps1 -Foreground",
+        "dev:meilisearch": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-meilisearch.ps1",
         "cache:clear": "\"C:\\laragon\\bin\\php\\php-8.3.30-Win32-vs16-x64\\php.exe\" artisan optimize:clear",
         "dev:serve": "\"C:\\laragon\\bin\\php\\php-8.3.30-Win32-vs16-x64\\php.exe\" artisan serve --host=127.0.0.1 --port=8000",
         "dev:reverb": "\"C:\\laragon\\bin\\php\\php-8.3.30-Win32-vs16-x64\\php.exe\" artisan reverb:start",
         "dev:watch": "vite build --watch",
         "dev:tunnel": "node scripts/run-cloudflared.mjs",
-        "dev:full": "npm run dev:prepare && concurrently --kill-others-on-fail -n meilisearch,laravel,reverb,vite -c yellow,blue,magenta,green \"npm run dev:meilisearch\" \"npm run dev:serve\" \"npm run dev:reverb\" \"npm run dev\"",
+        "dev:full": "npm run dev:prepare && concurrently --kill-others-on-fail -n laravel,reverb,vite -c blue,magenta,green \"npm run dev:serve\" \"npm run dev:reverb\" \"npm run dev\"",
         "dev:pwa": "node scripts/dev-full.mjs",
         "dev:inventory": "node scripts/inventory-worker.mjs"
     },
@@ -38,7 +38,8 @@
         "vue": "^3.3.13"
     },
     "overrides": {
-        "shell-quote": "^1.12.0"
+        "shell-quote": "^1.12.0",
+        "postcss-selector-parser": "^6.1.6"
     },
     "dependencies": {
         "apexcharts": "^5.16.0",

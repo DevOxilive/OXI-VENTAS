@@ -1,4 +1,4 @@
-import { existsSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, unlinkSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { createConnection } from 'node:net';
 import { resolve } from 'node:path';
@@ -88,9 +88,18 @@ const run = (label, command, args, options = {}) => {
 };
 
 const hotFile = resolve('public', 'hot');
+const appTunnelConfig = resolve('storage', 'framework', 'app-tunnel.json');
+const buildManifest = resolve('public', 'build', 'manifest.json');
+const startedAt = Date.now();
 
 if (existsSync(hotFile)) {
     unlinkSync(hotFile);
+}
+
+// Evita mostrar la URL que dejó un túnel de una ejecución anterior mientras
+// cloudflared crea la URL pública de este arranque.
+if (existsSync(appTunnelConfig)) {
+    unlinkSync(appTunnelConfig);
 }
 
 if (await isPortAvailable(8000)) {
@@ -108,6 +117,79 @@ if (await isPortAvailable(8080)) {
 run('vite', npmCommand, npmRunArgs('dev:watch'));
 run('inventory', process.execPath, ['scripts/inventory-worker.mjs']);
 run('tunnel', npmCommand, npmRunArgs('dev:tunnel'));
+
+const wait = (milliseconds) => new Promise((done) => setTimeout(done, milliseconds));
+
+const waitForPort = async (port, timeout = 30000) => {
+    const deadline = Date.now() + timeout;
+
+    while (Date.now() < deadline) {
+        if (await isPortAvailable(port)) return true;
+        await wait(250);
+    }
+
+    return false;
+};
+
+const getPublicUrl = () => {
+    if (!existsSync(appTunnelConfig)) return null;
+
+    try {
+        const { url } = JSON.parse(readFileSync(appTunnelConfig, 'utf8'));
+        return typeof url === 'string' && url.startsWith('https://') ? url : null;
+    } catch {
+        return null;
+    }
+};
+
+const waitForFirstBuild = async (timeout = 90000) => {
+    const deadline = Date.now() + timeout;
+
+    while (Date.now() < deadline) {
+        try {
+            if (statSync(buildManifest).mtimeMs >= startedAt) return true;
+        } catch {
+            // Vite todavía no ha generado el manifiesto de la compilación inicial.
+        }
+
+        await wait(250);
+    }
+
+    return false;
+};
+
+const showStartupUrl = async () => {
+    await Promise.all([
+        waitForPort(8000),
+        waitForFirstBuild(),
+    ]);
+
+    // El manifiesto se escribe justo antes de que Vite termine de listar los
+    // archivos generados. Esta pausa corta deja la URL como el último bloque
+    // visible del arranque, en lugar de perderla entre el listado de assets.
+    await wait(1000);
+
+    const deadline = Date.now() + 30000;
+    let publicUrl = getPublicUrl();
+
+    while (!publicUrl && Date.now() < deadline) {
+        await wait(250);
+        publicUrl = getPublicUrl();
+    }
+
+    console.log('\n══════════════ PWA LISTA ══════════════');
+    console.log(`  Abre: ${publicUrl ?? 'http://127.0.0.1:8000'}`);
+
+    if (publicUrl) {
+        console.log('  Local: http://127.0.0.1:8000');
+    } else {
+        console.log('  El túnel público no respondió; usa la URL local.');
+    }
+
+    console.log('════════════════════════════════════════\n');
+};
+
+void showStartupUrl();
 
 const stopChild = (child, signal) => {
     if (child.killed || child.pid === undefined) return;
