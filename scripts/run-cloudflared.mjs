@@ -36,7 +36,7 @@ function saveTunnelConfig(path, label, publicUrl) {
         ownerPid: process.pid,
     }, null, 2));
 
-    console.log(`[${label}] URL publica: ${publicUrl}`);
+    console.log(`[${label}] Túnel listo.`);
 }
 
 function startTunnel(label, localUrl, onPublicUrl = null, options = {}) {
