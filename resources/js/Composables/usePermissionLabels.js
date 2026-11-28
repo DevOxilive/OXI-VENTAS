@@ -332,7 +332,6 @@ const permissionLabels = {
     "inventory.purchase-orders.source.view": "Ver Órdenes de compra",
     "inventory.purchase-orders.source.update": "Editar Órdenes de compra",
     "inventory.purchase-orders.source.review": "Revisar Órdenes de compra",
-    "inventory.purchase-orders.source.transfer": "Transferir Órdenes de compra",
     "inventory.purchase-orders.general.view": "Ver Órdenes de compra generales",
     "inventory.purchase-orders.general.create": "Crear Órdenes de compra generales",
     "inventory.purchase-orders.general.update": "Editar Órdenes de compra generales",

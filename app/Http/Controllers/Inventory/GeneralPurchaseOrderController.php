@@ -12,7 +12,6 @@ use App\Models\GeneralPurchaseOrderItem;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseCycle;
-use App\Models\PurchaseOrderTransfer;
 use App\Models\SystemAudit;
 use App\Models\User;
 use App\Search\ProductSearchOptions;
@@ -64,26 +63,6 @@ class GeneralPurchaseOrderController extends Controller
                 ? $this->generationPayload($request)
                 : [],
         ]));
-    }
-
-    public function tracking(Request $request, Branch $branch)
-    {
-        $this->abortIfUserCannotAccessBranch($request, $branch);
-
-        return Inertia::render(
-            'Inventory/PurchaseOrderTracking',
-            $this->listPayload($request, $branch, GeneralPurchaseOrder::STATUS_PURCHASING)
-        );
-    }
-
-    public function history(Request $request, Branch $branch)
-    {
-        $this->abortIfUserCannotAccessBranch($request, $branch);
-
-        return Inertia::render(
-            'Inventory/PurchaseOrderHistory',
-            $this->listPayload($request, $branch, GeneralPurchaseOrder::STATUS_COMPLETED)
-        );
     }
 
     public function edit(Request $request, Branch $branch, GeneralPurchaseOrder $generalPurchaseOrder)
@@ -329,83 +308,12 @@ class GeneralPurchaseOrderController extends Controller
         $purchaseOrder->load([
             'branch',
             'user',
-            'assignedTo',
             'reviewedBy',
-            'transfers.fromUser',
-            'transfers.toUser',
-            'transfers.transferredBy',
             'items.branchProduct.product.barcodes',
             'items.branchProduct.product.category',
         ]);
 
         return response()->json($this->sourceOrderPayload($purchaseOrder));
-    }
-
-    public function transferSourceOrder(Request $request, Branch $branch, PurchaseOrder $purchaseOrder)
-    {
-        $this->abortIfUserCannotAccessBranch($request, $branch);
-        $this->abortIfCannotManageSourceOrder($request, $purchaseOrder);
-        abort_unless($purchaseOrder->status === PurchaseOrder::STATUS_GENERATED, 422);
-        abort_unless(
-            $purchaseOrder->review_status === PurchaseOrder::REVIEW_APPROVED,
-            422,
-            'La orden debe estar aprobada antes de transferirse.'
-        );
-        abort_if($purchaseOrder->general_purchase_order_id, 422, 'La orden ya forma parte de una Orden de compra general.');
-
-        $payload = $request->validate([
-            'assigned_to_user_id' => ['required', 'integer', 'exists:users,id'],
-        ]);
-        $targetUser = User::query()
-            ->whereKey($payload['assigned_to_user_id'])
-            ->where('is_active', true)
-            ->whereHas('role', fn ($query) => $query->where('name', 'Inventario'))
-            ->first();
-
-        if (! $targetUser || ! $targetUser->hasBranchAccess((int) $purchaseOrder->branch_id)) {
-            return back()->withErrors([
-                'assigned_to_user_id' => 'La persona seleccionada no pertenece a Inventario o no tiene acceso a la sucursal.',
-            ]);
-        }
-
-        if ((int) $targetUser->id === (int) $purchaseOrder->assigned_to_user_id) {
-            return back()->withErrors([
-                'assigned_to_user_id' => 'Selecciona a otra persona de Inventario.',
-            ]);
-        }
-
-        DB::transaction(function () use ($purchaseOrder, $request, $targetUser) {
-            $lockedOrder = PurchaseOrder::query()->lockForUpdate()->findOrFail($purchaseOrder->id);
-
-            abort_if($lockedOrder->general_purchase_order_id, 422, 'La orden ya forma parte de una Orden de compra general.');
-            abort_unless(
-                $lockedOrder->review_status === PurchaseOrder::REVIEW_APPROVED,
-                422,
-                'La orden debe estar aprobada antes de transferirse.'
-            );
-
-            PurchaseOrderTransfer::create([
-                'purchase_order_id' => $lockedOrder->id,
-                'from_user_id' => $lockedOrder->assigned_to_user_id,
-                'to_user_id' => $targetUser->id,
-                'transferred_by' => $request->user()?->id,
-            ]);
-
-            $lockedOrder->update(['assigned_to_user_id' => $targetUser->id]);
-        });
-        $purchaseOrder->loadMissing('branch');
-        $transferredBy = $request->user()?->name ?? 'Sistema';
-
-        event(new RealtimeActivityLogged(
-            "Recibiste la Orden de compra {$purchaseOrder->folio} de {$purchaseOrder->branch?->name}, transferida por {$transferredBy}.",
-            'Inventario',
-            'purchase_order_transferred',
-            $purchaseOrder->folio,
-            [$targetUser->id],
-            false,
-        ));
-
-        return redirect()->back()->with('success', 'Orden transferida correctamente.');
     }
 
     public function reviewSourceOrder(Request $request, Branch $branch, PurchaseOrder $purchaseOrder)
@@ -800,9 +708,8 @@ class GeneralPurchaseOrderController extends Controller
         $user->loadMissing('role');
         $accessibleBranchIds = Branch::query()->where('active', true)->pluck('id');
         $orders = PurchaseOrder::query()
-            ->with(['branch', 'user', 'assignedTo', 'reviewedBy'])
+            ->with(['branch', 'user', 'reviewedBy'])
             ->withCount('items')
-            ->withCount('transfers')
             ->withSum('items as requested_quantity', 'requested_quantity')
             ->whereIn('branch_id', $accessibleBranchIds)
             ->where('status', PurchaseOrder::STATUS_GENERATED)
@@ -815,14 +722,11 @@ class GeneralPurchaseOrderController extends Controller
                 'folio' => $order->folio,
                 'branch_id' => $order->branch_id,
                 'branch_name' => $order->branch?->name ?? 'Sucursal',
-                'assigned_to_user_id' => $order->assigned_to_user_id,
-                'assigned_to_name' => $order->assignedTo?->name ?? 'Sin responsable',
                 'requested_by_name' => $order->user?->name ?? 'Sin información',
                 'review_status' => $order->review_status,
                 'review_status_label' => $this->reviewStatusLabel($order->review_status),
                 'reviewed_by_name' => $order->reviewedBy?->name,
                 'reviewed_at' => $order->reviewed_at,
-                'transfer_history_count' => $order->transfers_count,
                 'items_count' => $order->items_count,
                 'requested_quantity' => (float) ($order->requested_quantity ?? 0),
                 'generated_at' => $order->generated_at ?? $order->created_at,
@@ -890,9 +794,8 @@ class GeneralPurchaseOrderController extends Controller
 
         $accessibleBranchIds = $user->accessibleBranchIds();
         $items = PurchaseOrder::query()
-            ->with(['branch', 'user', 'assignedTo'])
+            ->with(['branch', 'user'])
             ->withCount('items')
-            ->withCount('transfers')
             ->whereIn('branch_id', $accessibleBranchIds)
             ->where('status', PurchaseOrder::STATUS_GENERATED)
             ->whereNull('general_purchase_order_id')
@@ -907,8 +810,8 @@ class GeneralPurchaseOrderController extends Controller
                 'title' => $order->folio,
                 'description' => ($order->branch?->name ?? 'Sucursal').' · '.$order->items_count.' producto(s)',
                 'meta' => 'Solicitada por '.($order->user?->name ?? 'Sin informacion'),
-                'badge' => (int) $order->transfers_count > 0 ? 'Transferida' : 'Asignada',
-                'tone' => (int) $order->transfers_count > 0 ? 'blue' : 'amber',
+                'badge' => 'Pendiente',
+                'tone' => 'amber',
                 'status' => $order->status,
                 'updated_at' => $order->updated_at,
             ]);
@@ -941,10 +844,6 @@ class GeneralPurchaseOrderController extends Controller
                 'id' => $purchaseOrder->branch_id,
                 'name' => $purchaseOrder->branch?->name ?? 'Sucursal',
             ],
-            'assigned_to' => [
-                'id' => $purchaseOrder->assigned_to_user_id,
-                'name' => $purchaseOrder->assignedTo?->name ?? 'Sin responsable',
-            ],
             'user' => [
                 'id' => $purchaseOrder->user_id,
                 'name' => $purchaseOrder->user?->name ?? 'Sin información',
@@ -952,16 +851,6 @@ class GeneralPurchaseOrderController extends Controller
             'requested_by_name' => $purchaseOrder->user?->name ?? 'Sin información',
             'reviewed_by_name' => $purchaseOrder->reviewedBy?->name,
             'reviewed_at' => $purchaseOrder->reviewed_at,
-            'transfers' => $purchaseOrder->transfers
-                ->sortByDesc('created_at')
-                ->map(fn (PurchaseOrderTransfer $transfer) => [
-                    'id' => $transfer->id,
-                    'from_user_name' => $transfer->fromUser?->name ?? 'Sin responsable previo',
-                    'to_user_name' => $transfer->toUser?->name ?? 'Usuario no disponible',
-                    'transferred_by_name' => $transfer->transferredBy?->name ?? 'Sistema',
-                    'transferred_at' => $transfer->created_at,
-                ])
-                ->values(),
             'items' => $purchaseOrder->items->map(function (PurchaseOrderItem $item) {
                 $branchProduct = $item->branchProduct;
                 $product = $branchProduct?->product;

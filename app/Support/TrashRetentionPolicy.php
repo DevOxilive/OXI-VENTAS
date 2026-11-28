@@ -13,7 +13,6 @@ final class TrashRetentionPolicy
         'customers' => 180,
         'products' => 180,
         'categories' => 180,
-        'purchase-reports' => 180,
         'ticket-templates' => 180,
     ];
 
