@@ -7,7 +7,6 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Employee;
 use App\Models\Product;
-use App\Models\PurchaseReport;
 use App\Models\TicketTemplate;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,7 +27,6 @@ final class TrashRegistry
         'customers' => ['model' => Customer::class, 'label' => 'Clientes', 'searchable' => ['first_name', 'last_name', 'name']],
         'products' => ['model' => Product::class, 'label' => 'Productos', 'searchable' => ['name']],
         'categories' => ['model' => Category::class, 'label' => 'Categorías', 'searchable' => ['name']],
-        'purchase-reports' => ['model' => PurchaseReport::class, 'label' => 'Listas de compra', 'searchable' => ['folio']],
         'ticket-templates' => ['model' => TicketTemplate::class, 'label' => 'Plantillas de ticket', 'searchable' => ['name', 'slug']],
     ];
 

@@ -851,10 +851,6 @@ Route::middleware([
             ->middleware('permission:inventory.purchase-orders.source.view')
             ->name('branches.reports.purchase-orders.source-orders.show');
 
-        Route::post('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}/transfer', [GeneralPurchaseOrderController::class, 'transferSourceOrder'])
-            ->middleware(['permission:inventory.purchase-orders.source.transfer', 'idempotent'])
-            ->name('branches.reports.purchase-orders.source-orders.transfer');
-
         Route::put('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}/review', [GeneralPurchaseOrderController::class, 'reviewSourceOrder'])
             ->middleware('permission:inventory.purchase-orders.source.review')
             ->name('branches.reports.purchase-orders.source-orders.review');
@@ -866,14 +862,6 @@ Route::middleware([
         Route::put('/branches/{branch}/reports/purchase-orders/source-orders/{purchaseOrder}', [GeneralPurchaseOrderController::class, 'updateSourceOrder'])
             ->middleware('permission:inventory.purchase-orders.source.update')
             ->name('branches.reports.purchase-orders.source-orders.update');
-
-        Route::get('/branches/{branch}/reports/purchase-orders/tracking', [GeneralPurchaseOrderController::class, 'tracking'])
-            ->middleware('permission:inventory.purchase-orders.general.view')
-            ->name('branches.reports.purchase-orders.tracking');
-
-        Route::get('/branches/{branch}/reports/purchase-orders/history', [GeneralPurchaseOrderController::class, 'history'])
-            ->middleware('permission:inventory.purchase-orders.general.view')
-            ->name('branches.reports.purchase-orders.history');
 
         Route::get('/branches/{branch}/reports/purchase-orders/{generalPurchaseOrder}/capture', [GeneralPurchaseOrderController::class, 'edit'])
             ->middleware('permission:inventory.purchase-orders.general.update')

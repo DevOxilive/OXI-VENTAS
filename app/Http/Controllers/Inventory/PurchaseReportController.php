@@ -559,7 +559,6 @@ class PurchaseReportController extends Controller
                 'branch_id' => $order->branch_id,
                 'folio' => $order->folio,
                 'status' => $order->status,
-                'assigned_to_user_id' => $order->assigned_to_user_id,
                 'items_count' => $order->items_count,
                 'created_at' => $order->created_at,
                 'record_version' => $order->updated_at?->toJSON(),

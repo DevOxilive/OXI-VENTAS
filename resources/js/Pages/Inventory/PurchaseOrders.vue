@@ -223,7 +223,7 @@ onMounted(() => {
         REALTIME_CHANNELS.user(page.props.auth.user.id),
         REALTIME_EVENTS.activityLogged,
         (event) => {
-            if (!['purchase_order_assigned', 'purchase_order_transferred'].includes(event?.action)) return
+            if (event?.action !== 'purchase_order_assigned') return
 
             refreshPurchaseWorkflow()
         },
@@ -281,7 +281,7 @@ async function openSourceOrder(order, edit = false) {
     } catch {
         ErrorAlert({
             title: 'No se pudo abrir la orden de compra',
-            message: 'La orden pudo haber sido transferida o agregada a otra Orden de compra general.',
+            message: 'La solicitud pudo haber sido modificada o agregada a una Compra Central.',
         })
     } finally {
         loadingSourceOrder.value = false

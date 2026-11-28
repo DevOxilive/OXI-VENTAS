@@ -44,7 +44,6 @@ export function generateMenu(role, permissions = [], branches = []) {
             "inventory.purchase-orders.source.view",
             "inventory.purchase-orders.source.update",
             "inventory.purchase-orders.source.review",
-            "inventory.purchase-orders.source.transfer",
             "inventory.purchase-orders.general.view",
             "inventory.purchase-orders.general.create",
             "inventory.purchase-orders.general.update",

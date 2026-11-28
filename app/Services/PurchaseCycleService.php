@@ -8,7 +8,6 @@ use App\Models\GeneralPurchaseOrder;
 use App\Models\GeneralPurchaseOrderItem;
 use App\Models\Product;
 use App\Models\PurchaseCycle;
-use App\Models\PurchaseCycleBranch;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\User;
@@ -72,46 +71,6 @@ class PurchaseCycleService
 
                 return $cycle;
             }, 3);
-        });
-    }
-
-    public function registerOrder(PurchaseOrder $order, ?User $user = null): PurchaseCycle
-    {
-        return DB::transaction(function () use ($order, $user) {
-            $cycle = $this->currentOpenCycle($user);
-            $participation = $this->participationFor($cycle, $order->branch_id);
-            $order = PurchaseOrder::query()->lockForUpdate()->findOrFail($order->id);
-
-            $participation->update([
-                'purchase_order_id' => $participation->purchase_order_id ?: $order->id,
-                'submitted_without_items' => false,
-                'submitted_at' => $participation->submitted_at ?: now(),
-            ]);
-
-            $order->update(['purchase_cycle_id' => $cycle->id]);
-
-            return $cycle;
-        }, 3);
-    }
-
-    public function registerEmptyBranch(Branch $branch, ?User $user = null): PurchaseCycle
-    {
-        return DB::transaction(function () use ($branch, $user) {
-            $cycle = $this->currentOpenCycle($user);
-            $participation = $this->participationFor($cycle, $branch->id);
-
-            if ($participation->purchase_order_id) {
-                throw ValidationException::withMessages([
-                    'cycle' => 'La sucursal ya envió una orden con productos para este ciclo.',
-                ]);
-            }
-
-            $participation->update([
-                'submitted_without_items' => true,
-                'submitted_at' => now(),
-            ]);
-
-            return $cycle;
         });
     }
 
@@ -437,19 +396,6 @@ class PurchaseCycleService
             $prices['margin_percentage'] = round((((float) $pieceSalePrice - $pieceCost) / $pieceCost) * 100, 2);
             $product->update($prices);
         }
-    }
-
-    private function participationFor(PurchaseCycle $cycle, int $branchId): PurchaseCycleBranch
-    {
-        $participation = $cycle->branches()->where('branch_id', $branchId)->lockForUpdate()->first();
-
-        if (! $participation) {
-            throw ValidationException::withMessages([
-                'cycle' => 'La sucursal no forma parte del ciclo de compra actual.',
-            ]);
-        }
-
-        return $participation;
     }
 
     private function persistGeneralSelection(

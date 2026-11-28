@@ -29,7 +29,6 @@ class PurchaseOrder extends Model
         'purchase_cycle_id',
         'general_purchase_order_id',
         'user_id',
-        'assigned_to_user_id',
         'completed_by',
         'inventory_edited_by',
         'folio',
@@ -76,11 +75,6 @@ class PurchaseOrder extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function assignedTo()
-    {
-        return $this->belongsTo(User::class, 'assigned_to_user_id');
-    }
-
     public function completedBy()
     {
         return $this->belongsTo(User::class, 'completed_by');
@@ -94,11 +88,6 @@ class PurchaseOrder extends Model
     public function reviewedBy()
     {
         return $this->belongsTo(User::class, 'reviewed_by');
-    }
-
-    public function transfers()
-    {
-        return $this->hasMany(PurchaseOrderTransfer::class);
     }
 
     public function items()
